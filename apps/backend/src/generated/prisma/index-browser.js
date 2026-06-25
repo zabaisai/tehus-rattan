@@ -7,10 +7,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 
 const {
   Decimal,
-  DbNull,
-  JsonNull,
-  AnyNull,
-  NullTypes,
+  objectEnumValues,
   makeStrictEnum,
   Public,
   getRuntime,
@@ -24,12 +21,12 @@ exports.Prisma = Prisma
 exports.$Enums = {}
 
 /**
- * Prisma Client JS version: 7.8.0
- * Query Engine version: 3c6e192761c0362d496ed980de936e2f3cebcd3a
+ * Prisma Client JS version: 6.19.3
+ * Query Engine version: c2990dca591cba766e3b7ef5d9e8a84796e47ab7
  */
 Prisma.prismaVersion = {
-  client: "7.8.0",
-  engine: "3c6e192761c0362d496ed980de936e2f3cebcd3a"
+  client: "6.19.3",
+  engine: "c2990dca591cba766e3b7ef5d9e8a84796e47ab7"
 }
 
 Prisma.PrismaClientKnownRequestError = () => {
@@ -101,11 +98,15 @@ In case this error is unexpected for you, please report it in https://pris.ly/pr
 /**
  * Shorthand utilities for JSON filtering
  */
-Prisma.DbNull = DbNull
-Prisma.JsonNull = JsonNull
-Prisma.AnyNull = AnyNull
+Prisma.DbNull = objectEnumValues.instances.DbNull
+Prisma.JsonNull = objectEnumValues.instances.JsonNull
+Prisma.AnyNull = objectEnumValues.instances.AnyNull
 
-Prisma.NullTypes = NullTypes
+Prisma.NullTypes = {
+  DbNull: objectEnumValues.classes.DbNull,
+  JsonNull: objectEnumValues.classes.JsonNull,
+  AnyNull: objectEnumValues.classes.AnyNull
+}
 
 
 
@@ -120,9 +121,107 @@ exports.Prisma.TransactionIsolationLevel = makeStrictEnum({
   Serializable: 'Serializable'
 });
 
+exports.Prisma.CompanyScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  phone: 'phone',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.UserScalarFieldEnum = {
+  id: 'id',
+  email: 'email',
+  password: 'password',
+  name: 'name',
+  role: 'role',
+  isActive: 'isActive',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  companyId: 'companyId'
+};
+
+exports.Prisma.ContactScalarFieldEnum = {
+  id: 'id',
+  phone: 'phone',
+  name: 'name',
+  email: 'email',
+  tags: 'tags',
+  isBlocked: 'isBlocked',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  companyId: 'companyId'
+};
+
+exports.Prisma.ConversationScalarFieldEnum = {
+  id: 'id',
+  status: 'status',
+  stage: 'stage',
+  isPaused: 'isPaused',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  companyId: 'companyId',
+  contactId: 'contactId',
+  assignedTo: 'assignedTo'
+};
+
+exports.Prisma.MessageScalarFieldEnum = {
+  id: 'id',
+  wamid: 'wamid',
+  body: 'body',
+  type: 'type',
+  direction: 'direction',
+  status: 'status',
+  createdAt: 'createdAt',
+  conversationId: 'conversationId'
+};
+
+exports.Prisma.SortOrder = {
+  asc: 'asc',
+  desc: 'desc'
+};
+
+exports.Prisma.QueryMode = {
+  default: 'default',
+  insensitive: 'insensitive'
+};
+
+exports.Prisma.NullsOrder = {
+  first: 'first',
+  last: 'last'
+};
+exports.Role = exports.$Enums.Role = {
+  SUPER_ADMIN: 'SUPER_ADMIN',
+  ADMIN: 'ADMIN',
+  AGENT: 'AGENT'
+};
+
+exports.ConversationStatus = exports.$Enums.ConversationStatus = {
+  OPEN: 'OPEN',
+  CLOSED: 'CLOSED',
+  PENDING: 'PENDING'
+};
+
+exports.MessageType = exports.$Enums.MessageType = {
+  TEXT: 'TEXT',
+  IMAGE: 'IMAGE',
+  AUDIO: 'AUDIO',
+  VIDEO: 'VIDEO',
+  DOCUMENT: 'DOCUMENT',
+  TEMPLATE: 'TEMPLATE'
+};
+
+exports.Direction = exports.$Enums.Direction = {
+  INBOUND: 'INBOUND',
+  OUTBOUND: 'OUTBOUND'
+};
 
 exports.Prisma.ModelName = {
-
+  Company: 'Company',
+  User: 'User',
+  Contact: 'Contact',
+  Conversation: 'Conversation',
+  Message: 'Message'
 };
 
 /**
