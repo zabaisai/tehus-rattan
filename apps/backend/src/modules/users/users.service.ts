@@ -25,6 +25,20 @@ export class UsersService {
     });
   }
 
+  async findAllByCompany(companyId: string) {
+    return this.prisma.user.findMany({
+      where: { companyId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+  }
+
   async create(data: {
     email: string;
     password: string;
@@ -35,6 +49,28 @@ export class UsersService {
     const hashed = await bcrypt.hash(data.password, 10);
     return this.prisma.user.create({
       data: { ...data, password: hashed },
+    });
+  }
+
+  async update(id: string, data: { name?: string; role?: any; isActive?: boolean }) {
+    return this.prisma.user.update({
+      where: { id },
+      data,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+      },
+    });
+  }
+
+  async deactivate(id: string) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { isActive: false },
+      select: { id: true, email: true, isActive: true },
     });
   }
 }
