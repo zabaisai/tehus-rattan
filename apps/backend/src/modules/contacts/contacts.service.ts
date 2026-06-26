@@ -20,22 +20,29 @@ export class ContactsService {
     return contact;
   }
 
-  async create(companyId: string, data: {
-    phone: string;
-    name?: string;
-    email?: string;
-    tags?: string[];
-  }) {
+  async create(
+    companyId: string,
+    data: {
+      phone: string;
+      name?: string;
+      email?: string;
+      tags?: string[];
+    },
+  ) {
     return this.prisma.contact.create({
       data: { ...data, companyId },
     });
   }
 
-  async update(id: string, companyId: string, data: {
-    name?: string;
-    email?: string;
-    tags?: string[];
-  }) {
+  async update(
+    id: string,
+    companyId: string,
+    data: {
+      name?: string;
+      email?: string;
+      tags?: string[];
+    },
+  ) {
     await this.findById(id, companyId);
     return this.prisma.contact.update({
       where: { id },

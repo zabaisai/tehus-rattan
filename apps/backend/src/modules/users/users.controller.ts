@@ -10,9 +10,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { UsersService } from './users.service';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { UsersService } from './users.service';
+import { CreateUserDto } from './dto/create-user.dto';
+import { UpdateUserDto } from './dto/update-user.dto';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('users')
@@ -26,11 +28,7 @@ export class UsersController {
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Post()
-  create(
-    @Request() req: any,
-    @Body()
-    body: { email: string; password: string; name: string; role?: string },
-  ) {
+  create(@Request() req: any, @Body() body: CreateUserDto) {
     return this.usersService.create({ ...body, companyId: req.user.companyId });
   }
 
@@ -38,14 +36,15 @@ export class UsersController {
   @Patch(':id')
   update(
     @Param('id') id: string,
-    @Body() body: { name?: string; role?: string; isActive?: boolean },
+    @Request() req: any,
+    @Body() body: UpdateUserDto,
   ) {
-    return this.usersService.update(id, body);
+    return this.usersService.update(id, req.user.companyId, body);
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Delete(':id')
-  deactivate(@Param('id') id: string) {
-    return this.usersService.deactivate(id);
+  deactivate(@Param('id') id: string, @Request() req: any) {
+    return this.usersService.deactivate(id, req.user.companyId);
   }
 }

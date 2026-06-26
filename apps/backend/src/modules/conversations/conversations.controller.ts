@@ -12,6 +12,9 @@ import { AuthGuard } from '@nestjs/passport';
 import { ConversationsService } from './conversations.service';
 import { MessagesService } from '../messages/messages.service';
 import { WhatsappService } from '../automations/whatsapp.service';
+import { UpdateConversationDto } from './dto/update-conversation.dto';
+import { CreateMessageDto } from './dto/create-message.dto';
+import { SendMessageDto } from './dto/send-message.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('conversations')
@@ -36,7 +39,7 @@ export class ConversationsController {
   update(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body: { status?: string; stage?: string; assignedTo?: string },
+    @Body() body: UpdateConversationDto,
   ) {
     return this.conversationsService.update(id, req.user.companyId, body);
   }
@@ -52,15 +55,12 @@ export class ConversationsController {
   }
 
   @Get(':id/messages')
-  getMessages(@Param('id') id: string) {
-    return this.messagesService.findByConversation(id);
+  getMessages(@Param('id') id: string, @Request() req: any) {
+    return this.messagesService.findByConversation(id, req.user.companyId);
   }
 
   @Post(':id/messages')
-  createMessage(
-    @Param('id') id: string,
-    @Body() body: { body: string; type?: string },
-  ) {
+  createMessage(@Param('id') id: string, @Body() body: CreateMessageDto) {
     return this.messagesService.create({
       conversationId: id,
       body: body.body,
@@ -73,7 +73,7 @@ export class ConversationsController {
   async sendWhatsApp(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body: { message: string },
+    @Body() body: SendMessageDto,
   ) {
     const conversation = await this.conversationsService.findById(
       id,

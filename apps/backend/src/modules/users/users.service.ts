@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as bcrypt from 'bcryptjs';
 
@@ -52,7 +52,13 @@ export class UsersService {
     });
   }
 
-  async update(id: string, data: { name?: string; role?: any; isActive?: boolean }) {
+  async update(
+    id: string,
+    companyId: string,
+    data: { name?: string; role?: any; isActive?: boolean },
+  ) {
+    const user = await this.prisma.user.findFirst({ where: { id, companyId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
     return this.prisma.user.update({
       where: { id },
       data,
@@ -66,7 +72,9 @@ export class UsersService {
     });
   }
 
-  async deactivate(id: string) {
+  async deactivate(id: string, companyId: string) {
+    const user = await this.prisma.user.findFirst({ where: { id, companyId } });
+    if (!user) throw new NotFoundException('Usuario no encontrado');
     return this.prisma.user.update({
       where: { id },
       data: { isActive: false },

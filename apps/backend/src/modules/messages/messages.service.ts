@@ -5,9 +5,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class MessagesService {
   constructor(private prisma: PrismaService) {}
 
-  async findByConversation(conversationId: string) {
+  async findByConversation(conversationId: string, companyId: string) {
     return this.prisma.message.findMany({
-      where: { conversationId },
+      where: {
+        conversationId,
+        conversation: { companyId },
+      },
       orderBy: { createdAt: 'asc' },
     });
   }

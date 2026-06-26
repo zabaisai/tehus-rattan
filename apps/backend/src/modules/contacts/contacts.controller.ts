@@ -1,6 +1,18 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Request, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ContactsService } from './contacts.service';
+import { CreateContactDto } from './dto/create-contact.dto';
+import { UpdateContactDto } from './dto/update-contact.dto';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('contacts')
@@ -18,10 +30,7 @@ export class ContactsController {
   }
 
   @Post()
-  create(
-    @Request() req: any,
-    @Body() body: { phone: string; name?: string; email?: string; tags?: string[] },
-  ) {
+  create(@Request() req: any, @Body() body: CreateContactDto) {
     return this.contactsService.create(req.user.companyId, body);
   }
 
@@ -29,7 +38,7 @@ export class ContactsController {
   update(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body: { name?: string; email?: string; tags?: string[] },
+    @Body() body: UpdateContactDto,
   ) {
     return this.contactsService.update(id, req.user.companyId, body);
   }
