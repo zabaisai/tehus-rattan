@@ -17,6 +17,8 @@ model Company {
   users         User[]
   contacts      Contact[]
   conversations Conversation[]
+  automations   Automation[]
+  
 
   @@map("companies")
 }
@@ -57,19 +59,19 @@ model Contact {
 }
 
 model Conversation {
-  id         String             @id @default(cuid())
-  status     ConversationStatus @default(OPEN)
-  stage      String?
-  isPaused   Boolean            @default(false)
-  createdAt  DateTime           @default(now())
-  updatedAt  DateTime           @updatedAt
+  id        String             @id @default(cuid())
+  status    ConversationStatus @default(OPEN)
+  stage     String?
+  isPaused  Boolean            @default(false)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
 
   companyId  String
-  company    Company  @relation(fields: [companyId], references: [id])
+  company    Company @relation(fields: [companyId], references: [id])
   contactId  String
-  contact    Contact  @relation(fields: [contactId], references: [id])
+  contact    Contact @relation(fields: [contactId], references: [id])
   assignedTo String?
-  agent      User?    @relation(fields: [assignedTo], references: [id])
+  agent      User?   @relation(fields: [assignedTo], references: [id])
 
   messages Message[]
 
@@ -77,18 +79,38 @@ model Conversation {
 }
 
 model Message {
-  id             String       @id @default(cuid())
-  wamid          String?      @unique
-  body           String?
-  type           MessageType  @default(TEXT)
-  direction      Direction
-  status         String?
-  createdAt      DateTime     @default(now())
+  id        String      @id @default(cuid())
+  wamid     String?     @unique
+  body      String?
+  type      MessageType @default(TEXT)
+  direction Direction
+  status    String?
+  createdAt DateTime    @default(now())
 
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
   @@map("messages")
+}
+
+// ─────────────────────────────────────────
+// AUTOMATIZACION
+// ─────────────────────────────────────────
+model Automation {
+  id         String   @id @default(cuid())
+  name       String
+  isActive   Boolean  @default(true)
+  trigger    String
+  conditions Json?
+  actions    Json
+  order      Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  @@map("automations")
 }
 
 enum Role {

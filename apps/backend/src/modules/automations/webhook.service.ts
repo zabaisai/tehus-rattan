@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ConversationsService } from '../conversations/conversations.service';
 import { MessagesService } from '../messages/messages.service';
 import { ContactsService } from '../contacts/contacts.service';
+import { AutomationsService } from './automations.service';
 
 @Injectable()
 export class WebhookService {
@@ -13,6 +14,7 @@ export class WebhookService {
     private conversationsService: ConversationsService,
     private messagesService: MessagesService,
     private contactsService: ContactsService,
+    private automationsService: AutomationsService,
   ) {}
 
   async processWebhook(body: any): Promise<void> {
@@ -68,6 +70,13 @@ export class WebhookService {
         type: 'TEXT',
         status: 'received',
       });
+
+      await this.automationsService.processMessage(
+        company.id,
+        conversation.id,
+        message.text?.body || '',
+        message.from,
+      );
 
       this.logger.log(`Mensaje procesado de ${message.from}`);
     } catch (error) {
