@@ -8,6 +8,7 @@ import { CompaniesModule } from './modules/companies/companies.module';
 import { UsersModule } from './modules/users/users.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
+import { AutomationsModule } from './modules/automations/automations.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
     UsersModule,
     ContactsModule,
     ConversationsModule,
+    AutomationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
