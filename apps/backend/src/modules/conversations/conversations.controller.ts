@@ -11,6 +11,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ConversationsService } from './conversations.service';
 import { MessagesService } from '../messages/messages.service';
+import { WhatsappService } from '../automations/whatsapp.service';
 
 @UseGuards(AuthGuard('jwt'))
 @Controller('conversations')
@@ -18,6 +19,7 @@ export class ConversationsController {
   constructor(
     private conversationsService: ConversationsService,
     private messagesService: MessagesService,
+    private whatsappService: WhatsappService,
   ) {}
 
   @Get()
@@ -64,6 +66,31 @@ export class ConversationsController {
       body: body.body,
       direction: 'OUTBOUND',
       type: body.type || 'TEXT',
+    });
+  }
+
+  @Post(':id/send')
+  async sendWhatsApp(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { message: string },
+  ) {
+    const conversation = await this.conversationsService.findById(
+      id,
+      req.user.companyId,
+    );
+
+    await this.whatsappService.sendMessage(
+      conversation.contact.phone,
+      body.message,
+    );
+
+    return this.messagesService.create({
+      conversationId: id,
+      body: body.message,
+      direction: 'OUTBOUND',
+      type: 'TEXT',
+      status: 'sent',
     });
   }
 }
