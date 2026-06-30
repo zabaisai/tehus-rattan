@@ -85,3 +85,20 @@ export interface Conversation {
   agent: { id: string; name: string } | null;
   messages?: Message[];
 }
+
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type TaskType = 'TASK' | 'FOLLOW_UP' | 'CALL' | 'MEETING';
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  dueDate: string | null;
+  priority: TaskPriority;
+  type: TaskType;
+  status: TaskStatus;
+  lead: { id: string; title: string } | null;
+  contact: { id: string; name: string | null } | null;
+  agent: { id: string; name: string } | null;
+}
