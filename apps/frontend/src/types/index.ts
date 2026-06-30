@@ -16,6 +16,10 @@ export interface Contact {
   id: string;
   name: string | null;
   phone: string;
+  email: string | null;
+  tags: string[];
+  isBlocked: boolean;
+  createdAt: string;
 }
 
 export interface PipelineStage {
