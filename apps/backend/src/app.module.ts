@@ -11,6 +11,8 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
 import { AutomationsModule } from './modules/automations/automations.module';
 import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
+import { PipelineModule } from './modules/pipeline/pipeline.module';
+import { LeadsModule } from './modules/leads/leads.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { WebhookModule } from './modules/webhook/webhook.module';
     AutomationsModule,
     WhatsappModule,
     WebhookModule,
+    PipelineModule,
+    LeadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -18,6 +18,8 @@ model Company {
   contacts      Contact[]
   conversations Conversation[]
   automations   Automation[]
+  pipelines     Pipeline[]
+  leads         Lead[]
 
   @@map("companies")
 }
@@ -33,8 +35,10 @@ model User {
   updatedAt DateTime @updatedAt
 
   companyId     String
-  company       Company        @relation(fields: [companyId], references: [id])
+  company       Company            @relation(fields: [companyId], references: [id])
   conversations Conversation[]
+  leads         Lead[]
+  stageChanges  LeadStageHistory[]
 
   @@map("users")
 }
@@ -52,6 +56,7 @@ model Contact {
   companyId     String
   company       Company        @relation(fields: [companyId], references: [id])
   conversations Conversation[]
+  leads         Lead[]
 
   @@unique([phone, companyId])
   @@map("contacts")
@@ -112,6 +117,90 @@ model Automation {
   company   Company @relation(fields: [companyId], references: [id])
 
   @@map("automations")
+}
+
+// ─────────────────────────────────────────────
+// CRM CORE: PIPELINE Y LEADS
+// ─────────────────────────────────────────────
+model Pipeline {
+  id        String   @id @default(cuid())
+  name      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company         @relation(fields: [companyId], references: [id])
+  stages    PipelineStage[]
+  leads     Lead[]
+
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id        String   @id @default(cuid())
+  name      String
+  order     Int      @default(0)
+  color     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+  leads      Lead[]
+
+  @@map("pipeline_stages")
+}
+
+model Lead {
+  id                String     @id @default(cuid())
+  title             String
+  value             Float?     @default(0)
+  status            LeadStatus @default(OPEN)
+  lostReason        String?
+  expectedCloseDate DateTime?
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id])
+
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+
+  stageId String
+  stage   PipelineStage @relation(fields: [stageId], references: [id])
+
+  assignedTo String?
+  agent      User?   @relation(fields: [assignedTo], references: [id])
+
+  stageHistory LeadStageHistory[]
+
+  @@map("leads")
+}
+
+model LeadStageHistory {
+  id          String   @id @default(cuid())
+  fromStageId String?
+  toStageId   String
+  changedAt   DateTime @default(now())
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
+  changedBy String?
+  user      User?   @relation(fields: [changedBy], references: [id])
+
+  @@map("lead_stage_histories")
+}
+
+enum LeadStatus {
+  OPEN
+  WON
+  LOST
 }
 
 enum Role {
