@@ -1,20 +1,25 @@
-'use client';
+"use client";
 
-import { useState, useMemo } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Trash2, Pencil } from 'lucide-react';
-import { getContacts, createContact, updateContact, deleteContact } from '@/lib/contacts';
-import { Contact } from '@/types';
-import { ContactModal } from '@/components/contacts/ContactModal';
+import { useState, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Search, Trash2, Pencil } from "lucide-react";
+import {
+  getContacts,
+  createContact,
+  updateContact,
+  deleteContact,
+} from "@/lib/contacts";
+import { Contact } from "@/types";
+import { ContactModal } from "@/components/contacts/ContactModal";
 
 export default function ContactsPage() {
   const queryClient = useQueryClient();
   const { data: contacts, isLoading } = useQuery({
-    queryKey: ['contacts'],
+    queryKey: ["contacts"],
     queryFn: getContacts,
   });
 
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
 
@@ -39,9 +44,16 @@ export default function ContactsPage() {
     setModalOpen(true);
   }
 
-  async function handleSubmit(data: { phone: string; name: string; email: string }) {
+  async function handleSubmit(data: {
+    phone: string;
+    name: string;
+    email: string;
+  }) {
     if (editingContact) {
-      await updateContact(editingContact.id, { name: data.name, email: data.email || undefined });
+      await updateContact(editingContact.id, {
+        name: data.name,
+        email: data.email || undefined,
+      });
     } else {
       await createContact({
         phone: data.phone,
@@ -49,14 +61,14 @@ export default function ContactsPage() {
         email: data.email || undefined,
       });
     }
-    await queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    await queryClient.invalidateQueries({ queryKey: ["contacts"] });
     setModalOpen(false);
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('¿Eliminar este contacto?')) return;
+    if (!confirm("¿Eliminar este contacto?")) return;
     await deleteContact(id);
-    await queryClient.invalidateQueries({ queryKey: ['contacts'] });
+    await queryClient.invalidateQueries({ queryKey: ["contacts"] });
   }
 
   return (
@@ -73,7 +85,10 @@ export default function ContactsPage() {
       </div>
 
       <div className="mb-4 relative max-w-xs">
-        <Search size={15} className="absolute left-2.5 top-2.5 text-stone-400" />
+        <Search
+          size={15}
+          className="absolute left-2.5 top-2.5 text-stone-400"
+        />
         <input
           type="text"
           value={search}
@@ -96,7 +111,10 @@ export default function ContactsPage() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-stone-400">
+                <td
+                  colSpan={4}
+                  className="px-4 py-6 text-center text-stone-400"
+                >
                   Cargando...
                 </td>
               </tr>
@@ -104,17 +122,27 @@ export default function ContactsPage() {
 
             {!isLoading && filtered.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-stone-400">
+                <td
+                  colSpan={4}
+                  className="px-4 py-6 text-center text-stone-400"
+                >
                   No hay contactos.
                 </td>
               </tr>
             )}
 
             {filtered.map((contact) => (
-              <tr key={contact.id} className="border-b border-stone-100 last:border-0">
-                <td className="px-4 py-2.5 text-stone-800">{contact.name || '—'}</td>
+              <tr
+                key={contact.id}
+                className="border-b border-stone-100 last:border-0"
+              >
+                <td className="px-4 py-2.5 text-stone-800">
+                  {contact.name || "—"}
+                </td>
                 <td className="px-4 py-2.5 text-stone-600">{contact.phone}</td>
-                <td className="px-4 py-2.5 text-stone-600">{contact.email || '—'}</td>
+                <td className="px-4 py-2.5 text-stone-600">
+                  {contact.email || "—"}
+                </td>
                 <td className="px-4 py-2.5">
                   <div className="flex justify-end gap-1">
                     <button
@@ -139,6 +167,7 @@ export default function ContactsPage() {
 
       {modalOpen && (
         <ContactModal
+          key={editingContact?.id ?? "new"}
           contact={editingContact}
           onClose={() => setModalOpen(false)}
           onSubmit={handleSubmit}

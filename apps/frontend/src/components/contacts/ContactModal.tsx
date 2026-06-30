@@ -1,38 +1,42 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { Contact } from '@/types';
+import { useState } from 'react';
+import { X } from "lucide-react";
+import { Contact } from "@/types";
 
 interface ContactModalProps {
   contact: Contact | null;
   onClose: () => void;
-  onSubmit: (data: { phone: string; name: string; email: string }) => Promise<void>;
+  onSubmit: (data: {
+    phone: string;
+    name: string;
+    email: string;
+  }) => Promise<void>;
 }
 
-export function ContactModal({ contact, onClose, onSubmit }: ContactModalProps) {
-  const [phone, setPhone] = useState('');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+export function ContactModal({
+  contact,
+  onClose,
+  onSubmit,
+}: ContactModalProps) {
+const [phone, setPhone] = useState(contact?.phone ?? '');
+  const [name, setName] = useState(contact?.name ?? '');
+  const [email, setEmail] = useState(contact?.email ?? '');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (contact) {
-      setPhone(contact.phone);
-      setName(contact.name ?? '');
-      setEmail(contact.email ?? '');
-    }
-  }, [contact]);
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
     setSaving(true);
     try {
       await onSubmit({ phone, name, email });
     } catch (err: any) {
-      setError(err?.response?.data?.message?.[0] || err?.response?.data?.message || 'Ocurrió un error');
+      setError(
+        err?.response?.data?.message?.[0] ||
+          err?.response?.data?.message ||
+          "Ocurrió un error",
+      );
     } finally {
       setSaving(false);
     }
@@ -43,9 +47,12 @@ export function ContactModal({ contact, onClose, onSubmit }: ContactModalProps) 
       <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-stone-900">
-            {contact ? 'Editar contacto' : 'Nuevo contacto'}
+            {contact ? "Editar contacto" : "Nuevo contacto"}
           </h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+          <button
+            onClick={onClose}
+            className="text-stone-400 hover:text-stone-700"
+          >
             <X size={18} />
           </button>
         </div>
@@ -107,7 +114,7 @@ export function ContactModal({ contact, onClose, onSubmit }: ContactModalProps) 
               disabled={saving}
               className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
             >
-              {saving ? 'Guardando...' : 'Guardar'}
+              {saving ? "Guardando..." : "Guardar"}
             </button>
           </div>
         </form>

@@ -60,3 +60,28 @@ export interface KanbanData {
   pipeline: { id: string; name: string };
   stages: KanbanStage[];
 }
+export type MessageDirection = 'INBOUND' | 'OUTBOUND';
+export type MessageStatus = 'QUEUED' | 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'RECEIVED';
+export type ConversationStatus = 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED' | 'ARCHIVED';
+
+export interface Message {
+  id: string;
+  body: string | null;
+  type: string;
+  direction: MessageDirection;
+  status: MessageStatus;
+  createdAt: string;
+}
+
+export interface Conversation {
+  id: string;
+  status: ConversationStatus;
+  stage: string | null;
+  isPaused: boolean;
+  channel: string;
+  lastMessageAt: string | null;
+  updatedAt: string;
+  contact: Contact;
+  agent: { id: string; name: string } | null;
+  messages?: Message[];
+}
