@@ -9,12 +9,12 @@ import { UsersModule } from './modules/users/users.module';
 import { ContactsModule } from './modules/contacts/contacts.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
 import { AutomationsModule } from './modules/automations/automations.module';
+import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
+import { WebhookModule } from './modules/webhook/webhook.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
+    ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
     CompaniesModule,
@@ -22,6 +22,8 @@ import { AutomationsModule } from './modules/automations/automations.module';
     ContactsModule,
     ConversationsModule,
     AutomationsModule,
+    WhatsappModule,
+    WebhookModule,
   ],
   controllers: [AppController],
   providers: [AppService],

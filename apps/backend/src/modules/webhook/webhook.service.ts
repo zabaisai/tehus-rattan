@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { ConversationsService } from '../conversations/conversations.service';
 import { MessagesService } from '../messages/messages.service';
 import { ContactsService } from '../contacts/contacts.service';
-import { AutomationsService } from './automations.service';
+import { AutomationsService } from '../automations/automations.service';
 
 @Injectable()
 export class WebhookService {
