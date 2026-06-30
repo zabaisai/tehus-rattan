@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
@@ -16,13 +16,9 @@ export default function DashboardLayout({
   const user = useAuthStore((s) => s.user);
   const setSession = useAuthStore((s) => s.setSession);
   const clearSession = useAuthStore((s) => s.clearSession);
-  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
-    if (user) {
-      setChecking(false);
-      return;
-    }
+    if (user) return;
 
     const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
     if (!token) {
@@ -33,7 +29,6 @@ export default function DashboardLayout({
     getMe()
       .then((freshUser) => {
         setSession(freshUser, token);
-        setChecking(false);
       })
       .catch(() => {
         clearSession();
@@ -41,7 +36,7 @@ export default function DashboardLayout({
       });
   }, [user, router, setSession, clearSession]);
 
-  if (checking) {
+  if (!user) {
     return (
       <div className="flex h-screen items-center justify-center bg-stone-50">
         <p className="text-sm text-stone-500">Cargando...</p>
