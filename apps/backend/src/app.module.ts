@@ -13,6 +13,8 @@ import { WhatsappModule } from './modules/whatsapp/whatsapp.module';
 import { WebhookModule } from './modules/webhook/webhook.module';
 import { PipelineModule } from './modules/pipeline/pipeline.module';
 import { LeadsModule } from './modules/leads/leads.module';
+import { TasksModule } from './modules/tasks/tasks.module';
+import { NotesModule } from './modules/notes/notes.module';
 
 @Module({
   imports: [
@@ -28,6 +30,8 @@ import { LeadsModule } from './modules/leads/leads.module';
     WebhookModule,
     PipelineModule,
     LeadsModule,
+    TasksModule,
+    NotesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
