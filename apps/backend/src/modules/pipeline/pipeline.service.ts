@@ -159,4 +159,37 @@ export class PipelineService {
       ),
     );
   }
+  async getKanban(pipelineId: string, companyId: string) {
+    const pipeline = await this.findById(pipelineId, companyId);
+
+    const stages = await this.prisma.pipelineStage.findMany({
+      where: { pipelineId },
+      orderBy: { order: 'asc' },
+      include: {
+        leads: {
+          where: { companyId, status: 'OPEN' },
+          include: {
+            contact: { select: { id: true, name: true, phone: true } },
+            agent: { select: { id: true, name: true } },
+          },
+          orderBy: { updatedAt: 'desc' },
+        },
+      },
+    });
+
+    const stagesWithTotals = stages.map((stage) => ({
+      id: stage.id,
+      name: stage.name,
+      order: stage.order,
+      color: stage.color,
+      totalValue: stage.leads.reduce((sum, lead) => sum + (lead.value || 0), 0),
+      leadCount: stage.leads.length,
+      leads: stage.leads,
+    }));
+
+    return {
+      pipeline: { id: pipeline.id, name: pipeline.name },
+      stages: stagesWithTotals,
+    };
+  }
 }

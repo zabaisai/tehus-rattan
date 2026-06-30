@@ -51,6 +51,11 @@ export class PipelineController {
     return this.pipelineService.remove(id, req.user.companyId);
   }
 
+  @Get(':id/kanban')
+  getKanban(@Param('id') id: string, @Request() req: any) {
+    return this.pipelineService.getKanban(id, req.user.companyId);
+  }
+
   // ───────────────────────────────────────────
   // ETAPAS
   // ───────────────────────────────────────────
