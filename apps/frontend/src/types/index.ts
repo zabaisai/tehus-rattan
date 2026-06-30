@@ -40,7 +40,7 @@ export interface Lead {
   id: string;
   title: string;
   value: number | null;
-  status: 'OPEN' | 'WON' | 'LOST';
+  status: "OPEN" | "WON" | "LOST";
   contact: Contact;
   agent: { id: string; name: string } | null;
   updatedAt: string;
@@ -60,9 +60,21 @@ export interface KanbanData {
   pipeline: { id: string; name: string };
   stages: KanbanStage[];
 }
-export type MessageDirection = 'INBOUND' | 'OUTBOUND';
-export type MessageStatus = 'QUEUED' | 'SENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED' | 'RECEIVED';
-export type ConversationStatus = 'OPEN' | 'PENDING' | 'RESOLVED' | 'CLOSED' | 'ARCHIVED';
+export type MessageDirection = "INBOUND" | "OUTBOUND";
+export type MessageStatus =
+  | "QUEUED"
+  | "SENDING"
+  | "SENT"
+  | "DELIVERED"
+  | "READ"
+  | "FAILED"
+  | "RECEIVED";
+export type ConversationStatus =
+  | "OPEN"
+  | "PENDING"
+  | "RESOLVED"
+  | "CLOSED"
+  | "ARCHIVED";
 
 export interface Message {
   id: string;
@@ -86,9 +98,9 @@ export interface Conversation {
   messages?: Message[];
 }
 
-export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
-export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-export type TaskType = 'TASK' | 'FOLLOW_UP' | 'CALL' | 'MEETING';
+export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type TaskStatus = "PENDING" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+export type TaskType = "TASK" | "FOLLOW_UP" | "CALL" | "MEETING";
 
 export interface Task {
   id: string;

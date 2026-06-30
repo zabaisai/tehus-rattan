@@ -15,6 +15,7 @@ import { PipelineModule } from './modules/pipeline/pipeline.module';
 import { LeadsModule } from './modules/leads/leads.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { NotesModule } from './modules/notes/notes.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { NotesModule } from './modules/notes/notes.module';
     LeadsModule,
     TasksModule,
     NotesModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
