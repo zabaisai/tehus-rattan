@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MessagesService } from '../messages/messages.service';
 import { ConversationsService } from '../conversations/conversations.service';
@@ -39,6 +39,7 @@ export class AutomationsService {
 
   async update(
     id: string,
+    companyId: string,
     data: {
       name?: string;
       isActive?: boolean;
@@ -48,10 +49,22 @@ export class AutomationsService {
       order?: number;
     },
   ) {
+    const automation = await this.prisma.automation.findFirst({
+      where: { id, companyId },
+    });
+    if (!automation)
+      throw new NotFoundException('Automatización no encontrada');
+
     return this.prisma.automation.update({ where: { id }, data });
   }
 
-  async remove(id: string) {
+  async remove(id: string, companyId: string) {
+    const automation = await this.prisma.automation.findFirst({
+      where: { id, companyId },
+    });
+    if (!automation)
+      throw new NotFoundException('Automatización no encontrada');
+
     return this.prisma.automation.delete({ where: { id } });
   }
 
@@ -61,16 +74,32 @@ export class AutomationsService {
     messageBody: string,
     contactPhone: string,
   ) {
+    const conversation = await this.prisma.conversation.findUnique({
+      where: { id: conversationId },
+    });
+
+    if (conversation?.isPaused) {
+      this.logger.log(
+        `Conversación ${conversationId} pausada, automatizaciones no ejecutadas`,
+      );
+      return;
+    }
+
     const automations = await this.prisma.automation.findMany({
       where: { companyId, isActive: true },
       orderBy: { order: 'asc' },
     });
 
     for (const automation of automations) {
-      const triggered = await this.checkTrigger(automation, messageBody);
+      const triggered = await this.checkTrigger(
+        automation,
+        messageBody,
+        conversationId,
+      );
       if (triggered) {
         await this.executeActions(
           automation.actions as any[],
+          companyId,
           conversationId,
           contactPhone,
         );
@@ -81,6 +110,7 @@ export class AutomationsService {
   private async checkTrigger(
     automation: any,
     messageBody: string,
+    conversationId: string,
   ): Promise<boolean> {
     switch (automation.trigger) {
       case 'message_received': {
@@ -92,7 +122,10 @@ export class AutomationsService {
         return keywords.some((kw) => lower.includes(kw.toLowerCase()));
       }
       case 'first_message': {
-        return true;
+        const messageCount = await this.prisma.message.count({
+          where: { conversationId },
+        });
+        return messageCount === 1;
       }
       default: {
         return false;
@@ -102,6 +135,7 @@ export class AutomationsService {
 
   private async executeActions(
     actions: any[],
+    companyId: string,
     conversationId: string,
     contactPhone: string,
   ) {
@@ -123,19 +157,19 @@ export class AutomationsService {
             break;
           }
           case 'assign_agent': {
-            await this.conversationsService.update(conversationId, '', {
+            await this.conversationsService.update(conversationId, companyId, {
               assignedTo: action.agentId,
             });
             break;
           }
           case 'change_stage': {
-            await this.conversationsService.update(conversationId, '', {
+            await this.conversationsService.update(conversationId, companyId, {
               stage: action.stage,
             });
             break;
           }
           case 'close_conversation': {
-            await this.conversationsService.update(conversationId, '', {
+            await this.conversationsService.update(conversationId, companyId, {
               status: 'CLOSED',
             });
             break;
