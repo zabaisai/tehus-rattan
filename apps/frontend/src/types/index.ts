@@ -114,3 +114,33 @@ export interface Task {
   contact: { id: string; name: string | null } | null;
   agent: { id: string; name: string } | null;
 }
+export interface AnalyticsOverview {
+  leadsThisMonth: number;
+  openValue: number;
+  wonValue: number;
+  lostValue: number;
+  wonCount: number;
+  lostCount: number;
+  conversionRate: number;
+}
+
+export interface LeadsByStage {
+  stageId: string;
+  stageName: string;
+  count: number;
+  totalValue: number;
+}
+
+export interface AgentPerformance {
+  agentId: string;
+  agentName: string;
+  openLeads: number;
+  wonCount: number;
+  wonValue: number;
+  lostCount: number;
+}
+
+export interface LostReason {
+  reason: string;
+  count: number;
+}
