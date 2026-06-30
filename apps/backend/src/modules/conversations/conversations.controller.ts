@@ -90,7 +90,7 @@ export class ConversationsController {
       body: body.message,
       direction: 'OUTBOUND',
       type: 'TEXT',
-      status: 'sent',
+      status: 'SENT',
     });
   }
 }

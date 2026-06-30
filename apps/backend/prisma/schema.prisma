@@ -18,7 +18,6 @@ model Company {
   contacts      Contact[]
   conversations Conversation[]
   automations   Automation[]
-  
 
   @@map("companies")
 }
@@ -59,12 +58,14 @@ model Contact {
 }
 
 model Conversation {
-  id        String             @id @default(cuid())
-  status    ConversationStatus @default(OPEN)
-  stage     String?
-  isPaused  Boolean            @default(false)
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
+  id            String             @id @default(cuid())
+  status        ConversationStatus @default(OPEN)
+  stage         String?
+  isPaused      Boolean            @default(false)
+  channel       String             @default("whatsapp")
+  lastMessageAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   companyId  String
   company    Company @relation(fields: [companyId], references: [id])
@@ -79,13 +80,13 @@ model Conversation {
 }
 
 model Message {
-  id        String      @id @default(cuid())
-  wamid     String?     @unique
+  id        String        @id @default(cuid())
+  wamid     String?       @unique
   body      String?
-  type      MessageType @default(TEXT)
+  type      MessageType   @default(TEXT)
   direction Direction
-  status    String?
-  createdAt DateTime    @default(now())
+  status    MessageStatus @default(QUEUED)
+  createdAt DateTime      @default(now())
 
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
@@ -93,9 +94,9 @@ model Message {
   @@map("messages")
 }
 
-// ─────────────────────────────────────────
+// ─────────────────────────────────────────────
 // AUTOMATIZACION
-// ─────────────────────────────────────────
+// ─────────────────────────────────────────────
 model Automation {
   id         String   @id @default(cuid())
   name       String
@@ -121,8 +122,10 @@ enum Role {
 
 enum ConversationStatus {
   OPEN
-  CLOSED
   PENDING
+  RESOLVED
+  CLOSED
+  ARCHIVED
 }
 
 enum MessageType {
@@ -137,4 +140,14 @@ enum MessageType {
 enum Direction {
   INBOUND
   OUTBOUND
+}
+
+enum MessageStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  RECEIVED
 }

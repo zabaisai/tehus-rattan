@@ -152,7 +152,7 @@ export class AutomationsService {
               body: action.message,
               direction: 'OUTBOUND',
               type: 'TEXT',
-              status: 'sent',
+              status: 'SENT',
             });
             break;
           }

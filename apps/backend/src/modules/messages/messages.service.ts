@@ -21,9 +21,23 @@ export class MessagesService {
     direction: any;
     type?: any;
     wamid?: string;
-    status?: string;
+    status?:
+      | 'QUEUED'
+      | 'SENDING'
+      | 'SENT'
+      | 'DELIVERED'
+      | 'READ'
+      | 'FAILED'
+      | 'RECEIVED';
   }) {
-    return this.prisma.message.create({ data });
+    return this.prisma.$transaction(async (tx) => {
+      const message = await tx.message.create({ data });
+      await tx.conversation.update({
+        where: { id: data.conversationId },
+        data: { lastMessageAt: new Date() },
+      });
+      return message;
+    });
   }
 
   async findByWamid(wamid: string) {

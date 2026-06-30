@@ -68,7 +68,7 @@ export class WebhookService {
         body: message.text?.body || '',
         direction: 'INBOUND',
         type: 'TEXT',
-        status: 'received',
+        status: 'RECEIVED',
       });
 
       await this.automationsService.processMessage(
