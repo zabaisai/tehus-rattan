@@ -5,6 +5,7 @@ import {
   Patch,
   Body,
   Param,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -26,8 +27,17 @@ export class ConversationsController {
   ) {}
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.conversationsService.findAll(req.user.companyId);
+  findAll(
+    @Request() req: any,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.conversationsService.findAll(req.user.companyId, {
+      search,
+      limit,
+      offset,
+    });
   }
 
   @Get(':id')
