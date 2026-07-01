@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -31,6 +35,20 @@ export class ConversationsService {
 
   async update(id: string, companyId: string, data: any) {
     await this.findById(id, companyId);
+
+    if (data.assignedTo !== undefined) {
+      if (!data.assignedTo.trim()) {
+        throw new BadRequestException('assignedTo no puede estar vacÃ­o');
+      }
+
+      const user = await this.prisma.user.findFirst({
+        where: { id: data.assignedTo, companyId, isActive: true },
+        select: { id: true },
+      });
+
+      if (!user) throw new NotFoundException('Usuario no encontrado');
+    }
+
     return this.prisma.conversation.update({
       where: { id },
       data,
