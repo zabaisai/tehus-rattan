@@ -20,7 +20,16 @@ import { ProductsModule } from './modules/products/products.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: (config) => {
+        if (!config.JWT_SECRET?.trim()) {
+          throw new Error('JWT_SECRET is required');
+        }
+
+        return config;
+      },
+    }),
     PrismaModule,
     AuthModule,
     CompaniesModule,
