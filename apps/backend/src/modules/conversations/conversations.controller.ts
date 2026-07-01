@@ -60,8 +60,13 @@ export class ConversationsController {
   }
 
   @Post(':id/messages')
-  createMessage(@Param('id') id: string, @Body() body: CreateMessageDto) {
+  createMessage(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: CreateMessageDto,
+  ) {
     return this.messagesService.create({
+      companyId: req.user.companyId,
       conversationId: id,
       body: body.body,
       direction: 'OUTBOUND',
@@ -86,6 +91,7 @@ export class ConversationsController {
     );
 
     return this.messagesService.create({
+      companyId: req.user.companyId,
       conversationId: id,
       body: body.message,
       direction: 'OUTBOUND',

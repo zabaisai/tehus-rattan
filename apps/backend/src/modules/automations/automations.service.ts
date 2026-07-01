@@ -148,6 +148,7 @@ export class AutomationsService {
               action.message,
             );
             await this.messagesService.create({
+              companyId,
               conversationId,
               body: action.message,
               direction: 'OUTBOUND',

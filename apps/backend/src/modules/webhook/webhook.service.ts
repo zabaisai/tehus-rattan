@@ -63,6 +63,7 @@ export class WebhookService {
       );
 
       await this.messagesService.create({
+        companyId: company.id,
         conversationId: conversation.id,
         wamid: message.id,
         body: message.text?.body || '',
