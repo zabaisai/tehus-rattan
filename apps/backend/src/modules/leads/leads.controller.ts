@@ -30,6 +30,9 @@ export class LeadsController {
     @Query('contactId') contactId?: string,
     @Query('assignedTo') assignedTo?: string,
     @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
     return this.leadsService.findAll(req.user.companyId, {
       pipelineId,
@@ -37,6 +40,9 @@ export class LeadsController {
       contactId,
       assignedTo,
       status,
+      search,
+      limit,
+      offset,
     });
   }
 

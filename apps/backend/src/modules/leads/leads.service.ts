@@ -17,8 +17,13 @@ export class LeadsService {
       contactId?: string;
       assignedTo?: string;
       status?: string;
+      search?: string;
+      limit?: string;
+      offset?: string;
     },
   ) {
+    const pagination = this.parsePagination(filters.limit, filters.offset);
+
     return this.prisma.lead.findMany({
       where: {
         companyId,
@@ -27,6 +32,9 @@ export class LeadsService {
         ...(filters.contactId && { contactId: filters.contactId }),
         ...(filters.assignedTo && { assignedTo: filters.assignedTo }),
         ...(filters.status && { status: filters.status as any }),
+        ...(filters.search && {
+          title: { contains: filters.search, mode: 'insensitive' },
+        }),
       },
       include: {
         contact: { select: { id: true, name: true, phone: true } },
@@ -34,6 +42,7 @@ export class LeadsService {
         agent: { select: { id: true, name: true } },
       },
       orderBy: { updatedAt: 'desc' },
+      ...pagination,
     });
   }
 
@@ -201,5 +210,27 @@ export class LeadsService {
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
+  }
+
+  private parsePagination(limit?: string, offset?: string) {
+    const pagination: { take?: number; skip?: number } = {};
+
+    if (limit !== undefined) {
+      const take = Number(limit);
+      if (!Number.isInteger(take) || take < 1 || take > 100) {
+        throw new BadRequestException('limit debe ser un entero entre 1 y 100');
+      }
+      pagination.take = take;
+    }
+
+    if (offset !== undefined) {
+      const skip = Number(offset);
+      if (!Number.isInteger(skip) || skip < 0) {
+        throw new BadRequestException('offset debe ser un entero mayor o igual a 0');
+      }
+      pagination.skip = skip;
+    }
+
+    return pagination;
   }
 }
