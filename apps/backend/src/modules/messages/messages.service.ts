@@ -39,7 +39,7 @@ export class MessagesService {
       });
 
       if (!conversation)
-        throw new NotFoundException('ConversaciÃ³n no encontrada');
+        throw new NotFoundException('Conversacion no encontrada');
 
       const message = await tx.message.create({ data: messageData });
       await tx.conversation.update({
