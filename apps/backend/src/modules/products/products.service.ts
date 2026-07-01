@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -7,8 +11,15 @@ export class ProductsService {
 
   async findAll(
     companyId: string,
-    filters: { category?: string; search?: string },
+    filters: {
+      category?: string;
+      search?: string;
+      limit?: string;
+      offset?: string;
+    },
   ) {
+    const pagination = this.parsePagination(filters.limit, filters.offset);
+
     return this.prisma.product.findMany({
       where: {
         companyId,
@@ -23,6 +34,7 @@ export class ProductsService {
         }),
       },
       orderBy: { name: 'asc' },
+      ...pagination,
     });
   }
 
@@ -73,10 +85,32 @@ export class ProductsService {
 
   async remove(id: string, companyId: string) {
     await this.findById(id, companyId);
-    // Eliminación lógica, no física — preserva el historial de cotizaciones que lo referencien
+    // Soft delete preserves historical references.
     return this.prisma.product.update({
       where: { id },
       data: { isActive: false },
     });
+  }
+
+  private parsePagination(limit?: string, offset?: string) {
+    const pagination: { take?: number; skip?: number } = {};
+
+    if (limit !== undefined) {
+      const take = Number(limit);
+      if (!Number.isInteger(take) || take < 1 || take > 100) {
+        throw new BadRequestException('limit debe ser un entero entre 1 y 100');
+      }
+      pagination.take = take;
+    }
+
+    if (offset !== undefined) {
+      const skip = Number(offset);
+      if (!Number.isInteger(skip) || skip < 0) {
+        throw new BadRequestException('offset debe ser un entero mayor o igual a 0');
+      }
+      pagination.skip = skip;
+    }
+
+    return pagination;
   }
 }

@@ -27,10 +27,14 @@ export class ProductsController {
     @Request() req: any,
     @Query('category') category?: string,
     @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
     return this.productsService.findAll(req.user.companyId, {
       category,
       search,
+      limit,
+      offset,
     });
   }
 
