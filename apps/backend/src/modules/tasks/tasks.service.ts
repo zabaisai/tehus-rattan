@@ -70,6 +70,7 @@ export class TasksService {
     },
   ) {
     await this.validateAssignedUser(data.assignedTo, companyId);
+    await this.validateLead(data.leadId, companyId);
 
     return this.prisma.task.create({
       data: {
@@ -134,5 +135,20 @@ export class TasksService {
     });
 
     if (!user) throw new NotFoundException('Usuario no encontrado');
+  }
+
+  private async validateLead(leadId: string | undefined, companyId: string) {
+    if (leadId === undefined) return;
+
+    if (!leadId.trim()) {
+      throw new BadRequestException('leadId no puede estar vacio');
+    }
+
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: leadId, companyId },
+      select: { id: true },
+    });
+
+    if (!lead) throw new NotFoundException('Lead no encontrado');
   }
 }
