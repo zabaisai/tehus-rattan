@@ -29,7 +29,7 @@ export class ConversationsService {
         agent: { select: { id: true, name: true } },
       },
     });
-    if (!conv) throw new NotFoundException('Conversación no encontrada');
+    if (!conv) throw new NotFoundException('Conversacion no encontrada');
     return conv;
   }
 
@@ -38,7 +38,7 @@ export class ConversationsService {
 
     if (data.assignedTo !== undefined) {
       if (!data.assignedTo.trim()) {
-        throw new BadRequestException('assignedTo no puede estar vacÃ­o');
+        throw new BadRequestException('assignedTo no puede estar vacio');
       }
 
       const user = await this.prisma.user.findFirst({
