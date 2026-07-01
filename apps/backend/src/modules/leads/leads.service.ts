@@ -192,7 +192,7 @@ export class LeadsService {
     if (assignedTo === undefined) return;
 
     if (!assignedTo.trim()) {
-      throw new BadRequestException('assignedTo no puede estar vacÃ­o');
+      throw new BadRequestException('assignedTo no puede estar vacio');
     }
 
     const user = await this.prisma.user.findFirst({
