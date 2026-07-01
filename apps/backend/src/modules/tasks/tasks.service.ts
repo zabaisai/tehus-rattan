@@ -17,14 +17,24 @@ export class TasksService {
       status?: string;
       assignedTo?: string;
       overdue?: boolean;
+      search?: string;
+      limit?: string;
+      offset?: string;
     },
   ) {
+    const pagination = this.parsePagination(filters.limit, filters.offset);
     const where: any = {
       companyId,
       ...(filters.leadId && { leadId: filters.leadId }),
       ...(filters.contactId && { contactId: filters.contactId }),
       ...(filters.status && { status: filters.status }),
       ...(filters.assignedTo && { assignedTo: filters.assignedTo }),
+      ...(filters.search && {
+        OR: [
+          { title: { contains: filters.search, mode: 'insensitive' } },
+          { description: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      }),
     };
 
     if (filters.overdue) {
@@ -40,6 +50,7 @@ export class TasksService {
         agent: { select: { id: true, name: true } },
       },
       orderBy: { dueDate: 'asc' },
+      ...pagination,
     });
   }
 
@@ -166,5 +177,27 @@ export class TasksService {
     });
 
     if (!contact) throw new NotFoundException('Contacto no encontrado');
+  }
+
+  private parsePagination(limit?: string, offset?: string) {
+    const pagination: { take?: number; skip?: number } = {};
+
+    if (limit !== undefined) {
+      const take = Number(limit);
+      if (!Number.isInteger(take) || take < 1 || take > 100) {
+        throw new BadRequestException('limit debe ser un entero entre 1 y 100');
+      }
+      pagination.take = take;
+    }
+
+    if (offset !== undefined) {
+      const skip = Number(offset);
+      if (!Number.isInteger(skip) || skip < 0) {
+        throw new BadRequestException('offset debe ser un entero mayor o igual a 0');
+      }
+      pagination.skip = skip;
+    }
+
+    return pagination;
   }
 }

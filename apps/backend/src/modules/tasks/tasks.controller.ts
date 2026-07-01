@@ -28,6 +28,9 @@ export class TasksController {
     @Query('status') status?: string,
     @Query('assignedTo') assignedTo?: string,
     @Query('overdue') overdue?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
     return this.tasksService.findAll(req.user.companyId, {
       leadId,
@@ -35,6 +38,9 @@ export class TasksController {
       status,
       assignedTo,
       overdue: overdue === 'true',
+      search,
+      limit,
+      offset,
     });
   }
 
