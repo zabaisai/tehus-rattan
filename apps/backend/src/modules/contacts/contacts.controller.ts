@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -20,8 +21,17 @@ export class ContactsController {
   constructor(private contactsService: ContactsService) {}
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.contactsService.findAll(req.user.companyId);
+  findAll(
+    @Request() req: any,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.contactsService.findAll(req.user.companyId, {
+      search,
+      limit,
+      offset,
+    });
   }
 
   @Get(':id')
