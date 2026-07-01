@@ -83,6 +83,8 @@ export class LeadsService {
     if (!pipeline)
       throw new BadRequestException('El pipeline no pertenece a esta empresa');
 
+    await this.validateAssignedUser(data.assignedTo, companyId);
+
     return this.prisma.lead.create({
       data: {
         ...data,
@@ -105,6 +107,8 @@ export class LeadsService {
     },
   ) {
     await this.findById(id, companyId);
+    await this.validateAssignedUser(data.assignedTo, companyId);
+
     return this.prisma.lead.update({
       where: { id },
       data: {
@@ -182,5 +186,20 @@ export class LeadsService {
       },
       orderBy: { changedAt: 'desc' },
     });
+  }
+
+  private async validateAssignedUser(assignedTo: string | undefined, companyId: string) {
+    if (assignedTo === undefined) return;
+
+    if (!assignedTo.trim()) {
+      throw new BadRequestException('assignedTo no puede estar vacÃ­o');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: assignedTo, companyId, isActive: true },
+      select: { id: true },
+    });
+
+    if (!user) throw new NotFoundException('Usuario no encontrado');
   }
 }
