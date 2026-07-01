@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
@@ -65,6 +69,8 @@ export class TasksService {
       assignedTo?: string;
     },
   ) {
+    await this.validateAssignedUser(data.assignedTo, companyId);
+
     return this.prisma.task.create({
       data: {
         ...data,
@@ -89,6 +95,8 @@ export class TasksService {
     },
   ) {
     await this.findById(id, companyId);
+    await this.validateAssignedUser(data.assignedTo, companyId);
+
     return this.prisma.task.update({
       where: { id },
       data: {
@@ -111,5 +119,20 @@ export class TasksService {
   async remove(id: string, companyId: string) {
     await this.findById(id, companyId);
     return this.prisma.task.delete({ where: { id } });
+  }
+
+  private async validateAssignedUser(assignedTo: string | undefined, companyId: string) {
+    if (assignedTo === undefined) return;
+
+    if (!assignedTo.trim()) {
+      throw new BadRequestException('assignedTo no puede estar vacio');
+    }
+
+    const user = await this.prisma.user.findFirst({
+      where: { id: assignedTo, companyId, isActive: true },
+      select: { id: true },
+    });
+
+    if (!user) throw new NotFoundException('Usuario no encontrado');
   }
 }
