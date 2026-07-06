@@ -41,7 +41,8 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
       await onSubmit({ phone, name, email });
     } catch (err) {
       const message = (err as ApiError).response?.data?.message;
-      setError((message?.[0] || message || "Ocurrió un error") as string);
+      const errorMessage = Array.isArray(message) ? message[0] : message;
+      setError(errorMessage || "Ocurrió un error");
     } finally {
       setSaving(false);
     }
