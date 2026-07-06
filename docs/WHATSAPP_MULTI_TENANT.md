@@ -1,5 +1,7 @@
 # WhatsApp multiempresa
 
+> Para preparar y ejecutar una prueba contra un entorno real (staging + Meta real), ver [`docs/WHATSAPP_REAL_TEST_CHECKLIST.md`](./WHATSAPP_REAL_TEST_CHECKLIST.md).
+
 ## 1. Resumen
 
 - WhatsApp ahora es multiempresa: cada empresa puede tener su propia integración de WhatsApp Business.
