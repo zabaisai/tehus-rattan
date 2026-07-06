@@ -144,3 +144,29 @@ export interface LostReason {
   reason: string;
   count: number;
 }
+
+export type WhatsAppIntegrationStatus =
+  | "PENDING"
+  | "CONNECTED"
+  | "DISCONNECTED"
+  | "REVOKED";
+
+export interface WhatsAppIntegration {
+  id: string;
+  companyId: string;
+  displayPhoneNumber: string | null;
+  phoneNumberId: string;
+  wabaId: string | null;
+  status: WhatsAppIntegrationStatus;
+  connectedAt: string | null;
+  disconnectedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConnectWhatsAppIntegrationPayload {
+  phoneNumberId: string;
+  accessToken: string;
+  displayPhoneNumber?: string;
+  wabaId?: string;
+}
