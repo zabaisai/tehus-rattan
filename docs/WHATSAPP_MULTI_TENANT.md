@@ -54,6 +54,25 @@ Relación 1:1 con `Company` (`companyId` es único).
 - Si falta la clave, el formato es inválido, o el authentication tag no valida (token corrupto o cifrado con otra clave), se lanza un error claro sin imprimir el valor cifrado ni el descifrado.
 - Este documento no contiene secretos reales ni tokens de ejemplo con valores reales — todos los tokens usados en pruebas son ficticios.
 
+### 5.1 Generar un `accessTokenEncrypted`
+
+Hay un helper de línea de comandos en `apps/backend/scripts/encrypt-whatsapp-token.ts` que cifra un token con el mismo formato exacto que espera `WhatsappService`. No se conecta a Prisma, no hace llamadas a Meta, y no guarda nada — solo imprime el valor cifrado en la terminal.
+
+```
+WHATSAPP_TOKEN_ENCRYPTION_KEY="<clave-de-tu-entorno>" npm run whatsapp:encrypt-token -- "<token-real-de-meta>"
+```
+
+- Si se omite el token como argumento, el script lo pide por prompt interactivo.
+- Si falta `WHATSAPP_TOKEN_ENCRYPTION_KEY`, o no se proporciona ningún token, el script termina con un mensaje de error claro y código de salida distinto de cero — nunca imprime la clave ni el token en esos casos.
+- El resultado impreso es el valor listo para guardar en `WhatsAppIntegration.accessTokenEncrypted`.
+
+Ejemplo con valores ficticios (nunca usar tokens reales fuera de un entorno seguro):
+
+```
+$ WHATSAPP_TOKEN_ENCRYPTION_KEY="fixture-only-key-not-real" npm run whatsapp:encrypt-token -- "FAKE-TEST-TOKEN-12345"
+018881fbd7d09e317bb2d06e:b6ee0210fb440c15de01be5cf7e44895:ead2088bfe683038c210ed070cafe89179e2179ac9
+```
+
 ## 6. Variables de entorno
 
 | Variable | Estado |
@@ -81,7 +100,6 @@ npm run build
 ## 8. Limitaciones actuales
 
 - Falta UI en el frontend para conectar/desconectar WhatsApp por empresa.
-- Falta un script/helper CLI para cifrar tokens reales al dar de alta una integración (hoy el cifrado solo se ejercita en tests con claves y tokens ficticios).
 - Falta validar la firma `X-Hub-Signature-256` de los webhooks entrantes de Meta.
 - Falta el proceso de onboarding real con Meta (Embedded Signup u otro flujo de alta de número).
 - El verify token (`WHATSAPP_VERIFY_TOKEN`) sigue siendo global, no por integración.
