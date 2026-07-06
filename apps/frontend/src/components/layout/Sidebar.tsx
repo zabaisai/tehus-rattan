@@ -8,18 +8,26 @@ import {
   KanbanSquare,
   MessageSquare,
   CheckSquare,
+  MessageCircle,
 } from 'lucide-react';
-
-const navItems = [
-  { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
-  { href: '/dashboard/contacts', label: 'Contactos', icon: Users },
-  { href: '/dashboard/pipeline', label: 'Pipeline', icon: KanbanSquare },
-  { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
-  { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
-];
+import { useAuthStore } from '@/store/auth.store';
 
 export function Sidebar() {
   const pathname = usePathname();
+  const user = useAuthStore((s) => s.user);
+  const canManageWhatsApp =
+    user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+
+  const navItems = [
+    { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
+    { href: '/dashboard/contacts', label: 'Contactos', icon: Users },
+    { href: '/dashboard/pipeline', label: 'Pipeline', icon: KanbanSquare },
+    { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
+    { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
+    ...(canManageWhatsApp
+      ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
+      : []),
+  ];
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-stone-200 bg-white">
