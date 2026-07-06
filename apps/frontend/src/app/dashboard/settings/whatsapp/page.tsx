@@ -1,9 +1,10 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getWhatsAppIntegration } from '@/lib/whatsapp';
 import { useAuthStore } from '@/store/auth.store';
 import { WhatsAppIntegrationStatus } from '@/types';
+import { WhatsAppIntegrationForm } from '@/components/whatsapp/WhatsAppIntegrationForm';
 
 const statusLabels: Record<WhatsAppIntegrationStatus, string> = {
   CONNECTED: 'Conectado',
@@ -27,6 +28,7 @@ function formatDate(value: string | null) {
 export default function WhatsAppSettingsPage() {
   const user = useAuthStore((s) => s.user);
   const canManage = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const queryClient = useQueryClient();
 
   const {
     data: integration,
@@ -37,6 +39,10 @@ export default function WhatsAppSettingsPage() {
     queryFn: getWhatsAppIntegration,
     enabled: canManage,
   });
+
+  function handleFormSuccess() {
+    queryClient.invalidateQueries({ queryKey: ['whatsapp-integration'] });
+  }
 
   return (
     <div>
@@ -116,8 +122,20 @@ export default function WhatsAppSettingsPage() {
           )}
 
           <p className="mt-4 text-xs text-stone-400">
-            La conexión y desconexión se agregarán en el siguiente paso.
+            La desconexión se agregará en el siguiente paso.
           </p>
+        </div>
+      )}
+
+      {canManage && !isLoading && (
+        <div className="mt-4 rounded-lg border border-stone-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-stone-800">
+            {integration ? 'Actualizar integración' : 'Conectar WhatsApp'}
+          </h3>
+          <WhatsAppIntegrationForm
+            integration={integration ?? null}
+            onSuccess={handleFormSuccess}
+          />
         </div>
       )}
 
