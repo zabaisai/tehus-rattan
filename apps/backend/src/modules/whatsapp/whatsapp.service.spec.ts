@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { WhatsappService } from './whatsapp.service';
+import { WhatsAppTokenCryptoService } from '../whatsapp-integration/whatsapp-token-crypto.service';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -9,49 +9,33 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 // Test-only key, never read from .env and never logged.
 const TEST_ENCRYPTION_KEY = 'e2e-test-only-encryption-key-do-not-use';
 
-// Mirrors WhatsappService's private decryptAccessToken format so tests can
-// build valid fixtures: "<ivHex>:<authTagHex>:<cipherTextHex>",
-// AES-256-GCM with a 12-byte IV, key = sha256(rawKey).
-function encryptForTest(plainToken: string, rawKey: string): string {
-  const key = createHash('sha256').update(rawKey).digest();
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(plainToken, 'utf8'),
-    cipher.final(),
-  ]);
-  const authTag = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
-}
-
 describe('WhatsappService', () => {
   let whatsappIntegrationService: any;
-  let configService: any;
+  let tokenCryptoService: WhatsAppTokenCryptoService;
   let service: WhatsappService;
-
-  const connectedIntegration = {
-    id: 'integration-a',
-    companyId: 'company-a',
-    phoneNumberId: '1234567890',
-    accessTokenEncrypted: encryptForTest(
-      'fake-meta-access-token',
-      TEST_ENCRYPTION_KEY,
-    ),
-  };
+  let connectedIntegration: any;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
     whatsappIntegrationService = { findConnectedByCompanyId: jest.fn() };
-    configService = {
+    const configService = {
       get: jest.fn((key: string) =>
         key === 'WHATSAPP_TOKEN_ENCRYPTION_KEY'
           ? TEST_ENCRYPTION_KEY
           : undefined,
       ),
     };
+    tokenCryptoService = new WhatsAppTokenCryptoService(configService as any);
 
-    service = new WhatsappService(whatsappIntegrationService, configService);
+    connectedIntegration = {
+      id: 'integration-a',
+      companyId: 'company-a',
+      phoneNumberId: '1234567890',
+      accessTokenEncrypted: tokenCryptoService.encrypt('fake-meta-access-token'),
+    };
+
+    service = new WhatsappService(whatsappIntegrationService, tokenCryptoService);
   });
 
   it('sends the message using the tenant integration phoneNumberId and the decrypted token', async () => {

@@ -1,6 +1,6 @@
 import axios from 'axios';
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
 import { WhatsAppIntegrationService } from './whatsapp-integration/whatsapp-integration.service';
+import { WhatsAppTokenCryptoService } from './whatsapp-integration/whatsapp-token-crypto.service';
 import { WebhookService } from './webhook/webhook.service';
 import { WhatsappService } from './whatsapp/whatsapp.service';
 
@@ -10,19 +10,17 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 // Test-only key, never read from .env and never logged.
 const TEST_ENCRYPTION_KEY = 'tenant-isolation-test-only-key-do-not-use';
 
-// Mirrors WhatsappService's private decryptAccessToken format:
-// "<ivHex>:<authTagHex>:<cipherTextHex>", AES-256-GCM, key = sha256(rawKey).
-function encryptForTest(plainToken: string, rawKey: string): string {
-  const key = createHash('sha256').update(rawKey).digest();
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(plainToken, 'utf8'),
-    cipher.final(),
-  ]);
-  const authTag = cipher.getAuthTag();
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
-}
+// Shared real crypto service (mocked ConfigService only) used to build
+// fixtures below and to construct WhatsappService in the outbound tests,
+// so this file doesn't duplicate the encryption algorithm.
+const tokenCryptoConfigService = {
+  get: jest.fn((key: string) =>
+    key === 'WHATSAPP_TOKEN_ENCRYPTION_KEY' ? TEST_ENCRYPTION_KEY : undefined,
+  ),
+};
+const tokenCryptoService = new WhatsAppTokenCryptoService(
+  tokenCryptoConfigService as any,
+);
 
 const integrationA = {
   id: 'integration-a',
@@ -31,7 +29,7 @@ const integrationA = {
   displayPhoneNumber: '+50255550001',
   wabaId: 'waba-a',
   status: 'CONNECTED',
-  accessTokenEncrypted: encryptForTest('token-a', TEST_ENCRYPTION_KEY),
+  accessTokenEncrypted: tokenCryptoService.encrypt('token-a'),
 };
 
 const integrationB = {
@@ -41,7 +39,7 @@ const integrationB = {
   displayPhoneNumber: '+50255550002',
   wabaId: 'waba-b',
   status: 'CONNECTED',
-  accessTokenEncrypted: encryptForTest('token-b', TEST_ENCRYPTION_KEY),
+  accessTokenEncrypted: tokenCryptoService.encrypt('token-b'),
 };
 
 // Fake Prisma holding both companies' integrations at once, filtering
@@ -233,7 +231,6 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
   describe('Outbound: WhatsappService', () => {
     let whatsappIntegrationService: WhatsAppIntegrationService;
-    let configService: any;
     let service: WhatsappService;
 
     beforeEach(() => {
@@ -241,14 +238,10 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
       const prisma = buildFakePrisma([integrationA, integrationB]);
       whatsappIntegrationService = new WhatsAppIntegrationService(prisma);
-      configService = {
-        get: jest.fn((key: string) =>
-          key === 'WHATSAPP_TOKEN_ENCRYPTION_KEY'
-            ? TEST_ENCRYPTION_KEY
-            : undefined,
-        ),
-      };
-      service = new WhatsappService(whatsappIntegrationService, configService);
+      service = new WhatsappService(
+        whatsappIntegrationService,
+        tokenCryptoService,
+      );
 
       mockedAxios.post.mockResolvedValue({ data: {} });
     });

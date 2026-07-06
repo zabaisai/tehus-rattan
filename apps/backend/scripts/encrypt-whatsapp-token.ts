@@ -1,20 +1,14 @@
-import { createCipheriv, createHash, randomBytes } from 'node:crypto';
+import { ConfigService } from '@nestjs/config';
+import { WhatsAppTokenCryptoService } from '../src/modules/whatsapp-integration/whatsapp-token-crypto.service';
 
-// Mirrors WhatsappService's private decryptAccessToken format exactly:
-// "<ivHex>:<authTagHex>:<cipherTextHex>", AES-256-GCM with a 12-byte IV,
-// key = sha256(WHATSAPP_TOKEN_ENCRYPTION_KEY).
-export function encryptAccessToken(plainToken: string, rawKey: string): string {
-  const key = createHash('sha256').update(rawKey).digest();
-  const iv = randomBytes(12);
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(plainToken, 'utf8'),
-    cipher.final(),
-  ]);
-  const authTag = cipher.getAuthTag();
+// Minimal ConfigService-like object backed by process.env, so this CLI
+// script can reuse WhatsAppTokenCryptoService without booting Nest or
+// reading .env directly.
+const configService = {
+  get: (key: string) => process.env[key],
+} as unknown as ConfigService;
 
-  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
-}
+const tokenCryptoService = new WhatsAppTokenCryptoService(configService);
 
 async function promptForToken(): Promise<string> {
   const { createInterface } = await import('node:readline/promises');
@@ -51,7 +45,7 @@ async function main() {
     return;
   }
 
-  console.log(encryptAccessToken(token.trim(), rawKey));
+  console.log(tokenCryptoService.encrypt(token.trim()));
 }
 
 if (require.main === module) {
