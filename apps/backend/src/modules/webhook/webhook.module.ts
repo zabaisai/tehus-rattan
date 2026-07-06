@@ -5,6 +5,7 @@ import { ConversationsModule } from '../conversations/conversations.module';
 import { MessagesModule } from '../messages/messages.module';
 import { ContactsModule } from '../contacts/contacts.module';
 import { AutomationsModule } from '../automations/automations.module';
+import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-integration.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { AutomationsModule } from '../automations/automations.module';
     MessagesModule,
     ContactsModule,
     AutomationsModule,
+    WhatsAppIntegrationModule,
   ],
   controllers: [WebhookController],
   providers: [WebhookService],

@@ -4,6 +4,7 @@ import { ConversationsService } from '../conversations/conversations.service';
 import { MessagesService } from '../messages/messages.service';
 import { ContactsService } from '../contacts/contacts.service';
 import { AutomationsService } from '../automations/automations.service';
+import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-integration.service';
 
 @Injectable()
 export class WebhookService {
@@ -15,6 +16,7 @@ export class WebhookService {
     private messagesService: MessagesService,
     private contactsService: ContactsService,
     private automationsService: AutomationsService,
+    private whatsappIntegrationService: WhatsAppIntegrationService,
   ) {}
 
   async processWebhook(body: any): Promise<void> {
@@ -29,16 +31,19 @@ export class WebhookService {
       const contact = value.contacts?.[0];
       const phoneNumberId = value.metadata?.phone_number_id;
 
-      const company = await this.prisma.company.findFirst({
-        where: { phone: phoneNumberId },
-      });
+      const integration =
+        await this.whatsappIntegrationService.findConnectedByPhoneNumberId(
+          phoneNumberId,
+        );
 
-      if (!company) {
+      if (!integration) {
         this.logger.warn(
-          `No se encontró empresa para phoneNumberId: ${phoneNumberId}`,
+          `No se encontró integración WhatsApp conectada para phoneNumberId: ${phoneNumberId}`,
         );
         return;
       }
+
+      const companyId = integration.companyId;
 
       const duplicate = await this.messagesService.findByWamid(message.id);
       if (duplicate) {
@@ -47,23 +52,23 @@ export class WebhookService {
       }
 
       let contactRecord = await this.prisma.contact.findFirst({
-        where: { phone: message.from, companyId: company.id },
+        where: { phone: message.from, companyId },
       });
 
       if (!contactRecord) {
-        contactRecord = await this.contactsService.create(company.id, {
+        contactRecord = await this.contactsService.create(companyId, {
           phone: message.from,
           name: contact?.profile?.name,
         });
       }
 
       const conversation = await this.conversationsService.findOrCreate(
-        company.id,
+        companyId,
         contactRecord.id,
       );
 
       await this.messagesService.create({
-        companyId: company.id,
+        companyId,
         conversationId: conversation.id,
         wamid: message.id,
         body: message.text?.body || '',
@@ -73,7 +78,7 @@ export class WebhookService {
       });
 
       await this.automationsService.processMessage(
-        company.id,
+        companyId,
         conversation.id,
         message.text?.body || '',
         message.from,
