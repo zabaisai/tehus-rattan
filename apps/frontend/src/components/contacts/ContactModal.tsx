@@ -4,6 +4,14 @@ import { useState } from 'react';
 import { X } from "lucide-react";
 import { Contact } from "@/types";
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+};
+
 interface ContactModalProps {
   contact: Contact | null;
   onClose: () => void;
@@ -31,12 +39,9 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
     setSaving(true);
     try {
       await onSubmit({ phone, name, email });
-    } catch (err: any) {
-      setError(
-        err?.response?.data?.message?.[0] ||
-          err?.response?.data?.message ||
-          "Ocurrió un error",
-      );
+    } catch (err) {
+      const message = (err as ApiError).response?.data?.message;
+      setError((message?.[0] || message || "Ocurrió un error") as string);
     } finally {
       setSaving(false);
     }

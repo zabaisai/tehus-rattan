@@ -3,6 +3,14 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string | string[];
+    };
+  };
+};
+
 interface TaskModalProps {
   onClose: () => void;
   onSubmit: (data: {
@@ -29,8 +37,9 @@ export function TaskModal({ onClose, onSubmit }: TaskModalProps) {
     setSaving(true);
     try {
       await onSubmit({ title, description, dueDate, priority, type });
-    } catch (err: any) {
-      setError(err?.response?.data?.message?.[0] || err?.response?.data?.message || 'Ocurrió un error');
+    } catch (err) {
+      const message = (err as ApiError).response?.data?.message;
+      setError((message?.[0] || message || 'Ocurrió un error') as string);
     } finally {
       setSaving(false);
     }

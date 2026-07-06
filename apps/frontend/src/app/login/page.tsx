@@ -5,6 +5,14 @@ import { useRouter } from 'next/navigation';
 import { login } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 
+type ApiError = {
+  response?: {
+    data?: {
+      message?: string;
+    };
+  };
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
@@ -23,8 +31,9 @@ export default function LoginPage() {
       const { token, user } = await login(email, password);
       setSession(user, token);
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Credenciales inválidas');
+    } catch (err) {
+      const response = (err as ApiError).response;
+      setError(response?.data?.message || 'Credenciales inválidas');
     } finally {
       setLoading(false);
     }
