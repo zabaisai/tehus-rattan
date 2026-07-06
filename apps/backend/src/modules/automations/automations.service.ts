@@ -144,6 +144,7 @@ export class AutomationsService {
         switch (action.type) {
           case 'send_message': {
             await this.whatsappService.sendMessage(
+              companyId,
               contactPhone,
               action.message,
             );

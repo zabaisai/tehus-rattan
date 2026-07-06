@@ -96,6 +96,7 @@ export class ConversationsController {
     );
 
     await this.whatsappService.sendMessage(
+      req.user.companyId,
       conversation.contact.phone,
       body.message,
     );
