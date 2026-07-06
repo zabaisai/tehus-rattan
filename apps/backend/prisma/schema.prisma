@@ -14,15 +14,16 @@ model Company {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users         User[]
-  contacts      Contact[]
-  conversations Conversation[]
-  automations   Automation[]
-  pipelines     Pipeline[]
-  leads         Lead[]
-  tasks         Task[]
-  notes         Note[]
-  products      Product[]
+  users               User[]
+  contacts            Contact[]
+  conversations       Conversation[]
+  automations         Automation[]
+  pipelines           Pipeline[]
+  leads               Lead[]
+  tasks               Task[]
+  notes               Note[]
+  products            Product[]
+  whatsappIntegration WhatsAppIntegration?
 
   @@map("companies")
 }
@@ -303,6 +304,34 @@ model Product {
   company   Company @relation(fields: [companyId], references: [id])
 
   @@map("products")
+}
+
+// ─────────────────────────────────────────────
+// WHATSAPP INTEGRATION
+// ─────────────────────────────────────────────
+model WhatsAppIntegration {
+  id                   String                    @id @default(cuid())
+  displayPhoneNumber   String?
+  phoneNumberId        String                    @unique
+  wabaId               String?
+  status               WhatsAppIntegrationStatus @default(PENDING)
+  accessTokenEncrypted String?
+  connectedAt          DateTime?
+  disconnectedAt       DateTime?
+  createdAt            DateTime                  @default(now())
+  updatedAt            DateTime                  @updatedAt
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id])
+
+  @@map("whatsapp_integrations")
+}
+
+enum WhatsAppIntegrationStatus {
+  PENDING
+  CONNECTED
+  DISCONNECTED
+  REVOKED
 }
 
 enum Role {
