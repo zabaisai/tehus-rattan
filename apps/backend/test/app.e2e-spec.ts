@@ -3,6 +3,13 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module';
+import { PrismaService } from './../src/prisma/prisma.service';
+
+// Stubbed so this baseline e2e test never dials a real Postgres instance.
+const prismaServiceStub = {
+  $connect: jest.fn(),
+  $disconnect: jest.fn(),
+};
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -10,7 +17,10 @@ describe('AppController (e2e)', () => {
   beforeEach(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue(prismaServiceStub)
+      .compile();
 
     app = moduleFixture.createNestApplication();
     await app.init();
