@@ -6,6 +6,7 @@ import { CreateTaskDto } from './tasks/dto/create-task.dto';
 import { UpdateTaskDto } from './tasks/dto/update-task.dto';
 import { CreateNoteDto } from './notes/dto/create-note.dto';
 import { UpdateConversationDto } from './conversations/dto/update-conversation.dto';
+import { ConnectWhatsAppIntegrationDto } from './whatsapp-integration/dto/connect-whatsapp-integration.dto';
 
 // Same configuration as the global ValidationPipe registered in src/main.ts
 const buildPipe = () =>
@@ -83,6 +84,59 @@ describe('DTO tenant field whitelist (real ValidationPipe)', () => {
     await expectCompanyIdRejected(UpdateConversationDto, {
       status: 'OPEN',
     });
+  });
+
+  it('rejects companyId in ConnectWhatsAppIntegrationDto', async () => {
+    await expectCompanyIdRejected(ConnectWhatsAppIntegrationDto, {
+      phoneNumberId: 'phone-a',
+      accessToken: 'fake-meta-token',
+    });
+  });
+
+  it('rejects status in ConnectWhatsAppIntegrationDto', async () => {
+    const pipe = buildPipe();
+    const value = {
+      phoneNumberId: 'phone-a',
+      accessToken: 'fake-meta-token',
+      status: 'CONNECTED',
+    };
+
+    let caught: BadRequestException | undefined;
+    try {
+      await pipe.transform(value, bodyMetadata(ConnectWhatsAppIntegrationDto));
+    } catch (error) {
+      caught = error as BadRequestException;
+    }
+
+    expect(caught).toBeInstanceOf(BadRequestException);
+    const response = caught!.getResponse() as { message: string[] };
+    expect(
+      response.message.some((m) => /status should not exist/.test(m)),
+    ).toBe(true);
+  });
+
+  it('rejects accessTokenEncrypted in ConnectWhatsAppIntegrationDto', async () => {
+    const pipe = buildPipe();
+    const value = {
+      phoneNumberId: 'phone-a',
+      accessToken: 'fake-meta-token',
+      accessTokenEncrypted: 'already-encrypted-value',
+    };
+
+    let caught: BadRequestException | undefined;
+    try {
+      await pipe.transform(value, bodyMetadata(ConnectWhatsAppIntegrationDto));
+    } catch (error) {
+      caught = error as BadRequestException;
+    }
+
+    expect(caught).toBeInstanceOf(BadRequestException);
+    const response = caught!.getResponse() as { message: string[] };
+    expect(
+      response.message.some((m) =>
+        /accessTokenEncrypted should not exist/.test(m),
+      ),
+    ).toBe(true);
   });
 
   it('accepts a valid body without companyId (control case)', async () => {
