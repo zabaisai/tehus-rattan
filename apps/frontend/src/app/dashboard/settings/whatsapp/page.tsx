@@ -1,7 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getWhatsAppIntegration } from '@/lib/whatsapp';
+import {
+  getWhatsAppIntegration,
+  disconnectWhatsAppIntegration,
+} from '@/lib/whatsapp';
 import { useAuthStore } from '@/store/auth.store';
 import { WhatsAppIntegrationStatus } from '@/types';
 import { WhatsAppIntegrationForm } from '@/components/whatsapp/WhatsAppIntegrationForm';
@@ -40,8 +44,49 @@ export default function WhatsAppSettingsPage() {
     enabled: canManage,
   });
 
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [disconnectError, setDisconnectError] = useState('');
+  const [disconnectSuccess, setDisconnectSuccess] = useState('');
+
   function handleFormSuccess() {
     queryClient.invalidateQueries({ queryKey: ['whatsapp-integration'] });
+  }
+
+  async function handleDisconnect() {
+    const confirmed = window.confirm(
+      'Esto desconectará WhatsApp localmente en el CRM. No revoca el token en Meta. ¿Deseas continuar?',
+    );
+    if (!confirmed) return;
+
+    setDisconnectError('');
+    setDisconnectSuccess('');
+    setIsDisconnecting(true);
+    try {
+      await disconnectWhatsAppIntegration();
+      await queryClient.invalidateQueries({ queryKey: ['whatsapp-integration'] });
+      setDisconnectSuccess('WhatsApp desconectado correctamente.');
+    } catch (err) {
+      const response = (
+        err as {
+          response?: {
+            status?: number;
+            data?: { message?: string | string[] };
+          };
+        }
+      )?.response;
+
+      if (response?.status === 403) {
+        setDisconnectError('No tienes permiso para esta acción.');
+      } else {
+        const message = response?.data?.message;
+        setDisconnectError(
+          (Array.isArray(message) ? message[0] : message) ||
+            'Ocurrió un error',
+        );
+      }
+    } finally {
+      setIsDisconnecting(false);
+    }
   }
 
   return (
@@ -118,12 +163,43 @@ export default function WhatsAppSettingsPage() {
                   </p>
                 </div>
               </div>
+
+              <div className="border-t border-stone-100 pt-4">
+                {integration.status !== 'DISCONNECTED' ? (
+                  <>
+                    <button
+                      onClick={handleDisconnect}
+                      disabled={isDisconnecting}
+                      className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+                    >
+                      {isDisconnecting
+                        ? 'Desconectando...'
+                        : 'Desconectar WhatsApp'}
+                    </button>
+                    <p className="mt-2 text-xs text-stone-400">
+                      La desconexión solo cambia el estado local en el CRM; no
+                      revoca el token en Meta.
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-sm text-stone-600">
+                    Esta integración está desconectada.
+                  </p>
+                )}
+
+                {disconnectError && (
+                  <p className="mt-2 text-xs text-red-600">
+                    {disconnectError}
+                  </p>
+                )}
+                {disconnectSuccess && (
+                  <p className="mt-2 text-xs text-emerald-600">
+                    {disconnectSuccess}
+                  </p>
+                )}
+              </div>
             </div>
           )}
-
-          <p className="mt-4 text-xs text-stone-400">
-            La desconexión se agregará en el siguiente paso.
-          </p>
         </div>
       )}
 
