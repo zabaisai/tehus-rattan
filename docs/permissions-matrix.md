@@ -40,6 +40,8 @@ Controllers use two patterns:
 | Products | read endpoints | JWT + RolesGuard | Any authenticated role when no method `@Roles` is present | JWT `companyId` |
 | Analytics | `/analytics/*` | JWT + RolesGuard | `ADMIN`, `SUPER_ADMIN` | JWT `companyId` |
 | Webhook | `/webhook/*` | Public | None | Resolved from WhatsApp `phone_number_id` |
+| WhatsApp Integrations | `GET /whatsapp-integrations/me` | JWT | Any authenticated role | JWT `companyId` |
+| WhatsApp Integrations | `PUT /whatsapp-integrations/me`, `POST /whatsapp-integrations/me/disconnect` | JWT + RolesGuard | `ADMIN`, `SUPER_ADMIN` | JWT `companyId` |
 
 ## Current Security Notes
 
@@ -48,6 +50,7 @@ Controllers use two patterns:
 - `createdBy` for notes is taken from JWT `sub`.
 - Current product behavior allows `AGENT` users to operate contacts, conversations, notes, leads, and tasks within their company.
 - Changing `AGENT` capabilities is a business decision and is not part of the current stabilization changes.
+- WhatsApp integration responses never include `accessToken` or `accessTokenEncrypted`, regardless of role.
 
 ## Recently Stabilized Ownership Checks
 
