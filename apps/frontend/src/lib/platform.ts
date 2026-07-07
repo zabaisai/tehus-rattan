@@ -2,6 +2,7 @@ import api from './axios';
 import {
   CompanyStatus,
   CreatePlatformCompanyPayload,
+  PlatformAuditLog,
   PlatformCompanyCreated,
   PlatformCompanyDetail,
   PlatformCompanyListItem,
@@ -40,10 +41,22 @@ export async function createPlatformCompany(
 export async function updatePlatformCompanyStatus(
   id: string,
   status: CompanyStatus,
+  reason?: string,
 ): Promise<PlatformCompanyListItem> {
   const { data } = await api.patch<PlatformCompanyListItem>(
     `/platform/companies/${id}/status`,
-    { status },
+    reason ? { status, reason } : { status },
   );
+  return data;
+}
+
+export async function getPlatformAuditLogs(params?: {
+  action?: string;
+  affectedCompanyId?: string;
+  actorUserId?: string;
+}): Promise<PlatformAuditLog[]> {
+  const { data } = await api.get<PlatformAuditLog[]>('/platform/audit-logs', {
+    params,
+  });
   return data;
 }

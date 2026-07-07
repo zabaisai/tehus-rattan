@@ -10,6 +10,7 @@ import {
   CheckSquare,
   MessageCircle,
   Building2,
+  ScrollText,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -20,6 +21,11 @@ export function Sidebar() {
     user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const isPlatformSuperAdmin =
     user?.role === 'SUPER_ADMIN' && user?.companyId === null;
+
+  const platformNavItems = [
+    { href: '/dashboard/platform/companies', label: 'Empresas', icon: Building2 },
+    { href: '/dashboard/platform/audit-logs', label: 'Auditoría', icon: ScrollText },
+  ];
 
   // A global SUPER_ADMIN administers the platform, not a company's CRM —
   // it never gets the normal business nav, only the Plataforma section.
@@ -74,17 +80,23 @@ export function Sidebar() {
             <div className="mb-1 mt-4 px-2.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
               Plataforma
             </div>
-            <Link
-              href="/dashboard/platform/companies"
-              className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
-                pathname.startsWith('/dashboard/platform/companies')
-                  ? 'bg-stone-900 text-white'
-                  : 'text-stone-600 hover:bg-stone-100'
-              }`}
-            >
-              <Building2 size={16} strokeWidth={2} />
-              Empresas
-            </Link>
+            {platformNavItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
+                    pathname.startsWith(item.href)
+                      ? 'bg-stone-900 text-white'
+                      : 'text-stone-600 hover:bg-stone-100'
+                  }`}
+                >
+                  <Icon size={16} strokeWidth={2} />
+                  {item.label}
+                </Link>
+              );
+            })}
           </>
         )}
       </nav>

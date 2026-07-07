@@ -8,22 +8,7 @@ import { useAuthStore } from '@/store/auth.store';
 import { CompanyStatus, PlatformCompanyListItem } from '@/types';
 import { CreateCompanyModal } from '@/components/platform/CreateCompanyModal';
 import { CompanyDetailModal } from '@/components/platform/CompanyDetailModal';
-
-type ApiError = {
-  response?: {
-    status?: number;
-    data?: {
-      message?: string | string[];
-    };
-  };
-};
-
-function extractErrorMessage(err: unknown, fallback: string): string {
-  const response = (err as ApiError).response;
-  if (response?.status === 403) return 'No tienes permiso para esta acción.';
-  const message = response?.data?.message;
-  return (Array.isArray(message) ? message[0] : message) || fallback;
-}
+import { ChangeCompanyStatusModal } from '@/components/platform/ChangeCompanyStatusModal';
 
 const statusLabels: Record<CompanyStatus, string> = {
   ACTIVE: 'Activa',
@@ -58,9 +43,11 @@ export default function PlatformCompaniesPage() {
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | ''>('');
   const [createOpen, setCreateOpen] = useState(false);
   const [detailCompanyId, setDetailCompanyId] = useState<string | null>(null);
-  const [actioningId, setActioningId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    company: PlatformCompanyListItem;
+    targetStatus: CompanyStatus;
+  } | null>(null);
 
   const {
     data: companies,
@@ -80,30 +67,33 @@ export default function PlatformCompaniesPage() {
     setCreateOpen(false);
     setSuccessMessage(`Empresa "${companyName}" creada correctamente.`);
     queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
+    // Creating a company is an audited action — refresh the audit trail
+    // too, so it doesn't show up to 30s stale if the admin checks right
+    // after (react-query's default staleTime).
+    queryClient.invalidateQueries({ queryKey: ['platform-audit-logs'] });
   }
 
-  async function handleStatusChange(
+  function openStatusChange(
     company: PlatformCompanyListItem,
-    newStatus: CompanyStatus,
+    targetStatus: CompanyStatus,
   ) {
-    const confirmMessages: Record<CompanyStatus, string> = {
-      SUSPENDED: `¿Suspender "${company.name}"? Sus usuarios no podrán iniciar sesión mientras esté suspendida.`,
-      ACTIVE: `¿Reactivar "${company.name}"?`,
-      DELETED: `¿Marcar "${company.name}" como eliminada? No podrá reactivarse después.`,
-    };
-    if (!window.confirm(confirmMessages[newStatus])) return;
-
-    setActionError('');
     setSuccessMessage('');
-    setActioningId(company.id);
-    try {
-      await updatePlatformCompanyStatus(company.id, newStatus);
-      await queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
-    } catch (err) {
-      setActionError(extractErrorMessage(err, 'Ocurrió un error'));
-    } finally {
-      setActioningId(null);
-    }
+    setPendingStatusChange({ company, targetStatus });
+  }
+
+  // Left uncaught on purpose: ChangeCompanyStatusModal awaits this and shows
+  // the error itself, keeping the modal open so the user can retry or
+  // cancel instead of losing whatever reason they already typed.
+  async function confirmStatusChange(reason?: string) {
+    if (!pendingStatusChange) return;
+    const { company, targetStatus } = pendingStatusChange;
+
+    await updatePlatformCompanyStatus(company.id, targetStatus, reason);
+    await queryClient.invalidateQueries({ queryKey: ['platform-companies'] });
+    // Same reasoning as handleCreated: status changes are audited too.
+    await queryClient.invalidateQueries({ queryKey: ['platform-audit-logs'] });
+    setPendingStatusChange(null);
+    setSuccessMessage(`Estado de "${company.name}" actualizado a ${statusLabels[targetStatus]}.`);
   }
 
   if (!isPlatformSuperAdmin) {
@@ -167,9 +157,6 @@ export default function PlatformCompaniesPage() {
 
       {successMessage && (
         <p className="mb-3 text-sm text-emerald-600">{successMessage}</p>
-      )}
-      {actionError && (
-        <p className="mb-3 text-sm text-red-600">{actionError}</p>
       )}
 
       <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
@@ -258,9 +245,8 @@ export default function PlatformCompaniesPage() {
 
                     {company.status === 'ACTIVE' && (
                       <button
-                        disabled={actioningId === company.id}
-                        onClick={() => handleStatusChange(company, 'SUSPENDED')}
-                        className="rounded-md px-2 py-1 text-xs text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                        onClick={() => openStatusChange(company, 'SUSPENDED')}
+                        className="rounded-md px-2 py-1 text-xs text-amber-700 hover:bg-amber-50"
                       >
                         Suspender
                       </button>
@@ -268,9 +254,8 @@ export default function PlatformCompaniesPage() {
 
                     {company.status === 'SUSPENDED' && (
                       <button
-                        disabled={actioningId === company.id}
-                        onClick={() => handleStatusChange(company, 'ACTIVE')}
-                        className="rounded-md px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                        onClick={() => openStatusChange(company, 'ACTIVE')}
+                        className="rounded-md px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
                       >
                         Reactivar
                       </button>
@@ -279,9 +264,8 @@ export default function PlatformCompaniesPage() {
                     {(company.status === 'ACTIVE' ||
                       company.status === 'SUSPENDED') && (
                       <button
-                        disabled={actioningId === company.id}
-                        onClick={() => handleStatusChange(company, 'DELETED')}
-                        className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        onClick={() => openStatusChange(company, 'DELETED')}
+                        className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50"
                       >
                         Marcar eliminada
                       </button>
@@ -305,6 +289,15 @@ export default function PlatformCompaniesPage() {
         <CompanyDetailModal
           companyId={detailCompanyId}
           onClose={() => setDetailCompanyId(null)}
+        />
+      )}
+
+      {pendingStatusChange && (
+        <ChangeCompanyStatusModal
+          companyName={pendingStatusChange.company.name}
+          targetStatus={pendingStatusChange.targetStatus}
+          onClose={() => setPendingStatusChange(null)}
+          onConfirm={confirmStatusChange}
         />
       )}
     </div>

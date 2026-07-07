@@ -247,3 +247,20 @@ export interface PlatformCompanyCreated {
     createdAt: string;
   };
 }
+
+export interface PlatformAuditLog {
+  id: string;
+  actorUserId: string | null;
+  actorRole: Role;
+  actor: { id: string; name: string; email: string } | null;
+  affectedCompanyId: string | null;
+  affectedCompany: { id: string; name: string } | null;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  reason: string | null;
+  metadata: Record<string, unknown> | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
