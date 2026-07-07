@@ -17,6 +17,7 @@ import { TasksModule } from './modules/tasks/tasks.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ProductsModule } from './modules/products/products.module';
+import { PlatformModule } from './modules/platform/platform.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { ProductsModule } from './modules/products/products.module';
     NotesModule,
     AnalyticsModule,
     ProductsModule,
+    PlatformModule,
   ],
   controllers: [AppController],
   providers: [AppService],
