@@ -6,6 +6,7 @@ import {
   PlatformCompanyCreated,
   PlatformCompanyDetail,
   PlatformCompanyListItem,
+  PlatformCompanySupportOverview,
 } from '@/types';
 
 export async function getPlatformCompanies(params?: {
@@ -46,6 +47,15 @@ export async function updatePlatformCompanyStatus(
   const { data } = await api.patch<PlatformCompanyListItem>(
     `/platform/companies/${id}/status`,
     reason ? { status, reason } : { status },
+  );
+  return data;
+}
+
+export async function getPlatformCompanySupportOverview(
+  id: string,
+): Promise<PlatformCompanySupportOverview> {
+  const { data } = await api.get<PlatformCompanySupportOverview>(
+    `/platform/companies/${id}/support-overview`,
   );
   return data;
 }

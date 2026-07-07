@@ -248,6 +248,69 @@ export interface PlatformCompanyCreated {
   };
 }
 
+export interface PlatformCompanySupportOverviewLead {
+  id: string;
+  title: string;
+  status: string;
+  stageName: string | null;
+  assignedUser: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlatformCompanySupportOverviewConversation {
+  id: string;
+  status: string;
+  channel: string;
+  contact: { id: string; name: string | null } | null;
+  assignedUser: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlatformCompanySupportOverviewTask {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: string | null;
+  assignedUser: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PlatformCompanySupportOverview {
+  company: {
+    id: string;
+    name: string;
+    phone: string | null;
+    status: CompanyStatus;
+    createdAt: string;
+    updatedAt: string;
+  };
+  users: {
+    total: number;
+    active: number;
+    items: PlatformCompanyUser[];
+  };
+  counts: {
+    contacts: number;
+    leads: number;
+    conversations: number;
+    tasks: number;
+    products: number;
+  };
+  whatsapp: {
+    connected: boolean;
+    status: string | null;
+    phoneNumberId: string | null;
+    displayPhoneNumber: string | null;
+  };
+  recentLeads: PlatformCompanySupportOverviewLead[];
+  recentConversations: PlatformCompanySupportOverviewConversation[];
+  recentTasks: PlatformCompanySupportOverviewTask[];
+  lastActivityAt: string | null;
+}
+
 export interface PlatformAuditLog {
   id: string;
   actorUserId: string | null;

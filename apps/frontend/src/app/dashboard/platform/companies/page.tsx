@@ -9,6 +9,7 @@ import { CompanyStatus, PlatformCompanyListItem } from '@/types';
 import { CreateCompanyModal } from '@/components/platform/CreateCompanyModal';
 import { CompanyDetailModal } from '@/components/platform/CompanyDetailModal';
 import { ChangeCompanyStatusModal } from '@/components/platform/ChangeCompanyStatusModal';
+import { CompanySupportOverviewModal } from '@/components/platform/CompanySupportOverviewModal';
 
 const statusLabels: Record<CompanyStatus, string> = {
   ACTIVE: 'Activa',
@@ -43,6 +44,9 @@ export default function PlatformCompaniesPage() {
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | ''>('');
   const [createOpen, setCreateOpen] = useState(false);
   const [detailCompanyId, setDetailCompanyId] = useState<string | null>(null);
+  const [supportOverviewCompanyId, setSupportOverviewCompanyId] = useState<
+    string | null
+  >(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [pendingStatusChange, setPendingStatusChange] = useState<{
     company: PlatformCompanyListItem;
@@ -243,6 +247,13 @@ export default function PlatformCompaniesPage() {
                       Ver detalle
                     </button>
 
+                    <button
+                      onClick={() => setSupportOverviewCompanyId(company.id)}
+                      className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                    >
+                      Ver soporte
+                    </button>
+
                     {company.status === 'ACTIVE' && (
                       <button
                         onClick={() => openStatusChange(company, 'SUSPENDED')}
@@ -298,6 +309,13 @@ export default function PlatformCompaniesPage() {
           targetStatus={pendingStatusChange.targetStatus}
           onClose={() => setPendingStatusChange(null)}
           onConfirm={confirmStatusChange}
+        />
+      )}
+
+      {supportOverviewCompanyId && (
+        <CompanySupportOverviewModal
+          companyId={supportOverviewCompanyId}
+          onClose={() => setSupportOverviewCompanyId(null)}
         />
       )}
     </div>
