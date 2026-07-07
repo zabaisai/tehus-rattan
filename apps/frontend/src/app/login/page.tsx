@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { login } from '@/lib/auth';
+import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 
 type ApiError = {
@@ -29,7 +29,13 @@ export default function LoginPage() {
 
     try {
       const { token, user } = await login(email, password);
+      // The login response only carries id/email/name. role and companyId
+      // (needed right away for role-gated nav like the platform section)
+      // only come from /auth/me, so fetch the full profile before
+      // navigating instead of waiting for a later remount to backfill it.
       setSession(user, token);
+      const fullUser = await getMe();
+      setSession(fullUser, token);
       router.push('/dashboard');
     } catch (err) {
       const response = (err as ApiError).response;

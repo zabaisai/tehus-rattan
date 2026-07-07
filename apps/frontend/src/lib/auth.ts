@@ -1,5 +1,5 @@
 import api from "./axios";
-import { AuthResponse } from "@/types";
+import { AuthResponse, User } from "@/types";
 
 export async function login(
   email: string,
@@ -22,7 +22,7 @@ export async function register(payload: {
   return data;
 }
 
-export async function getMe() {
-  const { data } = await api.get("/auth/me");
+export async function getMe(): Promise<User> {
+  const { data } = await api.get<User>("/auth/me");
   return data;
 }

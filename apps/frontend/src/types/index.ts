@@ -5,7 +5,7 @@ export interface User {
   email: string;
   name: string;
   role: Role;
-  companyId?: string;
+  companyId: string | null;
 }
 
 export interface AuthResponse {
@@ -169,4 +169,81 @@ export interface ConnectWhatsAppIntegrationPayload {
   accessToken: string;
   displayPhoneNumber?: string;
   wabaId?: string;
+}
+
+export type CompanyStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
+
+export interface PlatformCompanyListItem {
+  id: string;
+  name: string;
+  phone: string | null;
+  status: CompanyStatus;
+  createdAt: string;
+  updatedAt: string;
+  totalUsers: number;
+  activeUsers: number;
+  totalContacts: number;
+  totalLeads: number;
+  totalConversations: number;
+  whatsappConnected: boolean;
+}
+
+export interface PlatformCompanyUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface PlatformCompanyDetail {
+  id: string;
+  name: string;
+  phone: string | null;
+  status: CompanyStatus;
+  createdAt: string;
+  updatedAt: string;
+  users: {
+    total: number;
+    items: PlatformCompanyUser[];
+  };
+  counts: {
+    contacts: number;
+    leads: number;
+    conversations: number;
+    tasks: number;
+    products: number;
+  };
+  whatsapp: {
+    connected: boolean;
+    status: string | null;
+    phoneNumberId: string | null;
+    displayPhoneNumber: string | null;
+  };
+}
+
+export interface CreatePlatformCompanyPayload {
+  companyName: string;
+  companyPhone?: string;
+  adminName: string;
+  adminEmail: string;
+  adminPassword: string;
+}
+
+export interface PlatformCompanyCreated {
+  id: string;
+  name: string;
+  phone: string | null;
+  status: CompanyStatus;
+  createdAt: string;
+  updatedAt: string;
+  admin: {
+    id: string;
+    name: string;
+    email: string;
+    role: Role;
+    isActive: boolean;
+    createdAt: string;
+  };
 }

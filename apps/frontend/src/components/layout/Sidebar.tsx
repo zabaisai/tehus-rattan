@@ -9,6 +9,7 @@ import {
   MessageSquare,
   CheckSquare,
   MessageCircle,
+  Building2,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -17,6 +18,8 @@ export function Sidebar() {
   const user = useAuthStore((s) => s.user);
   const canManageWhatsApp =
     user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  const isPlatformSuperAdmin =
+    user?.role === 'SUPER_ADMIN' && user?.companyId === null;
 
   const navItems = [
     { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
@@ -61,6 +64,25 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        {isPlatformSuperAdmin && (
+          <>
+            <div className="mb-1 mt-4 px-2.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
+              Plataforma
+            </div>
+            <Link
+              href="/dashboard/platform/companies"
+              className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
+                pathname.startsWith('/dashboard/platform/companies')
+                  ? 'bg-stone-900 text-white'
+                  : 'text-stone-600 hover:bg-stone-100'
+              }`}
+            >
+              <Building2 size={16} strokeWidth={2} />
+              Empresas
+            </Link>
+          </>
+        )}
       </nav>
     </aside>
   );
