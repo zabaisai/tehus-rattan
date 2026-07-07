@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { getMe } from '@/lib/auth';
@@ -13,9 +13,14 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const setSession = useAuthStore((s) => s.setSession);
   const clearSession = useAuthStore((s) => s.clearSession);
+
+  const isPlatformSuperAdmin =
+    user?.role === 'SUPER_ADMIN' && user?.companyId === null;
+  const isOnPlatformRoute = pathname.startsWith('/dashboard/platform');
 
   useEffect(() => {
     if (user) return;
@@ -36,10 +41,28 @@ export default function DashboardLayout({
       });
   }, [user, router, setSession, clearSession]);
 
+  useEffect(() => {
+    // A global SUPER_ADMIN has no companyId, so every normal CRM page
+    // (dashboard home, contacts, leads, tasks, ...) fires business queries
+    // that assume a real company and 500 silently. Keep them confined to
+    // /dashboard/platform/* instead of letting those pages ever mount.
+    if (isPlatformSuperAdmin && !isOnPlatformRoute) {
+      router.replace('/dashboard/platform/companies');
+    }
+  }, [isPlatformSuperAdmin, isOnPlatformRoute, router]);
+
   if (!user) {
     return (
       <div className="flex h-screen items-center justify-center bg-stone-50">
         <p className="text-sm text-stone-500">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (isPlatformSuperAdmin && !isOnPlatformRoute) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-stone-50">
+        <p className="text-sm text-stone-500">Redirigiendo...</p>
       </div>
     );
   }

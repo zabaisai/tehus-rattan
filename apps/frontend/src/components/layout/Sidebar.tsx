@@ -21,16 +21,20 @@ export function Sidebar() {
   const isPlatformSuperAdmin =
     user?.role === 'SUPER_ADMIN' && user?.companyId === null;
 
-  const navItems = [
-    { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
-    { href: '/dashboard/contacts', label: 'Contactos', icon: Users },
-    { href: '/dashboard/pipeline', label: 'Pipeline', icon: KanbanSquare },
-    { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
-    { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
-    ...(canManageWhatsApp
-      ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
-      : []),
-  ];
+  // A global SUPER_ADMIN administers the platform, not a company's CRM —
+  // it never gets the normal business nav, only the Plataforma section.
+  const navItems = isPlatformSuperAdmin
+    ? []
+    : [
+        { href: '/dashboard', label: 'Inicio', icon: LayoutDashboard },
+        { href: '/dashboard/contacts', label: 'Contactos', icon: Users },
+        { href: '/dashboard/pipeline', label: 'Pipeline', icon: KanbanSquare },
+        { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
+        { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
+        ...(canManageWhatsApp
+          ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
+          : []),
+      ];
 
   return (
     <aside className="flex h-full w-60 flex-col border-r border-stone-200 bg-white">

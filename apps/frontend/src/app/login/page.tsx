@@ -36,7 +36,15 @@ export default function LoginPage() {
       setSession(user, token);
       const fullUser = await getMe();
       setSession(fullUser, token);
-      router.push('/dashboard');
+
+      // A global SUPER_ADMIN (companyId null) has no company to scope the
+      // normal CRM dashboard to — every business query on it expects a
+      // real companyId and 500s. Send them straight to the platform area.
+      const isPlatformSuperAdmin =
+        fullUser.role === 'SUPER_ADMIN' && fullUser.companyId === null;
+      router.push(
+        isPlatformSuperAdmin ? '/dashboard/platform/companies' : '/dashboard',
+      );
     } catch (err) {
       const response = (err as ApiError).response;
       setError(response?.data?.message || 'Credenciales inválidas');
