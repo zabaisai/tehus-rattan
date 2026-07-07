@@ -4,21 +4,32 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { CompanyStatus } from '@prisma/client';
+import { CompanyStatus, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePlatformCompanyDto } from './dto/create-platform-company.dto';
+import { PlatformAuditLogService } from './platform-audit-log.service';
 
 interface ListCompaniesFilters {
   search?: string;
   status?: string;
 }
 
+export interface AuditActor {
+  actorUserId: string;
+  actorRole: Role;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}
+
 const VALID_STATUSES = Object.values(CompanyStatus);
 
 @Injectable()
 export class PlatformCompaniesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private auditLogService: PlatformAuditLogService,
+  ) {}
 
   async listCompanies(filters: ListCompaniesFilters = {}) {
     const where: {
@@ -130,7 +141,7 @@ export class PlatformCompaniesService {
     };
   }
 
-  async createCompany(dto: CreatePlatformCompanyDto) {
+  async createCompany(dto: CreatePlatformCompanyDto, actor: AuditActor) {
     const companyName = this.requireNonBlank(
       dto.companyName,
       'companyName no puede estar vacio',
@@ -169,38 +180,62 @@ export class PlatformCompaniesService {
 
     const passwordHash = await bcrypt.hash(dto.adminPassword, 10);
 
-    const company = await this.prisma.company.create({
-      data: {
-        name: companyName,
-        phone: companyPhone,
-        status: 'ACTIVE',
-        users: {
-          create: {
-            name: adminName,
-            email: adminEmail,
-            password: passwordHash,
-            role: 'ADMIN',
+    const company = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.company.create({
+        data: {
+          name: companyName,
+          phone: companyPhone,
+          status: 'ACTIVE',
+          users: {
+            create: {
+              name: adminName,
+              email: adminEmail,
+              password: passwordHash,
+              role: 'ADMIN',
+            },
           },
         },
-      },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-        users: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            isActive: true,
-            createdAt: true,
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          users: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              isActive: true,
+              createdAt: true,
+            },
           },
         },
-      },
+      });
+
+      // If this write fails, the transaction rolls back the Company/User
+      // creation too — a sensitive platform action must never go unlogged.
+      await this.auditLogService.record(tx, {
+        actorUserId: actor.actorUserId,
+        actorRole: actor.actorRole,
+        affectedCompanyId: created.id,
+        action: 'CREATE_COMPANY',
+        entityType: 'Company',
+        entityId: created.id,
+        metadata: {
+          companyName: created.name,
+          companyPhone: created.phone,
+          adminEmail: created.users[0].email,
+          adminUserId: created.users[0].id,
+          companyId: created.id,
+        },
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+      });
+
+      return created;
     });
 
     return {
@@ -214,12 +249,17 @@ export class PlatformCompaniesService {
     };
   }
 
-  async updateCompanyStatus(id: string, status: CompanyStatus) {
+  async updateCompanyStatus(
+    id: string,
+    status: CompanyStatus,
+    actor: AuditActor,
+    reason?: string,
+  ) {
     const trimmedId = this.requireNonBlank(id, 'id no puede estar vacio');
 
     const company = await this.prisma.company.findUnique({
       where: { id: trimmedId },
-      select: { id: true, status: true },
+      select: { id: true, name: true, status: true },
     });
     if (!company) {
       throw new NotFoundException('Empresa no encontrada');
@@ -231,17 +271,43 @@ export class PlatformCompaniesService {
       );
     }
 
-    return this.prisma.company.update({
-      where: { id: trimmedId },
-      data: { status },
-      select: {
-        id: true,
-        name: true,
-        phone: true,
-        status: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const fromStatus = company.status;
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.company.update({
+        where: { id: trimmedId },
+        data: { status },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      // If this write fails, the transaction rolls back the status change
+      // too — a sensitive platform action must never go unlogged.
+      await this.auditLogService.record(tx, {
+        actorUserId: actor.actorUserId,
+        actorRole: actor.actorRole,
+        affectedCompanyId: trimmedId,
+        action: 'UPDATE_COMPANY_STATUS',
+        entityType: 'Company',
+        entityId: trimmedId,
+        reason: reason?.trim() || null,
+        metadata: {
+          fromStatus,
+          toStatus: status,
+          companyName: updated.name,
+          companyId: trimmedId,
+        },
+        ipAddress: actor.ipAddress,
+        userAgent: actor.userAgent,
+      });
+
+      return updated;
     });
   }
 

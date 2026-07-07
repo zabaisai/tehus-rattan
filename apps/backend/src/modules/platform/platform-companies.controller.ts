@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Query,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
@@ -30,15 +31,30 @@ export class PlatformCompaniesController {
   }
 
   @Post()
-  create(@Body() dto: CreatePlatformCompanyDto) {
-    return this.companiesService.createCompany(dto);
+  create(@Body() dto: CreatePlatformCompanyDto, @Request() req: any) {
+    return this.companiesService.createCompany(dto, this.actorFromRequest(req));
   }
 
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdatePlatformCompanyStatusDto,
+    @Request() req: any,
   ) {
-    return this.companiesService.updateCompanyStatus(id, dto.status);
+    return this.companiesService.updateCompanyStatus(
+      id,
+      dto.status,
+      this.actorFromRequest(req),
+      dto.reason,
+    );
+  }
+
+  private actorFromRequest(req: any) {
+    return {
+      actorUserId: req.user.sub,
+      actorRole: req.user.role,
+      ipAddress: req.ip ?? null,
+      userAgent: req.headers?.['user-agent'] ?? null,
+    };
   }
 }

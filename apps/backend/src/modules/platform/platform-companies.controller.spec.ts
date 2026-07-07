@@ -50,8 +50,15 @@ describe('PlatformCompaniesController', () => {
     });
   });
 
+  const buildRequest = (overrides: Record<string, unknown> = {}) => ({
+    user: { sub: 'super-admin-1', role: 'SUPER_ADMIN', companyId: null },
+    ip: '127.0.0.1',
+    headers: { 'user-agent': 'jest-test-agent' },
+    ...overrides,
+  });
+
   describe('POST /platform/companies', () => {
-    it('delegates to createCompany with the dto', async () => {
+    it('delegates to createCompany with the dto and the actor from the JWT', async () => {
       const dto = {
         companyName: 'New Co',
         adminName: 'New Admin',
@@ -60,24 +67,51 @@ describe('PlatformCompaniesController', () => {
       };
       service.createCompany.mockResolvedValue({ id: 'company-new' });
 
-      await controller.create(dto as any);
+      await controller.create(dto as any, buildRequest());
 
-      expect(service.createCompany).toHaveBeenCalledWith(dto);
+      expect(service.createCompany).toHaveBeenCalledWith(dto, {
+        actorUserId: 'super-admin-1',
+        actorRole: 'SUPER_ADMIN',
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest-test-agent',
+      });
     });
   });
 
   describe('PATCH /platform/companies/:id/status', () => {
-    it('delegates to updateCompanyStatus with id and status', async () => {
+    it('delegates to updateCompanyStatus with id, status, actor, and reason', async () => {
       service.updateCompanyStatus.mockResolvedValue({ id: 'company-a' });
 
-      await controller.updateStatus('company-a', {
-        status: 'SUSPENDED',
-      } as any);
+      await controller.updateStatus(
+        'company-a',
+        { status: 'SUSPENDED', reason: 'Falta de pago' } as any,
+        buildRequest(),
+      );
 
       expect(service.updateCompanyStatus).toHaveBeenCalledWith(
         'company-a',
         'SUSPENDED',
+        {
+          actorUserId: 'super-admin-1',
+          actorRole: 'SUPER_ADMIN',
+          ipAddress: '127.0.0.1',
+          userAgent: 'jest-test-agent',
+        },
+        'Falta de pago',
       );
+    });
+
+    it('works without a reason', async () => {
+      service.updateCompanyStatus.mockResolvedValue({ id: 'company-a' });
+
+      await controller.updateStatus(
+        'company-a',
+        { status: 'ACTIVE' } as any,
+        buildRequest(),
+      );
+
+      const [, , , reason] = service.updateCompanyStatus.mock.calls[0];
+      expect(reason).toBeUndefined();
     });
   });
 

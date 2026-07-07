@@ -172,6 +172,10 @@ describe('PlatformCompaniesController (e2e)', () => {
 
       expect(companiesServiceMock.createCompany).toHaveBeenCalledWith(
         validBody,
+        expect.objectContaining({
+          actorUserId: 'user-1',
+          actorRole: 'SUPER_ADMIN',
+        }),
       );
     });
 
@@ -253,7 +257,47 @@ describe('PlatformCompaniesController (e2e)', () => {
       expect(companiesServiceMock.updateCompanyStatus).toHaveBeenCalledWith(
         'company-a',
         'SUSPENDED',
+        expect.objectContaining({
+          actorUserId: 'user-1',
+          actorRole: 'SUPER_ADMIN',
+        }),
+        undefined,
       );
+    });
+
+    it('forwards an optional reason to the service', async () => {
+      companiesServiceMock.updateCompanyStatus.mockResolvedValue({
+        id: 'company-a',
+        status: 'SUSPENDED',
+      });
+      const token = signToken('SUPER_ADMIN', null);
+
+      await request(app.getHttpServer())
+        .patch('/api/platform/companies/company-a/status')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'SUSPENDED', reason: 'Falta de pago reportada' })
+        .expect(200);
+
+      expect(companiesServiceMock.updateCompanyStatus).toHaveBeenCalledWith(
+        'company-a',
+        'SUSPENDED',
+        expect.any(Object),
+        'Falta de pago reportada',
+      );
+    });
+
+    it('rejects a reason longer than 500 characters with 400', async () => {
+      const token = signToken('SUPER_ADMIN', null);
+
+      await request(app.getHttpServer())
+        .patch('/api/platform/companies/company-a/status')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ status: 'SUSPENDED', reason: 'a'.repeat(501) })
+        .expect(400);
+
+      expect(
+        companiesServiceMock.updateCompanyStatus,
+      ).not.toHaveBeenCalled();
     });
 
     it('rejects an invalid status value with 400', async () => {

@@ -5,9 +5,18 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PlatformCompaniesService } from './platform-companies.service';
+import { PlatformAuditLogService } from './platform-audit-log.service';
+
+const actor = {
+  actorUserId: 'super-admin-1',
+  actorRole: 'SUPER_ADMIN' as const,
+  ipAddress: '127.0.0.1',
+  userAgent: 'jest-test-agent',
+};
 
 describe('PlatformCompaniesService', () => {
   let prisma: any;
+  let auditLogService: PlatformAuditLogService;
   let service: PlatformCompaniesService;
 
   beforeEach(() => {
@@ -21,8 +30,15 @@ describe('PlatformCompaniesService', () => {
       user: {
         findUnique: jest.fn(),
       },
+      auditLog: {
+        create: jest.fn(),
+      },
+      $transaction: jest.fn((callback: (tx: any) => Promise<any>) =>
+        callback(prisma),
+      ),
     };
-    service = new PlatformCompaniesService(prisma);
+    auditLogService = new PlatformAuditLogService(prisma);
+    service = new PlatformCompaniesService(prisma, auditLogService);
   });
 
   describe('listCompanies', () => {
@@ -190,7 +206,7 @@ describe('PlatformCompaniesService', () => {
         ],
       }));
 
-      const result = await service.createCompany(validDto as any);
+      const result = await service.createCompany(validDto as any, actor);
 
       const createCall = prisma.company.create.mock.calls[0][0];
       expect(createCall.data.status).toBe('ACTIVE');
@@ -229,7 +245,7 @@ describe('PlatformCompaniesService', () => {
         ],
       });
 
-      const result = await service.createCompany(validDto as any);
+      const result = await service.createCompany(validDto as any, actor);
 
       expect(result).not.toHaveProperty('password');
       expect(result.admin).not.toHaveProperty('password');
@@ -238,37 +254,124 @@ describe('PlatformCompaniesService', () => {
     it('throws ConflictException when adminEmail already exists', async () => {
       prisma.user.findUnique.mockResolvedValue({ id: 'existing-user' });
 
-      await expect(service.createCompany(validDto as any)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.createCompany(validDto as any, actor),
+      ).rejects.toThrow(ConflictException);
       expect(prisma.company.create).not.toHaveBeenCalled();
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
 
     it('throws ConflictException when companyPhone already exists', async () => {
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.company.findUnique.mockResolvedValue({ id: 'existing-company' });
 
-      await expect(service.createCompany(validDto as any)).rejects.toThrow(
-        ConflictException,
-      );
+      await expect(
+        service.createCompany(validDto as any, actor),
+      ).rejects.toThrow(ConflictException);
       expect(prisma.company.create).not.toHaveBeenCalled();
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+
+    it('records a CREATE_COMPANY audit log without adminPassword or a password hash', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.company.findUnique.mockResolvedValue(null);
+      prisma.company.create.mockResolvedValue({
+        id: 'company-new',
+        name: 'New Co',
+        phone: '+50255551111',
+        status: 'ACTIVE',
+        createdAt: new Date('2026-01-01'),
+        updatedAt: new Date('2026-01-01'),
+        users: [
+          {
+            id: 'user-new',
+            name: 'New Admin',
+            email: 'new-admin@company.test',
+            role: 'ADMIN',
+            isActive: true,
+            createdAt: new Date('2026-01-01'),
+          },
+        ],
+      });
+
+      await service.createCompany(validDto as any, actor);
+
+      expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+      const auditCall = prisma.auditLog.create.mock.calls[0][0].data;
+      expect(auditCall.action).toBe('CREATE_COMPANY');
+      expect(auditCall.entityType).toBe('Company');
+      expect(auditCall.entityId).toBe('company-new');
+      expect(auditCall.actorUserId).toBe(actor.actorUserId);
+      expect(auditCall.actorRole).toBe(actor.actorRole);
+      expect(auditCall.affectedCompanyId).toBe('company-new');
+      expect(auditCall.metadata).toEqual({
+        companyName: 'New Co',
+        companyPhone: '+50255551111',
+        adminEmail: 'new-admin@company.test',
+        adminUserId: 'user-new',
+        companyId: 'company-new',
+      });
+
+      const serialized = JSON.stringify(auditCall);
+      expect(serialized).not.toContain('plain-password');
+      expect(serialized.toLowerCase()).not.toContain('password');
+      expect(serialized).not.toContain('$2a$');
+      expect(serialized).not.toContain('$2b$');
+    });
+
+    it('rolls back the Company/User creation if writing the audit log fails', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.company.findUnique.mockResolvedValue(null);
+      prisma.company.create.mockResolvedValue({
+        id: 'company-new',
+        name: 'New Co',
+        phone: '+50255551111',
+        status: 'ACTIVE',
+        createdAt: new Date('2026-01-01'),
+        updatedAt: new Date('2026-01-01'),
+        users: [
+          {
+            id: 'user-new',
+            name: 'New Admin',
+            email: 'new-admin@company.test',
+            role: 'ADMIN',
+            isActive: true,
+            createdAt: new Date('2026-01-01'),
+          },
+        ],
+      });
+      prisma.auditLog.create.mockRejectedValue(new Error('db down'));
+      // A real Prisma $transaction rejects if the callback throws; the mock
+      // mirrors that so the "operation fails if the audit write fails" rule
+      // is actually exercised end-to-end through the transaction boundary.
+      prisma.$transaction.mockImplementation(
+        async (callback: (tx: any) => Promise<any>) => callback(prisma),
+      );
+
+      await expect(
+        service.createCompany(validDto as any, actor),
+      ).rejects.toThrow();
     });
   });
 
   describe('updateCompanyStatus', () => {
-    it('changes ACTIVE to SUSPENDED', async () => {
+    it('changes ACTIVE to SUSPENDED and records an audit log', async () => {
       prisma.company.findUnique.mockResolvedValue({
         id: 'company-a',
+        name: 'Company A',
         status: 'ACTIVE',
       });
       prisma.company.update.mockResolvedValue({
         id: 'company-a',
+        name: 'Company A',
         status: 'SUSPENDED',
       });
 
       const result = await service.updateCompanyStatus(
         'company-a',
         'SUSPENDED' as any,
+        actor,
+        'Falta de pago reportada',
       );
 
       expect(prisma.company.update).toHaveBeenCalledWith(
@@ -278,21 +381,36 @@ describe('PlatformCompaniesService', () => {
         }),
       );
       expect(result.status).toBe('SUSPENDED');
+
+      expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+      const auditCall = prisma.auditLog.create.mock.calls[0][0].data;
+      expect(auditCall.action).toBe('UPDATE_COMPANY_STATUS');
+      expect(auditCall.affectedCompanyId).toBe('company-a');
+      expect(auditCall.reason).toBe('Falta de pago reportada');
+      expect(auditCall.metadata).toEqual({
+        fromStatus: 'ACTIVE',
+        toStatus: 'SUSPENDED',
+        companyName: 'Company A',
+        companyId: 'company-a',
+      });
     });
 
     it('changes SUSPENDED to ACTIVE', async () => {
       prisma.company.findUnique.mockResolvedValue({
         id: 'company-a',
+        name: 'Company A',
         status: 'SUSPENDED',
       });
       prisma.company.update.mockResolvedValue({
         id: 'company-a',
+        name: 'Company A',
         status: 'ACTIVE',
       });
 
       const result = await service.updateCompanyStatus(
         'company-a',
         'ACTIVE' as any,
+        actor,
       );
 
       expect(result.status).toBe('ACTIVE');
@@ -301,39 +419,45 @@ describe('PlatformCompaniesService', () => {
     it('changes ACTIVE/SUSPENDED to DELETED', async () => {
       prisma.company.findUnique.mockResolvedValue({
         id: 'company-a',
+        name: 'Company A',
         status: 'ACTIVE',
       });
       prisma.company.update.mockResolvedValue({
         id: 'company-a',
+        name: 'Company A',
         status: 'DELETED',
       });
 
       const result = await service.updateCompanyStatus(
         'company-a',
         'DELETED' as any,
+        actor,
       );
 
       expect(result.status).toBe('DELETED');
     });
 
-    it('blocks reactivating a DELETED company with BadRequestException', async () => {
+    it('blocks reactivating a DELETED company with BadRequestException and does not audit-log it', async () => {
       prisma.company.findUnique.mockResolvedValue({
         id: 'company-a',
+        name: 'Company A',
         status: 'DELETED',
       });
 
       await expect(
-        service.updateCompanyStatus('company-a', 'ACTIVE' as any),
+        service.updateCompanyStatus('company-a', 'ACTIVE' as any, actor),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.company.update).not.toHaveBeenCalled();
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
 
-    it('throws NotFoundException when the company does not exist', async () => {
+    it('throws NotFoundException and does not create an audit log when the company does not exist', async () => {
       prisma.company.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updateCompanyStatus('missing', 'ACTIVE' as any),
+        service.updateCompanyStatus('missing', 'ACTIVE' as any, actor),
       ).rejects.toThrow(NotFoundException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 });

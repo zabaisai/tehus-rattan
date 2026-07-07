@@ -25,6 +25,7 @@ model Company {
   notes               Note[]
   products            Product[]
   whatsappIntegration WhatsAppIntegration?
+  auditLogs           AuditLog[]           @relation("AuditLogAffectedCompany")
 
   @@map("companies")
 }
@@ -46,6 +47,7 @@ model User {
   stageChanges  LeadStageHistory[]
   tasks         Task[]
   notes         Note[]
+  auditLogs     AuditLog[]         @relation("AuditLogActor")
 
   @@map("users")
 }
@@ -345,6 +347,33 @@ enum CompanyStatus {
   ACTIVE
   SUSPENDED
   DELETED
+}
+
+// ─────────────────────────────────────────────
+// PLATFORM AUDIT LOG
+// ─────────────────────────────────────────────
+model AuditLog {
+  id                String   @id @default(cuid())
+  actorUserId       String?
+  actorRole         Role
+  affectedCompanyId String?
+  action            String
+  entityType        String
+  entityId          String?
+  reason            String?
+  metadata          Json?
+  ipAddress         String?
+  userAgent         String?
+  createdAt         DateTime @default(now())
+
+  actor           User?    @relation("AuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  affectedCompany Company? @relation("AuditLogAffectedCompany", fields: [affectedCompanyId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorUserId])
+  @@index([affectedCompanyId])
+  @@index([action])
+  @@map("audit_logs")
 }
 
 enum ConversationStatus {
