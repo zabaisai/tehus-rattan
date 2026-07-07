@@ -48,7 +48,10 @@ export class AuthService {
   }
 
   async login(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { company: true },
+    });
     if (!user) throw new UnauthorizedException('Credenciales inválidas');
 
     const valid = await bcrypt.compare(password, user.password);
@@ -56,6 +59,18 @@ export class AuthService {
 
     if (!user.isActive)
       throw new UnauthorizedException('Credenciales inválidas');
+
+    if (user.role !== 'SUPER_ADMIN') {
+      if (!user.company) {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+      if (user.company.status === 'SUSPENDED') {
+        throw new UnauthorizedException('La empresa está suspendida');
+      }
+      if (user.company.status === 'DELETED') {
+        throw new UnauthorizedException('La empresa fue eliminada');
+      }
+    }
 
     const token = this.jwtService.sign({
       sub: user.id,

@@ -8,11 +8,12 @@ datasource db {
 }
 
 model Company {
-  id        String   @id @default(cuid())
+  id        String        @id @default(cuid())
   name      String
-  phone     String?  @unique
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  phone     String?       @unique
+  status    CompanyStatus @default(ACTIVE)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
   users               User[]
   contacts            Contact[]
@@ -38,8 +39,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  companyId     String
-  company       Company            @relation(fields: [companyId], references: [id])
+  companyId     String?
+  company       Company?           @relation(fields: [companyId], references: [id])
   conversations Conversation[]
   leads         Lead[]
   stageChanges  LeadStageHistory[]
@@ -338,6 +339,12 @@ enum Role {
   SUPER_ADMIN
   ADMIN
   AGENT
+}
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
 }
 
 enum ConversationStatus {
