@@ -30,6 +30,15 @@ describe('PlatformCompaniesService', () => {
       user: {
         findUnique: jest.fn(),
       },
+      lead: {
+        findMany: jest.fn(),
+      },
+      conversation: {
+        findMany: jest.fn(),
+      },
+      task: {
+        findMany: jest.fn(),
+      },
       auditLog: {
         create: jest.fn(),
       },
@@ -458,6 +467,238 @@ describe('PlatformCompaniesService', () => {
         service.updateCompanyStatus('missing', 'ACTIVE' as any, actor),
       ).rejects.toThrow(NotFoundException);
       expect(prisma.auditLog.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getSupportOverview', () => {
+    const rawCompany = {
+      id: 'company-a',
+      name: 'Company A',
+      phone: '+50255550000',
+      status: 'ACTIVE',
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-05'),
+      users: [
+        {
+          id: 'user-1',
+          name: 'Admin A',
+          email: 'admin@company-a.test',
+          role: 'ADMIN',
+          isActive: true,
+          createdAt: new Date('2026-01-01'),
+        },
+        {
+          id: 'user-2',
+          name: 'Inactive Agent',
+          email: 'agent@company-a.test',
+          role: 'AGENT',
+          isActive: false,
+          createdAt: new Date('2026-01-02'),
+        },
+      ],
+      _count: {
+        contacts: 3,
+        leads: 12,
+        conversations: 7,
+        tasks: 4,
+        products: 2,
+      },
+      whatsappIntegration: {
+        status: 'CONNECTED',
+        phoneNumberId: 'phone-a',
+        displayPhoneNumber: '+50255550000',
+      },
+    };
+
+    function stubQueries(overrides: Partial<{ leads: any[]; conversations: any[]; tasks: any[] }> = {}) {
+      prisma.company.findUnique.mockResolvedValue(rawCompany);
+      prisma.lead.findMany.mockResolvedValue(overrides.leads ?? []);
+      prisma.conversation.findMany.mockResolvedValue(
+        overrides.conversations ?? [],
+      );
+      prisma.task.findMany.mockResolvedValue(overrides.tasks ?? []);
+      prisma.auditLog.create.mockResolvedValue({ id: 'audit-1' });
+    }
+
+    it('lets a global SUPER_ADMIN query the overview and returns a safe shape', async () => {
+      stubQueries();
+
+      const result = await service.getSupportOverview('company-a', actor);
+
+      expect(result.company).toEqual({
+        id: 'company-a',
+        name: 'Company A',
+        phone: '+50255550000',
+        status: 'ACTIVE',
+        createdAt: rawCompany.createdAt,
+        updatedAt: rawCompany.updatedAt,
+      });
+      expect(result.users).toEqual({
+        total: 2,
+        active: 1,
+        items: rawCompany.users,
+      });
+      expect(result.counts).toEqual({
+        contacts: 3,
+        leads: 12,
+        conversations: 7,
+        tasks: 4,
+        products: 2,
+      });
+      expect(result.whatsapp).toEqual({
+        connected: true,
+        status: 'CONNECTED',
+        phoneNumberId: 'phone-a',
+        displayPhoneNumber: '+50255550000',
+      });
+    });
+
+    it('throws NotFoundException for a company that does not exist', async () => {
+      prisma.company.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.getSupportOverview('missing', actor),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
+      expect(prisma.lead.findMany).not.toHaveBeenCalled();
+    });
+
+    it('never includes accessTokenEncrypted in the response', async () => {
+      stubQueries();
+
+      const result = await service.getSupportOverview('company-a', actor);
+
+      expect(JSON.stringify(result)).not.toContain('accessTokenEncrypted');
+      expect(result.whatsapp).not.toHaveProperty('accessTokenEncrypted');
+    });
+
+    it('never includes messages or conversation content', async () => {
+      stubQueries({
+        conversations: [
+          {
+            id: 'conv-1',
+            status: 'OPEN',
+            channel: 'whatsapp',
+            createdAt: new Date('2026-01-04'),
+            updatedAt: new Date('2026-01-04'),
+            contact: { id: 'contact-1', name: 'Jane Doe' },
+            agent: { id: 'user-1', name: 'Admin A' },
+          },
+        ],
+      });
+
+      const result = await service.getSupportOverview('company-a', actor);
+
+      expect(result.recentConversations[0]).not.toHaveProperty('messages');
+      expect(result.recentConversations[0]).not.toHaveProperty(
+        'lastMessage',
+      );
+      expect(JSON.stringify(result)).not.toContain('"messages"');
+    });
+
+    it('never includes passwords or password hashes', async () => {
+      stubQueries();
+
+      const result = await service.getSupportOverview('company-a', actor);
+
+      expect(JSON.stringify(result)).not.toContain('$2a$');
+      expect(JSON.stringify(result)).not.toContain('$2b$');
+      result.users.items.forEach((u: any) => {
+        expect(u).not.toHaveProperty('password');
+      });
+    });
+
+    it('records a VIEW_COMPANY_SUPPORT_OVERVIEW audit log with safe metadata', async () => {
+      stubQueries();
+
+      await service.getSupportOverview('company-a', actor);
+
+      expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+      const auditCall = prisma.auditLog.create.mock.calls[0][0].data;
+      expect(auditCall.action).toBe('VIEW_COMPANY_SUPPORT_OVERVIEW');
+      expect(auditCall.entityType).toBe('Company');
+      expect(auditCall.entityId).toBe('company-a');
+      expect(auditCall.affectedCompanyId).toBe('company-a');
+      expect(auditCall.actorUserId).toBe(actor.actorUserId);
+      expect(auditCall.metadata).toEqual({
+        companyId: 'company-a',
+        companyName: 'Company A',
+      });
+    });
+
+    it('fails the request if writing the audit log fails, and never returns data', async () => {
+      stubQueries();
+      prisma.auditLog.create.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        service.getSupportOverview('company-a', actor),
+      ).rejects.toThrow();
+    });
+
+    it('limits recentLeads, recentConversations, and recentTasks to 5', async () => {
+      stubQueries();
+
+      await service.getSupportOverview('company-a', actor);
+
+      expect(prisma.lead.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 5, orderBy: { updatedAt: 'desc' } }),
+      );
+      expect(prisma.conversation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 5, orderBy: { updatedAt: 'desc' } }),
+      );
+      expect(prisma.task.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 5, orderBy: { updatedAt: 'desc' } }),
+      );
+    });
+
+    it('computes lastActivityAt as the max updatedAt across the three recent lists', async () => {
+      stubQueries({
+        leads: [
+          {
+            id: 'lead-1',
+            title: 'Lead 1',
+            status: 'OPEN',
+            createdAt: new Date('2026-01-01'),
+            updatedAt: new Date('2026-01-03'),
+            stage: { name: 'Nuevo' },
+            agent: null,
+          },
+        ],
+        conversations: [
+          {
+            id: 'conv-1',
+            status: 'OPEN',
+            channel: 'whatsapp',
+            createdAt: new Date('2026-01-01'),
+            updatedAt: new Date('2026-01-08'),
+            contact: { id: 'contact-1', name: 'Jane Doe' },
+            agent: null,
+          },
+        ],
+        tasks: [
+          {
+            id: 'task-1',
+            title: 'Task 1',
+            status: 'PENDING',
+            dueDate: null,
+            createdAt: new Date('2026-01-01'),
+            updatedAt: new Date('2026-01-02'),
+            agent: null,
+          },
+        ],
+      });
+
+      const result = await service.getSupportOverview('company-a', actor);
+
+      expect(result.lastActivityAt).toEqual(new Date('2026-01-08'));
+    });
+
+    it('returns lastActivityAt null when there is no recent activity at all', async () => {
+      stubQueries();
+
+      const result = await service.getSupportOverview('company-a', actor);
+
+      expect(result.lastActivityAt).toBeNull();
     });
   });
 });

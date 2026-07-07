@@ -311,6 +311,192 @@ export class PlatformCompaniesService {
     });
   }
 
+  async getSupportOverview(id: string, actor: AuditActor) {
+    const trimmedId = this.requireNonBlank(id, 'id no puede estar vacio');
+
+    const company = await this.prisma.company.findUnique({
+      where: { id: trimmedId },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            isActive: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+        _count: {
+          select: {
+            contacts: true,
+            leads: true,
+            conversations: true,
+            tasks: true,
+            products: true,
+          },
+        },
+        whatsappIntegration: {
+          select: {
+            status: true,
+            phoneNumberId: true,
+            displayPhoneNumber: true,
+          },
+        },
+      },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Empresa no encontrada');
+    }
+
+    const [recentLeads, recentConversations, recentTasks] = await Promise.all(
+      [
+        this.prisma.lead.findMany({
+          where: { companyId: trimmedId },
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+            stage: { select: { name: true } },
+            agent: { select: { id: true, name: true } },
+          },
+        }),
+        // No messages, no last message preview, no conversation content —
+        // this is a support overview, not a way to read what was said.
+        this.prisma.conversation.findMany({
+          where: { companyId: trimmedId },
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            status: true,
+            channel: true,
+            createdAt: true,
+            updatedAt: true,
+            contact: { select: { id: true, name: true } },
+            agent: { select: { id: true, name: true } },
+          },
+        }),
+        this.prisma.task.findMany({
+          where: { companyId: trimmedId },
+          orderBy: { updatedAt: 'desc' },
+          take: 5,
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            dueDate: true,
+            createdAt: true,
+            updatedAt: true,
+            agent: { select: { id: true, name: true } },
+          },
+        }),
+      ],
+    );
+
+    // Each list above is already sorted by updatedAt desc, so item [0] of
+    // each is the single most-recently-touched row of that entity type —
+    // the max across all three is exactly "last activity", not a sample.
+    const lastActivityAt =
+      [
+        recentLeads[0]?.updatedAt,
+        recentConversations[0]?.updatedAt,
+        recentTasks[0]?.updatedAt,
+      ]
+        .filter((date): date is Date => !!date)
+        .sort((a, b) => b.getTime() - a.getTime())[0] ?? null;
+
+    // Read-only view, so there is no domain write to roll back — but per
+    // the "no sensitive access without traceability" rule, the audit write
+    // still happens before returning anything, and its own failure (it
+    // throws InternalServerErrorException) fails the whole request rather
+    // than silently letting the SUPER_ADMIN see the data unlogged.
+    await this.auditLogService.record(this.prisma, {
+      actorUserId: actor.actorUserId,
+      actorRole: actor.actorRole,
+      affectedCompanyId: trimmedId,
+      action: 'VIEW_COMPANY_SUPPORT_OVERVIEW',
+      entityType: 'Company',
+      entityId: trimmedId,
+      metadata: {
+        companyId: trimmedId,
+        companyName: company.name,
+      },
+      ipAddress: actor.ipAddress,
+      userAgent: actor.userAgent,
+    });
+
+    return {
+      company: {
+        id: company.id,
+        name: company.name,
+        phone: company.phone,
+        status: company.status,
+        createdAt: company.createdAt,
+        updatedAt: company.updatedAt,
+      },
+      users: {
+        total: company.users.length,
+        active: company.users.filter((u) => u.isActive).length,
+        items: company.users,
+      },
+      counts: {
+        contacts: company._count.contacts,
+        leads: company._count.leads,
+        conversations: company._count.conversations,
+        tasks: company._count.tasks,
+        products: company._count.products,
+      },
+      whatsapp: {
+        connected: company.whatsappIntegration?.status === 'CONNECTED',
+        status: company.whatsappIntegration?.status ?? null,
+        phoneNumberId: company.whatsappIntegration?.phoneNumberId ?? null,
+        displayPhoneNumber:
+          company.whatsappIntegration?.displayPhoneNumber ?? null,
+      },
+      recentLeads: recentLeads.map((lead) => ({
+        id: lead.id,
+        title: lead.title,
+        status: lead.status,
+        stageName: lead.stage?.name ?? null,
+        createdAt: lead.createdAt,
+        updatedAt: lead.updatedAt,
+        assignedUser: lead.agent,
+      })),
+      recentConversations: recentConversations.map((conversation) => ({
+        id: conversation.id,
+        status: conversation.status,
+        channel: conversation.channel,
+        contact: conversation.contact,
+        assignedUser: conversation.agent,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+      })),
+      recentTasks: recentTasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        dueDate: task.dueDate,
+        assignedUser: task.agent,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+      })),
+      lastActivityAt,
+    };
+  }
+
   private parseStatus(value: string): CompanyStatus {
     if (!VALID_STATUSES.includes(value as CompanyStatus)) {
       throw new BadRequestException(

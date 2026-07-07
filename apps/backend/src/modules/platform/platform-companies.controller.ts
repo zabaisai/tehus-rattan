@@ -30,6 +30,14 @@ export class PlatformCompaniesController {
     return this.companiesService.getCompanyDetail(id);
   }
 
+  @Get(':id/support-overview')
+  supportOverview(@Param('id') id: string, @Request() req: any) {
+    return this.companiesService.getSupportOverview(
+      id,
+      this.actorFromRequest(req),
+    );
+  }
+
   @Post()
   create(@Body() dto: CreatePlatformCompanyDto, @Request() req: any) {
     return this.companiesService.createCompany(dto, this.actorFromRequest(req));

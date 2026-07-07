@@ -21,6 +21,7 @@ const companiesServiceMock = {
   getCompanyDetail: jest.fn(),
   createCompany: jest.fn(),
   updateCompanyStatus: jest.fn(),
+  getSupportOverview: jest.fn(),
 };
 
 describe('PlatformCompaniesController (e2e)', () => {
@@ -326,6 +327,74 @@ describe('PlatformCompaniesController (e2e)', () => {
       expect(
         companiesServiceMock.updateCompanyStatus,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/platform/companies/:id/support-overview', () => {
+    const safeOverview = {
+      company: { id: 'company-a', name: 'Company A' },
+      users: { total: 1, active: 1, items: [] },
+      counts: { contacts: 0, leads: 0, conversations: 0, tasks: 0, products: 0 },
+      whatsapp: {
+        connected: false,
+        status: null,
+        phoneNumberId: null,
+        displayPhoneNumber: null,
+      },
+      recentLeads: [],
+      recentConversations: [],
+      recentTasks: [],
+      lastActivityAt: null,
+    };
+
+    it('allows a global SUPER_ADMIN and returns a safe overview', async () => {
+      companiesServiceMock.getSupportOverview.mockResolvedValue(safeOverview);
+      const token = signToken('SUPER_ADMIN', null);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/platform/companies/company-a/support-overview')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(companiesServiceMock.getSupportOverview).toHaveBeenCalledWith(
+        'company-a',
+        expect.objectContaining({
+          actorUserId: 'user-1',
+          actorRole: 'SUPER_ADMIN',
+        }),
+      );
+      expect(res.body).not.toHaveProperty('accessTokenEncrypted');
+      expect(JSON.stringify(res.body)).not.toContain('messages');
+    });
+
+    it('rejects ADMIN with 403', async () => {
+      const token = signToken('ADMIN', 'company-a');
+
+      await request(app.getHttpServer())
+        .get('/api/platform/companies/company-a/support-overview')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(companiesServiceMock.getSupportOverview).not.toHaveBeenCalled();
+    });
+
+    it('rejects a SUPER_ADMIN scoped to a company with 403', async () => {
+      const token = signToken('SUPER_ADMIN', 'company-a');
+
+      await request(app.getHttpServer())
+        .get('/api/platform/companies/company-a/support-overview')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(companiesServiceMock.getSupportOverview).not.toHaveBeenCalled();
+    });
+
+    it('rejects a request without a token with 401', async () => {
+      await request(app.getHttpServer())
+        .get('/api/platform/companies/company-a/support-overview')
+        .expect(401);
+
+      expect(companiesServiceMock.getSupportOverview).not.toHaveBeenCalled();
     });
   });
 });

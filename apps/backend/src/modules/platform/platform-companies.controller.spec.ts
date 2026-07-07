@@ -12,6 +12,7 @@ describe('PlatformCompaniesController', () => {
       getCompanyDetail: jest.fn(),
       createCompany: jest.fn(),
       updateCompanyStatus: jest.fn(),
+      getSupportOverview: jest.fn(),
     };
     controller = new PlatformCompaniesController(service);
   });
@@ -112,6 +113,21 @@ describe('PlatformCompaniesController', () => {
 
       const [, , , reason] = service.updateCompanyStatus.mock.calls[0];
       expect(reason).toBeUndefined();
+    });
+  });
+
+  describe('GET /platform/companies/:id/support-overview', () => {
+    it('delegates to getSupportOverview with the id and the actor from the JWT', async () => {
+      service.getSupportOverview.mockResolvedValue({ company: { id: 'company-a' } });
+
+      await controller.supportOverview('company-a', buildRequest());
+
+      expect(service.getSupportOverview).toHaveBeenCalledWith('company-a', {
+        actorUserId: 'super-admin-1',
+        actorRole: 'SUPER_ADMIN',
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest-test-agent',
+      });
     });
   });
 
