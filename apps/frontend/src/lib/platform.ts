@@ -2,11 +2,15 @@ import api from './axios';
 import {
   CompanyStatus,
   CreatePlatformCompanyPayload,
+  CreateSupportSessionPayload,
   PlatformAuditLog,
   PlatformCompanyCreated,
   PlatformCompanyDetail,
   PlatformCompanyListItem,
   PlatformCompanySupportOverview,
+  PlatformSupportConversation,
+  PlatformSupportSession,
+  SupportSessionStatus,
 } from '@/types';
 
 export async function getPlatformCompanies(params?: {
@@ -68,5 +72,46 @@ export async function getPlatformAuditLogs(params?: {
   const { data } = await api.get<PlatformAuditLog[]>('/platform/audit-logs', {
     params,
   });
+  return data;
+}
+
+export async function createSupportSession(
+  payload: CreateSupportSessionPayload,
+): Promise<PlatformSupportSession> {
+  const { data } = await api.post<PlatformSupportSession>(
+    '/platform/support-sessions',
+    payload,
+  );
+  return data;
+}
+
+export async function getSupportSessions(params?: {
+  companyId?: string;
+  status?: SupportSessionStatus;
+}): Promise<PlatformSupportSession[]> {
+  const { data } = await api.get<PlatformSupportSession[]>(
+    '/platform/support-sessions',
+    { params },
+  );
+  return data;
+}
+
+export async function endSupportSession(
+  id: string,
+): Promise<PlatformSupportSession> {
+  const { data } = await api.post<PlatformSupportSession>(
+    `/platform/support-sessions/${id}/end`,
+  );
+  return data;
+}
+
+export async function getSupportSessionConversations(
+  id: string,
+  params?: { page?: number; limit?: number },
+): Promise<PlatformSupportConversation[]> {
+  const { data } = await api.get<PlatformSupportConversation[]>(
+    `/platform/support-sessions/${id}/conversations`,
+    { params },
+  );
   return data;
 }

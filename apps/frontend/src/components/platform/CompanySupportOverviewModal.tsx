@@ -1,9 +1,12 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { X } from 'lucide-react';
-import { getPlatformCompanySupportOverview } from '@/lib/platform';
-import { CompanyStatus } from '@/types';
+import { getPlatformCompanySupportOverview, getSupportSessions } from '@/lib/platform';
+import { CompanyStatus, PlatformSupportSession } from '@/types';
+import { StartSupportSessionModal } from './StartSupportSessionModal';
+import { SupportSessionPanel } from './SupportSessionPanel';
 
 const statusLabels: Record<CompanyStatus, string> = {
   ACTIVE: 'Activa',
@@ -31,6 +34,7 @@ export function CompanySupportOverviewModal({
   companyId,
   onClose,
 }: CompanySupportOverviewModalProps) {
+  const queryClient = useQueryClient();
   const {
     data: overview,
     isLoading,
@@ -40,6 +44,22 @@ export function CompanySupportOverviewModal({
     queryFn: () => getPlatformCompanySupportOverview(companyId),
   });
 
+  const [localSession, setLocalSession] = useState<PlatformSupportSession | null>(
+    null,
+  );
+  const [startModalOpen, setStartModalOpen] = useState(false);
+
+  const { data: activeSessions, isLoading: loadingActiveSession } = useQuery({
+    queryKey: ['platform-support-sessions-active', companyId],
+    queryFn: () => getSupportSessions({ companyId, status: 'ACTIVE' }),
+  });
+
+  // Whatever this modal just created or ended locally always wins over the
+  // list query — it reflects a state change we already know happened,
+  // while the query result may still be the pre-invalidation snapshot.
+  const session = localSession ?? activeSessions?.[0] ?? null;
+  const hasActiveSession = session?.status === 'ACTIVE';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
       <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-lg">
@@ -47,12 +67,22 @@ export function CompanySupportOverviewModal({
           <h3 className="text-sm font-semibold text-stone-900">
             Overview de soporte
           </h3>
-          <button
-            onClick={onClose}
-            className="text-stone-400 hover:text-stone-700"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-3">
+            {!hasActiveSession && !loadingActiveSession && overview && (
+              <button
+                onClick={() => setStartModalOpen(true)}
+                className="rounded-md bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-800"
+              >
+                Iniciar soporte
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-stone-400 hover:text-stone-700"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
@@ -299,9 +329,35 @@ export function CompanySupportOverviewModal({
               Esta vista es superficial: no muestra mensajes ni contenido de
               conversaciones.
             </p>
+
+            {session && (
+              <SupportSessionPanel
+                session={session}
+                onEnded={(ended) => setLocalSession(ended)}
+              />
+            )}
           </div>
         )}
       </div>
+
+      {startModalOpen && overview && (
+        <StartSupportSessionModal
+          companyId={companyId}
+          companyName={overview.company.name}
+          onClose={() => setStartModalOpen(false)}
+          onCreated={(created) => {
+            setLocalSession(created);
+            setStartModalOpen(false);
+            // Starting a session is an audited action (START_SUPPORT_SESSION)
+            // — same reasoning as the other platform mutations: refresh the
+            // audit trail so it isn't stale for up to 30s.
+            queryClient.invalidateQueries({ queryKey: ['platform-audit-logs'] });
+            queryClient.invalidateQueries({
+              queryKey: ['platform-support-sessions-active', companyId],
+            });
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -10,11 +10,19 @@ const actionFilterOptions: { value: string; label: string }[] = [
   { value: '', label: 'Todas' },
   { value: 'CREATE_COMPANY', label: 'CREATE_COMPANY' },
   { value: 'UPDATE_COMPANY_STATUS', label: 'UPDATE_COMPANY_STATUS' },
+  { value: 'VIEW_COMPANY_SUPPORT_OVERVIEW', label: 'VIEW_COMPANY_SUPPORT_OVERVIEW' },
+  { value: 'START_SUPPORT_SESSION', label: 'START_SUPPORT_SESSION' },
+  { value: 'VIEW_SUPPORT_CONVERSATIONS', label: 'VIEW_SUPPORT_CONVERSATIONS' },
+  { value: 'END_SUPPORT_SESSION', label: 'END_SUPPORT_SESSION' },
 ];
 
 const actionLabels: Record<string, string> = {
   CREATE_COMPANY: 'Crear empresa',
   UPDATE_COMPANY_STATUS: 'Cambiar estado de empresa',
+  VIEW_COMPANY_SUPPORT_OVERVIEW: 'Ver overview de soporte',
+  START_SUPPORT_SESSION: 'Iniciar sesión de soporte',
+  VIEW_SUPPORT_CONVERSATIONS: 'Ver conversaciones de soporte',
+  END_SUPPORT_SESSION: 'Cerrar sesión de soporte',
 };
 
 const metadataLabels: Record<string, string> = {
@@ -25,6 +33,13 @@ const metadataLabels: Record<string, string> = {
   companyId: 'ID empresa',
   fromStatus: 'Estado anterior',
   toStatus: 'Estado nuevo',
+  supportSessionId: 'ID sesión de soporte',
+  reason: 'Motivo',
+  expiresAt: 'Expira',
+  resultCount: 'Resultados',
+  page: 'Página',
+  limit: 'Límite',
+  durationSeconds: 'Duración (s)',
 };
 
 function formatDate(value: string) {

@@ -311,6 +311,35 @@ export interface PlatformCompanySupportOverview {
   lastActivityAt: string | null;
 }
 
+export type SupportSessionStatus = "ACTIVE" | "ENDED" | "EXPIRED";
+
+export interface PlatformSupportSession {
+  id: string;
+  actorUserId?: string;
+  companyId: string;
+  company: { id: string; name: string; status: CompanyStatus };
+  reason: string;
+  status: SupportSessionStatus;
+  expiresAt: string;
+  endedAt: string | null;
+  createdAt: string;
+}
+
+export interface PlatformSupportConversation {
+  id: string;
+  status: string;
+  channel: string;
+  contact: { id: string; name: string | null } | null;
+  assignedUser: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSupportSessionPayload {
+  companyId: string;
+  reason: string;
+}
+
 export interface PlatformAuditLog {
   id: string;
   actorUserId: string | null;
