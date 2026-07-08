@@ -11,13 +11,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
 import { UpdateLeadDto } from './dto/update-lead.dto';
 import { ChangeStageDto } from './dto/change-stage.dto';
 import { ChangeStatusDto } from './dto/change-status.dto';
 
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
 @Controller('leads')
 export class LeadsController {
   constructor(private leadsService: LeadsService) {}

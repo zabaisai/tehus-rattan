@@ -1,10 +1,11 @@
 import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { AnalyticsService } from './analytics.service';
 
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Roles('ADMIN', 'SUPER_ADMIN')
 @Controller('analytics')
 export class AnalyticsController {

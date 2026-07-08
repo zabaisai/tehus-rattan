@@ -11,10 +11,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { NotesService } from './notes.service';
 import { CreateNoteDto } from './dto/create-note.dto';
 
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
 @Controller('notes')
 export class NotesController {
   constructor(private notesService: NotesService) {}

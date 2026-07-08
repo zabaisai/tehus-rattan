@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { ConversationsService } from './conversations.service';
 import { MessagesService } from '../messages/messages.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
@@ -17,7 +18,7 @@ import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
 @Controller('conversations')
 export class ConversationsController {
   constructor(

@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { PipelineService } from './pipeline.service';
 import { CreatePipelineDto } from './dto/create-pipeline.dto';
@@ -19,7 +20,7 @@ import { CreateStageDto } from './dto/create-stage.dto';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { ReorderStagesDto } from './dto/reorder-stages.dto';
 
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Controller('pipelines')
 export class PipelineController {
   constructor(private pipelineService: PipelineService) {}

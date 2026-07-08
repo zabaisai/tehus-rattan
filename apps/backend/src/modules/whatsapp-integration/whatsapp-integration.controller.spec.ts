@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import { WhatsAppIntegrationController } from './whatsapp-integration.controller';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 
 describe('WhatsAppIntegrationController', () => {
   let managementService: any;
@@ -165,14 +166,15 @@ describe('WhatsAppIntegrationController', () => {
   });
 
   describe('guards', () => {
-    it('applies exactly 2 class-level guards, the second being RolesGuard', () => {
+    it('applies exactly 3 class-level guards: AuthGuard, BusinessTenantGuard, RolesGuard', () => {
       const guards = Reflect.getMetadata(
         '__guards__',
         WhatsAppIntegrationController,
       );
 
-      expect(guards).toHaveLength(2);
-      expect(guards[1]).toBe(RolesGuard);
+      expect(guards).toHaveLength(3);
+      expect(guards[1]).toBe(BusinessTenantGuard);
+      expect(guards[2]).toBe(RolesGuard);
 
       // The first guard is whatever AuthGuard('jwt') returns: a fresh
       // anonymous mixin class generated on every call to AuthGuard(...), not

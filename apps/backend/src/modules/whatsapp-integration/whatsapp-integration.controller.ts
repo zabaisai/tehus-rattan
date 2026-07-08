@@ -9,11 +9,12 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { WhatsAppIntegrationManagementService } from './whatsapp-integration-management.service';
 import { ConnectWhatsAppIntegrationDto } from './dto/connect-whatsapp-integration.dto';
 
-@UseGuards(AuthGuard('jwt'), RolesGuard)
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Controller('whatsapp-integrations')
 export class WhatsAppIntegrationController {
   constructor(
