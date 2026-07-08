@@ -340,6 +340,30 @@ export interface CreateSupportSessionPayload {
   reason: string;
 }
 
+export interface PlatformSupportMessage {
+  id: string;
+  direction: string;
+  type: string;
+  status: string;
+  body: string | null;
+  createdAt: string;
+}
+
+export interface PlatformSupportConversationDetail {
+  conversation: {
+    id: string;
+    status: string;
+    channel: string;
+    createdAt: string;
+    updatedAt: string;
+    contact: { id: string; name: string | null } | null;
+    assignedUser: { id: string; name: string } | null;
+  };
+  messages: PlatformSupportMessage[];
+  page: number;
+  limit: number;
+}
+
 export interface PlatformAuditLog {
   id: string;
   actorUserId: string | null;

@@ -13,6 +13,7 @@ const actionFilterOptions: { value: string; label: string }[] = [
   { value: 'VIEW_COMPANY_SUPPORT_OVERVIEW', label: 'VIEW_COMPANY_SUPPORT_OVERVIEW' },
   { value: 'START_SUPPORT_SESSION', label: 'START_SUPPORT_SESSION' },
   { value: 'VIEW_SUPPORT_CONVERSATIONS', label: 'VIEW_SUPPORT_CONVERSATIONS' },
+  { value: 'VIEW_SUPPORT_CONVERSATION_DETAIL', label: 'VIEW_SUPPORT_CONVERSATION_DETAIL' },
   { value: 'END_SUPPORT_SESSION', label: 'END_SUPPORT_SESSION' },
 ];
 
@@ -22,6 +23,7 @@ const actionLabels: Record<string, string> = {
   VIEW_COMPANY_SUPPORT_OVERVIEW: 'Ver overview de soporte',
   START_SUPPORT_SESSION: 'Iniciar sesión de soporte',
   VIEW_SUPPORT_CONVERSATIONS: 'Ver conversaciones de soporte',
+  VIEW_SUPPORT_CONVERSATION_DETAIL: 'Ver detalle de conversación de soporte',
   END_SUPPORT_SESSION: 'Cerrar sesión de soporte',
 };
 
@@ -40,6 +42,8 @@ const metadataLabels: Record<string, string> = {
   page: 'Página',
   limit: 'Límite',
   durationSeconds: 'Duración (s)',
+  conversationId: 'ID conversación',
+  messageCount: 'Cantidad de mensajes',
 };
 
 function formatDate(value: string) {

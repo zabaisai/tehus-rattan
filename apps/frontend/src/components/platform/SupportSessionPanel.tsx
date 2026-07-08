@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { endSupportSession, getSupportSessionConversations } from '@/lib/platform';
 import { PlatformSupportSession, SupportSessionStatus } from '@/types';
+import { SupportConversationDetailModal } from './SupportConversationDetailModal';
 
 type ApiError = {
   response?: {
@@ -58,6 +59,9 @@ export function SupportSessionPanel({
   const [page, setPage] = useState(1);
   const [ending, setEnding] = useState(false);
   const [endError, setEndError] = useState('');
+  const [openConversationId, setOpenConversationId] = useState<string | null>(
+    null,
+  );
 
   const isActive = session.status === 'ACTIVE';
 
@@ -176,13 +180,22 @@ export function SupportSessionPanel({
                   key={conversation.id}
                   className="rounded-md border border-stone-100 px-3 py-2"
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <p className="text-stone-800">
                       {conversation.contact?.name ?? 'Contacto sin nombre'}
                     </p>
-                    <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
-                      {conversation.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                        {conversation.status}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setOpenConversationId(conversation.id)}
+                        className="rounded-md border border-stone-200 px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                      >
+                        Ver mensajes
+                      </button>
+                    </div>
                   </div>
                   <p className="mt-1 text-xs text-stone-500">
                     {conversation.channel} ·{' '}
@@ -214,6 +227,14 @@ export function SupportSessionPanel({
             </button>
           </div>
         </div>
+      )}
+
+      {openConversationId && (
+        <SupportConversationDetailModal
+          sessionId={session.id}
+          conversationId={openConversationId}
+          onClose={() => setOpenConversationId(null)}
+        />
       )}
     </div>
   );

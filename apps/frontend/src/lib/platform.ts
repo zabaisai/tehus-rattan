@@ -9,6 +9,7 @@ import {
   PlatformCompanyListItem,
   PlatformCompanySupportOverview,
   PlatformSupportConversation,
+  PlatformSupportConversationDetail,
   PlatformSupportSession,
   SupportSessionStatus,
 } from '@/types';
@@ -111,6 +112,18 @@ export async function getSupportSessionConversations(
 ): Promise<PlatformSupportConversation[]> {
   const { data } = await api.get<PlatformSupportConversation[]>(
     `/platform/support-sessions/${id}/conversations`,
+    { params },
+  );
+  return data;
+}
+
+export async function getSupportSessionConversationDetail(
+  sessionId: string,
+  conversationId: string,
+  params?: { page?: number; limit?: number },
+): Promise<PlatformSupportConversationDetail> {
+  const { data } = await api.get<PlatformSupportConversationDetail>(
+    `/platform/support-sessions/${sessionId}/conversations/${conversationId}`,
     { params },
   );
   return data;
