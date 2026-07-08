@@ -60,6 +60,22 @@ export class SupportSessionsController {
     );
   }
 
+  @Get(':id/conversations/:conversationId')
+  getConversationDetail(
+    @Param('id') id: string,
+    @Param('conversationId') conversationId: string,
+    @Request() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.supportSessionsService.getSessionConversationDetail(
+      id,
+      conversationId,
+      this.actorFromRequest(req),
+      { page, limit },
+    );
+  }
+
   private actorFromRequest(req: any) {
     return {
       actorUserId: req.user.sub,

@@ -109,6 +109,7 @@ model Message {
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
+  @@index([conversationId, createdAt])
   @@map("messages")
 }
 

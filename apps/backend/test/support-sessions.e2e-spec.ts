@@ -29,6 +29,7 @@ const supportSessionsServiceMock = {
   endSession: jest.fn(),
   listSessions: jest.fn(),
   listSessionConversations: jest.fn(),
+  getSessionConversationDetail: jest.fn(),
 };
 
 const contactsServiceMock = {
@@ -342,6 +343,163 @@ describe('SupportSessionsController (e2e)', () => {
 
       expect(JSON.stringify(res.body)).not.toContain('messages');
       expect(JSON.stringify(res.body)).not.toContain('lastMessage');
+    });
+  });
+
+  describe('GET /api/platform/support-sessions/:id/conversations/:conversationId', () => {
+    const safeDetail = {
+      conversation: {
+        id: 'conv-1',
+        status: 'OPEN',
+        channel: 'whatsapp',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+        contact: { id: 'contact-1', name: 'Jane Doe' },
+        assignedUser: { id: 'user-1', name: 'Agent A' },
+      },
+      messages: [
+        {
+          id: 'msg-1',
+          direction: 'INBOUND',
+          type: 'TEXT',
+          status: 'RECEIVED',
+          body: 'Hola, necesito ayuda',
+          createdAt: '2026-01-01T10:00:00.000Z',
+        },
+      ],
+      page: 1,
+      limit: 50,
+    };
+
+    it('allows a global SUPER_ADMIN with a valid session to see the detail', async () => {
+      supportSessionsServiceMock.getSessionConversationDetail.mockResolvedValue(
+        safeDetail,
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(
+        supportSessionsServiceMock.getSessionConversationDetail,
+      ).toHaveBeenCalledWith(
+        'session-1',
+        'conv-1',
+        expect.objectContaining({ actorUserId: 'user-1' }),
+        { page: undefined, limit: undefined },
+      );
+      expect(res.body).toEqual(safeDetail);
+    });
+
+    it('rejects ADMIN with 403', async () => {
+      const token = signToken('ADMIN', 'company-a');
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(
+        supportSessionsServiceMock.getSessionConversationDetail,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a SUPER_ADMIN scoped to a company with 403', async () => {
+      const token = signToken('SUPER_ADMIN', 'company-a');
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(
+        supportSessionsServiceMock.getSessionConversationDetail,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a request without a token with 401', async () => {
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .expect(401);
+
+      expect(
+        supportSessionsServiceMock.getSessionConversationDetail,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('blocks access when the session is invalid (expired/ENDED) with 403', async () => {
+      supportSessionsServiceMock.getSessionConversationDetail.mockRejectedValue(
+        new ForbiddenException('La sesión de soporte no está activa'),
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+    });
+
+    it('blocks access when the session belongs to another actor with 404', async () => {
+      supportSessionsServiceMock.getSessionConversationDetail.mockRejectedValue(
+        new NotFoundException('Sesión de soporte no encontrada'),
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+
+    it('returns 404 for a conversation belonging to another company', async () => {
+      supportSessionsServiceMock.getSessionConversationDetail.mockRejectedValue(
+        new NotFoundException('Conversación no encontrada'),
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      await request(app.getHttpServer())
+        .get(
+          '/api/platform/support-sessions/session-1/conversations/conv-other-company',
+        )
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+
+    it('includes messages with body in the response', async () => {
+      supportSessionsServiceMock.getSessionConversationDetail.mockResolvedValue(
+        safeDetail,
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(res.body.messages).toHaveLength(1);
+      expect(res.body.messages[0].body).toBe('Hola, necesito ayuda');
+    });
+
+    it('never returns wamid, notes, tokens, password, or hash', async () => {
+      supportSessionsServiceMock.getSessionConversationDetail.mockResolvedValue(
+        safeDetail,
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations/conv-1')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      const serialized = JSON.stringify(res.body).toLowerCase();
+      ['wamid', 'notes', 'password', 'hash', 'accesstokenencrypted'].forEach(
+        (needle) => {
+          expect(serialized).not.toContain(needle);
+        },
+      );
+      expect(serialized).not.toContain('"token"');
     });
   });
 

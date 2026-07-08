@@ -18,6 +18,7 @@ describe('SupportSessionsController', () => {
       endSession: jest.fn(),
       listSessions: jest.fn(),
       listSessionConversations: jest.fn(),
+      getSessionConversationDetail: jest.fn(),
     };
     controller = new SupportSessionsController(service);
   });
@@ -77,6 +78,32 @@ describe('SupportSessionsController', () => {
         'session-1',
         expect.objectContaining({ actorUserId: 'super-admin-1' }),
         { page: '2', limit: '10' },
+      );
+    });
+  });
+
+  describe('GET /platform/support-sessions/:id/conversations/:conversationId', () => {
+    it('delegates to getSessionConversationDetail with session id, conversation id, actor, and pagination', async () => {
+      service.getSessionConversationDetail.mockResolvedValue({
+        conversation: { id: 'conv-1' },
+        messages: [],
+        page: 1,
+        limit: 50,
+      });
+
+      await controller.getConversationDetail(
+        'session-1',
+        'conv-1',
+        req as any,
+        '1',
+        '50',
+      );
+
+      expect(service.getSessionConversationDetail).toHaveBeenCalledWith(
+        'session-1',
+        'conv-1',
+        expect.objectContaining({ actorUserId: 'super-admin-1' }),
+        { page: '1', limit: '50' },
       );
     });
   });

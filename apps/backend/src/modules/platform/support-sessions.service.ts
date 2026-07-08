@@ -278,6 +278,7 @@ export class SupportSessionsService {
     const { page, limit, skip, take } = this.parsePagination(
       filters.page,
       filters.limit,
+      { defaultLimit: 20, maxLimit: 50 },
     );
 
     // Explicit select, not the business ConversationsService.findAll — that
@@ -336,7 +337,116 @@ export class SupportSessionsService {
     return items;
   }
 
-  private parsePagination(pageInput?: string, limitInput?: string) {
+  // Nivel 2 of support mode: unlike listSessionConversations, this reads
+  // real message content (body). Only reachable through the same
+  // ACTIVE/owned/non-expired SupportSession gate, and only ever audited —
+  // this is the first place support mode stops being superficial on
+  // purpose, so every access is logged with VIEW_SUPPORT_CONVERSATION_DETAIL.
+  async getSessionConversationDetail(
+    sessionId: string,
+    conversationId: string,
+    actor: AuditActor,
+    filters: { page?: string; limit?: string } = {},
+  ) {
+    const session = await this.validateActiveSupportSession(
+      sessionId,
+      actor.actorUserId,
+    );
+    const { page, limit, skip, take } = this.parsePagination(
+      filters.page,
+      filters.limit,
+      { defaultLimit: 50, maxLimit: 100 },
+    );
+    const trimmedConversationId = this.requireNonBlank(
+      conversationId,
+      'conversationId no puede estar vacio',
+    );
+
+    // companyId lives inside the query itself — never findFirst/findUnique
+    // by id alone and compare companyId afterwards, or a conversation from
+    // another tenant would exist in memory before being rejected.
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { id: trimmedConversationId, companyId: session.companyId },
+      select: {
+        id: true,
+        status: true,
+        channel: true,
+        createdAt: true,
+        updatedAt: true,
+        contact: { select: { id: true, name: true } },
+        agent: { select: { id: true, name: true } },
+      },
+    });
+    if (!conversation) {
+      throw new NotFoundException('Conversación no encontrada');
+    }
+
+    // Explicit select: no wamid (external provider id, not needed here),
+    // no Note relation. Message has neither updatedAt nor a per-message
+    // sender in the schema, so neither is fabricated — direction is the
+    // only attribution available (OUTBOUND is not necessarily the
+    // conversation's current assignedUser).
+    const messages = await this.prisma.message.findMany({
+      where: { conversationId: trimmedConversationId },
+      orderBy: { createdAt: 'asc' },
+      skip,
+      take,
+      select: {
+        id: true,
+        direction: true,
+        type: true,
+        status: true,
+        body: true,
+        createdAt: true,
+      },
+    });
+
+    // Read-only view, so there is no domain write to roll back — but per
+    // the "no sensitive access without traceability" rule, the audit write
+    // still happens before returning anything, and its own failure (it
+    // throws InternalServerErrorException) fails the whole request rather
+    // than silently letting message content go unlogged.
+    await this.auditLogService.record(this.prisma, {
+      actorUserId: actor.actorUserId,
+      actorRole: actor.actorRole,
+      affectedCompanyId: session.companyId,
+      action: 'VIEW_SUPPORT_CONVERSATION_DETAIL',
+      entityType: 'Conversation',
+      entityId: conversation.id,
+      metadata: {
+        supportSessionId: session.id,
+        companyId: session.companyId,
+        companyName: session.company.name,
+        conversationId: conversation.id,
+        messageCount: messages.length,
+        page,
+        limit,
+      },
+      ipAddress: actor.ipAddress,
+      userAgent: actor.userAgent,
+    });
+
+    return {
+      conversation: {
+        id: conversation.id,
+        status: conversation.status,
+        channel: conversation.channel,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt,
+        contact: conversation.contact,
+        assignedUser: conversation.agent,
+      },
+      messages,
+      page,
+      limit,
+    };
+  }
+
+  private parsePagination(
+    pageInput: string | undefined,
+    limitInput: string | undefined,
+    { defaultLimit, maxLimit }: { defaultLimit: number; maxLimit: number },
+  ) {
     let page = 1;
     if (pageInput !== undefined) {
       page = Number(pageInput);
@@ -345,11 +455,13 @@ export class SupportSessionsService {
       }
     }
 
-    let limit = 20;
+    let limit = defaultLimit;
     if (limitInput !== undefined) {
       limit = Number(limitInput);
-      if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
-        throw new BadRequestException('limit debe ser un entero entre 1 y 50');
+      if (!Number.isInteger(limit) || limit < 1 || limit > maxLimit) {
+        throw new BadRequestException(
+          `limit debe ser un entero entre 1 y ${maxLimit}`,
+        );
       }
     }
 
