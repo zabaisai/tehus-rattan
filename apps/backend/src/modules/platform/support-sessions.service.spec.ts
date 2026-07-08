@@ -148,6 +148,23 @@ describe('SupportSessionsService', () => {
       expect(prisma.supportSession.create).not.toHaveBeenCalled();
     });
 
+    it('checks for a duplicate session by actorUserId, companyId, status ACTIVE, and a non-expired expiresAt', async () => {
+      stubHappyPath();
+
+      await service.createSession(validDto, actor);
+
+      expect(prisma.supportSession.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            actorUserId: actor.actorUserId,
+            companyId: 'company-a',
+            status: 'ACTIVE',
+            expiresAt: expect.objectContaining({ gt: expect.any(Date) }),
+          }),
+        }),
+      );
+    });
+
     it('allows a new session when the previous one is ENDED (excluded by the ACTIVE filter)', async () => {
       stubHappyPath();
       // The findFirst mock only matches status: 'ACTIVE' in the real query,
@@ -260,6 +277,38 @@ describe('SupportSessionsService', () => {
         NotFoundException,
       );
       expect(prisma.supportSession.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects closing a session that is already ENDED with ConflictException', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue({
+        ...activeSession,
+        status: 'ENDED',
+      });
+
+      await expect(service.endSession('session-1', actor)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.supportSession.update).not.toHaveBeenCalled();
+    });
+
+    it('lazily marks an expired ACTIVE session as EXPIRED and rejects with ConflictException', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue({
+        ...activeSession,
+        status: 'ACTIVE',
+        expiresAt: new Date(Date.now() - 1000),
+      });
+
+      await expect(service.endSession('session-1', actor)).rejects.toThrow(
+        ConflictException,
+      );
+      expect(prisma.supportSession.update).toHaveBeenCalledWith({
+        where: { id: 'session-1' },
+        data: { status: 'EXPIRED' },
+      });
+      // The lazy-expiry write is the only update call — closing the
+      // session (status: 'ENDED') never happens on this path.
+      expect(prisma.supportSession.update).toHaveBeenCalledTimes(1);
+      expect(prisma.auditLog.create).not.toHaveBeenCalled();
     });
   });
 
@@ -421,6 +470,17 @@ describe('SupportSessionsService', () => {
       await expect(
         service.listSessionConversations('session-1', actor, {
           limit: '51',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-numeric page', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+
+      await expect(
+        service.listSessionConversations('session-1', actor, {
+          page: 'abc',
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.conversation.findMany).not.toHaveBeenCalled();
@@ -661,6 +721,18 @@ describe('SupportSessionsService', () => {
       await expect(
         service.getSessionConversationDetail('session-1', 'conv-1', actor, {
           limit: '101',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.message.findMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-numeric limit', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findFirst.mockResolvedValue(rawConversationDetail);
+
+      await expect(
+        service.getSessionConversationDetail('session-1', 'conv-1', actor, {
+          limit: 'abc',
         }),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.message.findMany).not.toHaveBeenCalled();

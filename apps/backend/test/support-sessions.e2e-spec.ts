@@ -236,6 +236,17 @@ describe('SupportSessionsController (e2e)', () => {
 
       expect(supportSessionsServiceMock.endSession).not.toHaveBeenCalled();
     });
+
+    it('rejects ADMIN with 403', async () => {
+      const token = signToken('ADMIN', 'company-a');
+
+      await request(app.getHttpServer())
+        .post('/api/platform/support-sessions/session-1/end')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(supportSessionsServiceMock.endSession).not.toHaveBeenCalled();
+    });
   });
 
   describe('GET /api/platform/support-sessions/:id/conversations', () => {
