@@ -26,6 +26,7 @@ model Company {
   products            Product[]
   whatsappIntegration WhatsAppIntegration?
   auditLogs           AuditLog[]           @relation("AuditLogAffectedCompany")
+  supportSessions     SupportSession[]
 
   @@map("companies")
 }
@@ -40,14 +41,15 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  companyId     String?
-  company       Company?           @relation(fields: [companyId], references: [id])
-  conversations Conversation[]
-  leads         Lead[]
-  stageChanges  LeadStageHistory[]
-  tasks         Task[]
-  notes         Note[]
-  auditLogs     AuditLog[]         @relation("AuditLogActor")
+  companyId       String?
+  company         Company?           @relation(fields: [companyId], references: [id])
+  conversations   Conversation[]
+  leads           Lead[]
+  stageChanges    LeadStageHistory[]
+  tasks           Task[]
+  notes           Note[]
+  auditLogs       AuditLog[]         @relation("AuditLogActor")
+  supportSessions SupportSession[]
 
   @@map("users")
 }
@@ -374,6 +376,36 @@ model AuditLog {
   @@index([affectedCompanyId])
   @@index([action])
   @@map("audit_logs")
+}
+
+// ─────────────────────────────────────────────
+// PLATFORM SUPPORT SESSIONS
+// ─────────────────────────────────────────────
+enum SupportSessionStatus {
+  ACTIVE
+  ENDED
+  EXPIRED
+}
+
+model SupportSession {
+  id          String               @id @default(cuid())
+  actorUserId String
+  companyId   String
+  reason      String
+  status      SupportSessionStatus @default(ACTIVE)
+  expiresAt   DateTime
+  endedAt     DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  actor   User    @relation(fields: [actorUserId], references: [id])
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@index([actorUserId])
+  @@index([companyId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("support_sessions")
 }
 
 enum ConversationStatus {
