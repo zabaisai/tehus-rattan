@@ -36,6 +36,9 @@ describe('SupportSessionsService', () => {
         create: jest.fn(),
         update: jest.fn(),
       },
+      conversation: {
+        findMany: jest.fn(),
+      },
       auditLog: {
         create: jest.fn(),
       },
@@ -300,6 +303,202 @@ describe('SupportSessionsService', () => {
       await expect(
         service.validateActiveSupportSession('session-1', actor.actorUserId),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('listSessionConversations', () => {
+    const activeSession = {
+      id: 'session-1',
+      actorUserId: actor.actorUserId,
+      companyId: 'company-a',
+      status: 'ACTIVE',
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+      company: { id: 'company-a', name: 'Company A' },
+    };
+
+    const rawConversation = {
+      id: 'conv-1',
+      status: 'OPEN',
+      channel: 'whatsapp',
+      createdAt: new Date('2026-01-01'),
+      updatedAt: new Date('2026-01-02'),
+      contact: { id: 'contact-1', name: 'Jane Doe' },
+      agent: { id: 'user-1', name: 'Agent A' },
+    };
+
+    it('lists conversations when the SupportSession is ACTIVE and not expired', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([rawConversation]);
+
+      const result = await service.listSessionConversations(
+        'session-1',
+        actor,
+      );
+
+      expect(result).toEqual([
+        {
+          id: 'conv-1',
+          status: 'OPEN',
+          channel: 'whatsapp',
+          createdAt: rawConversation.createdAt,
+          updatedAt: rawConversation.updatedAt,
+          contact: { id: 'contact-1', name: 'Jane Doe' },
+          assignedUser: { id: 'user-1', name: 'Agent A' },
+        },
+      ]);
+    });
+
+    it('rejects when the session is ENDED', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue({
+        ...activeSession,
+        status: 'ENDED',
+      });
+
+      await expect(
+        service.listSessionConversations('session-1', actor),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the session is expired', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue({
+        ...activeSession,
+        expiresAt: new Date(Date.now() - 1000),
+      });
+
+      await expect(
+        service.listSessionConversations('session-1', actor),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects when the session belongs to another actor', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue({
+        ...activeSession,
+        actorUserId: 'other-actor',
+      });
+
+      await expect(
+        service.listSessionConversations('session-1', actor),
+      ).rejects.toThrow(NotFoundException);
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+    });
+
+    it("filters conversations by the session's companyId", async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([]);
+
+      await service.listSessionConversations('session-1', actor);
+
+      expect(prisma.conversation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { companyId: 'company-a' },
+        }),
+      );
+    });
+
+    it('limits results according to the limit filter', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([]);
+
+      await service.listSessionConversations('session-1', actor, {
+        page: '2',
+        limit: '5',
+      });
+
+      expect(prisma.conversation.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 5, take: 5 }),
+      );
+    });
+
+    it('rejects a limit above 50', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+
+      await expect(
+        service.listSessionConversations('session-1', actor, {
+          limit: '51',
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.conversation.findMany).not.toHaveBeenCalled();
+    });
+
+    it('never returns messages', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([rawConversation]);
+
+      const result = await service.listSessionConversations(
+        'session-1',
+        actor,
+      );
+
+      expect(JSON.stringify(result)).not.toContain('"messages"');
+      result.forEach((item: any) => {
+        expect(item).not.toHaveProperty('messages');
+        expect(item).not.toHaveProperty('lastMessage');
+      });
+    });
+
+    it('never returns notes', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([rawConversation]);
+
+      const result = await service.listSessionConversations(
+        'session-1',
+        actor,
+      );
+
+      expect(JSON.stringify(result)).not.toContain('"notes"');
+      result.forEach((item: any) => {
+        expect(item).not.toHaveProperty('notes');
+      });
+    });
+
+    it('never returns passwords, hashes, tokens, or accessTokenEncrypted', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([rawConversation]);
+
+      const result = await service.listSessionConversations(
+        'session-1',
+        actor,
+      );
+
+      const serialized = JSON.stringify(result).toLowerCase();
+      expect(serialized).not.toContain('password');
+      expect(serialized).not.toContain('hash');
+      expect(serialized).not.toContain('accesstokenencrypted');
+      expect(serialized).not.toContain('"token"');
+    });
+
+    it('records a VIEW_SUPPORT_CONVERSATIONS audit log with safe metadata', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([rawConversation]);
+
+      await service.listSessionConversations('session-1', actor);
+
+      expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+      const auditCall = prisma.auditLog.create.mock.calls[0][0].data;
+      expect(auditCall.action).toBe('VIEW_SUPPORT_CONVERSATIONS');
+      expect(auditCall.entityType).toBe('SupportSession');
+      expect(auditCall.entityId).toBe('session-1');
+      expect(auditCall.affectedCompanyId).toBe('company-a');
+      expect(auditCall.metadata).toEqual({
+        supportSessionId: 'session-1',
+        companyId: 'company-a',
+        companyName: 'Company A',
+        resultCount: 1,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('fails the request if writing the audit log fails, and never returns data', async () => {
+      prisma.supportSession.findUnique.mockResolvedValue(activeSession);
+      prisma.conversation.findMany.mockResolvedValue([rawConversation]);
+      prisma.auditLog.create.mockRejectedValue(new Error('db down'));
+
+      await expect(
+        service.listSessionConversations('session-1', actor),
+      ).rejects.toThrow();
     });
   });
 

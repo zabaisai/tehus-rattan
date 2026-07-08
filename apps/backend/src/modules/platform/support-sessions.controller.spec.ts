@@ -17,6 +17,7 @@ describe('SupportSessionsController', () => {
       createSession: jest.fn(),
       endSession: jest.fn(),
       listSessions: jest.fn(),
+      listSessionConversations: jest.fn(),
     };
     controller = new SupportSessionsController(service);
   });
@@ -63,6 +64,20 @@ describe('SupportSessionsController', () => {
         companyId: 'company-a',
         status: 'ACTIVE',
       });
+    });
+  });
+
+  describe('GET /platform/support-sessions/:id/conversations', () => {
+    it('delegates to listSessionConversations with the session id, actor, and pagination', async () => {
+      service.listSessionConversations.mockResolvedValue([]);
+
+      await controller.listConversations('session-1', req as any, '2', '10');
+
+      expect(service.listSessionConversations).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({ actorUserId: 'super-admin-1' }),
+        { page: '2', limit: '10' },
+      );
     });
   });
 

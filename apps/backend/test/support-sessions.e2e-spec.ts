@@ -1,4 +1,9 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  ForbiddenException,
+  INestApplication,
+  NotFoundException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -23,6 +28,7 @@ const supportSessionsServiceMock = {
   createSession: jest.fn(),
   endSession: jest.fn(),
   listSessions: jest.fn(),
+  listSessionConversations: jest.fn(),
 };
 
 const contactsServiceMock = {
@@ -228,6 +234,114 @@ describe('SupportSessionsController (e2e)', () => {
         .expect(403);
 
       expect(supportSessionsServiceMock.endSession).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/platform/support-sessions/:id/conversations', () => {
+    const safeConversation = {
+      id: 'conv-1',
+      status: 'OPEN',
+      channel: 'whatsapp',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      contact: { id: 'contact-1', name: 'Jane Doe' },
+      assignedUser: { id: 'user-1', name: 'Agent A' },
+    };
+
+    it('allows a global SUPER_ADMIN with a valid session to list conversations', async () => {
+      supportSessionsServiceMock.listSessionConversations.mockResolvedValue([
+        safeConversation,
+      ]);
+      const token = signToken('SUPER_ADMIN', null);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(
+        supportSessionsServiceMock.listSessionConversations,
+      ).toHaveBeenCalledWith(
+        'session-1',
+        expect.objectContaining({ actorUserId: 'user-1' }),
+        { page: undefined, limit: undefined },
+      );
+      expect(res.body).toEqual([safeConversation]);
+    });
+
+    it('rejects ADMIN with 403', async () => {
+      const token = signToken('ADMIN', 'company-a');
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(
+        supportSessionsServiceMock.listSessionConversations,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a SUPER_ADMIN scoped to a company with 403', async () => {
+      const token = signToken('SUPER_ADMIN', 'company-a');
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+
+      expect(
+        supportSessionsServiceMock.listSessionConversations,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a request without a token with 401', async () => {
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations')
+        .expect(401);
+
+      expect(
+        supportSessionsServiceMock.listSessionConversations,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('blocks access when the session is invalid (expired/ENDED)', async () => {
+      supportSessionsServiceMock.listSessionConversations.mockRejectedValue(
+        new ForbiddenException('La sesión de soporte no está activa'),
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(403);
+    });
+
+    it('blocks access when the session belongs to another actor', async () => {
+      supportSessionsServiceMock.listSessionConversations.mockRejectedValue(
+        new NotFoundException('Sesión de soporte no encontrada'),
+      );
+      const token = signToken('SUPER_ADMIN', null);
+
+      await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(404);
+    });
+
+    it('never returns messages', async () => {
+      supportSessionsServiceMock.listSessionConversations.mockResolvedValue([
+        safeConversation,
+      ]);
+      const token = signToken('SUPER_ADMIN', null);
+
+      const res = await request(app.getHttpServer())
+        .get('/api/platform/support-sessions/session-1/conversations')
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+
+      expect(JSON.stringify(res.body)).not.toContain('messages');
+      expect(JSON.stringify(res.body)).not.toContain('lastMessage');
     });
   });
 

@@ -46,6 +46,20 @@ export class SupportSessionsController {
     });
   }
 
+  @Get(':id/conversations')
+  listConversations(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.supportSessionsService.listSessionConversations(
+      id,
+      this.actorFromRequest(req),
+      { page, limit },
+    );
+  }
+
   private actorFromRequest(req: any) {
     return {
       actorUserId: req.user.sub,

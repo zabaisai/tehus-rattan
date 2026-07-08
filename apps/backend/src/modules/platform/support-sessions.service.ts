@@ -230,10 +230,9 @@ export class SupportSessionsService {
     return sessions.map((session) => this.toListItem(session));
   }
 
-  // Used by future support-mode endpoints to gate access to a company's
-  // data behind a live, owned SupportSession. Deliberately read-only — no
-  // lazy EXPIRED write here, so a plain authorization check never mutates
-  // state.
+  // Used by support-mode endpoints to gate access to a company's data
+  // behind a live, owned SupportSession. Deliberately read-only — no lazy
+  // EXPIRED write here, so a plain authorization check never mutates state.
   async validateActiveSupportSession(sessionId: string, actorUserId: string) {
     const trimmedId = this.requireNonBlank(
       sessionId,
@@ -248,6 +247,7 @@ export class SupportSessionsService {
         companyId: true,
         status: true,
         expiresAt: true,
+        company: { select: { id: true, name: true } },
       },
     });
 
@@ -264,6 +264,96 @@ export class SupportSessionsService {
     }
 
     return session;
+  }
+
+  async listSessionConversations(
+    sessionId: string,
+    actor: AuditActor,
+    filters: { page?: string; limit?: string } = {},
+  ) {
+    const session = await this.validateActiveSupportSession(
+      sessionId,
+      actor.actorUserId,
+    );
+    const { page, limit, skip, take } = this.parsePagination(
+      filters.page,
+      filters.limit,
+    );
+
+    // Explicit select, not the business ConversationsService.findAll — that
+    // one intentionally includes the last message. A support session must
+    // never surface message content, so this query is built from scratch.
+    const conversations = await this.prisma.conversation.findMany({
+      where: { companyId: session.companyId },
+      orderBy: { updatedAt: 'desc' },
+      skip,
+      take,
+      select: {
+        id: true,
+        status: true,
+        channel: true,
+        createdAt: true,
+        updatedAt: true,
+        contact: { select: { id: true, name: true } },
+        agent: { select: { id: true, name: true } },
+      },
+    });
+
+    const items = conversations.map((conversation) => ({
+      id: conversation.id,
+      status: conversation.status,
+      channel: conversation.channel,
+      createdAt: conversation.createdAt,
+      updatedAt: conversation.updatedAt,
+      contact: conversation.contact,
+      assignedUser: conversation.agent,
+    }));
+
+    // Read-only view, so there is no domain write to roll back — but per
+    // the "no sensitive access without traceability" rule, the audit write
+    // still happens before returning anything, and its own failure (it
+    // throws InternalServerErrorException) fails the whole request rather
+    // than silently letting the SUPER_ADMIN see the list unlogged.
+    await this.auditLogService.record(this.prisma, {
+      actorUserId: actor.actorUserId,
+      actorRole: actor.actorRole,
+      affectedCompanyId: session.companyId,
+      action: 'VIEW_SUPPORT_CONVERSATIONS',
+      entityType: 'SupportSession',
+      entityId: session.id,
+      metadata: {
+        supportSessionId: session.id,
+        companyId: session.companyId,
+        companyName: session.company.name,
+        resultCount: items.length,
+        page,
+        limit,
+      },
+      ipAddress: actor.ipAddress,
+      userAgent: actor.userAgent,
+    });
+
+    return items;
+  }
+
+  private parsePagination(pageInput?: string, limitInput?: string) {
+    let page = 1;
+    if (pageInput !== undefined) {
+      page = Number(pageInput);
+      if (!Number.isInteger(page) || page < 1) {
+        throw new BadRequestException('page debe ser un entero mayor o igual a 1');
+      }
+    }
+
+    let limit = 20;
+    if (limitInput !== undefined) {
+      limit = Number(limitInput);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 50) {
+        throw new BadRequestException('limit debe ser un entero entre 1 y 50');
+      }
+    }
+
+    return { page, limit, skip: (page - 1) * limit, take: limit };
   }
 
   private parseStatus(value: string): SupportSessionStatus {
