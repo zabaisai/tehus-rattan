@@ -205,7 +205,7 @@ model LeadStageHistory {
   changedAt   DateTime @default(now())
 
   leadId String
-  lead   Lead   @relation(fields: [leadId], references: [id])
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   changedBy String?
   user      User?   @relation(fields: [changedBy], references: [id])
