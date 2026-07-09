@@ -92,3 +92,10 @@ una sesión autenticada tan pronto como el SUPER_ADMIN inicie sesión por
 primera vez. Vuelve a ejecutar el script con una contraseña nueva en
 cualquier momento para rotarla — es seguro y no afecta empresas ni datos
 de clientes.
+
+## Ver también
+
+El SUPER_ADMIN global documentado aquí es también el único rol que puede
+usar Support Mode (acceso temporal y auditado a conversaciones de una
+empresa cliente). Ver [`SUPPORT_MODE.md`](./SUPPORT_MODE.md) para el
+detalle completo de niveles de acceso, permisos, auditoría y seguridad.
