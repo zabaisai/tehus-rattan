@@ -12,6 +12,15 @@ export interface AuthResponse {
   token: string;
   user: User;
 }
+
+export interface CompanyUser {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  isActive: boolean;
+  createdAt: string;
+}
 export interface Contact {
   id: string;
   name: string | null;
@@ -36,14 +45,48 @@ export interface Pipeline {
   stages: PipelineStage[];
 }
 
+export interface LeadContactRef {
+  id: string;
+  name: string | null;
+  phone: string;
+}
+
+export interface LeadStageRef {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
 export interface Lead {
   id: string;
   title: string;
   value: number | null;
   status: "OPEN" | "WON" | "LOST";
-  contact: Contact;
-  agent: { id: string; name: string } | null;
+  lostReason: string | null;
+  expectedCloseDate: string | null;
+  createdAt: string;
   updatedAt: string;
+  contactId: string;
+  contact: LeadContactRef;
+  pipelineId: string;
+  stageId: string;
+  stage?: LeadStageRef;
+  assignedTo: string | null;
+  agent: { id: string; name: string } | null;
+}
+
+export interface LeadDetail extends Omit<Lead, "contact" | "stage"> {
+  contact: Contact;
+  stage: LeadStageRef;
+  pipeline: { id: string; name: string; isDefault: boolean };
+}
+
+export interface LeadStageHistoryEntry {
+  id: string;
+  fromStageId: string | null;
+  toStageId: string;
+  changedAt: string;
+  user: { id: string; name: string } | null;
 }
 
 export interface KanbanStage {

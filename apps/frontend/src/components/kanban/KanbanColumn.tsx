@@ -11,7 +11,13 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-export function KanbanColumn({ stage }: { stage: KanbanStage }) {
+export function KanbanColumn({
+  stage,
+  onLeadClick,
+}: {
+  stage: KanbanStage;
+  onLeadClick: (leadId: string) => void;
+}) {
   return (
     <div className="flex w-72 shrink-0 flex-col rounded-lg bg-stone-100">
       <div className="border-b border-stone-200 px-3 py-2.5">
@@ -37,7 +43,7 @@ export function KanbanColumn({ stage }: { stage: KanbanStage }) {
             style={{ minHeight: 80 }}
           >
             {stage.leads.map((lead, index) => (
-              <LeadCard key={lead.id} lead={lead} index={index} />
+              <LeadCard key={lead.id} lead={lead} index={index} onOpen={onLeadClick} />
             ))}
             {provided.placeholder}
           </div>

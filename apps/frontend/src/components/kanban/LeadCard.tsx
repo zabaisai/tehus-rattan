@@ -10,7 +10,15 @@ function formatCurrency(value: number | null) {
   }).format(value);
 }
 
-export function LeadCard({ lead, index }: { lead: Lead; index: number }) {
+export function LeadCard({
+  lead,
+  index,
+  onOpen,
+}: {
+  lead: Lead;
+  index: number;
+  onOpen: (leadId: string) => void;
+}) {
   return (
     <Draggable draggableId={lead.id} index={index}>
       {(provided, snapshot) => (
@@ -18,7 +26,13 @@ export function LeadCard({ lead, index }: { lead: Lead; index: number }) {
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          className={`mb-2 rounded-md border border-stone-200 bg-white p-3 shadow-sm transition-shadow ${
+          onClick={() => onOpen(lead.id)}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') onOpen(lead.id);
+          }}
+          className={`mb-2 cursor-pointer rounded-md border border-stone-200 bg-white p-3 shadow-sm transition-shadow hover:border-stone-300 ${
             snapshot.isDragging ? 'shadow-md ring-1 ring-stone-300' : ''
           }`}
         >

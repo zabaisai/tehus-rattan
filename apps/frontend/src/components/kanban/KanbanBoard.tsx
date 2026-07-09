@@ -7,7 +7,13 @@ import { getKanban, changeLeadStage } from '@/lib/pipeline';
 import { KanbanData } from '@/types';
 import { KanbanColumn } from './KanbanColumn';
 
-export function KanbanBoard({ pipelineId }: { pipelineId: string }) {
+export function KanbanBoard({
+  pipelineId,
+  onLeadClick,
+}: {
+  pipelineId: string;
+  onLeadClick: (leadId: string) => void;
+}) {
   const queryClient = useQueryClient();
   const queryKey = ['kanban', pipelineId];
 
@@ -68,7 +74,7 @@ export function KanbanBoard({ pipelineId }: { pipelineId: string }) {
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-4">
           {data.stages.map((stage) => (
-            <KanbanColumn key={stage.id} stage={stage} />
+            <KanbanColumn key={stage.id} stage={stage} onLeadClick={onLeadClick} />
           ))}
         </div>
       </DragDropContext>
