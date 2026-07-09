@@ -153,6 +153,9 @@ export interface Task {
   priority: TaskPriority;
   type: TaskType;
   status: TaskStatus;
+  leadId: string | null;
+  contactId: string | null;
+  assignedTo: string | null;
   lead: { id: string; title: string } | null;
   contact: { id: string; name: string | null } | null;
   agent: { id: string; name: string } | null;

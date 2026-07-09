@@ -12,8 +12,26 @@ export async function createTask(payload: {
   dueDate?: string;
   priority?: string;
   type?: string;
+  leadId?: string;
+  contactId?: string;
+  assignedTo?: string;
 }): Promise<Task> {
   const { data } = await api.post<Task>('/tasks', payload);
+  return data;
+}
+
+export async function updateTask(
+  id: string,
+  payload: {
+    title?: string;
+    description?: string;
+    dueDate?: string;
+    priority?: string;
+    status?: string;
+    assignedTo?: string;
+  },
+): Promise<Task> {
+  const { data } = await api.patch<Task>(`/tasks/${id}`, payload);
   return data;
 }
 
