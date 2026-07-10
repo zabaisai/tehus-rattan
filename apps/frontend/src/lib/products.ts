@@ -1,5 +1,10 @@
 import api from './axios';
-import { Product, CreateProductPayload, UpdateProductPayload } from '@/types';
+import {
+  Product,
+  CreateProductPayload,
+  UpdateProductPayload,
+  ProductImportSummary,
+} from '@/types';
 
 export const PRODUCT_CATEGORIES = [
   'Salas',
@@ -42,5 +47,17 @@ export async function updateProduct(
 
 export async function deactivateProduct(id: string): Promise<Product> {
   const { data } = await api.delete<Product>(`/products/${id}`);
+  return data;
+}
+
+export async function importProductsFromExcel(
+  file: File,
+): Promise<ProductImportSummary> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const { data } = await api.post<ProductImportSummary>(
+    '/products/import',
+    formData,
+  );
   return data;
 }

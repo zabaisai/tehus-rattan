@@ -2,16 +2,18 @@
 
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Trash2, Pencil, Package } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Package, FileSpreadsheet } from "lucide-react";
 import {
   getProducts,
   createProduct,
   updateProduct,
   deactivateProduct,
+  importProductsFromExcel,
   PRODUCT_CATEGORIES,
 } from "@/lib/products";
-import { Product } from "@/types";
+import { Product, ProductImportSummary } from "@/types";
 import { ProductModal, ProductFormData } from "@/components/products/ProductModal";
+import { ProductImportModal } from "@/components/products/ProductImportModal";
 
 const currencyFormatter = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -25,6 +27,7 @@ export default function ProductsPage() {
   const [category, setCategory] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [importModalOpen, setImportModalOpen] = useState(false);
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["products", category],
@@ -80,6 +83,12 @@ export default function ProductsPage() {
     await queryClient.invalidateQueries({ queryKey: ["products"] });
   }
 
+  async function handleImport(file: File): Promise<ProductImportSummary> {
+    const summary = await importProductsFromExcel(file);
+    await queryClient.invalidateQueries({ queryKey: ["products"] });
+    return summary;
+  }
+
   return (
     <div>
       <div className="mb-5 flex items-center justify-between">
@@ -87,13 +96,22 @@ export default function ProductsPage() {
           <h2 className="text-xl font-semibold text-stone-900">Catálogo Tehus</h2>
           <p className="text-xs text-stone-500">Productos activos de Tehus Rattan Medellín</p>
         </div>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
-        >
-          <Plus size={16} />
-          Nuevo producto
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setImportModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-700 hover:bg-stone-100"
+          >
+            <FileSpreadsheet size={16} />
+            Importar Excel
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          >
+            <Plus size={16} />
+            Nuevo producto
+          </button>
+        </div>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -203,6 +221,13 @@ export default function ProductsPage() {
           product={editingProduct}
           onClose={() => setModalOpen(false)}
           onSubmit={handleSubmit}
+        />
+      )}
+
+      {importModalOpen && (
+        <ProductImportModal
+          onClose={() => setImportModalOpen(false)}
+          onImport={handleImport}
         />
       )}
     </div>

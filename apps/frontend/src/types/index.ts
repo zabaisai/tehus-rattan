@@ -214,6 +214,26 @@ export interface CreateProductPayload {
   imageUrl?: string;
 }
 
+export interface ProductImportIssue {
+  rowNumber: number;
+  reason: string;
+  rawName?: string;
+}
+
+export interface ProductImportSummary {
+  totalRows: number;
+  created: number;
+  skipped: number;
+  warnings: ProductImportIssue[];
+  errors: ProductImportIssue[];
+  products: Array<{
+    id: string;
+    name: string;
+    category: string | null;
+    price: number;
+  }>;
+}
+
 export interface UpdateProductPayload {
   name?: string;
   description?: string;

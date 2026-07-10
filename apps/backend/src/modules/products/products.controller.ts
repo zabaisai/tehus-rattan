@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -8,20 +9,29 @@ import {
   Param,
   Query,
   Request,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ProductsService } from './products.service';
+import { ProductsImportService } from './products-import.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+
+const MAX_IMPORT_FILE_SIZE = 10 * 1024 * 1024;
 
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Controller('products')
 export class ProductsController {
-  constructor(private productsService: ProductsService) {}
+  constructor(
+    private productsService: ProductsService,
+    private productsImportService: ProductsImportService,
+  ) {}
 
   @Get()
   findAll(
@@ -48,6 +58,26 @@ export class ProductsController {
   @Post()
   create(@Request() req: any, @Body() body: CreateProductDto) {
     return this.productsService.create(req.user.companyId, body);
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Post('import')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_FILE_SIZE } }),
+  )
+  importExcel(
+    @UploadedFile() file: Express.Multer.File | undefined,
+    @Request() req: any,
+  ) {
+    if (!file) {
+      throw new BadRequestException('El archivo es requerido');
+    }
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    return this.productsImportService.importFromExcel(
+      req.user.companyId,
+      file,
+      baseUrl,
+    );
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
