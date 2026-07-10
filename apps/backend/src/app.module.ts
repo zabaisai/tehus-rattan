@@ -18,6 +18,7 @@ import { NotesModule } from './modules/notes/notes.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ProductsModule } from './modules/products/products.module';
 import { PlatformModule } from './modules/platform/platform.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { PlatformModule } from './modules/platform/platform.module';
     AnalyticsModule,
     ProductsModule,
     PlatformModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

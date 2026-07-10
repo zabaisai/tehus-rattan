@@ -15,6 +15,21 @@ model Company {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
 
+  // Informational company profile — display-only, never legal/fiscal/billing data.
+  slug             String?  @unique
+  logoUrl          String?
+  secondaryLogoUrl String?
+  primaryColor     String?
+  accentColor      String?
+  backgroundColor  String?
+  businessType     String?
+  city             String?
+  country          String?
+  email            String?
+  website          String?
+  description      String?
+  settings         Json?
+
   users               User[]
   contacts            Contact[]
   conversations       Conversation[]
