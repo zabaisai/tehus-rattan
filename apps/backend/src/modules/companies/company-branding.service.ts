@@ -54,11 +54,11 @@ export function detectImageExtension(buffer: Buffer): 'png' | 'jpg' | 'webp' | n
 export class CompanyBrandingService {
   constructor(private prisma: PrismaService) {}
 
-  async uploadLogo(
-    companyId: string,
-    file: UploadedLogoFile | undefined,
-    type: LogoType = 'primary',
-  ) {
+  // Public and reusable on purpose: onboarding needs to validate a logo
+  // file *before* creating anything in the database, without duplicating
+  // this logic. Returns the verified extension so callers that already
+  // called this don't need to re-run magic-byte detection themselves.
+  assertValidLogoFile(file: UploadedLogoFile | undefined): 'png' | 'jpg' | 'webp' {
     this.validateFile(file);
 
     const extension = detectImageExtension(file!.buffer);
@@ -67,6 +67,16 @@ export class CompanyBrandingService {
         'El archivo no es una imagen válida (PNG, JPG o WEBP)',
       );
     }
+
+    return extension;
+  }
+
+  async uploadLogo(
+    companyId: string,
+    file: UploadedLogoFile | undefined,
+    type: LogoType = 'primary',
+  ) {
+    const extension = this.assertValidLogoFile(file);
 
     const uploadsDir = path.join(process.cwd(), 'uploads', 'branding', companyId);
     fs.mkdirSync(uploadsDir, { recursive: true });

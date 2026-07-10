@@ -89,6 +89,56 @@ describe('CompanyBrandingService', () => {
     expect(prisma.company.update).not.toHaveBeenCalled();
   });
 
+  describe('assertValidLogoFile (reused by onboarding, no DB/disk access)', () => {
+    it('returns the detected extension for a valid PNG', () => {
+      expect(service.assertValidLogoFile(fakeFile())).toBe('png');
+    });
+
+    it('returns the detected extension for a valid JPEG', () => {
+      const file = fakeFile({
+        buffer: JPEG_BUFFER,
+        originalname: 'logo.jpg',
+        mimetype: 'image/jpeg',
+        size: JPEG_BUFFER.length,
+      });
+      expect(service.assertValidLogoFile(file)).toBe('jpg');
+    });
+
+    it('returns the detected extension for a valid WEBP', () => {
+      const file = fakeFile({
+        buffer: WEBP_BUFFER,
+        originalname: 'logo.webp',
+        mimetype: 'image/webp',
+        size: WEBP_BUFFER.length,
+      });
+      expect(service.assertValidLogoFile(file)).toBe('webp');
+    });
+
+    it('throws on a real SVG', () => {
+      const file = fakeFile({
+        buffer: SVG_BUFFER,
+        originalname: 'logo.svg',
+        mimetype: 'image/svg+xml',
+        size: SVG_BUFFER.length,
+      });
+      expect(() => service.assertValidLogoFile(file)).toThrow(BadRequestException);
+    });
+
+    it('throws on a spoofed PNG (SVG bytes, .png extension)', () => {
+      const file = fakeFile({
+        buffer: SVG_BUFFER,
+        originalname: 'logo.png',
+        mimetype: 'image/png',
+        size: SVG_BUFFER.length,
+      });
+      expect(() => service.assertValidLogoFile(file)).toThrow(BadRequestException);
+    });
+
+    it('throws when no file is provided', () => {
+      expect(() => service.assertValidLogoFile(undefined)).toThrow(BadRequestException);
+    });
+  });
+
   it('rejects an SVG file outright (extension not allowed)', async () => {
     const file = fakeFile({
       buffer: SVG_BUFFER,

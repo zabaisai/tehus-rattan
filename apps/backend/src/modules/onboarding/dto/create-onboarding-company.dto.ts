@@ -3,6 +3,7 @@ import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -131,6 +132,7 @@ export class OnboardingAgentDto {
 }
 
 export class CreateOnboardingCompanyDto {
+  @IsDefined({ message: 'company es requerido' })
   @ValidateNested()
   @Type(() => OnboardingCompanyInfoDto)
   company!: OnboardingCompanyInfoDto;
@@ -140,14 +142,17 @@ export class CreateOnboardingCompanyDto {
   @Type(() => OnboardingBrandingDto)
   branding?: OnboardingBrandingDto;
 
+  @IsDefined({ message: 'commercial es requerido' })
   @ValidateNested()
   @Type(() => OnboardingCommercialDto)
   commercial!: OnboardingCommercialDto;
 
+  @IsDefined({ message: 'pipeline es requerido' })
   @ValidateNested()
   @Type(() => OnboardingPipelineDto)
   pipeline!: OnboardingPipelineDto;
 
+  @IsDefined({ message: 'admin es requerido' })
   @ValidateNested()
   @Type(() => OnboardingAdminDto)
   admin!: OnboardingAdminDto;
