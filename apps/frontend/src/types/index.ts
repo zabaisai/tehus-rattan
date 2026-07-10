@@ -271,6 +271,49 @@ export interface ConnectWhatsAppIntegrationPayload {
 
 export type CompanyStatus = "ACTIVE" | "SUSPENDED" | "DELETED";
 
+export interface Company {
+  id: string;
+  name: string;
+  phone: string | null;
+  status: CompanyStatus;
+  slug: string | null;
+  logoUrl: string | null;
+  secondaryLogoUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  backgroundColor: string | null;
+  businessType: string | null;
+  city: string | null;
+  country: string | null;
+  email: string | null;
+  website: string | null;
+  description: string | null;
+  settings: Record<string, unknown> | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdateCompanyPayload {
+  name?: string;
+  phone?: string;
+  businessType?: string;
+  city?: string;
+  country?: string;
+  email?: string;
+  website?: string;
+  description?: string;
+  primaryColor?: string;
+  accentColor?: string;
+  backgroundColor?: string;
+}
+
+export interface CompanyLogoUploadResult {
+  companyId: string;
+  logoUrl: string | null;
+  secondaryLogoUrl: string | null;
+  message: string;
+}
+
 export interface PlatformCompanyListItem {
   id: string;
   name: string;
