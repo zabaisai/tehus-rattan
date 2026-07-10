@@ -105,6 +105,55 @@ describe('WhatsappService', () => {
     expect(mockedAxios.post).not.toHaveBeenCalled();
   });
 
+  it('returns the WhatsApp message id (wamid) from a successful send', async () => {
+    whatsappIntegrationService.findConnectedByCompanyId.mockResolvedValue(
+      connectedIntegration,
+    );
+    mockedAxios.post.mockResolvedValue({
+      data: { messages: [{ id: 'wamid.HBgLABC123' }] },
+    });
+
+    const result = await service.sendMessage(
+      'company-a',
+      '50255551111',
+      'Hola',
+    );
+
+    expect(result).toBe('wamid.HBgLABC123');
+  });
+
+  it('rethrows and logs a safe error (no token) when axios.post rejects', async () => {
+    whatsappIntegrationService.findConnectedByCompanyId.mockResolvedValue(
+      connectedIntegration,
+    );
+
+    const axiosError = {
+      isAxiosError: true,
+      message: 'Request failed with status code 401',
+      response: {
+        status: 401,
+        data: { error: { message: 'Invalid OAuth access token', code: 190 } },
+      },
+      config: {
+        headers: { Authorization: 'Bearer fake-meta-access-token' },
+      },
+    };
+    mockedAxios.post.mockRejectedValue(axiosError);
+    mockedAxios.isAxiosError = jest.fn().mockReturnValue(true) as any;
+
+    const errorSpy = jest.spyOn((service as any).logger, 'error');
+
+    await expect(
+      service.sendMessage('company-a', '50255551111', 'Hola'),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(errorSpy).toHaveBeenCalled();
+    const serialized = JSON.stringify(errorSpy.mock.calls.flat());
+    expect(serialized).not.toContain('fake-meta-access-token');
+    expect(serialized).not.toContain('Bearer');
+    expect(serialized).toContain('Invalid OAuth access token');
+  });
+
   it('never logs the decrypted token, the encrypted token, or the Authorization header', async () => {
     whatsappIntegrationService.findConnectedByCompanyId.mockResolvedValue(
       connectedIntegration,

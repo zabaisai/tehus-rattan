@@ -96,19 +96,31 @@ export class ConversationsController {
       req.user.companyId,
     );
 
-    await this.whatsappService.sendMessage(
-      req.user.companyId,
-      conversation.contact.phone,
-      body.message,
-    );
+    try {
+      const wamid = await this.whatsappService.sendMessage(
+        req.user.companyId,
+        conversation.contact.phone,
+        body.message,
+      );
 
-    return this.messagesService.create({
-      companyId: req.user.companyId,
-      conversationId: id,
-      body: body.message,
-      direction: 'OUTBOUND',
-      type: 'TEXT',
-      status: 'SENT',
-    });
+      return await this.messagesService.create({
+        companyId: req.user.companyId,
+        conversationId: id,
+        body: body.message,
+        direction: 'OUTBOUND',
+        type: 'TEXT',
+        status: 'SENT',
+        wamid,
+      });
+    } catch {
+      return this.messagesService.create({
+        companyId: req.user.companyId,
+        conversationId: id,
+        body: body.message,
+        direction: 'OUTBOUND',
+        type: 'TEXT',
+        status: 'FAILED',
+      });
+    }
   }
 }

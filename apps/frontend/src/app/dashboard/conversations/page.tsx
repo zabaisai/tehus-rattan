@@ -17,6 +17,7 @@ import { MessageInput } from "@/components/conversations/MessageInput";
 export default function ConversationsPage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [sendNotice, setSendNotice] = useState<string | null>(null);
 
   const { data: conversations } = useQuery({
     queryKey: ["conversations"],
@@ -36,9 +37,15 @@ export default function ConversationsPage() {
 
   async function handleSend(message: string) {
     if (!selectedId) return;
-    await sendMessage(selectedId, message);
+    const created = await sendMessage(selectedId, message);
     await queryClient.invalidateQueries({ queryKey: ["messages", selectedId] });
     await queryClient.invalidateQueries({ queryKey: ["conversations"] });
+
+    setSendNotice(
+      created.status === "FAILED"
+        ? "El mensaje no se pudo enviar por WhatsApp. Quedó marcado como fallido en la conversación."
+        : null,
+    );
   }
 
   async function handleTogglePause() {
@@ -57,7 +64,10 @@ export default function ConversationsPage() {
         <ConversationList
           conversations={conversations ?? []}
           selectedId={selectedId}
-          onSelect={setSelectedId}
+          onSelect={(id) => {
+            setSendNotice(null);
+            setSelectedId(id);
+          }}
         />
       </div>
 
@@ -101,6 +111,12 @@ export default function ConversationsPage() {
                 )}
               </button>
             </div>
+
+            {sendNotice && (
+              <p className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700">
+                {sendNotice}
+              </p>
+            )}
 
             <MessageThread messages={messages ?? []} />
             <MessageInput onSend={handleSend} />

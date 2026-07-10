@@ -16,8 +16,14 @@ export async function getMessages(conversationId: string): Promise<Message[]> {
   return data;
 }
 
-export async function sendMessage(conversationId: string, message: string) {
-  const { data } = await api.post(`/conversations/${conversationId}/send`, { message });
+export async function sendMessage(
+  conversationId: string,
+  message: string,
+): Promise<Message> {
+  const { data } = await api.post<Message>(
+    `/conversations/${conversationId}/send`,
+    { message },
+  );
   return data;
 }
 

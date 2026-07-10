@@ -24,6 +24,7 @@ export function MessageThread({ messages }: { messages: Message[] }) {
       <div className="flex flex-col gap-2">
         {messages.map((msg) => {
           const isOutbound = msg.direction === 'OUTBOUND';
+          const isFailed = msg.status === 'FAILED';
           return (
             <div
               key={msg.id}
@@ -31,18 +32,24 @@ export function MessageThread({ messages }: { messages: Message[] }) {
             >
               <div
                 className={`max-w-[70%] rounded-lg px-3 py-2 text-sm ${
-                  isOutbound
-                    ? 'bg-stone-900 text-white'
-                    : 'bg-white text-stone-800 border border-stone-200'
+                  isFailed
+                    ? 'border border-red-300 bg-red-50 text-red-700'
+                    : isOutbound
+                      ? 'bg-stone-900 text-white'
+                      : 'bg-white text-stone-800 border border-stone-200'
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.body}</p>
                 <p
                   className={`mt-1 text-[10px] ${
-                    isOutbound ? 'text-stone-300' : 'text-stone-400'
+                    isFailed
+                      ? 'font-medium text-red-600'
+                      : isOutbound
+                        ? 'text-stone-300'
+                        : 'text-stone-400'
                   }`}
                 >
-                  {formatTime(msg.createdAt)}
+                  {isFailed ? 'Error al enviar' : formatTime(msg.createdAt)}
                 </p>
               </div>
             </div>

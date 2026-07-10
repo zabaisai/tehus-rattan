@@ -21,7 +21,7 @@ export class WhatsappService {
     companyId: string,
     to: string,
     message: string,
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     const integration =
       await this.whatsappIntegrationService.findConnectedByCompanyId(
         companyId,
@@ -49,7 +49,7 @@ export class WhatsappService {
     const url = `https://graph.facebook.com/v19.0/${integration.phoneNumberId}/messages`;
 
     try {
-      await axios.post(
+      const response = await axios.post(
         url,
         {
           messaging_product: 'whatsapp',
@@ -65,8 +65,20 @@ export class WhatsappService {
         },
       );
       this.logger.log(`Mensaje enviado a ${to}`);
+      return response.data?.messages?.[0]?.id as string | undefined;
     } catch (error) {
-      this.logger.error(`Error enviando mensaje a ${to}`, error);
+      const status = axios.isAxiosError(error)
+        ? error.response?.status
+        : undefined;
+      const details = axios.isAxiosError(error)
+        ? error.response?.data
+        : (error as Error)?.message;
+      this.logger.error(
+        `Error enviando mensaje de WhatsApp a ${to} (status: ${
+          status ?? 'desconocido'
+        }): ${JSON.stringify(details)}`,
+      );
+      throw new BadRequestException('No se pudo enviar el mensaje de WhatsApp');
     }
   }
 }
