@@ -191,6 +191,38 @@ export interface LostReason {
   count: number;
 }
 
+export interface Product {
+  id: string;
+  code: string | null;
+  name: string;
+  description: string | null;
+  price: number;
+  imageUrl: string | null;
+  category: string | null;
+  sku: string | null;
+  stock: number | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProductPayload {
+  name: string;
+  description?: string;
+  price: number;
+  category?: string;
+  imageUrl?: string;
+}
+
+export interface UpdateProductPayload {
+  name?: string;
+  description?: string;
+  price?: number;
+  category?: string;
+  imageUrl?: string;
+  isActive?: boolean;
+}
+
 export type WhatsAppIntegrationStatus =
   | "PENDING"
   | "CONNECTED"

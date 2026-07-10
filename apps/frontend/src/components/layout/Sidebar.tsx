@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Building2,
   ScrollText,
+  Package,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 
@@ -37,6 +38,7 @@ export function Sidebar() {
         { href: '/dashboard/pipeline', label: 'Pipeline', icon: KanbanSquare },
         { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
         { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
+        { href: '/dashboard/products', label: 'Productos', icon: Package },
         ...(canManageWhatsApp
           ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
           : []),
