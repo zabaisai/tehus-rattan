@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import { X, Upload, FileSpreadsheet } from 'lucide-react';
 import { ProductImportSummary } from '@/types';
+import {
+  validateProductImportFile,
+  MAX_PRODUCT_IMPORT_FILE_SIZE_MB,
+  MAX_PRODUCT_IMPORT_ROWS,
+} from '@/lib/products';
 
 type ApiError = {
   response?: {
@@ -25,9 +30,29 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
   const [error, setError] = useState('');
   const [summary, setSummary] = useState<ProductImportSummary | null>(null);
 
+  function selectFile(selected: File | null) {
+    setError('');
+    if (selected) {
+      const validationError = validateProductImportFile(selected);
+      if (validationError) {
+        setFile(null);
+        setError(validationError);
+        return;
+      }
+    }
+    setFile(selected);
+  }
+
   async function handleImport() {
     if (!file) return;
     setError('');
+
+    const validationError = validateProductImportFile(file);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setImporting(true);
     try {
       const result = await onImport(file);
@@ -53,10 +78,14 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
 
         {!summary && (
           <>
-            <p className="mb-4 text-xs text-stone-500">
+            <p className="mb-1 text-xs text-stone-500">
               Puedes importar un Excel aunque no todas las columnas estén completas.
               El sistema intentará adaptar nombre, categoría, precio, imagen y
               detalles al catálogo.
+            </p>
+            <p className="mb-4 text-xs text-stone-500">
+              Puedes importar archivos Excel de hasta {MAX_PRODUCT_IMPORT_FILE_SIZE_MB}MB y
+              máximo {MAX_PRODUCT_IMPORT_ROWS.toLocaleString('es-CO')} filas.
             </p>
 
             <label className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-center hover:bg-stone-100">
@@ -73,9 +102,9 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
               </span>
               <input
                 type="file"
-                accept=".xlsx,.xls"
+                accept=".xlsx"
                 className="hidden"
-                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => selectFile(e.target.files?.[0] ?? null)}
               />
             </label>
 

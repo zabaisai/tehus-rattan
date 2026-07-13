@@ -2,6 +2,11 @@ import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import { BadRequestException } from '@nestjs/common';
 import { ProductsImportService } from './products-import.service';
+import {
+  MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES,
+  MAX_PRODUCT_IMPORT_ROWS,
+  PRODUCT_IMPORT_BATCH_SIZE,
+} from './products-import.constants';
 
 jest.mock('fs', () => ({
   ...jest.requireActual('fs'),
@@ -28,6 +33,17 @@ async function buildWorkbookBuffer(
 
 function fakeExcelFile(buffer: Buffer, name = 'catalogo.xlsx') {
   return { buffer, originalname: name, size: buffer.length };
+}
+
+async function buildWorkbookWithRowCount(rowCount: number): Promise<Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Productos');
+  worksheet.addRow(['Nombre', 'Precio']);
+  for (let i = 0; i < rowCount; i++) {
+    worksheet.addRow([`Producto ${i}`, 1000 + i]);
+  }
+  const arrayBuffer = await workbook.xlsx.writeBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 describe('ProductsImportService', () => {
@@ -228,5 +244,106 @@ describe('ProductsImportService', () => {
     await expect(
       service.importFromExcel('company-a', undefined, 'http://localhost:3001'),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts a file at the 50MB size limit', async () => {
+    const buffer = await buildWorkbookBuffer(['Nombre', 'Precio'], [['Sala', 100]]);
+    const file = fakeExcelFile(buffer);
+    // Report the file as exactly at the limit without allocating a real 50MB buffer.
+    (file as any).size = MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES;
+
+    const summary = await service.importFromExcel('company-a', file, 'http://localhost:3001');
+    expect(summary.created).toBe(1);
+  });
+
+  it('rejects a file larger than 50MB with a clear MB-aware message', async () => {
+    const buffer = await buildWorkbookBuffer(['Nombre', 'Precio'], [['Sala', 100]]);
+    const file = fakeExcelFile(buffer);
+    (file as any).size = MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES + 1;
+
+    await expect(
+      service.importFromExcel('company-a', file, 'http://localhost:3001'),
+    ).rejects.toThrow('El archivo supera el tamaño máximo permitido de 50MB.');
+  });
+
+  it('rejects an Excel with more rows than the configured maximum', async () => {
+    const buffer = await buildWorkbookWithRowCount(MAX_PRODUCT_IMPORT_ROWS + 1);
+
+    await expect(
+      service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001'),
+    ).rejects.toThrow(
+      `El archivo tiene demasiadas filas. Máximo permitido: ${MAX_PRODUCT_IMPORT_ROWS.toLocaleString('es-CO')} productos por importación.`,
+    );
+    expect(prisma.product.create).not.toHaveBeenCalled();
+  }, 20000);
+
+  it('accepts an Excel at exactly the row limit', async () => {
+    const buffer = await buildWorkbookWithRowCount(MAX_PRODUCT_IMPORT_ROWS);
+
+    const summary = await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
+
+    expect(summary.totalRows).toBe(MAX_PRODUCT_IMPORT_ROWS);
+    expect(summary.created).toBe(MAX_PRODUCT_IMPORT_ROWS);
+  }, 20000);
+
+  it('processes more rows than a single batch without dropping any', async () => {
+    const rowCount = PRODUCT_IMPORT_BATCH_SIZE * 2 + 10;
+    const buffer = await buildWorkbookWithRowCount(rowCount);
+
+    const summary = await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
+
+    expect(summary.created).toBe(rowCount);
+    expect(prisma.product.create).toHaveBeenCalledTimes(rowCount);
+  }, 20000);
+
+  it('isolates a single failed row within a batch instead of failing the whole import', async () => {
+    const buffer = await buildWorkbookBuffer(
+      ['Nombre', 'Precio'],
+      [
+        ['Sala A', 100],
+        ['Sala B', 200],
+        ['Sala C', 300],
+      ],
+    );
+
+    prisma.product.create.mockImplementation((args: any) => {
+      if (args.data.name === 'Sala B') {
+        return Promise.reject(new Error('db hiccup'));
+      }
+      return Promise.resolve({ id: `id-${Math.random()}`, ...args.data });
+    });
+
+    const summary = await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
+
+    expect(summary.created).toBe(2);
+    expect(summary.skipped).toBe(1);
+    expect(summary.errors).toEqual([
+      expect.objectContaining({ rowNumber: 3, reason: 'No se pudo guardar el producto', rawName: 'Sala B' }),
+    ]);
+  });
+
+  it('only reads and writes products scoped to the authenticated company', async () => {
+    const buffer = await buildWorkbookBuffer(['Nombre', 'Precio'], [['Sala', 100]]);
+
+    await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+
+    expect(prisma.product.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { companyId: 'company-a' } }),
+    );
+    expect(prisma.product.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ companyId: 'company-a' }) }),
+    );
   });
 });

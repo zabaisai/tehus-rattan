@@ -10,6 +10,7 @@ import {
   Query,
   Request,
   UploadedFile,
+  UseFilters,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
@@ -20,10 +21,10 @@ import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ProductsService } from './products.service';
 import { ProductsImportService } from './products-import.service';
+import { ProductImportFileSizeFilter } from './product-import-file-size.filter';
+import { MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES } from './products-import.constants';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
-
-const MAX_IMPORT_FILE_SIZE = 10 * 1024 * 1024;
 
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Controller('products')
@@ -62,8 +63,9 @@ export class ProductsController {
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Post('import')
+  @UseFilters(ProductImportFileSizeFilter)
   @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_FILE_SIZE } }),
+    FileInterceptor('file', { limits: { fileSize: MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES } }),
   )
   importExcel(
     @UploadedFile() file: Express.Multer.File | undefined,

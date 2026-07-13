@@ -4,6 +4,16 @@ import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES,
+  FILE_TOO_LARGE_MESSAGE,
+  MAX_PRODUCT_IMPORT_ROWS,
+  TOO_MANY_ROWS_MESSAGE,
+  PRODUCT_IMPORT_BATCH_SIZE,
+  PRODUCT_IMPORT_PREVIEW_LIMIT,
+  MAX_EMBEDDED_IMAGE_SIZE_BYTES,
+  MAX_TOTAL_EMBEDDED_IMAGES_BYTES,
+} from './products-import.constants';
 
 export interface ImportIssue {
   rowNumber: number;
@@ -54,7 +64,6 @@ const FIELD_ALIASES: Array<{ field: keyof Omit<RawRow, 'extras'>; aliases: strin
   { field: 'description', aliases: ['descripcion', 'detalle', 'observaciones', 'notas'] },
 ];
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xlsm'];
 
 interface ColumnMap {
@@ -65,6 +74,22 @@ interface ColumnMap {
 interface EmbeddedImage {
   extension: string;
   buffer: Buffer;
+}
+
+interface PendingProduct {
+  rowNumber: number;
+  name: string;
+  data: {
+    companyId: string;
+    name: string;
+    category: string;
+    price: number;
+    stock: number;
+    code: string | undefined;
+    sku: string | undefined;
+    description: string | undefined;
+    imageUrl: string | undefined;
+  };
 }
 
 @Injectable()
@@ -105,7 +130,13 @@ export class ProductsImportService {
       );
     }
 
-    const images = this.indexEmbeddedImages(workbook, worksheet);
+    const lastRow = worksheet.actualRowCount;
+    const dataRowCount = Math.max(0, lastRow - 1);
+    if (dataRowCount > MAX_PRODUCT_IMPORT_ROWS) {
+      throw new BadRequestException(TOO_MANY_ROWS_MESSAGE);
+    }
+
+    const { images, imagesTruncated } = this.indexEmbeddedImages(workbook, worksheet);
     const existing = await this.prisma.product.findMany({
       where: { companyId },
       select: { sku: true, code: true, name: true, category: true },
@@ -132,8 +163,21 @@ export class ProductsImportService {
       products: [],
     };
 
+    if (imagesTruncated) {
+      summary.warnings.push({
+        rowNumber: 0,
+        reason:
+          'Se alcanzó el límite de imágenes embebidas procesadas; algunas imágenes fueron omitidas',
+      });
+    }
+
     const uploadsDir = path.join(process.cwd(), 'uploads', 'products', companyId);
-    const lastRow = worksheet.actualRowCount;
+
+    // Rows are validated and deduplicated here (cheap, synchronous, in
+    // memory) and queued; the actual product.create() calls are flushed in
+    // bounded concurrent chunks by flushPendingBatch rather than one fully
+    // sequential await per row.
+    let pending: PendingProduct[] = [];
 
     for (let rowNumber = 2; rowNumber <= lastRow; rowNumber++) {
       const row = worksheet.getRow(rowNumber);
@@ -171,6 +215,14 @@ export class ProductsImportService {
         continue;
       }
 
+      // Reserve the dedup keys now, synchronously — before this row's
+      // product.create() has even been queued, let alone awaited — so an
+      // in-batch duplicate later in the same file is still caught correctly
+      // once creates start running concurrently.
+      if (skuKey) seenSku.add(skuKey);
+      if (codeKey) seenCode.add(codeKey);
+      seenNameCategory.add(nameCategoryKey);
+
       let imageUrl: string | undefined;
       const urlValue = raw.imageUrl?.trim();
       if (urlValue && /^https?:\/\//i.test(urlValue)) {
@@ -178,21 +230,31 @@ export class ProductsImportService {
       } else {
         const embedded = images.get(rowNumber - 1);
         if (embedded) {
-          try {
-            imageUrl = this.saveEmbeddedImage(embedded, uploadsDir, companyId, baseUrl);
-          } catch {
+          if (embedded.buffer.length > MAX_EMBEDDED_IMAGE_SIZE_BYTES) {
             summary.warnings.push({
               rowNumber,
-              reason: 'No se pudo guardar la imagen embebida',
+              reason: 'Imagen embebida demasiado grande, se omitió',
               rawName: name,
             });
+          } else {
+            try {
+              imageUrl = this.saveEmbeddedImage(embedded, uploadsDir, companyId, baseUrl);
+            } catch {
+              summary.warnings.push({
+                rowNumber,
+                reason: 'No se pudo guardar la imagen embebida',
+                rawName: name,
+              });
+            }
           }
         }
       }
 
       const description = this.buildDescription(raw);
 
-      const created = await this.prisma.product.create({
+      pending.push({
+        rowNumber,
+        name,
         data: {
           companyId,
           name,
@@ -206,20 +268,50 @@ export class ProductsImportService {
         },
       });
 
-      summary.created++;
-      summary.products.push({
-        id: created.id,
-        name: created.name,
-        category: created.category,
-        price: created.price,
-      });
+      if (pending.length >= PRODUCT_IMPORT_BATCH_SIZE) {
+        await this.flushPendingBatch(pending, summary);
+        pending = [];
+      }
+    }
 
-      if (skuKey) seenSku.add(skuKey);
-      if (codeKey) seenCode.add(codeKey);
-      seenNameCategory.add(nameCategoryKey);
+    if (pending.length > 0) {
+      await this.flushPendingBatch(pending, summary);
     }
 
     return summary;
+  }
+
+  private async flushPendingBatch(
+    batch: PendingProduct[],
+    summary: ImportSummary,
+  ): Promise<void> {
+    const results = await Promise.allSettled(
+      batch.map((item) => this.prisma.product.create({ data: item.data })),
+    );
+
+    results.forEach((result, index) => {
+      const item = batch[index];
+      if (result.status === 'fulfilled') {
+        summary.created++;
+        if (summary.products.length < PRODUCT_IMPORT_PREVIEW_LIMIT) {
+          summary.products.push({
+            id: result.value.id,
+            name: result.value.name,
+            category: result.value.category,
+            price: result.value.price,
+          });
+        }
+      } else {
+        // A single row failing to save (e.g. a transient DB error) must not
+        // abort the rest of the file — report it and move on.
+        summary.skipped++;
+        summary.errors.push({
+          rowNumber: item.rowNumber,
+          reason: 'No se pudo guardar el producto',
+          rawName: item.name,
+        });
+      }
+    });
   }
 
   private validateFile(file: UploadedExcelFile | undefined): void {
@@ -236,8 +328,8 @@ export class ProductsImportService {
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       throw new BadRequestException('Formato de archivo no permitido. Usa un archivo .xlsx');
     }
-    if (file.size > MAX_FILE_SIZE) {
-      throw new BadRequestException('El archivo supera el tamaño máximo permitido (10MB)');
+    if (file.size > MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES) {
+      throw new BadRequestException(FILE_TOO_LARGE_MESSAGE);
     }
   }
 
@@ -395,16 +487,31 @@ export class ProductsImportService {
   private indexEmbeddedImages(
     workbook: ExcelJS.Workbook,
     worksheet: ExcelJS.Worksheet,
-  ): Map<number, EmbeddedImage> {
+  ): { images: Map<number, EmbeddedImage>; imagesTruncated: boolean } {
     const map = new Map<number, EmbeddedImage>();
+    let totalBytes = 0;
+    let imagesTruncated = false;
+
     for (const img of worksheet.getImages()) {
+      // A file with very few data rows but many/huge embedded images
+      // shouldn't be able to blow up memory before a single row is even
+      // processed — stop indexing once the cumulative buffered size crosses
+      // the cap, regardless of how many images remain.
+      if (totalBytes >= MAX_TOTAL_EMBEDDED_IMAGES_BYTES) {
+        imagesTruncated = true;
+        break;
+      }
+
       const nativeRow = Math.floor(img.range.tl.nativeRow);
       const image = workbook.getImage(Number(img.imageId));
       if (image?.buffer) {
-        map.set(nativeRow, { extension: image.extension, buffer: Buffer.from(image.buffer) });
+        const buffer = Buffer.from(image.buffer);
+        totalBytes += buffer.length;
+        map.set(nativeRow, { extension: image.extension, buffer });
       }
     }
-    return map;
+
+    return { images: map, imagesTruncated };
   }
 
   private saveEmbeddedImage(
