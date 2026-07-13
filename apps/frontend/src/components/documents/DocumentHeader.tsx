@@ -13,12 +13,15 @@ export interface DocumentHeaderField {
 interface DocumentHeaderProps {
   title: string;
   fields: DocumentHeaderField[];
+  // Used by QuotePrintableDocument: real quote data is display-only here,
+  // never edited from the print view.
+  readOnly?: boolean;
 }
 
 // Reuses the company's own branding (same source as the Sidebar logo)
 // instead of a hardcoded image asset — the Excel's actual logo image is
 // intentionally not copied into the repo as an asset file.
-export function DocumentHeader({ title, fields }: DocumentHeaderProps) {
+export function DocumentHeader({ title, fields, readOnly }: DocumentHeaderProps) {
   const { data: company } = useQuery({
     queryKey: ['company-me'],
     queryFn: getMyCompany,
@@ -56,12 +59,16 @@ export function DocumentHeader({ title, fields }: DocumentHeaderProps) {
                 {field.label}
               </td>
               <td className="border border-stone-800 bg-[#E7D7C9] p-0">
-                <input
-                  type={field.type ?? 'text'}
-                  value={field.value}
-                  onChange={(e) => field.onChange(e.target.value)}
-                  className="w-32 bg-transparent px-2 py-1 text-xs outline-none"
-                />
+                {readOnly ? (
+                  <span className="block w-32 px-2 py-1 text-xs">{field.value}</span>
+                ) : (
+                  <input
+                    type={field.type ?? 'text'}
+                    value={field.value}
+                    onChange={(e) => field.onChange(e.target.value)}
+                    className="w-32 bg-transparent px-2 py-1 text-xs outline-none"
+                  />
+                )}
               </td>
             </tr>
           ))}

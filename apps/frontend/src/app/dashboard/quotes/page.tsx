@@ -3,7 +3,7 @@
 import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { FileText, Trash2 } from 'lucide-react';
+import { FileText, Printer, Trash2 } from 'lucide-react';
 import { getQuotes, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from '@/lib/quotes';
 import { QuoteStatus } from '@/types';
 import { QuoteDetailModal } from '@/components/quotes/QuoteDetailModal';
@@ -153,15 +153,28 @@ function QuotesPageContent() {
                   </td>
                   <td className="px-3 py-2 text-stone-500">{formatDate(quote.createdAt)}</td>
                   <td className="px-3 py-2 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDelete(quote.id);
-                      }}
-                      className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex justify-end gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(`/dashboard/quotes/${quote.id}/print`, '_blank');
+                        }}
+                        title="Ver documento imprimible"
+                        className="rounded p-1.5 text-stone-400 hover:bg-amber-50 hover:text-amber-700"
+                      >
+                        <Printer size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(quote.id);
+                        }}
+                        title="Eliminar"
+                        className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

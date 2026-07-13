@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { X, Printer } from 'lucide-react';
 import { getQuote, updateQuote, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from '@/lib/quotes';
 import { QuoteStatus } from '@/types';
 
@@ -242,6 +242,14 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
                 className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
               >
                 Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => window.open(`/dashboard/quotes/${quoteId}/print`, '_blank')}
+                className="flex items-center gap-1.5 rounded-md bg-[#A57014] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#8c5f10]"
+              >
+                <Printer size={14} />
+                Ver documento imprimible
               </button>
             </div>
           </div>
