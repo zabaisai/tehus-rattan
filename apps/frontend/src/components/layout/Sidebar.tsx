@@ -14,6 +14,7 @@ import {
   ScrollText,
   Package,
   FileText,
+  Calculator,
   Settings,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
@@ -53,6 +54,7 @@ export function Sidebar() {
         { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
         { href: '/dashboard/products', label: 'Productos', icon: Package },
         { href: '/dashboard/quotes', label: 'Cotizaciones', icon: FileText },
+        { href: '/dashboard/documents/calculator', label: 'Documentos', icon: Calculator },
         ...(canManageWhatsApp
           ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
           : []),
