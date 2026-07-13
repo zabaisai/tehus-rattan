@@ -4,6 +4,8 @@ import { CreateLeadDto } from './leads/dto/create-lead.dto';
 import { UpdateLeadDto } from './leads/dto/update-lead.dto';
 import { CreateLeadProductDto } from './leads/dto/create-lead-product.dto';
 import { UpdateLeadProductDto } from './leads/dto/update-lead-product.dto';
+import { CreateQuoteFromLeadDto } from './quotes/dto/create-quote-from-lead.dto';
+import { UpdateQuoteDto } from './quotes/dto/update-quote.dto';
 import { CreateTaskDto } from './tasks/dto/create-task.dto';
 import { UpdateTaskDto } from './tasks/dto/update-task.dto';
 import { CreateNoteDto } from './notes/dto/create-note.dto';
@@ -73,6 +75,18 @@ describe('DTO tenant field whitelist (real ValidationPipe)', () => {
   it('rejects companyId in UpdateLeadProductDto', async () => {
     await expectCompanyIdRejected(UpdateLeadProductDto, {
       quantity: 2,
+    });
+  });
+
+  it('rejects companyId in CreateQuoteFromLeadDto', async () => {
+    await expectCompanyIdRejected(CreateQuoteFromLeadDto, {
+      title: 'Cotización inicial',
+    });
+  });
+
+  it('rejects companyId in UpdateQuoteDto', async () => {
+    await expectCompanyIdRejected(UpdateQuoteDto, {
+      status: 'SENT',
     });
   });
 

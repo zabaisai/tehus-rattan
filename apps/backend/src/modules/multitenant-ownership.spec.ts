@@ -3,6 +3,7 @@ import { ContactsService } from './contacts/contacts.service';
 import { ConversationsService } from './conversations/conversations.service';
 import { LeadsService } from './leads/leads.service';
 import { LeadProductsService } from './leads/lead-products.service';
+import { QuotesService } from './quotes/quotes.service';
 import { MessagesService } from './messages/messages.service';
 import { NotesService } from './notes/notes.service';
 import { TasksService } from './tasks/tasks.service';
@@ -375,6 +376,54 @@ describe('multi-tenant ownership validations', () => {
         service.remove('lead-b', 'lp-1', companyId),
       ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.leadProduct.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('QuotesService', () => {
+    let prisma: any;
+    let service: QuotesService;
+
+    beforeEach(() => {
+      prisma = {
+        lead: { findFirst: jest.fn().mockResolvedValue(null) },
+        leadProduct: { findMany: jest.fn() },
+        quote: {
+          findMany: jest.fn(),
+          findFirst: jest.fn().mockResolvedValue(null),
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+      };
+      service = new QuotesService(prisma);
+    });
+
+    it('rejects creating a quote for a lead outside the authenticated company', async () => {
+      await expect(
+        service.createFromLead('lead-b', companyId, 'user-a', {}),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.leadProduct.findMany).not.toHaveBeenCalled();
+      expect(prisma.quote.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects reading a quote belonging to another company', async () => {
+      await expect(service.findById('quote-b', companyId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+    });
+
+    it('rejects updating a quote belonging to another company', async () => {
+      await expect(
+        service.update('quote-b', companyId, { discount: 10 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.quote.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting a quote belonging to another company', async () => {
+      await expect(service.remove('quote-b', companyId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.quote.delete).not.toHaveBeenCalled();
     });
   });
 

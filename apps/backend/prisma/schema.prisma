@@ -39,6 +39,7 @@ model Company {
   tasks               Task[]
   notes               Note[]
   products            Product[]
+  quotes              Quote[]
   whatsappIntegration WhatsAppIntegration?
   auditLogs           AuditLog[]           @relation("AuditLogAffectedCompany")
   supportSessions     SupportSession[]
@@ -63,6 +64,7 @@ model User {
   stageChanges    LeadStageHistory[]
   tasks           Task[]
   notes           Note[]
+  quotes          Quote[]
   auditLogs       AuditLog[]         @relation("AuditLogActor")
   supportSessions SupportSession[]
 
@@ -210,6 +212,7 @@ model Lead {
   tasks        Task[]
   notes        Note[]
   leadProducts LeadProduct[]
+  quotes       Quote[]
 
   @@map("leads")
 }
@@ -347,8 +350,76 @@ model Product {
   company   Company @relation(fields: [companyId], references: [id])
 
   leadProducts LeadProduct[]
+  quoteItems   QuoteItem[]
 
   @@map("products")
+}
+
+// ─────────────────────────────────────────────
+// COTIZACIONES
+// ─────────────────────────────────────────────
+model Quote {
+  id         String      @id @default(cuid())
+  number     String
+  title      String?
+  status     QuoteStatus @default(DRAFT)
+  // subtotal/total are computed and stored by the backend on every write —
+  // never trust a client-supplied value for either.
+  subtotal   Float       @default(0)
+  discount   Float       @default(0)
+  total      Float       @default(0)
+  notes      String?
+  validUntil DateTime?
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id])
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdById String?
+  createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  items QuoteItem[]
+
+  // number is only unique per company, not globally, since each company
+  // has its own COT-0001, COT-0002... sequence.
+  @@unique([companyId, number])
+  @@map("quotes")
+}
+
+enum QuoteStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model QuoteItem {
+  id   String  @id @default(cuid())
+  // Full snapshot of the LeadProduct/Product at the moment the quote was
+  // created — name/description/category/unitPrice never follow later
+  // catalog edits, so a sent quote always reflects what the client saw.
+  name        String
+  description String?
+  category    String?
+  quantity    Int
+  unitPrice   Float
+  subtotal    Float
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id])
+
+  @@map("quote_items")
 }
 
 // ─────────────────────────────────────────────

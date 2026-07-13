@@ -19,6 +19,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ProductsModule } from './modules/products/products.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { QuotesModule } from './modules/quotes/quotes.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
     ProductsModule,
     PlatformModule,
     OnboardingModule,
+    QuotesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
