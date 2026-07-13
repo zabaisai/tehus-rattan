@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { getMe } from "@/lib/auth";
+import { useAuthStore } from "@/store/auth.store";
 import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
 import { InviteCodeStep } from "@/components/onboarding/steps/InviteCodeStep";
 import { CompanyInfoStep, CompanyInfoState } from "@/components/onboarding/steps/CompanyInfoStep";
@@ -58,6 +60,7 @@ function mapOnboardingError(err: unknown): string {
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const setSession = useAuthStore((s) => s.setSession);
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -248,6 +251,21 @@ export default function OnboardingPage() {
         { logo: logoFile ?? undefined, secondaryLogo: secondaryLogoFile ?? undefined },
         inviteCode,
       );
+
+      if (response.token && response.user) {
+        // Same two-step pattern as the normal login: the onboarding response
+        // only carries id/email/name, so backfill role/companyId via
+        // /auth/me before sending the new admin into the dashboard.
+        setSession(response.user, response.token);
+        const fullUser = await getMe();
+        setSession(fullUser, response.token);
+        router.push("/dashboard");
+        return;
+      }
+
+      // No token came back (shouldn't normally happen) — fall back to the
+      // success screen with a manual link to /login instead of redirecting
+      // to a dashboard the user isn't authenticated for.
       setResult(response);
     } catch (err) {
       setSubmitError(mapOnboardingError(err));

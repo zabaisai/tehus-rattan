@@ -5,6 +5,7 @@ import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
+import { AuthService } from '../auth/auth.service';
 import {
   CompanyBrandingService,
   UploadedLogoFile,
@@ -44,6 +45,7 @@ export class OnboardingService {
   constructor(
     private prisma: PrismaService,
     private companyBrandingService: CompanyBrandingService,
+    private authService: AuthService,
   ) {}
 
   // Accepts either a plain JSON body (existing behavior, unchanged) or a
@@ -246,6 +248,13 @@ export class OnboardingService {
       }
     }
 
+    // Only mint a session once the company (and any logos) are fully and
+    // successfully committed — never before, so a failed request can never
+    // hand back a token for a company that doesn't actually exist. Agents
+    // never reach this point at all, since only the admin created above is
+    // ever passed in here.
+    const session = this.authService.issueSession(result.admin);
+
     return {
       message: 'Empresa creada correctamente',
       company: {
@@ -264,6 +273,8 @@ export class OnboardingService {
         name: stage.name,
         order: stage.order,
       })),
+      token: session.token,
+      user: session.user,
     };
   }
 

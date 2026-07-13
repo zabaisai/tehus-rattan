@@ -37,14 +37,7 @@ export class AuthService {
       role: 'ADMIN',
     });
 
-    const token = this.jwtService.sign({
-      sub: user.id,
-      email: user.email,
-      role: user.role,
-      companyId: user.companyId,
-    });
-
-    return { token, user: { id: user.id, email: user.email, name: user.name } };
+    return this.issueSession(user);
   }
 
   async login(email: string, password: string) {
@@ -72,6 +65,22 @@ export class AuthService {
       }
     }
 
+    return this.issueSession(user);
+  }
+
+  async me(userId: string) {
+    return this.usersService.findById(userId);
+  }
+
+  // Shared by login, register, and onboarding (which mints a session for the
+  // admin it just created) so token issuance stays in exactly one place.
+  issueSession(user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    companyId: string | null;
+  }) {
     const token = this.jwtService.sign({
       sub: user.id,
       email: user.email,
@@ -80,9 +89,5 @@ export class AuthService {
     });
 
     return { token, user: { id: user.id, email: user.email, name: user.name } };
-  }
-
-  async me(userId: string) {
-    return this.usersService.findById(userId);
   }
 }

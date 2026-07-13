@@ -39,6 +39,7 @@ const fakeLogoFile = (overrides: Partial<any> = {}) => ({
 describe('OnboardingService', () => {
   let prisma: any;
   let companyBrandingService: any;
+  let authService: any;
   let service: OnboardingService;
   let idCounter: number;
 
@@ -112,7 +113,14 @@ describe('OnboardingService', () => {
       }),
     };
 
-    service = new OnboardingService(prisma, companyBrandingService);
+    authService = {
+      issueSession: jest.fn((user: any) => ({
+        token: `fake-jwt-for-${user.id}`,
+        user: { id: user.id, email: user.email, name: user.name },
+      })),
+    };
+
+    service = new OnboardingService(prisma, companyBrandingService, authService);
   });
 
   it('creates company + admin + agents + pipeline + stages in one pass', async () => {
@@ -139,6 +147,24 @@ describe('OnboardingService', () => {
       'Contactado',
       'Cerrado ganado',
     ]);
+
+    // Auto-login: the response carries a session for the ADMIN, never for
+    // an agent, and it's issued through AuthService rather than signed here.
+    expect(authService.issueSession).toHaveBeenCalledTimes(1);
+    expect(authService.issueSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: result.admin.id,
+        email: 'admin@tehus.test',
+        role: 'ADMIN',
+        companyId: result.company.id,
+      }),
+    );
+    expect(result.token).toBe(`fake-jwt-for-${result.admin.id}`);
+    expect(result.user).toEqual({
+      id: result.admin.id,
+      email: 'admin@tehus.test',
+      name: 'Admin Tehus',
+    });
   });
 
   it('saves commercial config as settings JSON on the company', async () => {
@@ -184,6 +210,7 @@ describe('OnboardingService', () => {
 
     await expect(service.createCompany(buildDto())).rejects.toThrow(ConflictException);
     expect(prisma.company.create).not.toHaveBeenCalled();
+    expect(authService.issueSession).not.toHaveBeenCalled();
   });
 
   it('rejects when the same email appears twice within the payload', async () => {
@@ -196,6 +223,7 @@ describe('OnboardingService', () => {
     await expect(service.createCompany(dto)).rejects.toThrow(ConflictException);
     expect(prisma.user.findMany).not.toHaveBeenCalled();
     expect(prisma.company.create).not.toHaveBeenCalled();
+    expect(authService.issueSession).not.toHaveBeenCalled();
   });
 
   it('does not create the pipeline if creating an agent fails (no half-created company)', async () => {
@@ -215,6 +243,7 @@ describe('OnboardingService', () => {
     await expect(service.createCompany(dto)).rejects.toThrow('boom');
     expect(prisma.pipeline.create).not.toHaveBeenCalled();
     expect(prisma.pipelineStage.create).not.toHaveBeenCalled();
+    expect(authService.issueSession).not.toHaveBeenCalled();
   });
 
   it('appends a numeric suffix to the slug when the base slug is taken', async () => {
@@ -281,6 +310,10 @@ describe('OnboardingService', () => {
       );
       expect(result.company.logoUrl).toMatch(/^\/uploads\/branding\//);
       expect(result.company.secondaryLogoUrl).toBeNull();
+      // Auto-login also works on the logo path — the session is issued only
+      // after the logo upload above has already resolved successfully.
+      expect(authService.issueSession).toHaveBeenCalledTimes(1);
+      expect(result.token).toBe(`fake-jwt-for-${result.admin.id}`);
     });
 
     it('uploads both a primary and secondary logo', async () => {
@@ -299,6 +332,7 @@ describe('OnboardingService', () => {
 
       expect(companyBrandingService.uploadLogo).not.toHaveBeenCalled();
       expect(result.company.logoUrl).toBeNull();
+      expect(result.token).toBe(`fake-jwt-for-${result.admin.id}`);
     });
 
     it('cleans up the created company if saving the logo fails after the transaction', async () => {
@@ -312,6 +346,9 @@ describe('OnboardingService', () => {
       expect(prisma.pipeline.delete).toHaveBeenCalled();
       expect(prisma.user.deleteMany).toHaveBeenCalled();
       expect(prisma.company.delete).toHaveBeenCalled();
+      // A logo failure means the company is rolled back — no session should
+      // ever be issued for a company that no longer exists.
+      expect(authService.issueSession).not.toHaveBeenCalled();
     });
   });
 });

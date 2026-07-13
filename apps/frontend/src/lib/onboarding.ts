@@ -1,4 +1,5 @@
 import api from './axios';
+import { AuthResponse } from '@/types';
 
 export interface OnboardingCompanyInfo {
   name: string;
@@ -102,6 +103,11 @@ export interface OnboardingResult {
   agents: OnboardingSafeUser[];
   pipeline: { id: string; name: string };
   stages: Array<{ id: string; name: string; order: number }>;
+  // Present when the backend successfully issued a session for the admin
+  // it just created — absent (never guessed at) if that step didn't happen,
+  // in which case the wizard falls back to the "go to /login" screen.
+  token?: string;
+  user?: AuthResponse['user'];
 }
 
 // The invite code travels only in the X-Onboarding-Invite-Code header, never
