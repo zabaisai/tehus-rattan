@@ -279,6 +279,64 @@ export interface UpdateLeadProductPayload {
   notes?: string;
 }
 
+export type QuoteStatus = "DRAFT" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+
+export interface QuoteLeadRef {
+  id: string;
+  title: string;
+  status: string;
+}
+
+export interface QuoteItem {
+  id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  quoteId: string;
+  productId: string | null;
+}
+
+export interface Quote {
+  id: string;
+  number: string;
+  title: string | null;
+  status: QuoteStatus;
+  subtotal: number;
+  discount: number;
+  total: number;
+  notes: string | null;
+  validUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+  leadId: string;
+  companyId: string;
+  createdById: string | null;
+  lead: QuoteLeadRef;
+  // Only present on GET /quotes/:id — the list endpoint doesn't include items.
+  items?: QuoteItem[];
+}
+
+export interface CreateQuoteFromLeadPayload {
+  title?: string;
+  notes?: string;
+  validUntil?: string;
+  discount?: number;
+}
+
+export interface UpdateQuotePayload {
+  title?: string;
+  status?: QuoteStatus;
+  notes?: string;
+  validUntil?: string;
+  discount?: number;
+}
+
 export type WhatsAppIntegrationStatus =
   | "PENDING"
   | "CONNECTED"

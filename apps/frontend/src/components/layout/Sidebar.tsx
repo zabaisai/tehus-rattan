@@ -13,6 +13,7 @@ import {
   Building2,
   ScrollText,
   Package,
+  FileText,
   Settings,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
@@ -51,6 +52,7 @@ export function Sidebar() {
         { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
         { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
         { href: '/dashboard/products', label: 'Productos', icon: Package },
+        { href: '/dashboard/quotes', label: 'Cotizaciones', icon: FileText },
         ...(canManageWhatsApp
           ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
           : []),

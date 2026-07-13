@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Pencil, Trash2, Check, Plus } from 'lucide-react';
+import { X, Pencil, Trash2, Check, Plus, FileText } from 'lucide-react';
 import { getLead, updateLead, markLeadWon, markLeadLost } from '@/lib/leads';
 import { changeLeadStage } from '@/lib/pipeline';
 import { getCompanyUsers } from '@/lib/users';
@@ -13,7 +14,8 @@ import {
   removeLeadProduct,
 } from '@/lib/lead-products';
 import { AddProductToLeadModal } from './AddProductToLeadModal';
-import { PipelineStage, AddLeadProductPayload } from '@/types';
+import { CreateQuoteModal } from '@/components/quotes/CreateQuoteModal';
+import { PipelineStage, AddLeadProductPayload, Quote } from '@/types';
 
 type ApiError = {
   response?: {
@@ -67,6 +69,7 @@ interface LeadDetailModalProps {
 }
 
 export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDetailModalProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const queryKey = ['lead', leadId];
 
@@ -104,6 +107,9 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
   const [productNotesDraft, setProductNotesDraft] = useState('');
   const [productError, setProductError] = useState('');
   const [productSaving, setProductSaving] = useState(false);
+
+  const [createQuoteModalOpen, setCreateQuoteModalOpen] = useState(false);
+  const [createdQuote, setCreatedQuote] = useState<Quote | null>(null);
 
   const leadProductsTotal = (leadProducts ?? []).reduce(
     (sum, item) => sum + item.subtotal,
@@ -166,6 +172,16 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
       const errorMessage = Array.isArray(message) ? message[0] : message;
       setProductError(errorMessage || 'No se pudo quitar el producto');
     }
+  }
+
+  function handleQuoteCreated(quote: Quote) {
+    setCreateQuoteModalOpen(false);
+    setCreatedQuote(quote);
+  }
+
+  function goToCreatedQuote() {
+    if (!createdQuote) return;
+    router.push(`/dashboard/quotes?open=${createdQuote.id}`);
   }
 
   function startEditing() {
@@ -492,6 +508,38 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
               <p className="mt-2 text-[11px] text-stone-400">
                 Estos productos servirán como base para una futura cotización.
               </p>
+
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-stone-100 pt-3">
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setCreateQuoteModalOpen(true)}
+                    disabled={(leadProducts?.length ?? 0) === 0}
+                    className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <FileText size={14} />
+                    Crear cotización
+                  </button>
+                  {(leadProducts?.length ?? 0) === 0 && (
+                    <p className="mt-1 text-[11px] text-stone-400">
+                      Agrega productos al lead antes de crear una cotización.
+                    </p>
+                  )}
+                </div>
+
+                {createdQuote && (
+                  <div className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-1.5 text-xs text-green-700">
+                    <span>Cotización {createdQuote.number} creada</span>
+                    <button
+                      type="button"
+                      onClick={goToCreatedQuote}
+                      className="font-medium underline hover:no-underline"
+                    >
+                      Ver cotización
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
@@ -653,6 +701,14 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
         <AddProductToLeadModal
           onClose={() => setAddProductModalOpen(false)}
           onAdd={handleAddProduct}
+        />
+      )}
+
+      {createQuoteModalOpen && (
+        <CreateQuoteModal
+          leadId={leadId}
+          onClose={() => setCreateQuoteModalOpen(false)}
+          onCreated={handleQuoteCreated}
         />
       )}
     </div>
