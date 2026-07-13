@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ContactsService } from './contacts/contacts.service';
 import { ConversationsService } from './conversations/conversations.service';
 import { LeadsService } from './leads/leads.service';
+import { LeadProductsService } from './leads/lead-products.service';
 import { MessagesService } from './messages/messages.service';
 import { NotesService } from './notes/notes.service';
 import { TasksService } from './tasks/tasks.service';
@@ -311,6 +312,69 @@ describe('multi-tenant ownership validations', () => {
           where: { id: 'lead-b', companyId },
         }),
       );
+    });
+  });
+
+  describe('LeadProductsService', () => {
+    let prisma: any;
+    let service: LeadProductsService;
+
+    beforeEach(() => {
+      prisma = {
+        lead: { findFirst: jest.fn().mockResolvedValue(null) },
+        product: { findFirst: jest.fn() },
+        leadProduct: {
+          findMany: jest.fn(),
+          findUnique: jest.fn(),
+          findFirst: jest.fn(),
+          create: jest.fn(),
+          update: jest.fn(),
+          delete: jest.fn(),
+        },
+      };
+      service = new LeadProductsService(prisma);
+    });
+
+    it('rejects listing lead products for a lead outside the authenticated company', async () => {
+      await expect(service.findAllForLead('lead-b', companyId)).rejects.toBeInstanceOf(
+        NotFoundException,
+      );
+      expect(prisma.leadProduct.findMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects attaching a product outside the authenticated company to an owned lead', async () => {
+      prisma.lead.findFirst.mockResolvedValue({ id: 'lead-a' });
+      prisma.product.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.addProduct('lead-a', companyId, { productId: 'product-b' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(prisma.product.findFirst).toHaveBeenCalledWith({
+        where: { id: 'product-b', companyId },
+      });
+      expect(prisma.leadProduct.create).not.toHaveBeenCalled();
+    });
+
+    it('rejects attaching a product to a lead outside the authenticated company', async () => {
+      await expect(
+        service.addProduct('lead-b', companyId, { productId: 'product-a' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.product.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('rejects updating a lead product for a lead outside the authenticated company', async () => {
+      await expect(
+        service.update('lead-b', 'lp-1', companyId, { quantity: 2 }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.leadProduct.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects deleting a lead product for a lead outside the authenticated company', async () => {
+      await expect(
+        service.remove('lead-b', 'lp-1', companyId),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(prisma.leadProduct.delete).not.toHaveBeenCalled();
     });
   });
 

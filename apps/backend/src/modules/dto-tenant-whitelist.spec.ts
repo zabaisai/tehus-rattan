@@ -2,6 +2,8 @@ import { ArgumentMetadata, BadRequestException, ValidationPipe } from '@nestjs/c
 import { CreateContactDto } from './contacts/dto/create-contact.dto';
 import { CreateLeadDto } from './leads/dto/create-lead.dto';
 import { UpdateLeadDto } from './leads/dto/update-lead.dto';
+import { CreateLeadProductDto } from './leads/dto/create-lead-product.dto';
+import { UpdateLeadProductDto } from './leads/dto/update-lead-product.dto';
 import { CreateTaskDto } from './tasks/dto/create-task.dto';
 import { UpdateTaskDto } from './tasks/dto/update-task.dto';
 import { CreateNoteDto } from './notes/dto/create-note.dto';
@@ -59,6 +61,18 @@ describe('DTO tenant field whitelist (real ValidationPipe)', () => {
   it('rejects companyId in UpdateLeadDto', async () => {
     await expectCompanyIdRejected(UpdateLeadDto, {
       title: 'Updated lead',
+    });
+  });
+
+  it('rejects companyId in CreateLeadProductDto', async () => {
+    await expectCompanyIdRejected(CreateLeadProductDto, {
+      productId: 'product-a',
+    });
+  });
+
+  it('rejects companyId in UpdateLeadProductDto', async () => {
+    await expectCompanyIdRejected(UpdateLeadProductDto, {
+      quantity: 2,
     });
   });
 

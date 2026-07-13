@@ -2,11 +2,18 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
+import { X, Pencil, Trash2, Check, Plus } from 'lucide-react';
 import { getLead, updateLead, markLeadWon, markLeadLost } from '@/lib/leads';
 import { changeLeadStage } from '@/lib/pipeline';
 import { getCompanyUsers } from '@/lib/users';
-import { PipelineStage } from '@/types';
+import {
+  getLeadProducts,
+  addProductToLead,
+  updateLeadProduct,
+  removeLeadProduct,
+} from '@/lib/lead-products';
+import { AddProductToLeadModal } from './AddProductToLeadModal';
+import { PipelineStage, AddLeadProductPayload } from '@/types';
 
 type ApiError = {
   response?: {
@@ -24,6 +31,12 @@ function formatCurrency(value: number | null) {
     maximumFractionDigits: 0,
   }).format(value);
 }
+
+const moneyFormatter = new Intl.NumberFormat('es-CO', {
+  style: 'currency',
+  currency: 'COP',
+  maximumFractionDigits: 0,
+});
 
 function formatDate(value: string | null) {
   if (!value) return null;
@@ -67,6 +80,12 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
     queryFn: getCompanyUsers,
   });
 
+  const leadProductsQueryKey = ['lead-products', leadId];
+  const { data: leadProducts } = useQuery({
+    queryKey: leadProductsQueryKey,
+    queryFn: () => getLeadProducts(leadId),
+  });
+
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState('');
   const [value, setValue] = useState('');
@@ -77,6 +96,77 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+
+  const [addProductModalOpen, setAddProductModalOpen] = useState(false);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [productQuantityDraft, setProductQuantityDraft] = useState('');
+  const [productPriceDraft, setProductPriceDraft] = useState('');
+  const [productNotesDraft, setProductNotesDraft] = useState('');
+  const [productError, setProductError] = useState('');
+  const [productSaving, setProductSaving] = useState(false);
+
+  const leadProductsTotal = (leadProducts ?? []).reduce(
+    (sum, item) => sum + item.subtotal,
+    0,
+  );
+
+  async function refreshLeadProducts() {
+    await queryClient.invalidateQueries({ queryKey: leadProductsQueryKey });
+  }
+
+  async function handleAddProduct(payload: AddLeadProductPayload) {
+    await addProductToLead(leadId, payload);
+    await refreshLeadProducts();
+    setAddProductModalOpen(false);
+  }
+
+  function startEditingProduct(itemId: string) {
+    const item = leadProducts?.find((p) => p.id === itemId);
+    if (!item) return;
+    setEditingProductId(itemId);
+    setProductQuantityDraft(String(item.quantity));
+    setProductPriceDraft(String(item.unitPrice));
+    setProductNotesDraft(item.notes ?? '');
+    setProductError('');
+  }
+
+  function cancelEditingProduct() {
+    setEditingProductId(null);
+    setProductError('');
+  }
+
+  async function handleSaveProduct(itemId: string) {
+    setProductError('');
+    setProductSaving(true);
+    try {
+      await updateLeadProduct(leadId, itemId, {
+        quantity: productQuantityDraft ? Number(productQuantityDraft) : undefined,
+        unitPrice: productPriceDraft ? Number(productPriceDraft) : undefined,
+        notes: productNotesDraft.trim() || undefined,
+      });
+      await refreshLeadProducts();
+      setEditingProductId(null);
+    } catch (err) {
+      const message = (err as ApiError).response?.data?.message;
+      const errorMessage = Array.isArray(message) ? message[0] : message;
+      setProductError(errorMessage || 'No se pudo actualizar el producto');
+    } finally {
+      setProductSaving(false);
+    }
+  }
+
+  async function handleRemoveProduct(itemId: string) {
+    if (!confirm('¿Quitar este producto del lead?')) return;
+    setProductError('');
+    try {
+      await removeLeadProduct(leadId, itemId);
+      await refreshLeadProducts();
+    } catch (err) {
+      const message = (err as ApiError).response?.data?.message;
+      const errorMessage = Array.isArray(message) ? message[0] : message;
+      setProductError(errorMessage || 'No se pudo quitar el producto');
+    }
+  }
 
   function startEditing() {
     if (!lead) return;
@@ -178,7 +268,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg">
+      <div className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-lg">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-stone-900">Detalle del lead</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
@@ -250,6 +340,159 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                 </div>
               )}
             </dl>
+
+            <div className="mt-4 border-t border-stone-100 pt-4">
+              <div className="mb-2 flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                  Productos del lead
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setAddProductModalOpen(true)}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                >
+                  <Plus size={13} />
+                  Agregar producto
+                </button>
+              </div>
+
+              {(leadProducts?.length ?? 0) === 0 && (
+                <p className="rounded-md border border-dashed border-stone-200 py-4 text-center text-xs text-stone-400">
+                  Este lead todavía no tiene productos asociados.
+                </p>
+              )}
+
+              {(leadProducts?.length ?? 0) > 0 && (
+                <div className="overflow-hidden rounded-md border border-stone-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-stone-50 text-stone-500">
+                      <tr>
+                        <th className="px-2 py-1.5 font-medium">Producto</th>
+                        <th className="px-2 py-1.5 font-medium">Cantidad</th>
+                        <th className="px-2 py-1.5 font-medium">P. unitario</th>
+                        <th className="px-2 py-1.5 font-medium">Subtotal</th>
+                        <th className="px-2 py-1.5 font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leadProducts?.map((item) => {
+                        const isRowEditing = editingProductId === item.id;
+                        return (
+                          <tr key={item.id} className="border-t border-stone-100 align-top">
+                            <td className="px-2 py-1.5">
+                              <p className="font-medium text-stone-800">{item.product.name}</p>
+                              {item.product.category && (
+                                <p className="text-[10px] text-stone-400">{item.product.category}</p>
+                              )}
+                              {isRowEditing ? (
+                                <input
+                                  type="text"
+                                  value={productNotesDraft}
+                                  onChange={(e) => setProductNotesDraft(e.target.value)}
+                                  placeholder="Notas"
+                                  className="mt-1 w-full rounded border border-stone-300 px-1.5 py-1 text-[11px] outline-none focus:border-stone-500"
+                                />
+                              ) : (
+                                item.notes && (
+                                  <p className="mt-0.5 text-[10px] italic text-stone-400">{item.notes}</p>
+                                )
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              {isRowEditing ? (
+                                <input
+                                  type="number"
+                                  min={1}
+                                  step={1}
+                                  value={productQuantityDraft}
+                                  onChange={(e) => setProductQuantityDraft(e.target.value)}
+                                  className="w-16 rounded border border-stone-300 px-1.5 py-1 text-xs outline-none focus:border-stone-500"
+                                />
+                              ) : (
+                                item.quantity
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              {isRowEditing ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={productPriceDraft}
+                                  onChange={(e) => setProductPriceDraft(e.target.value)}
+                                  className="w-24 rounded border border-stone-300 px-1.5 py-1 text-xs outline-none focus:border-stone-500"
+                                />
+                              ) : (
+                                moneyFormatter.format(item.unitPrice)
+                              )}
+                            </td>
+                            <td className="px-2 py-1.5 font-medium text-stone-800">
+                              {moneyFormatter.format(item.subtotal)}
+                            </td>
+                            <td className="px-2 py-1.5">
+                              <div className="flex justify-end gap-1">
+                                {isRowEditing ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveProduct(item.id)}
+                                      disabled={productSaving}
+                                      className="rounded p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
+                                    >
+                                      <Check size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={cancelEditingProduct}
+                                      className="rounded p-1 text-stone-400 hover:bg-stone-100"
+                                    >
+                                      <X size={13} />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => startEditingProduct(item.id)}
+                                      className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                                    >
+                                      <Pencil size={13} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveProduct(item.id)}
+                                      className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                                    >
+                                      <Trash2 size={13} />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t border-stone-200 bg-stone-50">
+                        <td colSpan={3} className="px-2 py-1.5 text-right text-xs font-medium text-stone-600">
+                          Total estimado
+                        </td>
+                        <td colSpan={2} className="px-2 py-1.5 text-sm font-semibold text-stone-900">
+                          {moneyFormatter.format(leadProductsTotal)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+
+              {productError && <p className="mt-2 text-xs text-red-600">{productError}</p>}
+
+              <p className="mt-2 text-[11px] text-stone-400">
+                Estos productos servirán como base para una futura cotización.
+              </p>
+            </div>
 
             {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
             {justSaved && !error && <p className="mt-3 text-xs text-green-600">Cambios guardados</p>}
@@ -405,6 +648,13 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
           </form>
         )}
       </div>
+
+      {addProductModalOpen && (
+        <AddProductToLeadModal
+          onClose={() => setAddProductModalOpen(false)}
+          onAdd={handleAddProduct}
+        />
+      )}
     </div>
   );
 }

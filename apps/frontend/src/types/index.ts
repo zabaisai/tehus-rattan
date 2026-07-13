@@ -243,6 +243,42 @@ export interface UpdateProductPayload {
   isActive?: boolean;
 }
 
+export interface LeadProductRef {
+  id: string;
+  name: string;
+  category: string | null;
+  imageUrl: string | null;
+  price: number;
+  sku: string | null;
+  code: string | null;
+}
+
+export interface LeadProductItem {
+  id: string;
+  leadId: string;
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  product: LeadProductRef;
+}
+
+export interface AddLeadProductPayload {
+  productId: string;
+  quantity?: number;
+  unitPrice?: number;
+  notes?: string;
+}
+
+export interface UpdateLeadProductPayload {
+  quantity?: number;
+  unitPrice?: number;
+  notes?: string;
+}
+
 export type WhatsAppIntegrationStatus =
   | "PENDING"
   | "CONNECTED"

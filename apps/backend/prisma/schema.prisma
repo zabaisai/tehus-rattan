@@ -209,8 +209,30 @@ model Lead {
   stageHistory LeadStageHistory[]
   tasks        Task[]
   notes        Note[]
+  leadProducts LeadProduct[]
 
   @@map("leads")
+}
+
+model LeadProduct {
+  id        String   @id @default(cuid())
+  quantity  Int      @default(1)
+  // Snapshot of Product.price at the moment it was attached — must not
+  // follow future catalog price changes, since quotes built from this later
+  // need to reflect the price the lead actually saw.
+  unitPrice Float
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@unique([leadId, productId])
+  @@map("lead_products")
 }
 
 model LeadStageHistory {
@@ -323,6 +345,8 @@ model Product {
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
+
+  leadProducts LeadProduct[]
 
   @@map("products")
 }
