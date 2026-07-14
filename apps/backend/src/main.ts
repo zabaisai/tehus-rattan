@@ -7,6 +7,13 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // Behind the Caddy reverse proxy in staging/production, Express only sees
+  // requests arriving over plain HTTP from the proxy itself. Without this,
+  // req.protocol reports "http" even for HTTPS visitors, which corrupts the
+  // absolute URLs built for imported product images (see
+  // ProductsImportService.saveEmbeddedImage).
+  app.set('trust proxy', 1);
+
   app.setGlobalPrefix('api');
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 

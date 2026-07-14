@@ -1,0 +1,40 @@
+# Caddy automatically provisions and renews HTTPS certificates (Let's
+# Encrypt) for the domains below the moment their DNS A records resolve to
+# this VPS and ports 80/443 are reachable — no manual certbot/cron needed.
+#
+# Uncomment and set a real address before the first production deploy so
+# Let's Encrypt can reach you about certificate/account issues:
+# {
+# 	email you@tehusrattan.com
+# }
+
+crm-staging.tehusrattan.com {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# Same effect as X-Frame-Options: SAMEORIGIN, without the deprecated
+		# header — the frontend never needs to be framed by another origin.
+		Content-Security-Policy "frame-ancestors 'self'"
+		-Server
+	}
+
+	reverse_proxy frontend:3000
+}
+
+api.crm-staging.tehusrattan.com {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "frame-ancestors 'self'"
+		-Server
+	}
+
+	# Proxies everything, not just /api — the backend also serves uploaded
+	# files under /uploads/* (see main.ts useStaticAssets), outside the
+	# /api prefix.
+	reverse_proxy backend:3001
+}

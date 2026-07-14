@@ -1,2 +1,7 @@
 # Local scratchpad / reference files
 scratchpad/
+
+# Deployment secrets — real values only ever exist on the VPS or in a local
+# throwaway file while testing docker-compose.staging.yml, never committed.
+.env.staging
+.env.staging.*
