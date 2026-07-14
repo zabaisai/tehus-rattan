@@ -59,7 +59,7 @@ export class LeadsController {
 
   @Post()
   create(@Request() req: any, @Body() body: CreateLeadDto) {
-    return this.leadsService.create(req.user.companyId, body);
+    return this.leadsService.create(req.user.companyId, req.user.sub, body);
   }
 
   @Patch(':id')

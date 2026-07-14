@@ -62,6 +62,7 @@ export class LeadsService {
 
   async create(
     companyId: string,
+    userId: string,
     data: {
       title: string;
       contactId: string;
@@ -72,36 +73,64 @@ export class LeadsService {
       assignedTo?: string;
     },
   ) {
-    const contact = await this.prisma.contact.findFirst({
-      where: { id: data.contactId, companyId },
-    });
-    if (!contact)
-      throw new BadRequestException('El contacto no pertenece a esta empresa');
+    return this.prisma.$transaction(async (tx) => {
+      const contact = await tx.contact.findFirst({
+        where: { id: data.contactId, companyId },
+      });
+      if (!contact)
+        throw new BadRequestException(
+          'El contacto no pertenece a esta empresa',
+        );
 
-    const stage = await this.prisma.pipelineStage.findFirst({
-      where: { id: data.stageId, pipelineId: data.pipelineId },
-    });
-    if (!stage)
-      throw new BadRequestException(
-        'La etapa no pertenece al pipeline indicado',
-      );
+      const stage = await tx.pipelineStage.findFirst({
+        where: { id: data.stageId, pipelineId: data.pipelineId },
+      });
+      if (!stage)
+        throw new BadRequestException(
+          'La etapa no pertenece al pipeline indicado',
+        );
 
-    const pipeline = await this.prisma.pipeline.findFirst({
-      where: { id: data.pipelineId, companyId },
-    });
-    if (!pipeline)
-      throw new BadRequestException('El pipeline no pertenece a esta empresa');
+      const pipeline = await tx.pipeline.findFirst({
+        where: { id: data.pipelineId, companyId },
+      });
+      if (!pipeline)
+        throw new BadRequestException(
+          'El pipeline no pertenece a esta empresa',
+        );
 
-    await this.validateAssignedUser(data.assignedTo, companyId);
+      await this.validateAssignedUser(data.assignedTo, companyId, tx);
 
-    return this.prisma.lead.create({
-      data: {
-        ...data,
-        companyId,
-        expectedCloseDate: data.expectedCloseDate
-          ? new Date(data.expectedCloseDate)
-          : undefined,
-      },
+      const lead = await tx.lead.create({
+        data: {
+          ...data,
+          companyId,
+          expectedCloseDate: data.expectedCloseDate
+            ? new Date(data.expectedCloseDate)
+            : undefined,
+        },
+      });
+
+      // Every lead needs a stage history trail from the moment it exists —
+      // even one created directly into a non-first stage — so changeStage's
+      // later entries always have a starting point to read "from". Same
+      // transaction as the lead itself: either both are written, or neither is.
+      await tx.leadStageHistory.create({
+        data: {
+          leadId: lead.id,
+          fromStageId: null,
+          toStageId: lead.stageId,
+          changedBy: userId,
+        },
+      });
+
+      return tx.lead.findUniqueOrThrow({
+        where: { id: lead.id },
+        include: {
+          contact: { select: { id: true, name: true, phone: true } },
+          stage: { select: { id: true, name: true, color: true } },
+          agent: { select: { id: true, name: true } },
+        },
+      });
     });
   }
 
@@ -188,23 +217,33 @@ export class LeadsService {
 
   async getHistory(id: string, companyId: string) {
     await this.findById(id, companyId);
+    // Ascending so the initial null -> firstStage record (now always
+    // present, see create()) reads first, followed by each later
+    // changeStage transition in the order they actually happened.
     return this.prisma.leadStageHistory.findMany({
       where: { leadId: id },
       include: {
         user: { select: { id: true, name: true } },
       },
-      orderBy: { changedAt: 'desc' },
+      orderBy: { changedAt: 'asc' },
     });
   }
 
-  private async validateAssignedUser(assignedTo: string | undefined, companyId: string) {
+  private async validateAssignedUser(
+    assignedTo: string | undefined,
+    companyId: string,
+    // Accepts the transaction client so callers running inside
+    // this.prisma.$transaction (e.g. create) read/validate against the same
+    // transaction instead of a separate connection.
+    client: Pick<PrismaService, 'user'> = this.prisma,
+  ) {
     if (assignedTo === undefined) return;
 
     if (!assignedTo.trim()) {
       throw new BadRequestException('assignedTo no puede estar vacio');
     }
 
-    const user = await this.prisma.user.findFirst({
+    const user = await client.user.findFirst({
       where: { id: assignedTo, companyId, isActive: true },
       select: { id: true },
     });

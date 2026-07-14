@@ -227,24 +227,31 @@ describe('multi-tenant ownership validations', () => {
   });
 
   describe('LeadsService', () => {
-    const buildPrisma = (assignedUser: any = null) => ({
-      contact: { findFirst: jest.fn().mockResolvedValue({ id: 'contact-a' }) },
-      pipelineStage: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'stage-a' }),
-      },
-      pipeline: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'pipeline-a' }),
-      },
-      user: { findFirst: jest.fn().mockResolvedValue(assignedUser) },
-      lead: { create: jest.fn(), findFirst: jest.fn() },
-    });
+    const buildPrisma = (assignedUser: any = null) => {
+      const prisma: any = {
+        contact: { findFirst: jest.fn().mockResolvedValue({ id: 'contact-a' }) },
+        pipelineStage: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'stage-a' }),
+        },
+        pipeline: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'pipeline-a' }),
+        },
+        user: { findFirst: jest.fn().mockResolvedValue(assignedUser) },
+        lead: { create: jest.fn(), findFirst: jest.fn(), findUniqueOrThrow: jest.fn() },
+        leadStageHistory: { create: jest.fn() },
+      };
+      prisma.$transaction = jest.fn((arg: any) =>
+        Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
+      );
+      return prisma;
+    };
 
     it('rejects assigning a lead to a user outside the authenticated company', async () => {
       const prisma = buildPrisma(null);
       const service = new LeadsService(prisma as any);
 
       await expect(
-        service.create(companyId, {
+        service.create(companyId, 'user-creator', {
           title: 'New lead',
           contactId: 'contact-a',
           pipelineId: 'pipeline-a',
@@ -258,6 +265,7 @@ describe('multi-tenant ownership validations', () => {
         select: { id: true },
       });
       expect(prisma.lead.create).not.toHaveBeenCalled();
+      expect(prisma.leadStageHistory.create).not.toHaveBeenCalled();
     });
 
     it('rejects assigning a lead to an inactive user in the same company', async () => {
@@ -265,7 +273,7 @@ describe('multi-tenant ownership validations', () => {
       const service = new LeadsService(prisma as any);
 
       await expect(
-        service.create(companyId, {
+        service.create(companyId, 'user-creator', {
           title: 'New lead',
           contactId: 'contact-a',
           pipelineId: 'pipeline-a',
@@ -279,6 +287,7 @@ describe('multi-tenant ownership validations', () => {
         select: { id: true },
       });
       expect(prisma.lead.create).not.toHaveBeenCalled();
+      expect(prisma.leadStageHistory.create).not.toHaveBeenCalled();
     });
 
     it('rejects blank assignedTo before creating a lead', async () => {
@@ -286,7 +295,7 @@ describe('multi-tenant ownership validations', () => {
       const service = new LeadsService(prisma as any);
 
       await expect(
-        service.create(companyId, {
+        service.create(companyId, 'user-creator', {
           title: 'New lead',
           contactId: 'contact-a',
           pipelineId: 'pipeline-a',
