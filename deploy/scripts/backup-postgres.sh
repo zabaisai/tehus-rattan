@@ -18,12 +18,14 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-# Loaded into this shell's environment only, used solely to authenticate the
-# exec'd pg_dump below — never echoed or written anywhere.
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+# Read only the three keys this script actually needs, via grep/cut rather
+# than `source` — docker compose's env_file format allows unquoted values
+# with spaces (e.g. SUPER_ADMIN_NAME=Super Admin Staging), which is valid
+# there but breaks bash `source` (it tries to run the extra words as a
+# command). Never echoed or written anywhere.
+POSTGRES_USER="$(grep -m1 '^POSTGRES_USER=' "$ENV_FILE" | cut -d= -f2-)"
+POSTGRES_DB="$(grep -m1 '^POSTGRES_DB=' "$ENV_FILE" | cut -d= -f2-)"
+POSTGRES_PASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
 
 : "${POSTGRES_USER:?POSTGRES_USER missing from $ENV_FILE}"
 : "${POSTGRES_DB:?POSTGRES_DB missing from $ENV_FILE}"

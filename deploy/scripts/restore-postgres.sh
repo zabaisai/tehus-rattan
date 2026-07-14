@@ -46,10 +46,13 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+# Read only the three keys this script needs via grep/cut rather than
+# `source` — see backup-postgres.sh for why: unquoted values with spaces
+# (e.g. SUPER_ADMIN_NAME) are valid for docker compose's env_file format but
+# break bash `source`.
+POSTGRES_USER="$(grep -m1 '^POSTGRES_USER=' "$ENV_FILE" | cut -d= -f2-)"
+POSTGRES_DB="$(grep -m1 '^POSTGRES_DB=' "$ENV_FILE" | cut -d= -f2-)"
+POSTGRES_PASSWORD="$(grep -m1 '^POSTGRES_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)"
 : "${POSTGRES_USER:?POSTGRES_USER missing from $ENV_FILE}"
 : "${POSTGRES_DB:?POSTGRES_DB missing from $ENV_FILE}"
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD missing from $ENV_FILE}"
