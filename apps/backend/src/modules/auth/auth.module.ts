@@ -7,6 +7,7 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { UsersModule } from '../users/users.module';
 import { SessionsModule } from '../sessions/sessions.module';
+import { ACCESS_TOKEN_EXPIRES_IN } from '../sessions/sessions.constants';
 
 @Module({
   imports: [
@@ -18,7 +19,11 @@ import { SessionsModule } from '../sessions/sessions.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
         secret: configService.getOrThrow<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '7d' },
+        // Was 7d — now short-lived because JwtStrategy independently
+        // enforces revocation via `sid` on every request (see
+        // jwt.strategy.ts). This shorter window is a defense-in-depth
+        // measure for token leakage, not the revocation mechanism itself.
+        signOptions: { expiresIn: ACCESS_TOKEN_EXPIRES_IN },
       }),
     }),
   ],

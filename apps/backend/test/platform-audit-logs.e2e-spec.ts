@@ -6,8 +6,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { PlatformAuditLogController } from '../src/modules/platform/platform-audit-log.controller';
 import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 // Test-only secret, never read from .env and never logged.
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
@@ -47,7 +52,13 @@ describe('PlatformAuditLogController (e2e)', () => {
 
   const signToken = (role: string, companyId: string | null) =>
     jwtService.sign(
-      { sub: 'user-1', email: 'platform@tehus.test', role, companyId },
+      {
+        sub: 'user-1',
+        email: 'platform@tehus.test',
+        role,
+        companyId,
+        sid: encodeSid('user-1', companyId),
+      },
       { expiresIn: '5m' },
     );
 
@@ -66,6 +77,7 @@ describe('PlatformAuditLogController (e2e)', () => {
             },
           },
         },
+        { provide: PrismaService, useValue: buildFakeSessionPrisma() },
         {
           provide: PlatformAuditLogService,
           useValue: auditLogServiceMock,

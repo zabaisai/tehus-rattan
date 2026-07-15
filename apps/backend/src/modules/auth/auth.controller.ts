@@ -15,12 +15,11 @@ import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { buildSessionRequestContext } from '../sessions/utils/request-context.util';
+import { REFRESH_TOKEN_COOKIE } from '../sessions/sessions.constants';
 import {
-  REFRESH_TOKEN_COOKIE,
-  SESSION_INACTIVITY_EXPIRY_MS,
-} from '../sessions/sessions.constants';
-
-const REFRESH_COOKIE_PATH = '/api/auth';
+  setRefreshTokenCookie,
+  clearRefreshTokenCookie,
+} from '../sessions/utils/refresh-cookie.util';
 
 @Controller('auth')
 export class AuthController {
@@ -30,6 +29,13 @@ export class AuthController {
   // pipeline/stages/agents this endpoint never did. Kept for backward
   // compatibility, but gated the same way so it can no longer create a
   // Company + ADMIN for free.
+  //
+  // Deliberately NOT wired into session tracking: this path issues a
+  // sid-less access token via AuthService.issueSession(user) with no
+  // second argument, and JwtStrategy now rejects any token with no `sid`
+  // outright (see jwt.strategy.ts) — so the token this endpoint returns
+  // authenticates nothing against any guarded route. It is fully inert,
+  // not merely "legacy"; this is intentional rather than an oversight.
   @UseGuards(OnboardingInviteGuard)
   @Post('register')
   register(@Body() body: RegisterDto) {
@@ -48,7 +54,7 @@ export class AuthController {
       body.password,
       context,
     );
-    this.setRefreshCookie(res, refreshToken);
+    setRefreshTokenCookie(res, refreshToken);
     return result;
   }
 
@@ -67,7 +73,7 @@ export class AuthController {
       plainRefreshToken,
       context,
     );
-    this.setRefreshCookie(res, refreshToken);
+    setRefreshTokenCookie(res, refreshToken);
     return result;
   }
 
@@ -81,7 +87,7 @@ export class AuthController {
   ) {
     const plainRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
     await this.authService.logout(plainRefreshToken);
-    res.clearCookie(REFRESH_TOKEN_COOKIE, { path: REFRESH_COOKIE_PATH });
+    clearRefreshTokenCookie(res);
     return { message: 'Sesión cerrada' };
   }
 
@@ -89,15 +95,5 @@ export class AuthController {
   @Get('me')
   me(@Request() req: any) {
     return this.authService.me(req.user.sub);
-  }
-
-  private setRefreshCookie(res: Response, refreshToken: string) {
-    res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: SESSION_INACTIVITY_EXPIRY_MS,
-      path: REFRESH_COOKIE_PATH,
-    });
   }
 }

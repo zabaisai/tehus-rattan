@@ -79,7 +79,7 @@ describe('AuthController', () => {
       expect(authService.login).toHaveBeenCalledWith(
         'a@co.test',
         'password123',
-        expect.objectContaining({ deviceId: 'device-1' }),
+        expect.objectContaining({ deviceIdHash: expect.any(String) }),
       );
       expect(res.cookie).toHaveBeenCalledWith(
         'tehus_refresh_token',
@@ -110,7 +110,7 @@ describe('AuthController', () => {
 
       expect(authService.refresh).toHaveBeenCalledWith(
         'old-plain-refresh-token',
-        expect.objectContaining({ deviceId: 'device-1' }),
+        expect.objectContaining({ deviceIdHash: expect.any(String) }),
       );
       expect(res.cookie).toHaveBeenCalledWith(
         'tehus_refresh_token',

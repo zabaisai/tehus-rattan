@@ -4,10 +4,8 @@ import { AuthService } from './auth.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
 const fakeContext: SessionRequestContext = {
-  deviceId: 'device-1',
-  ipAddress: '181.60.12.24',
-  ipPreview: '181.***.***.24',
-  userAgent: 'test-agent',
+  deviceIdHash: 'device-1-hash',
+  ipPreview: '181.60.12.0',
   browser: 'Chrome 120',
   operatingSystem: 'Windows 10',
   deviceType: 'DESKTOP',
