@@ -26,3 +26,9 @@ export async function getMe(): Promise<User> {
   const { data } = await api.get<User>("/auth/me");
   return data;
 }
+
+// Closes only this browser's session (identified by its httpOnly
+// refresh-token cookie) — never other devices.
+export async function logout(): Promise<void> {
+  await api.post("/auth/logout");
+}

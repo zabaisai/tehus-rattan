@@ -19,6 +19,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: payload.email,
       role: payload.role,
       companyId: payload.companyId,
+      // Only present on tokens minted by a real /auth/login after this
+      // feature shipped — undefined for anything issued before, or by
+      // register/onboarding, which never breaks anything reading it since
+      // ActivityThrottleInterceptor treats an absent sid as "nothing to do".
+      sid: payload.sid,
     };
   }
 }

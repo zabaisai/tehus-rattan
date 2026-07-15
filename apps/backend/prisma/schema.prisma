@@ -16,7 +16,7 @@ model Company {
   updatedAt DateTime      @updatedAt
 
   // Informational company profile — display-only, never legal/fiscal/billing data.
-  slug             String?  @unique
+  slug             String? @unique
   logoUrl          String?
   secondaryLogoUrl String?
   primaryColor     String?
@@ -44,6 +44,8 @@ model Company {
   auditLogs           AuditLog[]           @relation("AuditLogAffectedCompany")
   supportSessions     SupportSession[]
   invitationCodesUsed InvitationCode[]
+  userSessions        UserSession[]
+  loginEvents         LoginEvent[]
 
   @@map("companies")
 }
@@ -72,6 +74,10 @@ model User {
   invitationCodesCreated InvitationCode[] @relation("InvitationCodeCreatedBy")
   invitationCodesUsed    InvitationCode[] @relation("InvitationCodeUsedBy")
   invitationCodesRevoked InvitationCode[] @relation("InvitationCodeRevokedBy")
+
+  sessions        UserSession[] @relation("UserSessionUser")
+  sessionsRevoked UserSession[] @relation("UserSessionRevokedBy")
+  loginEvents     LoginEvent[]
 
   @@map("users")
 }
@@ -404,7 +410,7 @@ enum QuoteStatus {
 }
 
 model QuoteItem {
-  id   String  @id @default(cuid())
+  id          String   @id @default(cuid())
   // Full snapshot of the LeadProduct/Product at the moment the quote was
   // created — name/description/category/unitPrice never follow later
   // catalog edits, so a sent quote always reflects what the client saw.
@@ -567,10 +573,10 @@ enum InvitationCodeStatus {
 }
 
 model InvitationCode {
-  id       String @id @default(cuid())
+  id          String @id @default(cuid())
   // SHA-256 hex digest of the normalized plaintext code. The plaintext
   // itself is never stored — only shown once, in the create-response.
-  codeHash String @unique
+  codeHash    String @unique
   // Masked display form for the admin panel, e.g. "TEHUS-****-****-****-A7F2".
   codePreview String
 
@@ -598,4 +604,126 @@ model InvitationCode {
   @@index([createdByUserId])
   @@index([companyId])
   @@map("invitation_codes")
+}
+
+// ─────────────────────────────────────────────
+// SESSIONS, DEVICES & LOGIN ACTIVITY (platform monitoring)
+// ─────────────────────────────────────────────
+enum UserSessionStatus {
+  ACTIVE
+  LOGGED_OUT
+  REVOKED
+  EXPIRED
+}
+
+enum LoginEventStatus {
+  SUCCESS
+  FAILED
+}
+
+enum DeviceType {
+  DESKTOP
+  MOBILE
+  TABLET
+  UNKNOWN
+}
+
+// One row per (userId, deviceId) pair — logging in again from the same
+// recognized browser updates this same row (status back to ACTIVE, fresh
+// refreshTokenHash/lastLoginAt) instead of creating a duplicate, so "number
+// of devices" is never inflated by repeat logins from the same browser.
+model UserSession {
+  id        String  @id @default(cuid())
+  userId    String
+  companyId String?
+  // Random, persistent, cookie-based identifier for the browser — never
+  // derived from IP, fonts, canvas, or any other invasive fingerprinting
+  // signal (see DeviceIdMiddleware).
+  deviceId  String
+
+  // SHA-256 hex digest of the opaque refresh token. The plaintext travels
+  // only in an httpOnly cookie and is never persisted anywhere.
+  refreshTokenHash String @unique
+
+  // Plaintext, full IP — restricted to SUPER_ADMIN-only endpoints, and even
+  // those never actually return this field (see PlatformActivityService),
+  // only ipPreview. Kept for potential future abuse investigation, not
+  // exposed today.
+  ipAddress String?
+  // Masked form for display, e.g. "181.***.**.24" — computed once at write
+  // time so no request needs to re-derive it.
+  ipPreview String?
+
+  userAgent       String?
+  browser         String?
+  operatingSystem String?
+  deviceType      DeviceType @default(UNKNOWN)
+
+  status UserSessionStatus @default(ACTIVE)
+
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+  lastLoginAt    DateTime @default(now())
+  // Throttled to at most one write every 5 minutes per session — see
+  // ActivityThrottleInterceptor. Reflects "the session is still open", not
+  // clicks or form content.
+  lastActivityAt DateTime @default(now())
+
+  loggedOutAt DateTime?
+  revokedAt   DateTime?
+
+  revokedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation("UserSessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  revokedBy User?    @relation("UserSessionRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, deviceId])
+  @@index([companyId])
+  @@index([status])
+  @@index([deviceId])
+  @@index([lastActivityAt])
+  @@map("user_sessions")
+}
+
+// One row per login attempt, successful or not. Never linked to a password
+// or token — only enough to power the platform's login-activity view.
+model LoginEvent {
+  id String @id @default(cuid())
+
+  userId         String?
+  companyId      String?
+  // Kept even for FAILED attempts against a non-existent email (lowercased,
+  // trimmed) — this is an internal audit row behind PlatformGuard, not a
+  // client-facing message, so it does not itself "reveal" account
+  // existence to anyone attempting to log in.
+  emailAttempted String
+
+  status        LoginEventStatus
+  // A small fixed set of generic codes (e.g. INVALID_CREDENTIALS,
+  // ACCOUNT_INACTIVE, COMPANY_SUSPENDED) — never the raw exception message.
+  failureReason String?
+
+  deviceId  String?
+  ipAddress String?
+  ipPreview String?
+
+  userAgent       String?
+  browser         String?
+  operatingSystem String?
+  deviceType      DeviceType @default(UNKNOWN)
+
+  createdAt DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("login_events")
 }

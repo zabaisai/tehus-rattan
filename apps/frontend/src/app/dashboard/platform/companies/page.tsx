@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { getPlatformCompanies, updatePlatformCompanyStatus } from '@/lib/platform';
@@ -36,6 +37,7 @@ function formatDate(value: string) {
 
 export default function PlatformCompaniesPage() {
   const user = useAuthStore((s) => s.user);
+  const router = useRouter();
   const isPlatformSuperAdmin =
     user?.role === 'SUPER_ADMIN' && user?.companyId === null;
   const queryClient = useQueryClient();
@@ -245,6 +247,13 @@ export default function PlatformCompaniesPage() {
                       className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
                     >
                       Ver detalle
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/dashboard/platform/activity/${company.id}`)}
+                      className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                    >
+                      Ver actividad
                     </button>
 
                     <button

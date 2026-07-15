@@ -2,6 +2,7 @@ import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -13,6 +14,11 @@ async function bootstrap() {
   // absolute URLs built for imported product images (see
   // ProductsImportService.saveEmbeddedImage).
   app.set('trust proxy', 1);
+
+  // Only ever reads the deviceId/refresh-token cookies this app itself
+  // sets (both httpOnly) — never used to parse the auth JWT, which still
+  // travels solely as an Authorization: Bearer header (see JwtStrategy).
+  app.use(cookieParser());
 
   app.setGlobalPrefix('api');
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
