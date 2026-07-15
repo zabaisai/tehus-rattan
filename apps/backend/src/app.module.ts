@@ -20,6 +20,7 @@ import { ProductsModule } from './modules/products/products.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
+import { InvitationCodesModule } from './modules/invitation-codes/invitation-codes.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { QuotesModule } from './modules/quotes/quotes.module';
     PlatformModule,
     OnboardingModule,
     QuotesModule,
+    InvitationCodesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

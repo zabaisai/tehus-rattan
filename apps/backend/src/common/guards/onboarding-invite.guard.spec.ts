@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { OnboardingInviteGuard } from './onboarding-invite.guard';
 
 function buildContext(headers: Record<string, string> = {}, body: any = {}) {
@@ -10,76 +10,38 @@ function buildContext(headers: Record<string, string> = {}, body: any = {}) {
 }
 
 describe('OnboardingInviteGuard', () => {
-  const originalEnv = process.env.ONBOARDING_INVITE_CODE;
   let guard: OnboardingInviteGuard;
 
   beforeEach(() => {
     guard = new OnboardingInviteGuard();
   });
 
-  afterEach(() => {
-    if (originalEnv === undefined) {
-      delete process.env.ONBOARDING_INVITE_CODE;
-    } else {
-      process.env.ONBOARDING_INVITE_CODE = originalEnv;
-    }
-  });
-
-  it('fails closed with 403 when ONBOARDING_INVITE_CODE is not configured', () => {
-    delete process.env.ONBOARDING_INVITE_CODE;
-
-    expect(() =>
-      guard.canActivate(buildContext({ 'x-onboarding-invite-code': 'anything' })),
-    ).toThrow(ForbiddenException);
-  });
-
   it('rejects a request with no code at all', () => {
-    process.env.ONBOARDING_INVITE_CODE = 'secret-code';
-
-    expect(() => guard.canActivate(buildContext({}, {}))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(buildContext({}, {}))).toThrow(BadRequestException);
   });
 
-  it('rejects a request with an incorrect code in the header', () => {
-    process.env.ONBOARDING_INVITE_CODE = 'secret-code';
-
+  it('rejects a request with a blank code in the header', () => {
     expect(() =>
-      guard.canActivate(buildContext({ 'x-onboarding-invite-code': 'wrong-code' })),
-    ).toThrow(ForbiddenException);
+      guard.canActivate(buildContext({ 'x-onboarding-invite-code': '   ' })),
+    ).toThrow(BadRequestException);
   });
 
-  it('rejects a request with an incorrect code in the body', () => {
-    process.env.ONBOARDING_INVITE_CODE = 'secret-code';
-
-    expect(() =>
-      guard.canActivate(buildContext({}, { inviteCode: 'wrong-code' })),
-    ).toThrow(ForbiddenException);
-  });
-
-  it('allows a request with the correct code in the header', () => {
-    process.env.ONBOARDING_INVITE_CODE = 'secret-code';
-
+  it('allows a request with any non-blank code in the header (real validation happens in the service)', () => {
     expect(
-      guard.canActivate(buildContext({ 'x-onboarding-invite-code': 'secret-code' })),
+      guard.canActivate(buildContext({ 'x-onboarding-invite-code': 'TEHUS-AAAA-BBBB-CCCC-DDDD' })),
     ).toBe(true);
   });
 
-  it('allows a request with the correct code in the body', () => {
-    process.env.ONBOARDING_INVITE_CODE = 'secret-code';
-
+  it('allows a request with any non-blank code in the body', () => {
     expect(
-      guard.canActivate(buildContext({}, { inviteCode: 'secret-code' })),
+      guard.canActivate(buildContext({}, { inviteCode: 'TEHUS-AAAA-BBBB-CCCC-DDDD' })),
     ).toBe(true);
   });
 
   it('prefers the header over the body when both are present', () => {
-    process.env.ONBOARDING_INVITE_CODE = 'secret-code';
-
     expect(
       guard.canActivate(
-        buildContext(
-          { 'x-onboarding-invite-code': 'secret-code' },
-          { inviteCode: 'wrong-code' },
-        ),
+        buildContext({ 'x-onboarding-invite-code': 'header-code' }, { inviteCode: '' }),
       ),
     ).toBe(true);
   });

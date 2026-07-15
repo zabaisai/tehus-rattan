@@ -17,5 +17,6 @@ import { SupportSessionsService } from './support-sessions.service';
     PlatformAuditLogService,
     SupportSessionsService,
   ],
+  exports: [PlatformAuditLogService],
 })
 export class PlatformModule {}

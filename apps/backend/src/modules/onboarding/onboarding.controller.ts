@@ -1,4 +1,12 @@
-import { Body, Controller, Post, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  Request,
+  UploadedFiles,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
 import { OnboardingService } from './onboarding.service';
@@ -38,11 +46,17 @@ export class OnboardingController {
   async createCompany(
     @UploadedFiles() files: OnboardingUploadedFiles | undefined,
     @Body() body: unknown,
+    @Request() req: any,
   ) {
     const dto = await this.onboardingService.parsePayload(body);
-    return this.onboardingService.createCompany(dto, {
-      logo: files?.logo?.[0],
-      secondaryLogo: files?.secondaryLogo?.[0],
-    });
+    const inviteCode = req.headers?.['x-onboarding-invite-code'] ?? dto.inviteCode;
+    return this.onboardingService.createCompany(
+      dto,
+      {
+        logo: files?.logo?.[0],
+        secondaryLogo: files?.secondaryLogo?.[0],
+      },
+      inviteCode,
+    );
   }
 }

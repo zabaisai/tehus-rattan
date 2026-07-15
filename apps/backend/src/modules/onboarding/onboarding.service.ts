@@ -6,11 +6,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
 import {
   CompanyBrandingService,
   UploadedLogoFile,
 } from '../companies/company-branding.service';
 import { CreateOnboardingCompanyDto } from './dto/create-onboarding-company.dto';
+import {
+  hashInvitationCode,
+  normalizeInvitationCode,
+} from '../invitation-codes/invitation-code.util';
 
 export interface OnboardingLogoFiles {
   logo?: UploadedLogoFile;
@@ -46,6 +51,7 @@ export class OnboardingService {
     private prisma: PrismaService,
     private companyBrandingService: CompanyBrandingService,
     private authService: AuthService,
+    private auditLogService: PlatformAuditLogService,
   ) {}
 
   // Accepts either a plain JSON body (existing behavior, unchanged) or a
@@ -96,7 +102,11 @@ export class OnboardingService {
     return messages;
   }
 
-  async createCompany(dto: CreateOnboardingCompanyDto, files?: OnboardingLogoFiles) {
+  async createCompany(
+    dto: CreateOnboardingCompanyDto,
+    files: OnboardingLogoFiles | undefined,
+    inviteCode: unknown,
+  ) {
     // Validate any logo files (extension, mimetype, size, magic bytes) as
     // the very first thing — before any database access at all — so a bad
     // file rejects the whole request with zero reads or writes, instead of
@@ -105,6 +115,11 @@ export class OnboardingService {
     if (files?.secondaryLogo) {
       this.companyBrandingService.assertValidLogoFile(files.secondaryLogo);
     }
+
+    if (typeof inviteCode !== 'string' || !inviteCode.trim()) {
+      throw new BadRequestException('El código de invitación es requerido');
+    }
+    const codeHash = hashInvitationCode(normalizeInvitationCode(inviteCode));
 
     const adminEmail = dto.admin.email.trim().toLowerCase();
     const agents = dto.agents ?? [];
@@ -148,6 +163,54 @@ export class OnboardingService {
     };
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const invitation = await tx.invitationCode.findUnique({ where: { codeHash } });
+
+      if (!invitation) {
+        this.logger.warn('Intento de onboarding con código de invitación inválido');
+        throw new BadRequestException('Código de invitación inválido');
+      }
+      if (invitation.status === 'REVOKED') {
+        this.logger.warn(
+          `Intento de onboarding con código revocado (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación revocado');
+      }
+      if (invitation.status === 'USED') {
+        this.logger.warn(
+          `Intento de onboarding con código ya utilizado (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación ya utilizado');
+      }
+      const isExpired =
+        invitation.status === 'EXPIRED' ||
+        (invitation.expiresAt !== null && invitation.expiresAt.getTime() <= Date.now());
+      if (isExpired) {
+        this.logger.warn(
+          `Intento de onboarding con código vencido (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación vencido');
+      }
+
+      // Atomic conditional claim: if a concurrent request already consumed,
+      // revoked, or the code expired in the instant between the read above
+      // and here, `count` comes back 0 and this whole transaction rolls
+      // back — at most one of two simultaneous requests with the same code
+      // can ever get past this point.
+      const claim = await tx.invitationCode.updateMany({
+        where: {
+          id: invitation.id,
+          status: 'ACTIVE',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        data: { status: 'USED', usedAt: new Date() },
+      });
+      if (claim.count === 0) {
+        this.logger.warn(
+          `Código de invitación perdió la carrera de uso concurrente (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación ya utilizado');
+      }
+
       const company = await tx.company.create({
         data: {
           name: companyName,
@@ -212,7 +275,30 @@ export class OnboardingService {
         stages.push(stage);
       }
 
-      return { company, admin, createdAgents, pipeline, stages };
+      await tx.invitationCode.update({
+        where: { id: invitation.id },
+        data: { companyId: company.id, usedByUserId: admin.id },
+      });
+
+      // If this write fails, the transaction rolls back the invitation
+      // consumption (and the company/admin) too — using a code must never
+      // go unlogged.
+      await this.auditLogService.record(tx, {
+        actorUserId: admin.id,
+        actorRole: 'ADMIN',
+        affectedCompanyId: company.id,
+        action: 'USE_INVITATION_CODE',
+        entityType: 'InvitationCode',
+        entityId: invitation.id,
+        metadata: {
+          invitationId: invitation.id,
+          codePreview: invitation.codePreview,
+          companyId: company.id,
+          companyName: company.name,
+        },
+      });
+
+      return { company, admin, createdAgents, pipeline, stages, invitationId: invitation.id };
     });
 
     let logoUrl = result.company.logoUrl;
@@ -243,7 +329,11 @@ export class OnboardingService {
         // uploaded file can't be part of the same Postgres transaction) —
         // so a logo failure here is compensated with an explicit cleanup
         // instead of leaving a company with a half-applied logo.
-        await this.cleanupFailedCompany(result.company.id, result.pipeline.id);
+        await this.cleanupFailedCompany(
+          result.company.id,
+          result.pipeline.id,
+          result.invitationId,
+        );
         throw err;
       }
     }
@@ -281,6 +371,7 @@ export class OnboardingService {
   private async cleanupFailedCompany(
     companyId: string,
     pipelineId: string,
+    invitationId: string,
   ): Promise<void> {
     try {
       await this.prisma.$transaction([
@@ -288,6 +379,19 @@ export class OnboardingService {
         this.prisma.pipeline.delete({ where: { id: pipelineId } }),
         this.prisma.user.deleteMany({ where: { companyId } }),
         this.prisma.company.delete({ where: { id: companyId } }),
+        // The onboarding attempt failed overall (logo upload, in this case)
+        // — the invitation must not stay burned for a company that was
+        // just deleted. Give it back its ACTIVE state so the same code can
+        // be retried.
+        this.prisma.invitationCode.update({
+          where: { id: invitationId },
+          data: {
+            status: 'ACTIVE',
+            usedAt: null,
+            usedByUserId: null,
+            companyId: null,
+          },
+        }),
       ]);
     } catch (cleanupError) {
       // Never swallow this — an onboarding company that fails to clean up

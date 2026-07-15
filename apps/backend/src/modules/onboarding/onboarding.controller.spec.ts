@@ -20,51 +20,73 @@ describe('OnboardingController', () => {
     expect(guards).toContain(OnboardingInviteGuard);
   });
 
-  it('parses the raw body via parsePayload and forwards the resolved DTO to createCompany', async () => {
-    const dto = { company: { name: 'Tehus Rattan' } };
+  it('parses the raw body via parsePayload and forwards the resolved DTO to createCompany, falling back to the body inviteCode when no header is sent', async () => {
+    const dto = { company: { name: 'Tehus Rattan' }, inviteCode: 'TEHUS-FROM-BODY' };
     onboardingService.parsePayload.mockResolvedValue(dto);
     onboardingService.createCompany.mockResolvedValue({ message: 'ok' });
 
     const rawBody = { data: JSON.stringify(dto) };
-    await controller.createCompany(undefined, rawBody);
+    const req = { headers: {} };
+    await controller.createCompany(undefined, rawBody, req);
 
     expect(onboardingService.parsePayload).toHaveBeenCalledWith(rawBody);
-    expect(onboardingService.createCompany).toHaveBeenCalledWith(dto, {
-      logo: undefined,
-      secondaryLogo: undefined,
-    });
+    expect(onboardingService.createCompany).toHaveBeenCalledWith(
+      dto,
+      { logo: undefined, secondaryLogo: undefined },
+      'TEHUS-FROM-BODY',
+    );
   });
 
-  it('forwards the uploaded logo and secondaryLogo files to createCompany', async () => {
+  it('forwards the uploaded logo and secondaryLogo files and the header invite code to createCompany', async () => {
     const dto = { company: { name: 'Tehus Rattan' } };
     onboardingService.parsePayload.mockResolvedValue(dto);
     onboardingService.createCompany.mockResolvedValue({ message: 'ok' });
 
     const logoFile = { originalname: 'logo.png' } as Express.Multer.File;
     const secondaryFile = { originalname: 'secondary.png' } as Express.Multer.File;
+    const req = { headers: { 'x-onboarding-invite-code': 'TEHUS-FROM-HEADER' } };
 
     await controller.createCompany(
       { logo: [logoFile], secondaryLogo: [secondaryFile] },
       { data: '{}' },
+      req,
     );
 
-    expect(onboardingService.createCompany).toHaveBeenCalledWith(dto, {
-      logo: logoFile,
-      secondaryLogo: secondaryFile,
-    });
+    expect(onboardingService.createCompany).toHaveBeenCalledWith(
+      dto,
+      { logo: logoFile, secondaryLogo: secondaryFile },
+      'TEHUS-FROM-HEADER',
+    );
   });
 
-  it('still works for a plain JSON body with no files at all', async () => {
+  it('prefers the header invite code over the body one when both are present', async () => {
+    const dto = { company: { name: 'Tehus Rattan' }, inviteCode: 'TEHUS-FROM-BODY' };
+    onboardingService.parsePayload.mockResolvedValue(dto);
+    onboardingService.createCompany.mockResolvedValue({ message: 'ok' });
+
+    const req = { headers: { 'x-onboarding-invite-code': 'TEHUS-FROM-HEADER' } };
+    await controller.createCompany(undefined, dto, req);
+
+    expect(onboardingService.createCompany).toHaveBeenCalledWith(
+      dto,
+      { logo: undefined, secondaryLogo: undefined },
+      'TEHUS-FROM-HEADER',
+    );
+  });
+
+  it('still works for a plain JSON body with no files and no invite code at all', async () => {
     const dto = { company: { name: 'Tehus Rattan' } };
     onboardingService.parsePayload.mockResolvedValue(dto);
     onboardingService.createCompany.mockResolvedValue({ message: 'ok' });
 
-    await controller.createCompany(undefined, dto);
+    const req = { headers: {} };
+    await controller.createCompany(undefined, dto, req);
 
     expect(onboardingService.parsePayload).toHaveBeenCalledWith(dto);
-    expect(onboardingService.createCompany).toHaveBeenCalledWith(dto, {
-      logo: undefined,
-      secondaryLogo: undefined,
-    });
+    expect(onboardingService.createCompany).toHaveBeenCalledWith(
+      dto,
+      { logo: undefined, secondaryLogo: undefined },
+      undefined,
+    );
   });
 });

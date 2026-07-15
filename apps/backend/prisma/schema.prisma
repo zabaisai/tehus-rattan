@@ -43,6 +43,7 @@ model Company {
   whatsappIntegration WhatsAppIntegration?
   auditLogs           AuditLog[]           @relation("AuditLogAffectedCompany")
   supportSessions     SupportSession[]
+  invitationCodesUsed InvitationCode[]
 
   @@map("companies")
 }
@@ -67,6 +68,10 @@ model User {
   quotes          Quote[]
   auditLogs       AuditLog[]         @relation("AuditLogActor")
   supportSessions SupportSession[]
+
+  invitationCodesCreated InvitationCode[] @relation("InvitationCodeCreatedBy")
+  invitationCodesUsed    InvitationCode[] @relation("InvitationCodeUsedBy")
+  invitationCodesRevoked InvitationCode[] @relation("InvitationCodeRevokedBy")
 
   @@map("users")
 }
@@ -549,4 +554,48 @@ enum MessageStatus {
   READ
   FAILED
   RECEIVED
+}
+
+// ─────────────────────────────────────────────
+// INVITATION CODES (company onboarding gate)
+// ─────────────────────────────────────────────
+enum InvitationCodeStatus {
+  ACTIVE
+  USED
+  REVOKED
+  EXPIRED
+}
+
+model InvitationCode {
+  id       String @id @default(cuid())
+  // SHA-256 hex digest of the normalized plaintext code. The plaintext
+  // itself is never stored — only shown once, in the create-response.
+  codeHash String @unique
+  // Masked display form for the admin panel, e.g. "TEHUS-****-****-****-A7F2".
+  codePreview String
+
+  intendedCompanyName  String
+  intendedContactEmail String?
+
+  status    InvitationCodeStatus @default(ACTIVE)
+  expiresAt DateTime?
+  createdAt DateTime             @default(now())
+
+  createdByUserId String
+  createdBy       User   @relation("InvitationCodeCreatedBy", fields: [createdByUserId], references: [id])
+
+  usedAt       DateTime?
+  usedByUserId String?
+  usedBy       User?     @relation("InvitationCodeUsedBy", fields: [usedByUserId], references: [id])
+  companyId    String?
+  company      Company?  @relation(fields: [companyId], references: [id])
+
+  revokedAt       DateTime?
+  revokedByUserId String?
+  revokedBy       User?     @relation("InvitationCodeRevokedBy", fields: [revokedByUserId], references: [id])
+
+  @@index([status])
+  @@index([createdByUserId])
+  @@index([companyId])
+  @@map("invitation_codes")
 }

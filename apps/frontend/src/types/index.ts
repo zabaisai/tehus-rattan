@@ -615,3 +615,43 @@ export interface PlatformAuditLog {
   userAgent: string | null;
   createdAt: string;
 }
+
+export type InvitationCodeStatus = "ACTIVE" | "USED" | "REVOKED" | "EXPIRED";
+
+export interface InvitationCodeUserRef {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface InvitationCode {
+  id: string;
+  codePreview: string;
+  intendedCompanyName: string;
+  intendedContactEmail: string | null;
+  status: InvitationCodeStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  createdByUserId: string;
+  createdBy: InvitationCodeUserRef;
+  usedAt: string | null;
+  usedByUserId: string | null;
+  usedBy: InvitationCodeUserRef | null;
+  companyId: string | null;
+  company: { id: string; name: string } | null;
+  revokedAt: string | null;
+  revokedByUserId: string | null;
+  revokedBy: InvitationCodeUserRef | null;
+}
+
+export interface CreateInvitationCodePayload {
+  intendedCompanyName: string;
+  intendedContactEmail?: string;
+  expiresAt?: string;
+}
+
+// The only response that ever carries the plaintext code — never persisted,
+// never returned again by any other endpoint.
+export interface CreateInvitationCodeResult extends InvitationCode {
+  code: string;
+}

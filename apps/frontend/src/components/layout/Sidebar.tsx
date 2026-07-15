@@ -16,6 +16,7 @@ import {
   FileText,
   Calculator,
   Settings,
+  KeyRound,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
@@ -39,6 +40,11 @@ export function Sidebar() {
 
   const platformNavItems = [
     { href: '/dashboard/platform/companies', label: 'Empresas', icon: Building2 },
+    {
+      href: '/dashboard/platform/invitation-codes',
+      label: 'Códigos de invitación',
+      icon: KeyRound,
+    },
     { href: '/dashboard/platform/audit-logs', label: 'Auditoría', icon: ScrollText },
   ];
 
