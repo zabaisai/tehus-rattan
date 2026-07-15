@@ -6,8 +6,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { WhatsAppIntegrationController } from '../src/modules/whatsapp-integration/whatsapp-integration.controller';
 import { WhatsAppIntegrationManagementService } from '../src/modules/whatsapp-integration/whatsapp-integration-management.service';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 // Test-only secret, never read from .env and never logged.
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
@@ -40,7 +45,13 @@ describe('WhatsAppIntegrationController (e2e)', () => {
 
   const signToken = (role: string, companyId: string) =>
     jwtService.sign(
-      { sub: 'user-1', email: 'user@example.com', role, companyId },
+      {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role,
+        companyId,
+        sid: encodeSid('user-1', companyId),
+      },
       { expiresIn: '5m' },
     );
 
@@ -59,6 +70,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
             },
           },
         },
+        { provide: PrismaService, useValue: buildFakeSessionPrisma() },
         {
           provide: WhatsAppIntegrationManagementService,
           useValue: managementServiceMock,
@@ -209,9 +221,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
         .send({ ...validBody, status: 'CONNECTED' })
         .expect(400);
 
-      expect(res.body.message.some((m: string) => /status/.test(m))).toBe(
-        true,
-      );
+      expect(res.body.message.some((m: string) => /status/.test(m))).toBe(true);
       expect(
         managementServiceMock.connectOrUpdateForCompany,
       ).not.toHaveBeenCalled();
@@ -294,9 +304,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(403);
 
-      expect(
-        managementServiceMock.disconnectForCompany,
-      ).not.toHaveBeenCalled();
+      expect(managementServiceMock.disconnectForCompany).not.toHaveBeenCalled();
     });
   });
 });

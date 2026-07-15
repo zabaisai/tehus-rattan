@@ -2,14 +2,18 @@ import {
   Body,
   Controller,
   Post,
-  Request,
+  Req,
+  Res,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import type { Request as ExpressRequest, Response } from 'express';
 import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
 import { OnboardingService } from './onboarding.service';
+import { buildSessionRequestContext } from '../sessions/utils/request-context.util';
+import { setRefreshTokenCookie } from '../sessions/utils/refresh-cookie.util';
 
 const MAX_LOGO_UPLOAD_SIZE = 2 * 1024 * 1024;
 
@@ -46,17 +50,29 @@ export class OnboardingController {
   async createCompany(
     @UploadedFiles() files: OnboardingUploadedFiles | undefined,
     @Body() body: unknown,
-    @Request() req: any,
+    @Req() req: ExpressRequest,
+    @Res({ passthrough: true }) res: Response,
   ) {
     const dto = await this.onboardingService.parsePayload(body);
-    const inviteCode = req.headers?.['x-onboarding-invite-code'] ?? dto.inviteCode;
-    return this.onboardingService.createCompany(
-      dto,
-      {
-        logo: files?.logo?.[0],
-        secondaryLogo: files?.secondaryLogo?.[0],
-      },
-      inviteCode,
-    );
+    const inviteCode =
+      req.headers?.['x-onboarding-invite-code'] ?? dto.inviteCode;
+    const context = buildSessionRequestContext(req);
+
+    const { refreshToken, ...result } =
+      await this.onboardingService.createCompany(
+        dto,
+        {
+          logo: files?.logo?.[0],
+          secondaryLogo: files?.secondaryLogo?.[0],
+        },
+        inviteCode,
+        context,
+      );
+
+    // Same cookie mechanism as POST /auth/login — the freshly-created ADMIN
+    // is auto-logged-in with a real, trackable, revocable session.
+    setRefreshTokenCookie(res, refreshToken);
+
+    return result;
   }
 }

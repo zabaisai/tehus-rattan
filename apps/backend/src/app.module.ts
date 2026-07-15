@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -21,6 +22,8 @@ import { PlatformModule } from './modules/platform/platform.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
 import { InvitationCodesModule } from './modules/invitation-codes/invitation-codes.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
+import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
 
 @Module({
   imports: [
@@ -34,7 +37,9 @@ import { InvitationCodesModule } from './modules/invitation-codes/invitation-cod
         return config;
       },
     }),
+    ScheduleModule.forRoot(),
     PrismaModule,
+    SessionsModule,
     AuthModule,
     CompaniesModule,
     UsersModule,
@@ -57,4 +62,8 @@ import { InvitationCodesModule } from './modules/invitation-codes/invitation-cod
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(DeviceIdMiddleware).forRoutes('*');
+  }
+}

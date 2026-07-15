@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
 import * as bcrypt from 'bcryptjs';
@@ -16,6 +21,8 @@ import {
   hashInvitationCode,
   normalizeInvitationCode,
 } from '../invitation-codes/invitation-code.util';
+import { SessionsService } from '../sessions/sessions.service';
+import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
 export interface OnboardingLogoFiles {
   logo?: UploadedLogoFile;
@@ -52,6 +59,7 @@ export class OnboardingService {
     private companyBrandingService: CompanyBrandingService,
     private authService: AuthService,
     private auditLogService: PlatformAuditLogService,
+    private sessionsService: SessionsService,
   ) {}
 
   // Accepts either a plain JSON body (existing behavior, unchanged) or a
@@ -84,7 +92,9 @@ export class OnboardingService {
       try {
         return JSON.parse((rawBody as Record<string, unknown>).data as string);
       } catch {
-        throw new BadRequestException('El campo "data" debe ser un JSON válido');
+        throw new BadRequestException(
+          'El campo "data" debe ser un JSON válido',
+        );
       }
     }
     return (rawBody ?? {}) as Record<string, unknown>;
@@ -94,7 +104,8 @@ export class OnboardingService {
     const messages: string[] = [];
     const walk = (list: ValidationError[]) => {
       for (const error of list) {
-        if (error.constraints) messages.push(...Object.values(error.constraints));
+        if (error.constraints)
+          messages.push(...Object.values(error.constraints));
         if (error.children?.length) walk(error.children);
       }
     };
@@ -106,12 +117,14 @@ export class OnboardingService {
     dto: CreateOnboardingCompanyDto,
     files: OnboardingLogoFiles | undefined,
     inviteCode: unknown,
+    context: SessionRequestContext,
   ) {
     // Validate any logo files (extension, mimetype, size, magic bytes) as
     // the very first thing — before any database access at all — so a bad
     // file rejects the whole request with zero reads or writes, instead of
     // leaving a company (or even a wasted duplicate-email lookup) behind.
-    if (files?.logo) this.companyBrandingService.assertValidLogoFile(files.logo);
+    if (files?.logo)
+      this.companyBrandingService.assertValidLogoFile(files.logo);
     if (files?.secondaryLogo) {
       this.companyBrandingService.assertValidLogoFile(files.secondaryLogo);
     }
@@ -163,10 +176,14 @@ export class OnboardingService {
     };
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const invitation = await tx.invitationCode.findUnique({ where: { codeHash } });
+      const invitation = await tx.invitationCode.findUnique({
+        where: { codeHash },
+      });
 
       if (!invitation) {
-        this.logger.warn('Intento de onboarding con código de invitación inválido');
+        this.logger.warn(
+          'Intento de onboarding con código de invitación inválido',
+        );
         throw new BadRequestException('Código de invitación inválido');
       }
       if (invitation.status === 'REVOKED') {
@@ -183,7 +200,8 @@ export class OnboardingService {
       }
       const isExpired =
         invitation.status === 'EXPIRED' ||
-        (invitation.expiresAt !== null && invitation.expiresAt.getTime() <= Date.now());
+        (invitation.expiresAt !== null &&
+          invitation.expiresAt.getTime() <= Date.now());
       if (isExpired) {
         this.logger.warn(
           `Intento de onboarding con código vencido (invitationId=${invitation.id})`,
@@ -240,6 +258,26 @@ export class OnboardingService {
           companyId: company.id,
         },
       });
+
+      // Part of this same transaction on purpose — see recordLoginSuccess's
+      // `writer` param — so a failure anywhere later in onboarding (an
+      // agent create, a pipeline stage, the invitation claim) rolls this
+      // back too. There must never be a UserSession/LoginEvent "successful
+      // login" row for a company that doesn't end up existing.
+      const { sessionId, refreshToken } =
+        await this.sessionsService.recordLoginSuccess(
+          {
+            user: {
+              id: admin.id,
+              email: admin.email,
+              name: admin.name,
+              role: admin.role,
+              companyId: admin.companyId,
+            },
+            context,
+          },
+          tx,
+        );
 
       const createdAgents: SafeUser[] = [];
       for (let i = 0; i < agents.length; i++) {
@@ -298,7 +336,16 @@ export class OnboardingService {
         },
       });
 
-      return { company, admin, createdAgents, pipeline, stages, invitationId: invitation.id };
+      return {
+        company,
+        admin,
+        createdAgents,
+        pipeline,
+        stages,
+        invitationId: invitation.id,
+        sessionId,
+        refreshToken,
+      };
     });
 
     let logoUrl = result.company.logoUrl;
@@ -342,8 +389,13 @@ export class OnboardingService {
     // successfully committed — never before, so a failed request can never
     // hand back a token for a company that doesn't actually exist. Agents
     // never reach this point at all, since only the admin created above is
-    // ever passed in here.
-    const session = this.authService.issueSession(result.admin);
+    // ever passed in here. sessionId embeds the UserSession created inside
+    // the transaction above, so this access token is immediately subject
+    // to the same sid-based revocation as one from a real /auth/login.
+    const session = this.authService.issueSession(
+      result.admin,
+      result.sessionId,
+    );
 
     return {
       message: 'Empresa creada correctamente',
@@ -365,6 +417,7 @@ export class OnboardingService {
       })),
       token: session.token,
       user: session.user,
+      refreshToken: result.refreshToken,
     };
   }
 
@@ -402,7 +455,12 @@ export class OnboardingService {
         cleanupError instanceof Error ? cleanupError.stack : cleanupError,
       );
     } finally {
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'branding', companyId);
+      const uploadsDir = path.join(
+        process.cwd(),
+        'uploads',
+        'branding',
+        companyId,
+      );
       fs.rmSync(uploadsDir, { recursive: true, force: true });
     }
   }
@@ -423,7 +481,9 @@ export class OnboardingService {
 
     // A handful of sequential lookups is fine here — onboarding is a rare,
     // invite-gated action, not a high-traffic path.
-    while (await this.prisma.company.findUnique({ where: { slug: candidate } })) {
+    while (
+      await this.prisma.company.findUnique({ where: { slug: candidate } })
+    ) {
       candidate = `${base}-${suffix}`;
       suffix++;
     }

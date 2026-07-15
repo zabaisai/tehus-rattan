@@ -3,13 +3,22 @@
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
+import { logout } from '@/lib/auth';
 
 export function Header() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
 
-  function handleLogout() {
+  async function handleLogout() {
+    // Best-effort: local session state clears and the user is sent to
+    // /login either way, even if this request fails (offline, expired
+    // cookie, etc.) — logout must never get "stuck" waiting on the network.
+    try {
+      await logout();
+    } catch {
+      // ignored — see comment above
+    }
     clearSession();
     router.push('/login');
   }

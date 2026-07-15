@@ -17,6 +17,7 @@ import {
   Calculator,
   Settings,
   KeyRound,
+  ShieldCheck,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
@@ -46,6 +47,11 @@ export function Sidebar() {
       icon: KeyRound,
     },
     { href: '/dashboard/platform/audit-logs', label: 'Auditoría', icon: ScrollText },
+    {
+      href: '/dashboard/platform/activity',
+      label: 'Actividad y seguridad',
+      icon: ShieldCheck,
+    },
   ];
 
   // A global SUPER_ADMIN administers the platform, not a company's CRM —
