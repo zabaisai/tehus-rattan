@@ -12,11 +12,9 @@ CREATE TABLE "user_sessions" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "companyId" TEXT,
-    "deviceId" TEXT NOT NULL,
+    "deviceIdHash" TEXT NOT NULL,
     "refreshTokenHash" TEXT NOT NULL,
-    "ipAddress" TEXT,
     "ipPreview" TEXT,
-    "userAgent" TEXT,
     "browser" TEXT,
     "operatingSystem" TEXT,
     "deviceType" "DeviceType" NOT NULL DEFAULT 'UNKNOWN',
@@ -42,10 +40,8 @@ CREATE TABLE "login_events" (
     "emailAttempted" TEXT NOT NULL,
     "status" "LoginEventStatus" NOT NULL,
     "failureReason" TEXT,
-    "deviceId" TEXT,
-    "ipAddress" TEXT,
+    "deviceIdHash" TEXT,
     "ipPreview" TEXT,
-    "userAgent" TEXT,
     "browser" TEXT,
     "operatingSystem" TEXT,
     "deviceType" "DeviceType" NOT NULL DEFAULT 'UNKNOWN',
@@ -64,13 +60,13 @@ CREATE INDEX "user_sessions_companyId_idx" ON "user_sessions"("companyId");
 CREATE INDEX "user_sessions_status_idx" ON "user_sessions"("status");
 
 -- CreateIndex
-CREATE INDEX "user_sessions_deviceId_idx" ON "user_sessions"("deviceId");
+CREATE INDEX "user_sessions_deviceIdHash_idx" ON "user_sessions"("deviceIdHash");
 
 -- CreateIndex
 CREATE INDEX "user_sessions_lastActivityAt_idx" ON "user_sessions"("lastActivityAt");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "user_sessions_userId_deviceId_key" ON "user_sessions"("userId", "deviceId");
+CREATE UNIQUE INDEX "user_sessions_userId_deviceIdHash_key" ON "user_sessions"("userId", "deviceIdHash");
 
 -- CreateIndex
 CREATE INDEX "login_events_userId_idx" ON "login_events"("userId");

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SessionRequestContext } from './utils/request-context.util';
 import { generateOpaqueToken, hashToken } from './utils/token.util';
-import { SESSION_INACTIVITY_EXPIRY_MS } from './sessions.constants';
+import { isSessionInactiveExpired } from './sessions.constants';
 
 export type LoginFailureReason =
   | 'INVALID_CREDENTIALS'
@@ -18,34 +18,46 @@ export interface SessionUser {
   companyId: string | null;
 }
 
+// Any Prisma client capable of writing userSession/loginEvent rows: the
+// main PrismaService, or the interactive-transaction client passed into a
+// prisma.$transaction(async (tx) => ...) callback. Mirrors
+// PlatformAuditLogService's AuditLogWriter pattern — onboarding needs the
+// session it creates to be part of the SAME transaction as the
+// company/admin it just created, so a failure anywhere rolls back all of
+// it together, never leaving an orphaned "successful login" audit trail
+// for a company that doesn't exist.
+type SessionWriter = Pick<PrismaService, 'userSession' | 'loginEvent'>;
+
 @Injectable()
 export class SessionsService {
   constructor(private prisma: PrismaService) {}
 
   // Creates or reactivates the single UserSession row for this
-  // (userId, deviceId) pair — logging in again from an already-recognized
-  // browser never creates a duplicate device. A previously LOGGED_OUT or
-  // REVOKED session is legitimately reactivated here: valid credentials at
-  // login time are exactly what "log back in on this device" means.
-  async recordLoginSuccess(params: {
-    user: SessionUser;
-    context: SessionRequestContext;
-  }): Promise<{ sessionId: string; refreshToken: string }> {
+  // (userId, deviceIdHash) pair — logging in again from an already-
+  // recognized browser never creates a duplicate device. A previously
+  // LOGGED_OUT or REVOKED session is legitimately reactivated here: valid
+  // credentials at login time are exactly what "log back in on this
+  // device" means.
+  async recordLoginSuccess(
+    params: {
+      user: SessionUser;
+      context: SessionRequestContext;
+    },
+    writer: SessionWriter = this.prisma,
+  ): Promise<{ sessionId: string; refreshToken: string }> {
     const refreshToken = generateOpaqueToken();
     const refreshTokenHash = hashToken(refreshToken);
     const now = new Date();
     const { user, context } = params;
 
-    const session = await this.prisma.userSession.upsert({
-      where: { userId_deviceId: { userId: user.id, deviceId: context.deviceId } },
+    const session = await writer.userSession.upsert({
+      where: { userId_deviceIdHash: { userId: user.id, deviceIdHash: context.deviceIdHash } },
       create: {
         userId: user.id,
         companyId: user.companyId,
-        deviceId: context.deviceId,
+        deviceIdHash: context.deviceIdHash,
         refreshTokenHash,
-        ipAddress: context.ipAddress,
         ipPreview: context.ipPreview,
-        userAgent: context.userAgent,
         browser: context.browser,
         operatingSystem: context.operatingSystem,
         deviceType: context.deviceType,
@@ -57,9 +69,7 @@ export class SessionsService {
       update: {
         refreshTokenHash,
         companyId: user.companyId,
-        ipAddress: context.ipAddress,
         ipPreview: context.ipPreview,
-        userAgent: context.userAgent,
         browser: context.browser,
         operatingSystem: context.operatingSystem,
         deviceType: context.deviceType,
@@ -74,16 +84,14 @@ export class SessionsService {
       select: { id: true },
     });
 
-    await this.prisma.loginEvent.create({
+    await writer.loginEvent.create({
       data: {
         userId: user.id,
         companyId: user.companyId,
         emailAttempted: user.email,
         status: 'SUCCESS',
-        deviceId: context.deviceId,
-        ipAddress: context.ipAddress,
+        deviceIdHash: context.deviceIdHash,
         ipPreview: context.ipPreview,
-        userAgent: context.userAgent,
         browser: context.browser,
         operatingSystem: context.operatingSystem,
         deviceType: context.deviceType,
@@ -112,10 +120,8 @@ export class SessionsService {
         emailAttempted: params.emailAttempted,
         status: 'FAILED',
         failureReason: params.failureReason,
-        deviceId: context.deviceId,
-        ipAddress: context.ipAddress,
+        deviceIdHash: context.deviceIdHash,
         ipPreview: context.ipPreview,
-        userAgent: context.userAgent,
         browser: context.browser,
         operatingSystem: context.operatingSystem,
         deviceType: context.deviceType,
@@ -140,7 +146,7 @@ export class SessionsService {
     });
     if (!session) return null;
 
-    if (session.status === 'ACTIVE' && this.isInactiveExpired(session.lastSeenAt)) {
+    if (session.status === 'ACTIVE' && isSessionInactiveExpired(session.lastSeenAt)) {
       await this.prisma.userSession.update({
         where: { id: session.id },
         data: { status: 'EXPIRED' },
@@ -160,9 +166,7 @@ export class SessionsService {
       data: {
         refreshTokenHash: newHash,
         lastSeenAt: now,
-        ipAddress: context.ipAddress,
         ipPreview: context.ipPreview,
-        userAgent: context.userAgent,
         browser: context.browser,
         operatingSystem: context.operatingSystem,
         deviceType: context.deviceType,
@@ -201,9 +205,5 @@ export class SessionsService {
       where: { id: sessionId, status: 'ACTIVE' },
       data: { lastActivityAt: new Date() },
     });
-  }
-
-  private isInactiveExpired(lastSeenAt: Date): boolean {
-    return Date.now() - lastSeenAt.getTime() > SESSION_INACTIVITY_EXPIRY_MS;
   }
 }

@@ -628,33 +628,33 @@ enum DeviceType {
   UNKNOWN
 }
 
-// One row per (userId, deviceId) pair — logging in again from the same
+// One row per (userId, deviceIdHash) pair — logging in again from the same
 // recognized browser updates this same row (status back to ACTIVE, fresh
 // refreshTokenHash/lastLoginAt) instead of creating a duplicate, so "number
 // of devices" is never inflated by repeat logins from the same browser.
 model UserSession {
-  id        String  @id @default(cuid())
-  userId    String
-  companyId String?
-  // Random, persistent, cookie-based identifier for the browser — never
-  // derived from IP, fonts, canvas, or any other invasive fingerprinting
-  // signal (see DeviceIdMiddleware).
-  deviceId  String
+  id           String  @id @default(cuid())
+  userId       String
+  companyId    String?
+  // SHA-256 hex digest of the random, persistent, cookie-based device
+  // identifier — never the raw cookie value itself, and never derived from
+  // IP, fonts, canvas, or any other invasive fingerprinting signal (see
+  // DeviceIdMiddleware and buildSessionRequestContext).
+  deviceIdHash String
 
   // SHA-256 hex digest of the opaque refresh token. The plaintext travels
   // only in an httpOnly cookie and is never persisted anywhere.
   refreshTokenHash String @unique
 
-  // Plaintext, full IP — restricted to SUPER_ADMIN-only endpoints, and even
-  // those never actually return this field (see PlatformActivityService),
-  // only ipPreview. Kept for potential future abuse investigation, not
-  // exposed today.
-  ipAddress String?
-  // Masked form for display, e.g. "181.***.**.24" — computed once at write
-  // time so no request needs to re-derive it.
+  // Anonymized, already-truncated IP — the only form ever stored or
+  // returned: IPv4 has its last octet zeroed (181.60.12.0), IPv6 is
+  // truncated to its first 3 hextets (2001:db8:1234::). The precise
+  // address is never written to any column, log line, or API response —
+  // see ip.util.ts#truncateIp.
   ipPreview String?
 
-  userAgent       String?
+  // No raw User-Agent is ever persisted — only the coarse fields parsed
+  // from it at write time (see user-agent.util.ts#parseUserAgent).
   browser         String?
   operatingSystem String?
   deviceType      DeviceType @default(UNKNOWN)
@@ -681,10 +681,10 @@ model UserSession {
   company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
   revokedBy User?    @relation("UserSessionRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
 
-  @@unique([userId, deviceId])
+  @@unique([userId, deviceIdHash])
   @@index([companyId])
   @@index([status])
-  @@index([deviceId])
+  @@index([deviceIdHash])
   @@index([lastActivityAt])
   @@map("user_sessions")
 }
@@ -707,11 +707,11 @@ model LoginEvent {
   // ACCOUNT_INACTIVE, COMPANY_SUSPENDED) — never the raw exception message.
   failureReason String?
 
-  deviceId  String?
-  ipAddress String?
-  ipPreview String?
+  // See UserSession — same hashed-device and truncated-IP treatment, and
+  // no raw User-Agent, only the parsed fields.
+  deviceIdHash String?
+  ipPreview    String?
 
-  userAgent       String?
   browser         String?
   operatingSystem String?
   deviceType      DeviceType @default(UNKNOWN)

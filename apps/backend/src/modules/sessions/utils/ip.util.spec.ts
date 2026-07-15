@@ -1,47 +1,37 @@
-import { getTrustedClientIp, maskIp, normalizeIp } from './ip.util';
+import { getTrustedClientIp, truncateIp } from './ip.util';
 
-describe('normalizeIp', () => {
+describe('truncateIp', () => {
   it('returns null for null/undefined/empty input', () => {
-    expect(normalizeIp(null)).toBeNull();
-    expect(normalizeIp(undefined)).toBeNull();
-    expect(normalizeIp('   ')).toBeNull();
+    expect(truncateIp(null)).toBeNull();
+    expect(truncateIp(undefined)).toBeNull();
+    expect(truncateIp('   ')).toBeNull();
   });
 
-  it('leaves a plain IPv4 address unchanged', () => {
-    expect(normalizeIp('181.60.12.24')).toBe('181.60.12.24');
+  it('zeroes the last octet of an IPv4 address — never the full address', () => {
+    expect(truncateIp('181.60.12.24')).toBe('181.60.12.0');
   });
 
-  it('leaves a plain IPv6 address unchanged', () => {
-    expect(normalizeIp('2001:db8::1a2b')).toBe('2001:db8::1a2b');
+  it('collapses an IPv4-mapped IPv6 address to IPv4 before truncating', () => {
+    expect(truncateIp('::ffff:181.60.12.24')).toBe('181.60.12.0');
   });
 
-  it('collapses an IPv4-mapped IPv6 address down to plain IPv4', () => {
-    expect(normalizeIp('::ffff:181.60.12.24')).toBe('181.60.12.24');
-    expect(normalizeIp('::FFFF:181.60.12.24')).toBe('181.60.12.24');
+  it('truncates an IPv6 address to its first 3 hextets', () => {
+    expect(truncateIp('2001:db8:1234:5678:0:0:0:1')).toBe('2001:db8:1234::');
   });
 
-  it('trims surrounding whitespace', () => {
-    expect(normalizeIp('  181.60.12.24  ')).toBe('181.60.12.24');
-  });
-});
-
-describe('maskIp', () => {
-  it('returns null for null input', () => {
-    expect(maskIp(null)).toBeNull();
-  });
-
-  it('masks the two middle octets of an IPv4 address', () => {
-    expect(maskIp('181.60.12.24')).toBe('181.***.***.24');
-  });
-
-  it('masks the middle groups of an IPv6 address, keeping first and last', () => {
-    expect(maskIp('2001:db8:0:0:0:0:0:1a2b')).toBe('2001:****:****:1a2b');
+  it('truncates a "::" shorthand IPv6 address correctly', () => {
+    expect(truncateIp('2001:db8::1a2b')).toBe('2001:db8:0::');
   });
 
   it('never contains enough of the original address to reconstruct it', () => {
-    const masked = maskIp('181.60.12.24');
-    expect(masked).not.toContain('60');
-    expect(masked).not.toContain('12');
+    const truncated = truncateIp('181.60.12.24');
+    // The precise last octet must never survive.
+    expect(truncated).not.toContain('.24');
+    expect(truncated).not.toMatch(/24$/);
+  });
+
+  it('is deterministic — the same input always truncates the same way', () => {
+    expect(truncateIp('181.60.12.24')).toBe(truncateIp('181.60.12.24'));
   });
 });
 

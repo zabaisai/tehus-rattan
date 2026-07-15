@@ -684,14 +684,15 @@ export interface PlatformSessionUserRef {
   email: string;
 }
 
-// The full IP and any token/hash are never part of this type — the API
-// never returns them, only ipPreview (e.g. "181.***.***.24").
+// The full IP, any raw user agent, and any token/hash/deviceId are never
+// part of this type — the API never returns them, only the
+// already-truncated ipPreview (e.g. "181.60.12.0") and the browser/OS/
+// deviceType already parsed out of the user agent server-side.
 export interface PlatformUserSession {
   id: string;
   userId: string;
   status: UserSessionStatus;
   ipPreview: string | null;
-  userAgent: string | null;
   browser: string | null;
   operatingSystem: string | null;
   deviceType: DeviceType;

@@ -33,7 +33,6 @@ const SESSION_LIST_SELECT = {
   userId: true,
   status: true,
   ipPreview: true,
-  userAgent: true,
   browser: true,
   operatingSystem: true,
   deviceType: true,
@@ -130,7 +129,7 @@ export class PlatformActivityService {
         where: { companyId: trimmedId },
         select: {
           userId: true,
-          deviceId: true,
+          deviceIdHash: true,
           status: true,
           lastActivityAt: true,
         },
@@ -207,7 +206,7 @@ export class PlatformActivityService {
       usersNeverLoggedIn,
       totalSessions: sessions.length,
       activeSessions: sessions.filter((s) => s.status === 'ACTIVE').length,
-      recognizedDevices: new Set(sessions.map((s) => s.deviceId)).size,
+      recognizedDevices: new Set(sessions.map((s) => s.deviceIdHash)).size,
       recentLogins,
       dailyHistory: buildDailyHistory(
         recentSuccessEvents.map((e) => e.createdAt),
@@ -287,7 +286,6 @@ export class PlatformActivityService {
         status: true,
         userId: true,
         companyId: true,
-        deviceId: true,
       },
     });
     if (!session) throw new NotFoundException('Sesión no encontrada');
@@ -318,10 +316,13 @@ export class PlatformActivityService {
         action: 'REVOKE_SESSION',
         entityType: 'UserSession',
         entityId: trimmedId,
+        // Deliberately no deviceIdHash/ipPreview here — this metadata is
+        // returned verbatim by GET /platform/audit-logs, and even a hashed
+        // device identifier or a truncated IP has no place in a response
+        // body per this feature's privacy requirements.
         metadata: {
           sessionId: trimmedId,
           userId: session.userId,
-          deviceId: session.deviceId,
         },
         ipAddress: actor.ipAddress,
         userAgent: actor.userAgent,

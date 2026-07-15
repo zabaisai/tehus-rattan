@@ -129,15 +129,20 @@ describe('PlatformActivityService', () => {
       );
     });
 
-    it('never selects refreshTokenHash or the full ipAddress — only ipPreview', async () => {
+    it('never selects refreshTokenHash, deviceIdHash, raw userAgent, or a full ipAddress — only ipPreview and the parsed browser/OS/deviceType fields', async () => {
       prisma.company.findUnique.mockResolvedValue({ id: 'company-a' });
 
       await service.listCompanySessions('company-a', {});
 
       const findManyCall = prisma.userSession.findMany.mock.calls[0][0];
       expect(findManyCall.select.refreshTokenHash).toBeUndefined();
+      expect(findManyCall.select.deviceIdHash).toBeUndefined();
+      expect(findManyCall.select.userAgent).toBeUndefined();
       expect(findManyCall.select.ipAddress).toBeUndefined();
       expect(findManyCall.select.ipPreview).toBe(true);
+      expect(findManyCall.select.browser).toBe(true);
+      expect(findManyCall.select.operatingSystem).toBe(true);
+      expect(findManyCall.select.deviceType).toBe(true);
     });
 
     it('rejects an invalid status filter', async () => {
