@@ -57,8 +57,12 @@ export default function PlatformInvitationCodesPage() {
     enabled: isPlatformSuperAdmin,
   });
 
+  // Does NOT close the modal — CreateInvitationCodeModal stays open on its
+  // own "código generado" panel until the admin checks "ya lo copié" and
+  // closes it themselves (see its handleClose). Closing it here as a side
+  // effect of generation would unmount that panel before the one-time
+  // plaintext code is ever shown.
   function handleCreated() {
-    setCreateOpen(false);
     setSuccessMessage('Código de invitación generado correctamente.');
     queryClient.invalidateQueries({ queryKey: ['platform-invitation-codes'] });
     queryClient.invalidateQueries({ queryKey: ['platform-audit-logs'] });

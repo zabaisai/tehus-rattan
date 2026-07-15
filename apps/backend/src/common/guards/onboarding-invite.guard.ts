@@ -1,4 +1,9 @@
-import { BadRequestException, CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+} from '@nestjs/common';
 
 const INVITE_CODE_HEADER = 'x-onboarding-invite-code';
 

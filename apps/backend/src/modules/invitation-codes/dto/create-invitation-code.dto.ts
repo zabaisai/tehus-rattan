@@ -1,4 +1,10 @@
-import { IsDateString, IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import {
+  IsDateString,
+  IsEmail,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export class CreateInvitationCodeDto {
   @IsString()

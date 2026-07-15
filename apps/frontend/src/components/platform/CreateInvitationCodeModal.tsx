@@ -35,6 +35,7 @@ export function CreateInvitationCodeModal({
   const [saving, setSaving] = useState(false);
   const [created, setCreated] = useState<CreateInvitationCodeResult | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState('');
   const [confirmedCopy, setConfirmedCopy] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -58,8 +59,16 @@ export function CreateInvitationCodeModal({
 
   async function handleCopy() {
     if (!created) return;
-    await navigator.clipboard.writeText(created.code);
-    setCopied(true);
+    try {
+      await navigator.clipboard.writeText(created.code);
+      setCopied(true);
+      setCopyError('');
+    } catch {
+      // The clipboard API can be denied by browser permission policy — the
+      // admin is still holding a one-time secret, so they must be told to
+      // select and copy it manually instead of getting silence.
+      setCopyError('No se pudo copiar automáticamente. Selecciona y copia el código manualmente.');
+    }
   }
 
   function handleClose() {
@@ -178,6 +187,8 @@ export function CreateInvitationCodeModal({
                 {copied ? 'Copiado' : 'Copiar'}
               </button>
             </div>
+
+            {copyError && <p className="mb-3 text-xs text-red-600">{copyError}</p>}
 
             <label className="mb-4 flex items-start gap-2 text-xs text-stone-600">
               <input
