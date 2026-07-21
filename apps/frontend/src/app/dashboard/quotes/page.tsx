@@ -7,6 +7,7 @@ import { FileText, Printer, Trash2 } from 'lucide-react';
 import { getQuotes, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from '@/lib/quotes';
 import { QuoteStatus } from '@/types';
 import { QuoteDetailModal } from '@/components/quotes/QuoteDetailModal';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 type ApiError = {
   response?: {
@@ -105,14 +106,69 @@ function QuotesPageContent() {
       {isLoading && <p className="py-10 text-center text-sm text-stone-400">Cargando...</p>}
 
       {!isLoading && (quotes?.length ?? 0) === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-stone-300 bg-white py-14 text-stone-400">
-          <FileText size={28} strokeWidth={1.5} />
-          <p className="text-sm">No hay cotizaciones todavía.</p>
-        </div>
+        <EmptyState icon={FileText} message="No hay cotizaciones todavía." />
       )}
 
       {!isLoading && (quotes?.length ?? 0) > 0 && (
-        <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        <>
+          {/* Móvil: tarjetas apiladas en vez de tabla */}
+          <div className="flex flex-col gap-2 sm:hidden">
+            {quotes?.map((quote) => (
+              <div
+                key={quote.id}
+                onClick={() => setSelectedQuoteId(quote.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') setSelectedQuoteId(quote.id);
+                }}
+                className="cursor-pointer rounded-lg border border-stone-200 bg-white p-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-stone-900">{quote.number}</p>
+                    <p className="truncate text-xs text-stone-500">{quote.lead.title}</p>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${QUOTE_STATUS_COLORS[quote.status]}`}
+                  >
+                    {QUOTE_STATUS_LABELS[quote.status]}
+                  </span>
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <p className="text-sm font-semibold text-stone-900">
+                    {moneyFormatter.format(quote.total)}
+                  </p>
+                  <p className="text-xs text-stone-400">{formatDate(quote.createdAt)}</p>
+                </div>
+                <div className="mt-2 flex justify-end gap-1 border-t border-stone-100 pt-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(`/dashboard/quotes/${quote.id}/print`, '_blank');
+                    }}
+                    aria-label="Ver documento imprimible"
+                    className="rounded p-2 text-stone-400 hover:bg-amber-50 hover:text-amber-700"
+                  >
+                    <Printer size={16} />
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(quote.id);
+                    }}
+                    aria-label="Eliminar cotización"
+                    className="rounded p-2 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Escritorio/tablet: tabla tradicional */}
+          <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white sm:block">
           <table className="w-full text-left text-sm">
             <thead className="bg-stone-50 text-xs text-stone-500">
               <tr>
@@ -180,7 +236,8 @@ function QuotesPageContent() {
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       {selectedQuoteId && (

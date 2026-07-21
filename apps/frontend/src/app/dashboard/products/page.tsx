@@ -14,6 +14,7 @@ import {
 import { Product, ProductImportSummary } from "@/types";
 import { ProductModal, ProductFormData } from "@/components/products/ProductModal";
 import { ProductImportModal } from "@/components/products/ProductImportModal";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const currencyFormatter = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -91,7 +92,7 @@ export default function ProductsPage() {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-stone-900">Catálogo Tehus</h2>
           <p className="text-xs text-stone-500">Productos activos de Tehus Rattan Medellín</p>
@@ -99,14 +100,14 @@ export default function ProductsPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setImportModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-700 hover:bg-stone-100"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-700 hover:bg-stone-100 sm:flex-none"
           >
             <FileSpreadsheet size={16} />
             Importar Excel
           </button>
           <button
             onClick={openCreateModal}
-            className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800 sm:flex-none"
           >
             <Plus size={16} />
             Nuevo producto
@@ -115,7 +116,7 @@ export default function ProductsPage() {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative max-w-xs flex-1">
+        <div className="relative w-full flex-1 sm:max-w-xs">
           <Search size={15} className="absolute left-2.5 top-2.5 text-stone-400" />
           <input
             type="text"
@@ -145,10 +146,7 @@ export default function ProductsPage() {
       )}
 
       {!isLoading && filtered.length === 0 && (
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-stone-300 bg-white py-14 text-stone-400">
-          <Package size={28} strokeWidth={1.5} />
-          <p className="text-sm">No hay productos en el catálogo todavía.</p>
-        </div>
+        <EmptyState icon={Package} message="No hay productos en el catálogo todavía." />
       )}
 
       {!isLoading && filtered.length > 0 && (
