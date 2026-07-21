@@ -98,7 +98,7 @@ export default function PlatformInvitationCodesPage() {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-stone-900">Códigos de invitación</h2>
           <p className="mt-1 text-sm text-stone-500">
@@ -107,7 +107,7 @@ export default function PlatformInvitationCodesPage() {
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
         >
           <Plus size={16} />
           Generar código
@@ -133,7 +133,73 @@ export default function PlatformInvitationCodesPage() {
       )}
       {revokeError && <p className="mb-3 text-sm text-red-600">{revokeError}</p>}
 
-      <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+      {isLoading && (
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 sm:hidden">
+          Cargando...
+        </p>
+      )}
+      {!isLoading && isError && (
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-red-600 sm:hidden">
+          No se pudo cargar el listado de códigos.
+        </p>
+      )}
+      {!isLoading && !isError && (codes?.length ?? 0) === 0 && (
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 sm:hidden">
+          No hay códigos de invitación.
+        </p>
+      )}
+
+      {/* Móvil: tarjetas apiladas en vez de tabla */}
+      <div className="flex flex-col gap-2 sm:hidden">
+        {codes?.map((code) => (
+          <div key={code.id} className="rounded-lg border border-stone-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-stone-900">
+                  {code.intendedCompanyName}
+                </p>
+                <p className="mt-0.5 truncate font-mono text-xs text-stone-500">
+                  {code.codePreview}
+                </p>
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[code.status]}`}
+              >
+                {statusLabels[code.status]}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-stone-600">
+              <div>
+                <p className="text-stone-400">Creado</p>
+                <p>{formatDate(code.createdAt)}</p>
+              </div>
+              <div>
+                <p className="text-stone-400">Vence</p>
+                <p>{formatDate(code.expiresAt)}</p>
+              </div>
+              {code.usedBy && (
+                <div className="col-span-2">
+                  <p className="text-stone-400">Usado por</p>
+                  <p>{code.usedBy.name} ({code.company?.name ?? '-'})</p>
+                </div>
+              )}
+            </div>
+            {code.status === 'ACTIVE' && (
+              <div className="mt-3 border-t border-stone-100 pt-3">
+                <button
+                  onClick={() => handleRevoke(code)}
+                  disabled={revokingId === code.id}
+                  className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600 disabled:opacity-50"
+                >
+                  {revokingId === code.id ? 'Revocando...' : 'Revocar'}
+                </button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white sm:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">

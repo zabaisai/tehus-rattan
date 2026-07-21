@@ -132,11 +132,11 @@ export default function PlatformAuditLogsPage() {
         </p>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-auto"
         >
           {actionFilterOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -150,7 +150,7 @@ export default function PlatformAuditLogsPage() {
           value={affectedCompanyId}
           onChange={(e) => setAffectedCompanyId(e.target.value)}
           placeholder="ID de empresa afectada"
-          className="w-56 rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-56"
         />
 
         <input
@@ -158,7 +158,7 @@ export default function PlatformAuditLogsPage() {
           value={actorUserId}
           onChange={(e) => setActorUserId(e.target.value)}
           placeholder="ID del actor"
-          className="w-56 rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-56"
         />
       </div>
 

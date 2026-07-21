@@ -18,6 +18,7 @@ import {
   DeviceType,
   UserSessionStatus,
 } from '@/types';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 
 type Tab = 'resumen' | 'usuarios' | 'actividad' | 'sesiones';
 
@@ -129,6 +130,12 @@ export default function CompanyActivityDetailPage() {
   const [actionError, setActionError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<
+    | { type: 'session'; sessionId: string }
+    | { type: 'user'; userId: string; userName: string }
+    | { type: 'company' }
+    | null
+  >(null);
 
   const [sessionFilters, setSessionFilters] = useState<{
     userId: string;
@@ -246,7 +253,7 @@ export default function CompanyActivityDetailPage() {
         Volver a empresas
       </button>
 
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-stone-900">
             {company?.name ?? 'Actividad de la empresa'}
@@ -264,12 +271,12 @@ export default function CompanyActivityDetailPage() {
         )}
       </div>
 
-      <div className="mb-4 flex gap-1 border-b border-stone-200">
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-stone-200">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               tab === t.id
                 ? 'border-stone-900 text-stone-900'
                 : 'border-transparent text-stone-500 hover:text-stone-800'
@@ -352,7 +359,7 @@ export default function CompanyActivityDetailPage() {
                     <td className="px-4 py-2.5 text-right">
                       {!neverLoggedIn && (
                         <button
-                          onClick={() => handleRevokeAllForUser(u.id)}
+                          onClick={() => setConfirmTarget({ type: 'user', userId: u.id, userName: u.name })}
                           disabled={revokingId === u.id}
                           className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
                         >
@@ -426,8 +433,8 @@ export default function CompanyActivityDetailPage() {
 
       {tab === 'sesiones' && (
         <div>
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <input
                 type="text"
                 placeholder="Filtrar por userId"
@@ -474,7 +481,7 @@ export default function CompanyActivityDetailPage() {
             </div>
 
             <button
-              onClick={handleRevokeAllForCompany}
+              onClick={() => setConfirmTarget({ type: 'company' })}
               disabled={revokingId === 'company'}
               className="rounded-md px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
             >
@@ -547,7 +554,7 @@ export default function CompanyActivityDetailPage() {
                     <td className="px-4 py-2.5 text-right">
                       {s.status === 'ACTIVE' && (
                         <button
-                          onClick={() => handleRevokeSession(s.id)}
+                          onClick={() => setConfirmTarget({ type: 'session', sessionId: s.id })}
                           disabled={revokingId === s.id}
                           className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
                         >
@@ -586,6 +593,58 @@ export default function CompanyActivityDetailPage() {
             </div>
           )}
         </div>
+      )}
+
+      {confirmTarget?.type === 'session' && (
+        <ConfirmDialog
+          title="Revocar sesión"
+          message="¿Revocar esta sesión? El usuario deberá iniciar sesión de nuevo en ese dispositivo."
+          confirmLabel="Revocar"
+          onClose={() => setConfirmTarget(null)}
+          onConfirm={async () => {
+            await handleRevokeSession(confirmTarget.sessionId);
+            setConfirmTarget(null);
+          }}
+        />
+      )}
+
+      {confirmTarget?.type === 'user' && (
+        <ConfirmDialog
+          title="Cerrar todas las sesiones del usuario"
+          message={
+            <>
+              ¿Cerrar todas las sesiones activas de{' '}
+              <span className="font-medium text-stone-900">{confirmTarget.userName}</span>? Deberá
+              iniciar sesión de nuevo en todos sus dispositivos.
+            </>
+          }
+          confirmLabel="Cerrar sesiones"
+          onClose={() => setConfirmTarget(null)}
+          onConfirm={async () => {
+            await handleRevokeAllForUser(confirmTarget.userId);
+            setConfirmTarget(null);
+          }}
+        />
+      )}
+
+      {confirmTarget?.type === 'company' && (
+        <ConfirmDialog
+          title="Cerrar todas las sesiones de la empresa"
+          message={
+            <>
+              ¿Cerrar <span className="font-medium text-stone-900">todas</span> las sesiones
+              activas de{' '}
+              <span className="font-medium text-stone-900">{company?.name ?? 'esta empresa'}</span>
+              ? Todos los usuarios deberán iniciar sesión de nuevo.
+            </>
+          }
+          confirmLabel="Cerrar todas"
+          onClose={() => setConfirmTarget(null)}
+          onConfirm={async () => {
+            await handleRevokeAllForCompany();
+            setConfirmTarget(null);
+          }}
+        />
       )}
     </div>
   );
