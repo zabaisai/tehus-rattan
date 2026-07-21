@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PauseCircle, PlayCircle } from 'lucide-react';
+import { PauseCircle, PlayCircle, ArrowLeft } from 'lucide-react';
 import {
   getConversations,
   getMessages,
@@ -60,7 +60,12 @@ export default function ConversationsPage() {
 
   return (
     <div className="flex h-full overflow-hidden rounded-lg border border-stone-200 bg-white">
-      <div className="w-72 shrink-0 overflow-y-auto border-r border-stone-200">
+      {/* Móvil: solo se muestra el listado O el chat, nunca ambos a la vez. */}
+      <div
+        className={`w-full shrink-0 overflow-y-auto border-stone-200 sm:block sm:w-72 sm:border-r ${
+          selectedId ? 'hidden sm:block' : 'block'
+        }`}
+      >
         <ConversationList
           conversations={conversations ?? []}
           selectedId={selectedId}
@@ -71,7 +76,9 @@ export default function ConversationsPage() {
         />
       </div>
 
-      <div className="flex flex-1 flex-col">
+      <div
+        className={`flex-1 flex-col sm:flex ${selectedId ? 'flex' : 'hidden'}`}
+      >
         {!selectedConversation && (
           <div className="flex flex-1 items-center justify-center text-sm text-stone-400">
             Selecciona una conversación
@@ -81,14 +88,23 @@ export default function ConversationsPage() {
         {selectedConversation && (
           <>
             <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
-              <div>
-                <p className="text-sm font-medium text-stone-900">
-                  {selectedConversation.contact.name ||
-                    selectedConversation.contact.phone}
-                </p>
-                <p className="text-xs text-stone-400">
-                  {selectedConversation.contact.phone}
-                </p>
+              <div className="flex min-w-0 items-center gap-2">
+                <button
+                  onClick={() => setSelectedId(null)}
+                  aria-label="Volver al listado de conversaciones"
+                  className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100 sm:hidden"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-stone-900">
+                    {selectedConversation.contact.name ||
+                      selectedConversation.contact.phone}
+                  </p>
+                  <p className="text-xs text-stone-400">
+                    {selectedConversation.contact.phone}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={handleTogglePause}

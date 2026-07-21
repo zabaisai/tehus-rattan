@@ -60,6 +60,38 @@ export function KanbanBoard({
     }
   }
 
+  // Touch-friendly alternative to drag-and-drop, used by the "Mover a etapa"
+  // select rendered on each card below the lg breakpoint.
+  async function handleMoveStage(leadId: string, newStageId: string) {
+    const previous = queryClient.getQueryData<KanbanData>(queryKey);
+    if (!previous) return;
+
+    const sourceStage = previous.stages.find((s) => s.leads.some((l) => l.id === leadId));
+    if (!sourceStage || sourceStage.id === newStageId) return;
+
+    const next: KanbanData = structuredClone(previous);
+    const nextSource = next.stages.find((s) => s.id === sourceStage.id)!;
+    const nextDest = next.stages.find((s) => s.id === newStageId)!;
+    const index = nextSource.leads.findIndex((l) => l.id === leadId);
+    const [movedLead] = nextSource.leads.splice(index, 1);
+    nextDest.leads.push(movedLead);
+
+    nextSource.leadCount = nextSource.leads.length;
+    nextDest.leadCount = nextDest.leads.length;
+    nextSource.totalValue = nextSource.leads.reduce((sum, l) => sum + (l.value || 0), 0);
+    nextDest.totalValue = nextDest.leads.reduce((sum, l) => sum + (l.value || 0), 0);
+
+    queryClient.setQueryData(queryKey, next);
+    setError('');
+
+    try {
+      await changeLeadStage(leadId, newStageId);
+    } catch {
+      queryClient.setQueryData(queryKey, previous);
+      setError('No se pudo mover el lead. Intenta de nuevo.');
+    }
+  }
+
   if (isLoading) {
     return <p className="text-sm text-stone-500">Cargando pipeline...</p>;
   }
@@ -68,13 +100,21 @@ export function KanbanBoard({
     return <p className="text-sm text-red-600">No se pudo cargar el pipeline.</p>;
   }
 
+  const allStages = data.stages.map((s) => ({ id: s.id, name: s.name }));
+
   return (
     <div>
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-4">
           {data.stages.map((stage) => (
-            <KanbanColumn key={stage.id} stage={stage} onLeadClick={onLeadClick} />
+            <KanbanColumn
+              key={stage.id}
+              stage={stage}
+              stages={allStages}
+              onLeadClick={onLeadClick}
+              onMoveStage={handleMoveStage}
+            />
           ))}
         </div>
       </DragDropContext>
