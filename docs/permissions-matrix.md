@@ -26,6 +26,7 @@ Controllers use two patterns:
 | Auth | `POST /auth/login` | Public | None | User lookup by email |
 | Auth | `GET /auth/me` | JWT | Any authenticated role | JWT `sub` |
 | Companies | `/companies/*` | JWT | `ADMIN`, `SUPER_ADMIN` for updates | JWT `companyId` |
+| Quotes | `/quotes/*` | JWT + BusinessTenantGuard | Any authenticated role | JWT `companyId` |
 | Users | `/users/*` | JWT | `ADMIN`, `SUPER_ADMIN` for create/update/delete | JWT `companyId` |
 | Contacts | `/contacts/*` | JWT | Any authenticated role | JWT `companyId` |
 | Conversations | `/conversations/*` | JWT | Any authenticated role | JWT `companyId` |
@@ -51,6 +52,7 @@ Controllers use two patterns:
 - Current product behavior allows `AGENT` users to operate contacts, conversations, notes, leads, and tasks within their company.
 - Changing `AGENT` capabilities is a business decision and is not part of the current stabilization changes.
 - WhatsApp integration responses never include `accessToken` or `accessTokenEncrypted`, regardless of role.
+- Company fiscal identity (`legalName`, `taxId`, `address`, `quoteFooter`) is edited only via `PATCH /companies/me` (`ADMIN`/`SUPER_ADMIN`, JWT `companyId`). `GET /quotes/:id` returns the quote's **owning** company identity (isolated by `where: { id, companyId }`) so a quote never carries another company's fiscal data. See `docs/COMPANY_FISCAL_IDENTITY.md`.
 
 ## Recently Stabilized Ownership Checks
 
