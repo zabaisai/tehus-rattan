@@ -51,6 +51,14 @@ backend), no del visor ni de estado manipulable del navegador. La calculadora
 de documentos (`/dashboard/documents/calculator`) usa la empresa del usuario
 autenticado (`GET /companies/me`) para el documento en blanco que crea.
 
+Nota de exposición: `GET /quotes/:id` usa un `select` curado
+(`COMPANY_IDENTITY_SELECT`) que **no** incluye `settings` ni timestamps — es la
+superficie multiempresa. `GET /companies/me` sí devuelve la fila completa de la
+empresa **propia** del usuario (incluye `settings`): no es una fuga entre
+tenants (es su propia empresa, sin secretos en el modelo) y se mantiene así para
+no arriesgar regresiones en branding/settings; curarlo se deja como mejora
+opcional futura.
+
 ## 4. Qué sucede con campos vacíos
 
 Cada línea se **omite** si el campo está vacío — sin etiquetas colgantes,
@@ -77,18 +85,44 @@ aditiva, cuatro columnas `TEXT` nullable en `companies`. No borra ni renombra
 columnas. Aplicable a `localhost:5432/tehus_rattan`. Verificada aplicándose en
 orden sobre una base local vacía sin destruir datos existentes.
 
-## 7. Limitación actual — snapshot histórico (pendiente)
+## 7. Limitación actual — snapshot histórico (análisis + decisión)
 
 `QuoteItem` ya es un snapshot (nombre/precio congelados al crear la cotización),
 pero la **identidad fiscal de la empresa se lee en vivo** al imprimir. Si una
 empresa cambia su NIT/dirección, las cotizaciones antiguas mostrarán los datos
 nuevos.
 
-**Recomendación (fase posterior, no implementada aquí):** columna
-`Quote.companySnapshot Json?` poblada al pasar la cotización a `SENT` (o al
-crearla), con la identidad fiscal del momento. La plantilla preferiría el
-snapshot y caería a la empresa viva si es null. Es un cambio aditivo con lógica
-de ciclo de vida; se dejó fuera de alcance para no rediseñar el módulo ahora.
+Análisis para una posible columna `Quote.companySnapshot Json?`:
+
+- **Cuándo congelar:** al pasar a `SENT` (es el momento en que el cliente
+  recibe el documento y adquiere valor comercial/legal). No en `ACCEPTED` (sería
+  tarde: el cliente ya vio otra identidad) ni forzosamente en creación (una
+  `DRAFT` aún se edita internamente).
+- **Qué incluir:** `name`, `legalName`, `taxId`, `email`, `phone`, `address`,
+  `city`, `country`, `logoUrl` — la misma forma que `DocumentCompanyIdentity`.
+- **`DRAFT`:** sin snapshot; renderiza la identidad viva (así refleja los
+  cambios de la empresa hasta que se envía).
+- **Migrar cotizaciones existentes:** no es posible reconstruir la identidad
+  histórica de las `SENT` previas; se dejan con snapshot `null` y caen a la
+  empresa viva. Se documenta que las `SENT` anteriores mostrarán la identidad
+  actual (único dato disponible).
+- **Evitar información mutable:** el snapshot es una copia JSON por valor tomada
+  en el momento de congelar. Caveat: `logoUrl` es una ruta; si el archivo del
+  logo se reemplaza, la ruta sigue igual pero la imagen cambia. Inmutabilidad
+  total del logo exigiría copiar el asset (fuera de alcance).
+- **Compatibilidad:** cambio aditivo (`Quote.companySnapshot Json?` nullable).
+  La plantilla usaría `snapshot ?? empresa viva`, sin romper cotizaciones
+  existentes.
+- **Impacto en PDF/impresión/auditoría:** la impresión lee la misma identidad
+  resuelta (snapshot o viva); opcionalmente se audita el snapshot al enviar.
+
+**Recomendación: B — implementar después del piloto pero antes de producción.**
+No es una inconsistencia crítica inmediata: los datos fiscales de una empresa
+son estables y el piloto sirve precisamente para validar el flujo multiempresa;
+la solución tampoco es trivial (requiere lógica de ciclo de vida en el cambio de
+estado). No se implementa ahora (habría sido *A*), pero para documentos con
+valor legal en producción la identidad debe congelarse al enviar, por lo que
+tampoco se descarta (*C*).
 
 ## 8. Hallazgos P1/P2 resueltos
 
@@ -111,17 +145,34 @@ de ciclo de vida; se dejó fuera de alcance para no rediseñar el módulo ahora.
 - **P2-6**: Placeholder de Productos truncado a 360px → texto corto
   ("Buscar productos") + buscador a ancho completo apilado sobre el filtro.
 
+Defecto detectado y corregido durante la auditoría de estabilización:
+
+- **Limpieza de campos fiscales:** vaciar un campo fiscal en el formulario no
+  persistía (se enviaba `undefined` y se omitía del `PATCH`, conservando el
+  valor anterior, que seguía imprimiéndose). Corregido: los campos fiscales
+  envían `null` al vaciarse, y el documento omite la línea correctamente.
+
 ## 9. Pruebas ejecutadas
 
-- Backend: 50 suites / 537 unit tests; 12 suites / 108 e2e (solo Postgres
-  local, sin llamadas externas).
-- Frontend: 11 archivos / 43 tests (incluye render de identidad por empresa,
-  ausencia de "Tehus Rattan" en otro tenant, pie con y sin campos opcionales,
-  dos empresas sin contaminación, dashboard/productos/auditoría).
-- Builds y lint: frontend y backend OK.
-- Migraciones: aplican en orden sobre BD local vacía.
-- Verificación visual: 360/390/768/1440 con Empresa A y Empresa B — documentos
-  distintos, sin datos de Tehus, sin overflow, sin errores de consola/HTTP.
+- Backend: 51 suites / 552 unit tests; 13 suites / 112 e2e (solo Postgres
+  local, sin llamadas externas). Incluye `companies.controller.spec`
+  (permisos por rol + aislamiento del `companyId` del JWT), field-security del
+  DTO (Unicode, saltos de línea, contenido tipo HTML, longitudes, null-clear) y
+  `quotes-company-identity.e2e` (identidad de la empresa dueña, sin fugas
+  A↔B, A no lee la cotización de B) contra Postgres local real.
+- Frontend: 13 archivos / 49 tests (render de identidad por empresa, ausencia
+  de "Tehus Rattan" en otro tenant, pie con y sin campos opcionales, dos
+  empresas sin contaminación, dashboard/productos/auditoría, terms como texto
+  escapado + saltos de línea, y limpieza de campo fiscal → `null`).
+- Builds y lint: frontend y backend OK. Prisma schema válido.
+- Migraciones: la cadena completa aplica en orden sobre una BD local vacía
+  desechable (sin tocar `tehus_rattan`).
+- Verificación visual: matriz completa 11 pantallas × 4 viewports
+  (360/390/768/1440), Empresa A y Empresa B — documentos distintos, sin datos
+  de Tehus, sin overflow, sin errores de consola/HTTP, tablas adaptadas.
+- Prueba funcional del formulario fiscal (llenar, guardar, recargar, persistir,
+  imprimir, limpiar campo → desaparece del documento, doble envío evitado,
+  validación de longitud, AGENT no puede editar).
 
 ## 10. Pendientes de fases siguientes (Staging/Seguridad)
 
