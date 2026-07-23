@@ -93,4 +93,68 @@ describe('UpdateCompanyDto', () => {
       expect(errors.some((e) => e.property === 'taxId')).toBe(true);
     });
   });
+
+  describe('fiscal field security', () => {
+    it('accepts Unicode (accents/emoji) within the length limit', async () => {
+      const errors = await validatePayload({
+        legalName: 'Muebles Ñandú S.A.S 🌿',
+        address: 'Cra 7 #12-34, 3.º piso — Bogotá',
+      });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts and preserves internal newlines in quoteFooter (only ends are trimmed)', async () => {
+      const body = '  Línea 1\nLínea 2\nLínea 3  ';
+      const instance = plainToInstance(UpdateCompanyDto, { quoteFooter: body });
+      // Internal newlines survive; only leading/trailing whitespace is stripped.
+      expect(instance.quoteFooter).toBe('Línea 1\nLínea 2\nLínea 3');
+      const errors = await validate(instance, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('stores HTML/script-like content verbatim as a string (escaped safely at render time, never executed)', async () => {
+      // The DTO does not sanitize — it is stored as-is and React escapes it as
+      // text when rendered (no dangerouslySetInnerHTML). This asserts it is
+      // accepted as a plain string, not that it is stripped.
+      const errors = await validatePayload({
+        quoteFooter: '<script>alert(1)</script> & <b>x</b>',
+        legalName: '<img src=x onerror=alert(1)>',
+      });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('normalizes a whitespace-only value to an empty string', async () => {
+      const instance = plainToInstance(UpdateCompanyDto, { taxId: '    ' });
+      expect(instance.taxId).toBe('');
+      const errors = await validate(instance, {
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts values exactly at the max length but rejects one over', async () => {
+      expect(await validatePayload({ address: 'x'.repeat(200) })).toHaveLength(0);
+      const over = await validatePayload({ address: 'x'.repeat(201) });
+      expect(over.some((e) => e.property === 'address')).toBe(true);
+    });
+
+    it('accepts a long multi-line quoteFooter up to 2000 chars', async () => {
+      const errors = await validatePayload({ quoteFooter: 'l\n'.repeat(1000) });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('accepts null on a fiscal field (clearing it), passing validation', async () => {
+      const errors = await validatePayload({
+        legalName: null,
+        taxId: null,
+        address: null,
+        quoteFooter: null,
+      });
+      expect(errors).toHaveLength(0);
+    });
+  });
 });

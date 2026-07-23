@@ -89,6 +89,15 @@ describe('CompaniesService', () => {
     expect(args.data).not.toHaveProperty('companyId');
   });
 
+  it('update passes null through for a cleared fiscal field (sets the column to NULL)', async () => {
+    await service.update('company-a', { taxId: null, quoteFooter: null });
+
+    expect(prisma.company.update).toHaveBeenCalledWith({
+      where: { id: 'company-a' },
+      data: { taxId: null, quoteFooter: null },
+    });
+  });
+
   it('turns a duplicate-phone Prisma constraint error into a clean 409, not a raw 500', async () => {
     const prismaError = new Prisma.PrismaClientKnownRequestError(
       'Unique constraint failed on the fields: (`phone`)',

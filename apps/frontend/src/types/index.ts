@@ -425,10 +425,12 @@ export interface UpdateCompanyPayload {
   primaryColor?: string;
   accentColor?: string;
   backgroundColor?: string;
-  legalName?: string;
-  taxId?: string;
-  address?: string;
-  quoteFooter?: string;
+  // Fiscal fields accept null so the settings form can clear them explicitly
+  // (undefined would omit the field and leave the previous value in place).
+  legalName?: string | null;
+  taxId?: string | null;
+  address?: string | null;
+  quoteFooter?: string | null;
 }
 
 export interface CompanyLogoUploadResult {

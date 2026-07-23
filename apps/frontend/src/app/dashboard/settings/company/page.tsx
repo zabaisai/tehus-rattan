@@ -157,10 +157,13 @@ function CompanySettingsForm({ company }: { company: Company }) {
         email: form.email.trim() || undefined,
         website: form.website.trim() || undefined,
         description: form.description.trim() || undefined,
-        legalName: form.legalName.trim() || undefined,
-        taxId: form.taxId.trim() || undefined,
-        address: form.address.trim() || undefined,
-        quoteFooter: form.quoteFooter.trim() || undefined,
+        // Fiscal fields send `null` (not `undefined`) when cleared, so emptying
+        // one actually clears it server-side instead of being omitted from the
+        // PATCH and silently keeping its previous value.
+        legalName: form.legalName.trim() || null,
+        taxId: form.taxId.trim() || null,
+        address: form.address.trim() || null,
+        quoteFooter: form.quoteFooter.trim() || null,
         primaryColor: form.primaryColor || undefined,
         accentColor: form.accentColor || undefined,
         backgroundColor: form.backgroundColor || undefined,
