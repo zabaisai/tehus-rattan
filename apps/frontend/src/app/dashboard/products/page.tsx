@@ -12,6 +12,7 @@ import {
   PRODUCT_CATEGORIES,
 } from "@/lib/products";
 import { Product, ProductImportSummary } from "@/types";
+import { getMyCompany } from "@/lib/companies";
 import { ProductModal, ProductFormData } from "@/components/products/ProductModal";
 import { ProductImportModal } from "@/components/products/ProductImportModal";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -34,6 +35,13 @@ export default function ProductsPage() {
     queryKey: ["products", category],
     queryFn: () => getProducts(category ? { category } : undefined),
   });
+
+  // Heading/subtitle name the logged-in company (never a hardcoded tenant or
+  // city). The city line is shown only when the company actually has one.
+  const { data: company } = useQuery({ queryKey: ["company-me"], queryFn: getMyCompany });
+  const catalogSubtitle = company
+    ? `Productos activos de ${company.name}${company.city ? ` · ${company.city}` : ""}`
+    : "Productos activos del catálogo";
 
   const filtered = useMemo(() => {
     if (!products) return [];
@@ -94,8 +102,8 @@ export default function ProductsPage() {
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-stone-900">Catálogo Tehus</h2>
-          <p className="text-xs text-stone-500">Productos activos de Tehus Rattan Medellín</p>
+          <h2 className="text-xl font-semibold text-stone-900">Catálogo</h2>
+          <p className="text-xs text-stone-500">{catalogSubtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -115,14 +123,14 @@ export default function ProductsPage() {
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative w-full flex-1 sm:max-w-xs">
           <Search size={15} className="absolute left-2.5 top-2.5 text-stone-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre o código"
+            placeholder="Buscar productos"
             className="w-full rounded-md border border-stone-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
           />
         </div>
@@ -130,7 +138,7 @@ export default function ProductsPage() {
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-auto"
         >
           <option value="">Todas las categorías</option>
           {PRODUCT_CATEGORIES.map((c) => (

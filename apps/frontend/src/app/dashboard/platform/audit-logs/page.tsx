@@ -25,7 +25,23 @@ const actionLabels: Record<string, string> = {
   VIEW_SUPPORT_CONVERSATIONS: 'Ver conversaciones de soporte',
   VIEW_SUPPORT_CONVERSATION_DETAIL: 'Ver detalle de conversación de soporte',
   END_SUPPORT_SESSION: 'Cerrar sesión de soporte',
+  REVOKE_SESSION: 'Revocar sesión',
+  REVOKE_ALL_USER_SESSIONS: 'Revocar todas las sesiones del usuario',
+  REVOKE_ALL_COMPANY_SESSIONS: 'Revocar todas las sesiones de la empresa',
+  CREATE_INVITATION_CODE: 'Crear código de invitación',
+  REVOKE_INVITATION_CODE: 'Revocar código de invitación',
+  USE_INVITATION_CODE: 'Usar código de invitación',
 };
+
+// Fallback for any action string not in the map above (e.g. a new backend
+// action shipped before this list is updated): humanize the SNAKE_CASE code
+// into "Sentence case" instead of showing raw technical identifiers.
+function humanizeAction(action: string): string {
+  if (actionLabels[action]) return actionLabels[action];
+  const words = action.toLowerCase().replace(/_/g, ' ').trim();
+  if (!words) return action;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 const metadataLabels: Record<string, string> = {
   companyName: 'Nombre de empresa',
@@ -208,7 +224,7 @@ export default function PlatformAuditLogsPage() {
                   {formatDate(log.createdAt)}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-stone-800">
-                  {actionLabels[log.action] ?? log.action}
+                  {humanizeAction(log.action)}
                 </td>
                 <td className="px-4 py-2.5">
                   <ActorCell log={log} />

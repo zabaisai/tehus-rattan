@@ -166,23 +166,24 @@ export default function PlatformCompaniesPage() {
       )}
 
       {isLoading && (
-        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 sm:hidden">
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 lg:hidden">
           Cargando...
         </p>
       )}
       {!isLoading && isError && (
-        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-red-600 sm:hidden">
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-red-600 lg:hidden">
           No se pudo cargar el listado de empresas.
         </p>
       )}
       {!isLoading && !isError && (companies?.length ?? 0) === 0 && (
-        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 sm:hidden">
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 lg:hidden">
           No hay empresas.
         </p>
       )}
 
-      {/* Móvil: tarjetas apiladas en vez de tabla */}
-      <div className="flex flex-col gap-2 sm:hidden">
+      {/* Móvil y tablet (<lg): tarjetas en vez de tabla, para que las acciones
+          no se apilen y agranden las filas como pasaba a 768px con la tabla. */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:hidden">
         {companies?.map((company) => (
           <div key={company.id} className="rounded-lg border border-stone-200 bg-white p-3">
             <div className="flex items-start justify-between gap-2">
@@ -258,7 +259,7 @@ export default function PlatformCompaniesPage() {
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white sm:block">
+      <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white lg:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
