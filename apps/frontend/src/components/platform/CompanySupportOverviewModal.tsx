@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { getPlatformCompanySupportOverview, getSupportSessions } from '@/lib/platform';
 import { CompanyStatus, PlatformSupportSession } from '@/types';
 import { StartSupportSessionModal } from './StartSupportSessionModal';
 import { SupportSessionPanel } from './SupportSessionPanel';
+import { Modal } from '@/components/ui/Modal';
 
 const statusLabels: Record<CompanyStatus, string> = {
   ACTIVE: 'Activa',
@@ -61,30 +61,22 @@ export function CompanySupportOverviewModal({
   const hasActiveSession = session?.status === 'ACTIVE';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            Overview de soporte
-          </h3>
-          <div className="flex items-center gap-3">
-            {!hasActiveSession && !loadingActiveSession && overview && (
-              <button
-                onClick={() => setStartModalOpen(true)}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-800"
-              >
-                Iniciar soporte
-              </button>
-            )}
+    <>
+      <Modal
+        title="Overview de soporte"
+        onClose={onClose}
+        maxWidth="2xl"
+        headerActions={
+          !hasActiveSession && !loadingActiveSession && overview ? (
             <button
-              onClick={onClose}
-              className="text-stone-400 hover:text-stone-700"
+              onClick={() => setStartModalOpen(true)}
+              className="whitespace-nowrap rounded-md bg-stone-900 px-3 py-1.5 text-xs text-white hover:bg-stone-800"
             >
-              <X size={18} />
+              Iniciar soporte
             </button>
-          </div>
-        </div>
-
+          ) : undefined
+        }
+      >
         {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
 
         {!isLoading && isError && (
@@ -338,7 +330,7 @@ export function CompanySupportOverviewModal({
             )}
           </div>
         )}
-      </div>
+      </Modal>
 
       {startModalOpen && overview && (
         <StartSupportSessionModal
@@ -358,6 +350,6 @@ export function CompanySupportOverviewModal({
           }}
         />
       )}
-    </div>
+    </>
   );
 }

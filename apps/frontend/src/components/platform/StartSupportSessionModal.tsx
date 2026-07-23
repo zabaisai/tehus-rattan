@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { createSupportSession } from '@/lib/platform';
 import { PlatformSupportSession } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -68,20 +68,12 @@ export function StartSupportSessionModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            Iniciar soporte para &quot;{companyName}&quot;
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-stone-400 hover:text-stone-700"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal
+      title={`Iniciar soporte para "${companyName}"`}
+      onClose={onClose}
+      maxWidth="sm"
+      stackedZIndex
+    >
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="mb-1 block text-xs font-medium text-stone-600">
@@ -122,7 +114,6 @@ export function StartSupportSessionModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

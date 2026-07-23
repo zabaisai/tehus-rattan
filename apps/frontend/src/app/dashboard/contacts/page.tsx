@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Search, Trash2, Pencil } from "lucide-react";
+import { Plus, Search, Trash2, Pencil, Users } from "lucide-react";
 import {
   getContacts,
   createContact,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/contacts";
 import { Contact } from "@/types";
 import { ContactModal } from "@/components/contacts/ContactModal";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export default function ContactsPage() {
   const queryClient = useQueryClient();
@@ -73,18 +74,18 @@ export default function ContactsPage() {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-stone-900">Contactos</h2>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
         >
           <Plus size={16} />
           Nuevo contacto
         </button>
       </div>
 
-      <div className="mb-4 relative max-w-xs">
+      <div className="mb-4 relative sm:max-w-xs">
         <Search
           size={15}
           className="absolute left-2.5 top-2.5 text-stone-400"
@@ -98,72 +99,101 @@ export default function ContactsPage() {
         />
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
-              <th className="px-4 py-2.5 font-medium">Nombre</th>
-              <th className="px-4 py-2.5 font-medium">Teléfono</th>
-              <th className="px-4 py-2.5 font-medium">Correo</th>
-              <th className="px-4 py-2.5 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading && (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-6 text-center text-stone-400"
-                >
-                  Cargando...
-                </td>
-              </tr>
-            )}
+      {isLoading && <p className="py-10 text-center text-sm text-stone-400">Cargando...</p>}
 
-            {!isLoading && filtered.length === 0 && (
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-4 py-6 text-center text-stone-400"
-                >
-                  No hay contactos.
-                </td>
-              </tr>
-            )}
+      {!isLoading && filtered.length === 0 && (
+        <EmptyState icon={Users} message="No hay contactos." />
+      )}
 
+      {!isLoading && filtered.length > 0 && (
+        <>
+          {/* Móvil: tarjetas apiladas en vez de tabla */}
+          <div className="flex flex-col gap-2 sm:hidden">
             {filtered.map((contact) => (
-              <tr
+              <div
                 key={contact.id}
-                className="border-b border-stone-100 last:border-0"
+                className="rounded-lg border border-stone-200 bg-white p-3"
               >
-                <td className="px-4 py-2.5 text-stone-800">
-                  {contact.name || "—"}
-                </td>
-                <td className="px-4 py-2.5 text-stone-600">{contact.phone}</td>
-                <td className="px-4 py-2.5 text-stone-600">
-                  {contact.email || "—"}
-                </td>
-                <td className="px-4 py-2.5">
-                  <div className="flex justify-end gap-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-stone-900">
+                      {contact.name || "—"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-stone-600">{contact.phone}</p>
+                    {contact.email && (
+                      <p className="truncate text-xs text-stone-500">{contact.email}</p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => openEditModal(contact)}
-                      className="rounded p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                      aria-label="Editar contacto"
+                      className="rounded p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
                     >
-                      <Pencil size={14} />
+                      <Pencil size={15} />
                     </button>
                     <button
                       onClick={() => handleDelete(contact.id)}
-                      className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                      aria-label="Eliminar contacto"
+                      className="rounded p-2 text-stone-400 hover:bg-red-50 hover:text-red-600"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
-                </td>
-              </tr>
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* Escritorio/tablet: tabla tradicional */}
+          <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white sm:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
+                  <th className="px-4 py-2.5 font-medium">Nombre</th>
+                  <th className="px-4 py-2.5 font-medium">Teléfono</th>
+                  <th className="px-4 py-2.5 font-medium">Correo</th>
+                  <th className="px-4 py-2.5 font-medium"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((contact) => (
+                  <tr
+                    key={contact.id}
+                    className="border-b border-stone-100 last:border-0"
+                  >
+                    <td className="px-4 py-2.5 text-stone-800">
+                      {contact.name || "—"}
+                    </td>
+                    <td className="px-4 py-2.5 text-stone-600">{contact.phone}</td>
+                    <td className="px-4 py-2.5 text-stone-600">
+                      {contact.email || "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex justify-end gap-1">
+                        <button
+                          onClick={() => openEditModal(contact)}
+                          aria-label="Editar contacto"
+                          className="rounded p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(contact.id)}
+                          aria-label="Eliminar contacto"
+                          className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
 
       {modalOpen && (
         <ContactModal

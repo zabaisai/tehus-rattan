@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { getLeads } from '@/lib/leads';
 import { getContacts } from '@/lib/contacts';
 import { getCompanyUsers } from '@/lib/users';
 import { Task } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -109,17 +109,7 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            {isEditing ? 'Editar tarea' : 'Nueva tarea'}
-          </h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal title={isEditing ? 'Editar tarea' : 'Nueva tarea'} onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label className="mb-1 block text-xs font-medium text-stone-600">Título</label>
@@ -311,7 +301,6 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

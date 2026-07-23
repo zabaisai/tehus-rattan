@@ -118,10 +118,10 @@ export default function DashboardHomePage() {
               {agents.map((agent) => (
                 <div
                   key={agent.agentId}
-                  className="flex items-center justify-between border-b border-stone-100 pb-2 text-sm last:border-0"
+                  className="flex flex-col gap-1 border-b border-stone-100 pb-2 text-sm last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                 >
-                  <span className="text-stone-700">{agent.agentName}</span>
-                  <div className="flex items-center gap-3 text-xs text-stone-500">
+                  <span className="truncate text-stone-700">{agent.agentName}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
                     <span>{agent.openLeads} abiertos</span>
                     <span className="text-emerald-600">{agent.wonCount} ganados</span>
                     <span className="font-medium text-stone-800">

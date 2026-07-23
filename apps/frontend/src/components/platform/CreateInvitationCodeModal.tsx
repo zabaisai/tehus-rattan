@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Copy, Check, AlertTriangle } from 'lucide-react';
+import { Copy, Check, AlertTriangle } from 'lucide-react';
 import { createInvitationCode } from '@/lib/invitation-codes';
 import { CreateInvitationCodeResult } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -80,22 +81,12 @@ export function CreateInvitationCodeModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            {created ? 'Código generado' : 'Generar código de invitación'}
-          </h3>
-          {(!created || confirmedCopy) && (
-            <button
-              onClick={handleClose}
-              className="text-stone-400 hover:text-stone-700"
-            >
-              <X size={18} />
-            </button>
-          )}
-        </div>
-
+    <Modal
+      title={created ? 'Código generado' : 'Generar código de invitación'}
+      onClose={handleClose}
+      maxWidth="sm"
+      hideCloseButton={!!created && !confirmedCopy}
+    >
         {!created && (
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
@@ -212,7 +203,6 @@ export function CreateInvitationCodeModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

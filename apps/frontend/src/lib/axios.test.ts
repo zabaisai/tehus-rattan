@@ -106,6 +106,7 @@ describe('axios refresh interceptor', () => {
     Object.defineProperty(window, 'location', {
       value: { ...originalLocation, href: '' },
       writable: true,
+      configurable: true,
     });
 
     localStorage.setItem('token', 'stale-token');
@@ -123,7 +124,11 @@ describe('axios refresh interceptor', () => {
     );
     expect(refreshCalls).toHaveLength(1);
 
-    Object.defineProperty(window, 'location', { value: originalLocation, writable: true });
+    Object.defineProperty(window, 'location', {
+      value: originalLocation,
+      writable: true,
+      configurable: true,
+    });
   });
 
   it('retries the original request at most once even if the retry also 401s', async () => {

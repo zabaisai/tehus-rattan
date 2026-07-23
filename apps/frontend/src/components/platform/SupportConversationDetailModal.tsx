@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { getSupportSessionConversationDetail } from '@/lib/platform';
+import { Modal } from '@/components/ui/Modal';
 
 const MESSAGES_LIMIT = 50;
 
@@ -50,35 +50,50 @@ export function SupportConversationDetailModal({
       }),
   });
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-lg">
-        <div className="flex items-center justify-between border-b border-stone-100 p-5 pb-4">
-          <h3 className="text-sm font-semibold text-stone-900">
-            Conversación
-            {detail ? ` — ${detail.conversation.contact?.name ?? 'Contacto sin nombre'}` : ''}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-stone-400 hover:text-stone-700"
-          >
-            <X size={18} />
-          </button>
-        </div>
+  const showFooter = !isLoading && !isError && !!detail;
 
+  return (
+    <Modal
+      title={`Conversación${detail ? ` — ${detail.conversation.contact?.name ?? 'Contacto sin nombre'}` : ''}`}
+      onClose={onClose}
+      maxWidth="2xl"
+      footer={
+        showFooter && detail ? (
+          <div className="flex items-center justify-between text-xs">
+            <button
+              type="button"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
+            >
+              Anterior
+            </button>
+            <span className="text-stone-400">Página {detail.page}</span>
+            <button
+              type="button"
+              disabled={detail.messages.length < MESSAGES_LIMIT}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
+            >
+              Siguiente
+            </button>
+          </div>
+        ) : undefined
+      }
+    >
         {isLoading && (
-          <p className="p-5 text-sm text-stone-400">Cargando...</p>
+          <p className="text-sm text-stone-400">Cargando...</p>
         )}
 
         {!isLoading && isError && (
-          <p className="p-5 text-sm text-red-600">
+          <p className="text-sm text-red-600">
             No se pudo cargar el detalle de la conversación.
           </p>
         )}
 
         {!isLoading && !isError && detail && (
           <>
-            <div className="border-b border-stone-100 p-5 pt-4 text-sm">
+            <div className="mb-4 border-b border-stone-100 pb-4 text-sm">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
                   <p className="text-xs text-stone-500">Estado</p>
@@ -106,7 +121,7 @@ export function SupportConversationDetailModal({
               </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
+            <div>
               {detail.messages.length === 0 ? (
                 <p className="text-center text-sm text-stone-400">
                   Sin mensajes en esta página.
@@ -154,29 +169,8 @@ export function SupportConversationDetailModal({
                 </div>
               )}
             </div>
-
-            <div className="flex items-center justify-between border-t border-stone-100 p-4 text-xs">
-              <button
-                type="button"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
-              >
-                Anterior
-              </button>
-              <span className="text-stone-400">Página {detail.page}</span>
-              <button
-                type="button"
-                disabled={detail.messages.length < MESSAGES_LIMIT}
-                onClick={() => setPage((p) => p + 1)}
-                className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
-              >
-                Siguiente
-              </button>
-            </div>
           </>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

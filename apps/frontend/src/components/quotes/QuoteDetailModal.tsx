@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Printer } from 'lucide-react';
+import { Printer } from 'lucide-react';
 import { getQuote, updateQuote, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from '@/lib/quotes';
 import { QuoteStatus } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -123,17 +124,11 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            {quote ? `Cotización ${quote.number}` : 'Cotización'}
-          </h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal
+      title={quote ? `Cotización ${quote.number}` : 'Cotización'}
+      onClose={onClose}
+      maxWidth="2xl"
+    >
         {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
         {isError && <p className="text-sm text-red-600">No se pudo cargar la cotización.</p>}
 
@@ -160,8 +155,8 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
               </select>
             </div>
 
-            <div className="overflow-hidden rounded-md border border-stone-200">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto rounded-md border border-stone-200">
+              <table className="w-full min-w-[420px] text-left text-xs">
                 <thead className="bg-stone-50 text-stone-500">
                   <tr>
                     <th className="px-2 py-1.5 font-medium">Producto</th>
@@ -227,7 +222,7 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
 
             {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
 
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={handleDelete}
@@ -323,7 +318,6 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
             </div>
           </form>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
