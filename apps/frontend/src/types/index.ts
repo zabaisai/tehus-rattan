@@ -287,6 +287,24 @@ export interface QuoteLeadRef {
   status: string;
 }
 
+// The fiscal identity of the company that OWNS the quote, resolved server-side
+// and returned by GET /quotes/:id. This is the authoritative source for the
+// printable document — never the viewer's own company or a hardcoded footer.
+export interface QuoteCompanyIdentity {
+  id: string;
+  name: string;
+  legalName: string | null;
+  taxId: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  website: string | null;
+  logoUrl: string | null;
+  quoteFooter: string | null;
+}
+
 export interface QuoteItem {
   id: string;
   name: string;
@@ -320,6 +338,9 @@ export interface Quote {
   lead: QuoteLeadRef;
   // Only present on GET /quotes/:id — the list endpoint doesn't include items.
   items?: QuoteItem[];
+  // Only present on GET /quotes/:id — the owning company's fiscal identity,
+  // used to render the printable document.
+  company?: QuoteCompanyIdentity;
 }
 
 export interface CreateQuoteFromLeadPayload {
@@ -383,6 +404,11 @@ export interface Company {
   website: string | null;
   description: string | null;
   settings: Record<string, unknown> | null;
+  // Per-company fiscal identity (used to render quotes). All optional.
+  legalName: string | null;
+  taxId: string | null;
+  address: string | null;
+  quoteFooter: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -399,6 +425,10 @@ export interface UpdateCompanyPayload {
   primaryColor?: string;
   accentColor?: string;
   backgroundColor?: string;
+  legalName?: string;
+  taxId?: string;
+  address?: string;
+  quoteFooter?: string;
 }
 
 export interface CompanyLogoUploadResult {

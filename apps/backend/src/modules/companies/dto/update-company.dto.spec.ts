@@ -57,4 +57,40 @@ describe('UpdateCompanyDto', () => {
       expect(errors.length).toBeGreaterThan(0);
     },
   );
+
+  describe('fiscal identity fields', () => {
+    it('accepts the optional fiscal fields', async () => {
+      const errors = await validatePayload({
+        legalName: 'Empresa Ejemplo S.A.S',
+        taxId: '900123456-7',
+        address: 'Calle 10 #20-30',
+        quoteFooter: 'Precios sujetos a cambio sin previo aviso.',
+      });
+      expect(errors).toHaveLength(0);
+    });
+
+    it('trims surrounding whitespace on fiscal fields', async () => {
+      const instance = plainToInstance(UpdateCompanyDto, {
+        legalName: '  Empresa Ejemplo  ',
+        taxId: '  900123456-7  ',
+      });
+      expect(instance.legalName).toBe('Empresa Ejemplo');
+      expect(instance.taxId).toBe('900123456-7');
+    });
+
+    it('rejects a taxId longer than the max length', async () => {
+      const errors = await validatePayload({ taxId: 'X'.repeat(51) });
+      expect(errors.some((e) => e.property === 'taxId')).toBe(true);
+    });
+
+    it('rejects a legalName longer than the max length', async () => {
+      const errors = await validatePayload({ legalName: 'X'.repeat(151) });
+      expect(errors.some((e) => e.property === 'legalName')).toBe(true);
+    });
+
+    it('rejects a non-string fiscal field', async () => {
+      const errors = await validatePayload({ taxId: 12345 });
+      expect(errors.some((e) => e.property === 'taxId')).toBe(true);
+    });
+  });
 });

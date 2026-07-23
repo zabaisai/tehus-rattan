@@ -30,6 +30,14 @@ model Company {
   description      String?
   settings         Json?
 
+  // Per-company fiscal identity used to render quotes/printable documents.
+  // All optional and additive — an empty field is simply omitted from the
+  // printed document, never replaced by a global/hardcoded fallback.
+  legalName        String? // Razón social
+  taxId            String? // Identificación fiscal / NIT
+  address          String? // Dirección
+  quoteFooter      String? // Texto/condiciones opcionales para el pie de cotizaciones
+
   users               User[]
   contacts            Contact[]
   conversations       Conversation[]

@@ -1,7 +1,20 @@
 import { Prisma } from '@prisma/client';
-import { IsEmail, IsObject, IsOptional, IsString, Matches } from 'class-validator';
+import { Transform } from 'class-transformer';
+import {
+  IsEmail,
+  IsObject,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+} from 'class-validator';
 
 const HEX_COLOR_REGEX = /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/;
+
+// Collapse surrounding whitespace so a value that is only spaces becomes an
+// empty string (and blank optional fields stay blank) before validation.
+const trim = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim() : value;
 
 export class UpdateCompanyDto {
   @IsOptional()
@@ -57,6 +70,33 @@ export class UpdateCompanyDto {
   @IsOptional()
   @IsObject()
   settings?: Prisma.InputJsonValue;
+
+  // ── Per-company fiscal identity (used to render quotes) ──
+  // Optional and normalized (trimmed) with sane max lengths. Empty values are
+  // omitted from the printed document, never replaced by a global fallback.
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(150)
+  legalName?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(50)
+  taxId?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(200)
+  address?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(2000)
+  quoteFooter?: string;
 
   // Deliberately NOT declared here: id, status, slug, companyId, createdAt,
   // updatedAt, logoUrl, secondaryLogoUrl. The global ValidationPipe

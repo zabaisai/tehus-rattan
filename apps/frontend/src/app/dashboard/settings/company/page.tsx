@@ -122,6 +122,10 @@ function CompanySettingsForm({ company }: { company: Company }) {
     email: company.email ?? "",
     website: company.website ?? "",
     description: company.description ?? "",
+    legalName: company.legalName ?? "",
+    taxId: company.taxId ?? "",
+    address: company.address ?? "",
+    quoteFooter: company.quoteFooter ?? "",
     primaryColor: company.primaryColor ?? "#A57014",
     accentColor: company.accentColor ?? "#FDDC7F",
     backgroundColor: company.backgroundColor ?? "#FAF8F3",
@@ -153,6 +157,10 @@ function CompanySettingsForm({ company }: { company: Company }) {
         email: form.email.trim() || undefined,
         website: form.website.trim() || undefined,
         description: form.description.trim() || undefined,
+        legalName: form.legalName.trim() || undefined,
+        taxId: form.taxId.trim() || undefined,
+        address: form.address.trim() || undefined,
+        quoteFooter: form.quoteFooter.trim() || undefined,
         primaryColor: form.primaryColor || undefined,
         accentColor: form.accentColor || undefined,
         backgroundColor: form.backgroundColor || undefined,
@@ -190,7 +198,8 @@ function CompanySettingsForm({ company }: { company: Company }) {
       <form onSubmit={handleSubmit} className="rounded-lg border border-stone-200 bg-white p-5">
         <h3 className="mb-4 text-sm font-semibold text-stone-800">Datos de la empresa</h3>
         <p className="mb-4 text-xs text-stone-400">
-          Estos datos son informativos. No son datos legales, fiscales ni de facturación.
+          Perfil comercial de tu empresa dentro del CRM. Los datos fiscales para
+          cotizaciones se configuran en la sección de abajo.
         </p>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -270,7 +279,61 @@ function CompanySettingsForm({ company }: { company: Company }) {
           />
         </div>
 
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mt-8 border-t border-stone-100 pt-6">
+          <h3 className="mb-1 text-sm font-semibold text-stone-800">
+            Identidad fiscal (para cotizaciones)
+          </h3>
+          <p className="mb-4 text-xs text-stone-400">
+            Todos los campos son opcionales. Se usan para el encabezado y el pie
+            de las cotizaciones impresas de tu empresa. Los que dejes vacíos
+            simplemente no aparecen en el documento.
+          </p>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className={labelClass}>Razón social (opcional)</label>
+              <input
+                type="text"
+                value={form.legalName}
+                onChange={(e) => patch({ legalName: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>NIT / Identificación fiscal (opcional)</label>
+              <input
+                type="text"
+                value={form.taxId}
+                onChange={(e) => patch({ taxId: e.target.value })}
+                className={inputClass}
+              />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className={labelClass}>Dirección (opcional)</label>
+            <input
+              type="text"
+              value={form.address}
+              onChange={(e) => patch({ address: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+
+          <div className="mt-4">
+            <label className={labelClass}>
+              Condiciones / texto del pie de cotización (opcional)
+            </label>
+            <textarea
+              value={form.quoteFooter}
+              onChange={(e) => patch({ quoteFooter: e.target.value })}
+              rows={3}
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div className="mt-8 grid grid-cols-1 gap-4 border-t border-stone-100 pt-6 sm:grid-cols-3">
           <div>
             <label className={labelClass}>Color principal</label>
             <div className="flex items-center gap-2">

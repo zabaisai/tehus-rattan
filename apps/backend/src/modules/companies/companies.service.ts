@@ -25,6 +25,10 @@ export class CompaniesService {
       accentColor?: string;
       backgroundColor?: string;
       settings?: Prisma.InputJsonValue;
+      legalName?: string;
+      taxId?: string;
+      address?: string;
+      quoteFooter?: string;
     },
   ) {
     try {

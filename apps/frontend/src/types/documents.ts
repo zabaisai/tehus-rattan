@@ -4,6 +4,26 @@
 
 export type DocumentTemplateType = 'SALE_INVOICE' | 'REPAIR' | 'REMISSION';
 
+// Explicit, typed company identity a printable document renders. `name` is the
+// only required field (a company always has a registered name); every fiscal
+// field is optional and omitted from the document when empty — never replaced
+// by a hardcoded/global fallback. This is passed down explicitly so no
+// document component infers the company from browser-held state.
+export interface DocumentCompanyIdentity {
+  name: string;
+  legalName?: string | null;
+  taxId?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  website?: string | null;
+  logoUrl?: string | null;
+  // Optional per-company footer/terms text for quotes; omitted when empty.
+  quoteFooter?: string | null;
+}
+
 export interface DocumentItem {
   id: string;
   code: string;

@@ -64,6 +64,31 @@ describe('CompaniesService', () => {
     });
   });
 
+  it('update passes the per-company fiscal identity fields through to Prisma', async () => {
+    const data = {
+      legalName: 'Empresa Ejemplo S.A.S',
+      taxId: '900123456-7',
+      address: 'Calle 10 #20-30',
+      quoteFooter: 'Precios sujetos a cambio sin previo aviso.',
+    };
+
+    await service.update('company-a', data);
+
+    expect(prisma.company.update).toHaveBeenCalledWith({
+      where: { id: 'company-a' },
+      data,
+    });
+  });
+
+  it('update always scopes the write to the given company id (never a body id)', async () => {
+    await service.update('company-a', { taxId: '900123456-7' });
+
+    const args = prisma.company.update.mock.calls[0][0];
+    expect(args.where).toEqual({ id: 'company-a' });
+    expect(args.data).not.toHaveProperty('id');
+    expect(args.data).not.toHaveProperty('companyId');
+  });
+
   it('turns a duplicate-phone Prisma constraint error into a clean 409, not a raw 500', async () => {
     const prismaError = new Prisma.PrismaClientKnownRequestError(
       'Unique constraint failed on the fields: (`phone`)',
