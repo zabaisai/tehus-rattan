@@ -1,14 +1,18 @@
 'use client';
 
-import { DOCUMENT_TERMS_AND_CONDITIONS } from '@/lib/document-templates';
+interface DocumentTermsAndConditionsProps {
+  // Per-company terms/footer text. Rendered only when non-empty — there is no
+  // hardcoded/global legal text, so a company without terms shows none.
+  terms?: string | null;
+}
 
-// Copied verbatim from the reference Excel (see lib/document-templates.ts).
-// Only rendered by templates whose source sheet actually has this block —
-// "Reparacion" has none in the Excel, so RepairTemplate never renders this.
-export function DocumentTermsAndConditions() {
+export function DocumentTermsAndConditions({ terms }: DocumentTermsAndConditionsProps) {
+  const text = terms?.trim();
+  if (!text) return null;
+
   return (
     <p className="mb-3 whitespace-pre-line border border-stone-400 p-1.5 text-[7px] leading-tight text-stone-700">
-      {DOCUMENT_TERMS_AND_CONDITIONS}
+      {text}
     </p>
   );
 }

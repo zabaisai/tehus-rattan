@@ -1,7 +1,7 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
+import { resolveCompanyAssetUrl } from '@/lib/companies';
+import { DocumentCompanyIdentity } from '@/types/documents';
 
 export interface DocumentHeaderField {
   label: string;
@@ -13,22 +13,21 @@ export interface DocumentHeaderField {
 interface DocumentHeaderProps {
   title: string;
   fields: DocumentHeaderField[];
+  // The company whose identity heads the document. Passed explicitly (from the
+  // quote's owning company, or the calculator's own company) — never inferred
+  // here from browser state.
+  company: DocumentCompanyIdentity;
   // Used by QuotePrintableDocument: real quote data is display-only here,
   // never edited from the print view.
   readOnly?: boolean;
 }
 
-// Reuses the company's own branding (same source as the Sidebar logo)
-// instead of a hardcoded image asset — the Excel's actual logo image is
-// intentionally not copied into the repo as an asset file.
-export function DocumentHeader({ title, fields, readOnly }: DocumentHeaderProps) {
-  const { data: company } = useQuery({
-    queryKey: ['company-me'],
-    queryFn: getMyCompany,
-  });
-
-  const logoUrl = company?.logoUrl ? resolveCompanyAssetUrl(company.logoUrl) : null;
-  const companyName = company?.name || 'Tehus Rattan';
+// Renders the company's own branding (logo + name). The only fallback for the
+// name is the company's registered name, which is always present — there is no
+// hardcoded/global company name here.
+export function DocumentHeader({ title, fields, company, readOnly }: DocumentHeaderProps) {
+  const logoUrl = company.logoUrl ? resolveCompanyAssetUrl(company.logoUrl) : null;
+  const companyName = company.name;
 
   return (
     <div className="mb-4 flex items-start justify-between gap-4 border-b-2 border-stone-800 pb-3">
@@ -45,6 +44,9 @@ export function DocumentHeader({ title, fields, readOnly }: DocumentHeaderProps)
           <p className="text-sm font-bold uppercase tracking-wide text-stone-900">
             {companyName}
           </p>
+          {company.legalName && company.legalName !== companyName && (
+            <p className="text-[10px] text-stone-500">{company.legalName}</p>
+          )}
           <p className="text-xs font-semibold uppercase tracking-wide text-[#A57014]">
             {title}
           </p>
