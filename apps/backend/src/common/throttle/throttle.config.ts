@@ -21,8 +21,16 @@ export const THROTTLE_LIMITS = {
   // accidentally rate-limited.
   default: positiveIntFromEnv('THROTTLE_DEFAULT_LIMIT', 300),
   // Strict on the credential endpoint (brute-force / credential stuffing).
+  // Always per-IP (see AppThrottlerGuard) — device bucketing is deliberately
+  // NOT applied here so it cannot dilute brute-force protection.
   auth: positiveIntFromEnv('THROTTLE_AUTH_LIMIT', 10),
-  // Refresh is called more often than login but still bounded.
+  // Refresh is bucketed PER DEVICE (via the httpOnly device-id cookie), not per
+  // shared IP — see AppThrottlerGuard — so colleagues behind one office
+  // NAT/public IP never exhaust each other's refresh budget. 30/minute is very
+  // generous for one honest device (a 15-min access token needs ~4 refreshes/h
+  // plus the odd reload) while still capping a runaway loop; the whole office is
+  // effectively N_devices × this limit. Clients that send no device-id cookie
+  // fall back to a per-IP bucket at this same limit.
   refresh: positiveIntFromEnv('THROTTLE_REFRESH_LIMIT', 30),
   // Onboarding + legacy register: throttle invite-code guessing.
   onboarding: positiveIntFromEnv('THROTTLE_ONBOARDING_LIMIT', 15),
