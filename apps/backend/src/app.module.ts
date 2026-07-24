@@ -1,8 +1,12 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { validateEnv } from './common/config/env.validation';
+import { THROTTLE_TTL_MS, THROTTLE_LIMITS } from './common/throttle/throttle.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
@@ -29,14 +33,15 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: (config) => {
-        if (!config.JWT_SECRET?.trim()) {
-          throw new Error('JWT_SECRET is required');
-        }
-
-        return config;
-      },
+      validate: validateEnv,
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: THROTTLE_TTL_MS,
+        limit: THROTTLE_LIMITS.default,
+      },
+    ]),
     ScheduleModule.forRoot(),
     PrismaModule,
     SessionsModule,
@@ -60,7 +65,13 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     InvitationCodesModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Global HTTP rate limiting. Individual routes tighten or skip it with
+    // @Throttle / @SkipThrottle. Uses req.ip, which respects the
+    // `trust proxy = 1` set in main.ts (the single Caddy hop).
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

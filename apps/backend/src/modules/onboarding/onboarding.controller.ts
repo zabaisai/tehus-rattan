@@ -9,8 +9,13 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import type { Request as ExpressRequest, Response } from 'express';
 import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
+import {
+  THROTTLE_TTL_MS,
+  THROTTLE_LIMITS,
+} from '../../common/throttle/throttle.config';
 import { OnboardingService } from './onboarding.service';
 import { buildSessionRequestContext } from '../sessions/utils/request-context.util';
 import { setRefreshTokenCookie } from '../sessions/utils/refresh-cookie.util';
@@ -36,6 +41,7 @@ export class OnboardingController {
   // executes before FileFieldsInterceptor/multer has parsed the multipart
   // body — body.inviteCode (and any "data" field content) isn't available
   // yet at that point for a multipart request.
+  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding } })
   @UseGuards(OnboardingInviteGuard)
   @Post('company')
   @UseInterceptors(
