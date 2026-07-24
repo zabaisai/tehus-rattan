@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
+import { ConnectionUnavailable } from '@/components/auth/ConnectionUnavailable';
 
 type ApiError = {
   response?: {
@@ -61,6 +62,12 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // The server was unreachable during bootstrap (429 / network / 5xx): show the
+  // retry screen, not a form that implies the session expired.
+  if (status === 'unavailable') {
+    return <ConnectionUnavailable />;
   }
 
   // While the initial bootstrap runs, or when already authenticated (redirect

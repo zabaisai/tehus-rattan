@@ -3,12 +3,15 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
+import { ConnectionUnavailable } from './ConnectionUnavailable';
 
 // Guards protected subtrees. Renders children ONLY once the session is
-// confirmed authenticated — while "bootstrapping" or "anonymous" it shows a
-// neutral loader, so private content never flashes before auth is known and
-// there is no login↔dashboard redirect loop. Real authorization is still
-// enforced by the backend on every request.
+// confirmed authenticated — while "bootstrapping" it shows a neutral loader,
+// when "anonymous" it redirects to /login, and when "unavailable" (bootstrap
+// could not reach the server) it shows a retry screen instead of the login
+// form. Private content never flashes before auth is known and there is no
+// login↔dashboard redirect loop. Real authorization is still enforced by the
+// backend on every request.
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const status = useAuthStore((s) => s.status);
@@ -18,6 +21,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       router.replace('/login');
     }
   }, [status, router]);
+
+  // A transient bootstrap failure must not look like an expired session: keep
+  // private content hidden, but offer a retry rather than bouncing to /login.
+  if (status === 'unavailable') {
+    return <ConnectionUnavailable />;
+  }
 
   if (status !== 'authenticated') {
     return (

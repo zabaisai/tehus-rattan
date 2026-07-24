@@ -48,30 +48,96 @@ const REFRESH_URL = `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`;
 const CROSS_TAB_LOCK = 'tehus-auth-refresh';
 const LOCK_TIMEOUT_MS = 5000;
 
+// A refresh attempt has four genuinely different outcomes. Collapsing them all
+// into `string | null` (as before) made a transient 429 / network blip / 5xx
+// indistinguishable from a truly invalid session, so any two consecutive
+// failures logged the user out globally. Callers must branch on the outcome:
+//  - success:            a new access token was minted.
+//  - invalid-session:    two consecutive 401s → the refresh token is really
+//                        gone/revoked. ONLY this should clear the session.
+//  - transient-error:    429 / network / timeout / 5xx → the session may well be
+//                        alive; keep it, surface a recoverable failure.
+//  - configuration-error: 403 (Origin/CSRF/config) → do not log out, do not storm.
+export type RefreshResult =
+  | { status: 'success'; token: string }
+  | { status: 'invalid-session' }
+  | { status: 'transient-error'; retryAfterMs?: number }
+  | { status: 'configuration-error' };
+
+export type RefreshErrorKind = 'invalid' | 'transient' | 'configuration';
+
+// Map an Axios failure onto a coarse kind. A missing response object means the
+// request never got an HTTP status (DNS failure, connection refused, timeout,
+// CORS/network) → transient. Any unexpected 4xx that is neither 401 nor 403 is
+// treated as transient too: it must never force a false logout, and returning
+// transient keeps the session and avoids a retry storm.
+export function classifyRefreshError(error: unknown): RefreshErrorKind {
+  const status = (error as AxiosError | undefined)?.response?.status;
+  if (status === undefined) return 'transient'; // network error / timeout
+  if (status === 401) return 'invalid';
+  if (status === 403) return 'configuration';
+  if (status === 429) return 'transient';
+  if (status >= 500) return 'transient';
+  return 'transient';
+}
+
+// Best-effort parse of a Retry-After header (delta-seconds or HTTP-date). Only
+// used to annotate a transient result; we never auto-retry a 429, so this is
+// informational (e.g. for a future backoff), not a scheduler.
+function parseRetryAfterMs(error: unknown): number | undefined {
+  const header = (error as AxiosError | undefined)?.response?.headers?.[
+    'retry-after'
+  ];
+  if (!header) return undefined;
+  const seconds = Number(header);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const when = Date.parse(String(header));
+  return Number.isFinite(when) ? Math.max(0, when - Date.now()) : undefined;
+}
+
+async function postRefresh(): Promise<{ token: string }> {
+  const { data } = await axios.post<{ token: string }>(REFRESH_URL, undefined, {
+    withCredentials: true,
+  });
+  return data;
+}
+
+// One POST /auth/refresh, with a SINGLE retry that is used ONLY for a first 401
+// (a recoverable CAS race: another tab just rotated the shared httpOnly cookie,
+// so the token this request sent is already spent — retrying uses the now-current
+// cookie). A 429 / 5xx / network / 403 on the first attempt returns immediately:
+// there is no second immediate attempt, so we never worsen a rate limit and
+// never storm. Two 401s in a row are a genuinely invalid session.
+async function attemptRefresh(): Promise<RefreshResult> {
+  try {
+    const { token } = await postRefresh();
+    setAccessToken(token);
+    return { status: 'success', token };
+  } catch (error) {
+    const kind = classifyRefreshError(error);
+    if (kind === 'configuration') return { status: 'configuration-error' };
+    if (kind === 'transient') {
+      return { status: 'transient-error', retryAfterMs: parseRetryAfterMs(error) };
+    }
+    // kind === 'invalid' (first 401) → fall through to exactly one retry.
+  }
+
+  try {
+    const { token } = await postRefresh();
+    setAccessToken(token);
+    return { status: 'success', token };
+  } catch (error) {
+    const kind = classifyRefreshError(error);
+    if (kind === 'invalid') return { status: 'invalid-session' };
+    if (kind === 'configuration') return { status: 'configuration-error' };
+    return { status: 'transient-error', retryAfterMs: parseRetryAfterMs(error) };
+  }
+}
+
 // Shared across every concurrent 401 in THIS tab — the first to hit this creates
 // the promise and starts one refresh; every other request that 401s while it is
 // in flight awaits this SAME promise. Cleared once it settles.
-let refreshPromise: Promise<string | null> | null = null;
-
-// One POST /auth/refresh, with a single retry. A 401 can be a *recoverable*
-// race: another tab just rotated the shared httpOnly cookie, so the token this
-// request sent is already spent. Retrying once uses the now-current cookie and
-// succeeds. Two failures in a row mean the session is genuinely gone → null
-// (the caller logs out). Never loops beyond one retry, so there is no storm.
-async function attemptRefresh(): Promise<string | null> {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const { data } = await axios.post<{ token: string }>(REFRESH_URL, undefined, {
-        withCredentials: true,
-      });
-      setAccessToken(data.token);
-      return data.token;
-    } catch {
-      if (attempt === 1) return null;
-    }
-  }
-  return null;
-}
+let refreshPromise: Promise<RefreshResult> | null = null;
 
 // Serialize refresh ACROSS TABS with the Web Locks API so two tabs never rotate
 // the same refresh token at the same instant. Each tab still makes its OWN
@@ -80,7 +146,7 @@ async function attemptRefresh(): Promise<string | null> {
 // unavailable or acquiring the lock times out (a stuck holder must never block
 // refresh forever); the per-request retry above plus the backend compare-and-
 // swap keep that fallback race-safe and loop-free.
-async function refreshWithCrossTabLock(): Promise<string | null> {
+async function refreshWithCrossTabLock(): Promise<RefreshResult> {
   const locks =
     typeof navigator !== 'undefined' ? navigator.locks : undefined;
   if (!locks || typeof locks.request !== 'function') {
@@ -104,7 +170,7 @@ async function refreshWithCrossTabLock(): Promise<string | null> {
 }
 
 // Exposed so the bootstrap flow reuses the exact same single-flight refresh.
-export function refreshAccessToken(): Promise<string | null> {
+export function refreshAccessToken(): Promise<RefreshResult> {
   if (!refreshPromise) {
     refreshPromise = refreshWithCrossTabLock().finally(() => {
       refreshPromise = null;
@@ -112,6 +178,8 @@ export function refreshAccessToken(): Promise<string | null> {
   }
   return refreshPromise;
 }
+
+let configErrorLogged = false;
 
 api.interceptors.response.use(
   (response) => response,
@@ -133,15 +201,27 @@ api.interceptors.response.use(
     // (session genuinely gone) it falls through above instead of looping.
     originalRequest._retry = true;
 
-    const newToken = await refreshAccessToken();
+    const result = await refreshAccessToken();
 
-    if (!newToken) {
-      handleSessionInvalidated();
-      return Promise.reject(error);
+    if (result.status === 'success') {
+      originalRequest.headers.Authorization = `Bearer ${result.token}`;
+      return api(originalRequest);
     }
 
-    originalRequest.headers.Authorization = `Bearer ${newToken}`;
-    return api(originalRequest);
+    // ONLY a genuinely invalid session clears memory / broadcasts / redirects.
+    if (result.status === 'invalid-session') {
+      handleSessionInvalidated();
+    } else if (result.status === 'configuration-error' && !configErrorLogged) {
+      // Surface once for diagnosis; never log out, never storm.
+      configErrorLogged = true;
+      console.error(
+        'Refresh rejected with a configuration/security error (403). ' +
+          'Session kept; check Origin/CORS configuration.',
+      );
+    }
+    // transient-error / configuration-error: keep the session, surface the
+    // original failure to the caller so it can retry later. No logout.
+    return Promise.reject(error);
   },
 );
 

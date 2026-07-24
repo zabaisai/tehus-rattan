@@ -9,8 +9,16 @@ import {
 // - "bootstrapping": app just loaded; a controlled /auth/refresh is deciding
 //   whether there is a live session. Protected views must wait in this state.
 // - "authenticated": a user is known and an access token is in memory.
-// - "anonymous": no session (refresh failed / logged out).
-export type AuthStatus = "bootstrapping" | "authenticated" | "anonymous";
+// - "anonymous": no session (refresh genuinely invalid / logged out).
+// - "unavailable": the bootstrap could not reach a verdict because /auth/refresh
+//   failed transiently (429 / network / timeout / 5xx). The session may well be
+//   alive — we just could not confirm it — so protected views must NOT fall back
+//   to the login form; they show a "retry" state instead.
+export type AuthStatus =
+  | "bootstrapping"
+  | "authenticated"
+  | "anonymous"
+  | "unavailable";
 
 interface AuthState {
   user: User | null;
