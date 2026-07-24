@@ -4,9 +4,11 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-integration.service';
 import { WhatsAppTokenCryptoService } from '../whatsapp-integration/whatsapp-token-crypto.service';
+import { DEFAULT_GRAPH_API_VERSION } from '../../common/config/env.validation';
 
 @Injectable()
 export class WhatsappService {
@@ -15,6 +17,7 @@ export class WhatsappService {
   constructor(
     private whatsappIntegrationService: WhatsAppIntegrationService,
     private tokenCryptoService: WhatsAppTokenCryptoService,
+    private config: ConfigService,
   ) {}
 
   async sendMessage(
@@ -46,7 +49,10 @@ export class WhatsappService {
       );
     }
 
-    const url = `https://graph.facebook.com/v19.0/${integration.phoneNumberId}/messages`;
+    const graphVersion =
+      this.config.get<string>('WHATSAPP_GRAPH_API_VERSION')?.trim() ||
+      DEFAULT_GRAPH_API_VERSION;
+    const url = `https://graph.facebook.com/${graphVersion}/${integration.phoneNumberId}/messages`;
 
     try {
       const response = await axios.post(

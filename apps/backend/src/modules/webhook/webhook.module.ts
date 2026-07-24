@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { WebhookController } from './webhook.controller';
 import { WebhookService } from './webhook.service';
+import { WhatsAppSignatureGuard } from './whatsapp-signature.guard';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { MessagesModule } from '../messages/messages.module';
 import { ContactsModule } from '../contacts/contacts.module';
@@ -16,6 +17,6 @@ import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-inte
     WhatsAppIntegrationModule,
   ],
   controllers: [WebhookController],
-  providers: [WebhookService],
+  providers: [WebhookService, WhatsAppSignatureGuard],
 })
 export class WebhookModule {}

@@ -241,6 +241,8 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       service = new WhatsappService(
         whatsappIntegrationService,
         tokenCryptoService,
+        // No WHATSAPP_GRAPH_API_VERSION override → the service uses its default.
+        { get: () => undefined } as any,
       );
 
       mockedAxios.post.mockResolvedValue({ data: {} });

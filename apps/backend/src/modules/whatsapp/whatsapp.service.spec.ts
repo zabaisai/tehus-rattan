@@ -35,7 +35,11 @@ describe('WhatsappService', () => {
       accessTokenEncrypted: tokenCryptoService.encrypt('fake-meta-access-token'),
     };
 
-    service = new WhatsappService(whatsappIntegrationService, tokenCryptoService);
+    service = new WhatsappService(
+      whatsappIntegrationService,
+      tokenCryptoService,
+      configService as any,
+    );
   });
 
   it('sends the message using the tenant integration phoneNumberId and the decrypted token', async () => {
