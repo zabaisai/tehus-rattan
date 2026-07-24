@@ -41,8 +41,16 @@ autenticado.
 - Cookie: `httpOnly: true`, `secure: NODE_ENV === 'production'`,
   `sameSite: 'lax'`, `path: '/api/auth'`, `maxAge` 90 días, sin `domain`
   (host-only). `set` y `clear` usan el mismo `path` → el navegador la borra.
-- **Rotación:** cada `/auth/refresh` genera un token nuevo y sobrescribe el hash;
-  el token anterior deja de resolver (rechazado).
+- **Rotación atómica (compare-and-swap):** cada `/auth/refresh` genera un token
+  nuevo. La escritura es un `updateMany` condicionado a `id` + `status ACTIVE` +
+  `refreshTokenHash` **todavía igual** al presentado; si `count !== 1` la rotación
+  perdió la carrera (otra petición ya rotó ese token) y devuelve fallo genérico
+  **sin** sobrescribir el hash ganador ni revocar la sesión. Esto elimina la
+  condición de carrera en la que dos refresh concurrentes con el mismo token
+  ambos tenían éxito y desincronizaban la cookie del hash final en BD. No requiere
+  cambios de modelo Prisma ni migración: Postgres (READ COMMITTED) bloquea la fila
+  en el `UPDATE ... WHERE`, serializando los dos intentos. El token anterior deja
+  de resolver (rechazado).
 - **Revocación inmediata:** `JwtStrategy` valida la `UserSession` por `sid` en
   **cada** request (status ACTIVE, no revocada, no cerrada, no expirada por
   inactividad). Revocar una sesión la invalida al instante.
@@ -67,6 +75,22 @@ autenticado.
 - Cada pestaña mantiene su propio access token en memoria y lo deriva por
   refresh. Al recibir un evento de otra pestaña, limpia su sesión y va a
   `/login`. Degrada a no-op si `BroadcastChannel` no está disponible.
+- **Serialización de refresh entre pestañas (Web Locks API):** además del
+  single-flight `refreshPromise` por pestaña, `refreshWithCrossTabLock`
+  (`lib/axios.ts`) toma el lock exclusivo con nombre estable `tehus-auth-refresh`
+  (`navigator.locks.request`) para que dos pestañas no roten el mismo token en el
+  mismo instante. El lock **solo ordena** los refresh: cada pestaña hace su propia
+  petición y guarda su propio access token en memoria — nunca se comparte un token
+  por el canal ni por el lock.
+- **Fallback seguro:** si Web Locks no está disponible, o si adquirir el lock
+  excede `LOCK_TIMEOUT_MS` (5 s, vía `AbortController`), se degrada a un refresh
+  sin lock. Ese fallback sigue siendo seguro y sin bucles gracias a dos capas:
+  (a) `attemptRefresh` reintenta **una sola vez** ante un 401 recuperable (otra
+  pestaña ya rotó la cookie compartida, así que el reintento usa la cookie ya
+  vigente y tiene éxito); (b) la rotación atómica del backend (§3) garantiza que
+  solo una de las dos peticiones concurrentes consuma el token. Un 401
+  recuperable **no** emite `session-invalidated`; solo dos fallos seguidos (sesión
+  realmente inválida) limpian la sesión y redirigen.
 
 ## 6. Protección Origin / CSRF
 
@@ -77,9 +101,16 @@ autenticado.
   envía.
 - Defensa en profundidad: `CookieOriginGuard` valida el header `Origin` en
   `POST /auth/login|refresh|logout`. Allowlist: `FRONTEND_URL`
-  (+ `http://localhost:3000` en no-producción, o `CSRF_ALLOWED_ORIGINS`). Origin
-  presente y no permitido → **403**; Origin ausente (curl/servidor) → permitido
-  (un navegador siempre envía Origin en un POST CSRF-relevante).
+  (+ `http://localhost:3000` en no-producción, o `CSRF_ALLOWED_ORIGINS`).
+  - Origin presente y no permitido (incluido el literal `"null"` de un origen
+    opaco/sandbox) → **403**.
+  - Origin **ausente**: en `NODE_ENV=production` **falla cerrado** (403) porque
+    login/refresh/logout son endpoints de navegador y un navegador siempre envía
+    Origin en estos POST; en no-producción (dev / E2E) se permite para clientes no
+    browser (curl, supertest) de forma controlada.
+  - En producción, si no hay ningún origen configurado (sin `FRONTEND_URL` ni
+    `CSRF_ALLOWED_ORIGINS`) la allowlist queda vacía y **toda** petición se rechaza
+    — fail-closed deliberado ante mala configuración.
 - `secure` está condicionado a `NODE_ENV === 'production'`: **staging debe
   correr con `NODE_ENV=production`** para que la cookie nunca viaje por HTTP.
 
@@ -89,6 +120,7 @@ autenticado.
 | --- | --- | --- |
 | `secure` en cookie | off (`NODE_ENV != production`) | on |
 | Origins permitidos | `FRONTEND_URL` + `localhost:3000` | `FRONTEND_URL` (+ `CSRF_ALLOWED_ORIGINS`) |
+| Origin ausente en POST de auth | permitido (curl / supertest) | **403** (fail-closed) |
 | Frontend/backend | mismo host `localhost` (puertos distintos) | subdominios `crm-*` / `api.crm-*` (same-site) |
 
 ## 8. Variables de entorno
@@ -104,7 +136,9 @@ Ningún ejemplo contiene secretos reales.
 
 - **Reuse-detection del refresh token:** hoy un token ya rotado (robado) que se
   reintenta devuelve 401 genérico; no mata la cadena de sesión como señal de
-  robo. Recomendado para una fase posterior (con guardia atómica de rotación).
+  robo. La rotación atómica (§3) ya distingue al ganador del perdedor de forma
+  determinista, así que una fase posterior puede construir sobre ella la detección
+  de reuse (matar la cadena) sin reintroducir la condición de carrera.
 - **SameSite=strict** opcional para el refresh (más estricto que `lax`); se
   mantuvo `lax` por compatibilidad, con Origin como defensa adicional.
 - CSP / Helmet / security headers: **fase separada** (no en esta rama).
@@ -129,3 +163,10 @@ valores de tokens):
    a `/login`.
 10. `Network`: `Authorization: Bearer` presente; el refresh token nunca aparece
     en cuerpos JSON.
+11. **Refresh concurrente entre pestañas:** con dos pestañas autenticadas,
+    forzar refresh casi simultáneo (recargar ambas a la vez, o dejar caducar el
+    access token en ambas). Resultado esperado: **ambas** siguen autenticadas, sin
+    expulsión ni bucle de refresh; un refresh adicional en cualquiera funciona
+    (cookie y hash en BD siguen sincronizados). Un refresh **genuinamente**
+    inválido (sesión revocada) sí expulsa. En `Network`, la carrera recuperable no
+    debe disparar redirección a `/login`.
