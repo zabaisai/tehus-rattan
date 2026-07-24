@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { LogOut, Menu } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { logout } from '@/lib/auth';
+import { broadcastAuthEvent } from '@/lib/auth-events';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -24,6 +25,8 @@ export function Header({ onMenuClick }: HeaderProps) {
       // ignored — see comment above
     }
     clearSession();
+    // Tell other tabs of this browser to drop the (now closed) session too.
+    broadcastAuthEvent('logout');
     router.push('/login');
   }
 

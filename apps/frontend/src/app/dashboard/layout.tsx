@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
-import { getMe } from '@/lib/auth';
+import { AuthGate } from '@/components/auth/AuthGate';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function DashboardLayout({
@@ -12,11 +12,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // AuthGate waits for the client-side bootstrap: it only renders the shell
+  // once the session is confirmed authenticated (otherwise a loader, or a
+  // redirect to /login for anonymous). No token is read from storage here.
+  return (
+    <AuthGate>
+      <DashboardShell>{children}</DashboardShell>
+    </AuthGate>
+  );
+}
+
+function DashboardShell({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
-  const setSession = useAuthStore((s) => s.setSession);
-  const clearSession = useAuthStore((s) => s.clearSession);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const isPlatformSuperAdmin =
@@ -24,41 +33,13 @@ export default function DashboardLayout({
   const isOnPlatformRoute = pathname.startsWith('/dashboard/platform');
 
   useEffect(() => {
-    if (user) return;
-
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    if (!token) {
-      router.push('/login');
-      return;
-    }
-
-    getMe()
-      .then((freshUser) => {
-        setSession(freshUser, token);
-      })
-      .catch(() => {
-        clearSession();
-        router.push('/login');
-      });
-  }, [user, router, setSession, clearSession]);
-
-  useEffect(() => {
-    // A global SUPER_ADMIN has no companyId, so every normal CRM page
-    // (dashboard home, contacts, leads, tasks, ...) fires business queries
-    // that assume a real company and 500 silently. Keep them confined to
-    // /dashboard/platform/* instead of letting those pages ever mount.
+    // A global SUPER_ADMIN has no companyId, so every normal CRM page fires
+    // business queries that assume a real company and 500 silently. Keep them
+    // confined to /dashboard/platform/* instead of letting those pages mount.
     if (isPlatformSuperAdmin && !isOnPlatformRoute) {
       router.replace('/dashboard/platform/companies');
     }
   }, [isPlatformSuperAdmin, isOnPlatformRoute, router]);
-
-  if (!user) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-stone-50">
-        <p className="text-sm text-stone-500">Cargando...</p>
-      </div>
-    );
-  }
 
   if (isPlatformSuperAdmin && !isOnPlatformRoute) {
     return (
