@@ -5,6 +5,7 @@ import { MessagesService } from '../messages/messages.service';
 import { ContactsService } from '../contacts/contacts.service';
 import { AutomationsService } from '../automations/automations.service';
 import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-integration.service';
+import { maskPhone } from '../../common/logging/redact';
 
 @Injectable()
 export class WebhookService {
@@ -136,6 +137,6 @@ export class WebhookService {
       message.from,
     );
 
-    this.logger.log(`Mensaje procesado de ${message.from}`);
+    this.logger.log(`Mensaje procesado de ${maskPhone(message.from)}`);
   }
 }

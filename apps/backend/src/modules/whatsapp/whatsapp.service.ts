@@ -10,6 +10,7 @@ import axios from 'axios';
 import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-integration.service';
 import { WhatsAppTokenCryptoService } from '../whatsapp-integration/whatsapp-token-crypto.service';
 import { GRAPH_API_VERSION_FORMAT } from '../../common/config/env.validation';
+import { maskPhone } from '../../common/logging/redact';
 
 @Injectable()
 export class WhatsappService {
@@ -69,7 +70,7 @@ export class WhatsappService {
           },
         },
       );
-      this.logger.log(`Mensaje enviado a ${to}`);
+      this.logger.log(`Mensaje enviado a ${maskPhone(to)}`);
       return response.data?.messages?.[0]?.id as string | undefined;
     } catch (error) {
       const status = axios.isAxiosError(error)
