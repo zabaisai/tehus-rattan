@@ -11,11 +11,13 @@ import { REMISSION_PAYMENT_METHOD_SUGGESTIONS } from '@/lib/document-templates';
 import {
   DocumentTransport,
   DocumentReceiver,
+  DocumentCompanyIdentity,
   DocumentItem,
   RemissionMeta,
 } from '@/types/documents';
 
 interface RemissionTemplateProps {
+  company: DocumentCompanyIdentity;
   meta: RemissionMeta;
   onMetaChange: (meta: RemissionMeta) => void;
   transport: DocumentTransport;
@@ -29,6 +31,7 @@ interface RemissionTemplateProps {
 }
 
 export function RemissionTemplate({
+  company,
   meta,
   onMetaChange,
   transport,
@@ -46,6 +49,7 @@ export function RemissionTemplate({
   return (
     <div>
       <DocumentHeader
+        company={company}
         title="Remisión"
         fields={[
           {
@@ -131,13 +135,14 @@ export function RemissionTemplate({
         />
       </div>
 
-      <DocumentTermsAndConditions />
+      <DocumentTermsAndConditions terms={company.quoteFooter} />
       <DocumentSignatureBlock
         variant="single"
+        companyName={company.name}
         receiverName={receiver.name}
         onReceiverNameChange={(v) => onReceiverChange({ ...receiver, name: v })}
       />
-      <DocumentFooter />
+      <DocumentFooter company={company} />
     </div>
   );
 }

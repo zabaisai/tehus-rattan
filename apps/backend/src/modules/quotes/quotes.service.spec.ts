@@ -229,6 +229,63 @@ describe('QuotesService', () => {
         NotFoundException,
       );
     });
+
+    it("includes the owning company's fiscal identity (for the printable document)", async () => {
+      prisma.quote.findFirst.mockResolvedValue({ id: 'quote-1', companyId });
+
+      await service.findById('quote-1', companyId);
+
+      const args = prisma.quote.findFirst.mock.calls[0][0];
+      // Isolation: always scoped by both id AND companyId.
+      expect(args.where).toEqual({ id: 'quote-1', companyId });
+      // The company relation is included with an explicit fiscal/identity
+      // select so the print view renders the quote's OWNER, not the viewer.
+      expect(args.include.company).toBeDefined();
+      const select = args.include.company.select;
+      expect(select).toEqual(
+        expect.objectContaining({
+          name: true,
+          legalName: true,
+          taxId: true,
+          email: true,
+          phone: true,
+          address: true,
+          city: true,
+          country: true,
+          website: true,
+          logoUrl: true,
+          quoteFooter: true,
+        }),
+      );
+    });
+
+    it('returns the company identity of the quote owner (Empresa A never gets Empresa B data)', async () => {
+      const companyAIdentity = {
+        id: companyId,
+        name: 'Empresa A',
+        legalName: 'Empresa A S.A.S',
+        taxId: 'A-111',
+        email: 'a@empresa-a.test',
+        phone: '+571111',
+        address: 'Calle A',
+        city: 'Ciudad A',
+        country: 'País A',
+        website: null,
+        logoUrl: null,
+        quoteFooter: null,
+      };
+      prisma.quote.findFirst.mockResolvedValue({
+        id: 'quote-1',
+        companyId,
+        company: companyAIdentity,
+      });
+
+      const result = await service.findById('quote-1', companyId);
+
+      expect(result.company).toEqual(companyAIdentity);
+      expect(result.company.taxId).toBe('A-111');
+      expect(JSON.stringify(result)).not.toContain('Empresa B');
+    });
   });
 
   describe('update', () => {

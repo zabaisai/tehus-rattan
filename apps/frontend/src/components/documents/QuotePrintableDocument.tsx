@@ -9,7 +9,8 @@ import { DocumentTermsAndConditions } from './DocumentTermsAndConditions';
 import { DocumentSignatureBlock } from './DocumentSignatureBlock';
 import { DocumentFooter } from './DocumentFooter';
 import { Quote, LeadDetail } from '@/types';
-import { DocumentItem } from '@/types/documents';
+import { DocumentCompanyIdentity, DocumentItem } from '@/types/documents';
+import { toDocumentCompanyIdentity } from '@/lib/document-company';
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return '';
@@ -36,6 +37,14 @@ interface QuotePrintableDocumentProps {
 // Remisión aren't wired to any real data source yet (only quotes exist on
 // the backend), so this only ever renders the sale-invoice layout.
 export function QuotePrintableDocument({ quote, lead }: QuotePrintableDocumentProps) {
+  // The document renders the identity of the company that OWNS the quote
+  // (resolved server-side and returned on GET /quotes/:id), never the viewer's
+  // own company or a hardcoded footer. The only name fallback is the owning
+  // company's registered name, which is always present.
+  const company: DocumentCompanyIdentity = quote.company
+    ? toDocumentCompanyIdentity(quote.company)
+    : { name: '' };
+
   // QuoteItem is already the snapshot taken when the quote was created —
   // reading it here, never the live Product, is what keeps a sent quote
   // showing what the client actually saw even if the catalog changes later.
@@ -65,6 +74,7 @@ export function QuotePrintableDocument({ quote, lead }: QuotePrintableDocumentPr
     <PrintableDocumentShell>
       <DocumentHeader
         readOnly
+        company={company}
         title="Cotización"
         fields={[
           { label: 'Número', value: quote.number, onChange: noop },
@@ -107,9 +117,9 @@ export function QuotePrintableDocument({ quote, lead }: QuotePrintableDocumentPr
         </div>
       )}
 
-      <DocumentTermsAndConditions />
-      <DocumentSignatureBlock variant="dual" />
-      <DocumentFooter />
+      <DocumentTermsAndConditions terms={company.quoteFooter} />
+      <DocumentSignatureBlock variant="dual" companyName={company.name} />
+      <DocumentFooter company={company} />
     </PrintableDocumentShell>
   );
 }

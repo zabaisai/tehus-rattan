@@ -9,6 +9,26 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 const LEAD_SELECT = { id: true, title: true, status: true };
 
+// Curated fiscal/identity fields of the quote's OWNING company, so the
+// printable document renders the company that owns the quote (resolved
+// server-side, isolated by companyId) rather than the viewer's company or a
+// hardcoded footer. Never selects secrets — Company has none, but we still
+// list fields explicitly instead of returning the whole row.
+const COMPANY_IDENTITY_SELECT = {
+  id: true,
+  name: true,
+  legalName: true,
+  taxId: true,
+  email: true,
+  phone: true,
+  address: true,
+  city: true,
+  country: true,
+  website: true,
+  logoUrl: true,
+  quoteFooter: true,
+} as const;
+
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
@@ -35,6 +55,7 @@ export class QuotesService {
       include: {
         lead: { select: LEAD_SELECT },
         items: { orderBy: { createdAt: 'asc' } },
+        company: { select: COMPANY_IDENTITY_SELECT },
       },
     });
     if (!quote) throw new NotFoundException('Cotización no encontrada');
