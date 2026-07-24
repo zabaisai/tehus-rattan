@@ -40,7 +40,8 @@ Controllers use two patterns:
 | Products | write endpoints | JWT + RolesGuard | `ADMIN`, `SUPER_ADMIN` | JWT `companyId` |
 | Products | read endpoints | JWT + RolesGuard | Any authenticated role when no method `@Roles` is present | JWT `companyId` |
 | Analytics | `/analytics/*` | JWT + RolesGuard | `ADMIN`, `SUPER_ADMIN` | JWT `companyId` |
-| Webhook | `/webhook/*` | Public | None | Resolved from WhatsApp `phone_number_id` |
+| Webhook | `POST /webhook` | Public + `WhatsAppSignatureGuard` | X-Hub-Signature-256 HMAC (Meta App Secret) | Resolved from WhatsApp `phone_number_id` |
+| Webhook | `GET /webhook` | Public | Verify token (`hub.verify_token`) | Meta handshake |
 | WhatsApp Integrations | `GET /whatsapp-integrations/me` | JWT | Any authenticated role | JWT `companyId` |
 | WhatsApp Integrations | `PUT /whatsapp-integrations/me`, `POST /whatsapp-integrations/me/disconnect` | JWT + RolesGuard | `ADMIN`, `SUPER_ADMIN` | JWT `companyId` |
 
@@ -52,6 +53,7 @@ Controllers use two patterns:
 - Current product behavior allows `AGENT` users to operate contacts, conversations, notes, leads, and tasks within their company.
 - Changing `AGENT` capabilities is a business decision and is not part of the current stabilization changes.
 - WhatsApp integration responses never include `accessToken` or `accessTokenEncrypted`, regardless of role.
+- Public endpoints are rate-limited (`@nestjs/throttler`, global `ThrottlerGuard`): strict on login/refresh/onboarding, high on the webhook, health exempt. `POST /webhook` additionally requires a valid Meta X-Hub-Signature-256 (fail-closed). See `docs/WEBHOOK_SECURITY.md`.
 - Company fiscal identity (`legalName`, `taxId`, `address`, `quoteFooter`) is edited only via `PATCH /companies/me` (`ADMIN`/`SUPER_ADMIN`, JWT `companyId`). `GET /quotes/:id` returns the quote's **owning** company identity (isolated by `where: { id, companyId }`) so a quote never carries another company's fiscal data. See `docs/COMPANY_FISCAL_IDENTITY.md`.
 
 ## Recently Stabilized Ownership Checks

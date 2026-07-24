@@ -39,7 +39,7 @@ Relación 1:1 con `Company` (`companyId` es único).
 2. `WhatsappService` busca la integración conectada de esa empresa vía `WhatsAppIntegrationService.findConnectedByCompanyId(companyId)`.
 3. Si no hay integración conectada, o le falta `accessTokenEncrypted`, se lanza `NotFoundException('WhatsApp no conectado para esta empresa')` — no se realiza ninguna llamada a Meta.
 4. Se descifra `accessTokenEncrypted` (ver sección 5) para obtener el token real.
-5. Se envía el mensaje a `https://graph.facebook.com/v19.0/{phoneNumberId}/messages` usando el `phoneNumberId` de **esa** integración y `Authorization: Bearer <token descifrado>`.
+5. Se envía el mensaje a `https://graph.facebook.com/{WHATSAPP_GRAPH_API_VERSION}/{phoneNumberId}/messages` (versión configurable por entorno, default `v19.0`; ver [`docs/WEBHOOK_SECURITY.md`](./WEBHOOK_SECURITY.md)) usando el `phoneNumberId` de **esa** integración y `Authorization: Bearer <token descifrado>`.
 6. Ya **no** se usan `WHATSAPP_PHONE_NUMBER_ID` ni `WHATSAPP_TOKEN` globales en ningún punto del envío.
 
 ## 5. Endpoints de gestión
@@ -148,7 +148,7 @@ npm run build             # OK
 - Ya **no** falta un endpoint/admin básico para registrar o actualizar una integración por empresa — cubierto por `GET/PUT /whatsapp-integrations/me` y `POST /whatsapp-integrations/me/disconnect` (ver sección 5).
 - Todavía falta UI en el frontend para conectar/desconectar WhatsApp por empresa.
 - Todavía falta el proceso de onboarding real con Meta (Embedded Signup u otro flujo de alta de número).
-- Todavía falta validar la firma `X-Hub-Signature-256` de los webhooks entrantes de Meta.
+- ~~Todavía falta validar la firma `X-Hub-Signature-256`~~ — **hecho** en la Fase 2A de seguridad: el `POST /webhook` valida la firma HMAC-SHA256 con el App Secret de Meta (ver [`docs/WEBHOOK_SECURITY.md`](./WEBHOOK_SECURITY.md)).
 - Todavía falta probar contra un número de WhatsApp real — todo lo actual está cubierto con mocks/fixtures ficticias, nunca con Meta real.
 - El verify token (`WHATSAPP_VERIFY_TOKEN`) sigue siendo global, no por integración.
 - `POST /me/disconnect` actualmente solo marca `status: DISCONNECTED` localmente — no revoca ni desconecta nada del lado de Meta.
