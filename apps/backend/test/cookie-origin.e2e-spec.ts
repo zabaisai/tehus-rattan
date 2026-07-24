@@ -9,8 +9,7 @@ import { CookieOriginGuard } from '../src/common/guards/cookie-origin.guard';
 const ALLOWED_ORIGIN = 'https://crm-staging.tehusrattan.com';
 
 // AuthService is fully mocked — this only proves the CookieOriginGuard is wired
-// on the cookie-based auth POSTs and that it allows the configured origin,
-// rejects a foreign one, and allows a missing Origin (non-browser clients).
+// on the cookie-based auth POSTs and enforces the Origin policy.
 const authServiceMock = {
   login: jest.fn().mockResolvedValue({
     refreshToken: 'opaque-refresh',
@@ -20,67 +19,101 @@ const authServiceMock = {
   logout: jest.fn().mockResolvedValue(undefined),
 };
 
-describe('CookieOriginGuard on auth endpoints (e2e)', () => {
-  let app: INestApplication;
-
-  beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({
-      controllers: [AuthController],
-      providers: [
-        CookieOriginGuard,
-        { provide: AuthService, useValue: authServiceMock },
-        {
-          provide: ConfigService,
-          useValue: {
-            get: (key: string) =>
-              ({ FRONTEND_URL: ALLOWED_ORIGIN, NODE_ENV: 'production' } as Record<string, string>)[key],
-          },
+async function buildApp(nodeEnv: string): Promise<INestApplication> {
+  const moduleRef = await Test.createTestingModule({
+    controllers: [AuthController],
+    providers: [
+      CookieOriginGuard,
+      { provide: AuthService, useValue: authServiceMock },
+      {
+        provide: ConfigService,
+        useValue: {
+          get: (key: string) =>
+            ({ FRONTEND_URL: ALLOWED_ORIGIN, NODE_ENV: nodeEnv } as Record<string, string>)[key],
         },
-      ],
-    }).compile();
+      },
+    ],
+  }).compile();
 
-    app = moduleRef.createNestApplication();
-    app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
-    await app.init();
+  const app = moduleRef.createNestApplication();
+  app.setGlobalPrefix('api');
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+  await app.init();
+  return app;
+}
+
+const creds = { email: 'a@co.test', password: 'secret123' };
+
+describe('CookieOriginGuard on auth endpoints (e2e)', () => {
+  describe('non-production (dev / E2E): missing Origin tolerated', () => {
+    let app: INestApplication;
+    beforeAll(async () => (app = await buildApp('development')));
+    afterAll(async () => await app.close());
+    beforeEach(() => jest.clearAllMocks());
+
+    it('allows POST /api/auth/login from the configured Origin', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set('Origin', ALLOWED_ORIGIN)
+        .send(creds)
+        .expect(201);
+      expect(authServiceMock.login).toHaveBeenCalled();
+    });
+
+    it('rejects a foreign Origin with 403 and never calls the service', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set('Origin', 'https://evil.example.com')
+        .send(creds)
+        .expect(403);
+      expect(authServiceMock.login).not.toHaveBeenCalled();
+    });
+
+    it('rejects the literal Origin "null" with 403', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set('Origin', 'null')
+        .send(creds)
+        .expect(403);
+    });
+
+    it('allows a request with no Origin header (curl / server-to-server)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send(creds)
+        .expect(201);
+      expect(authServiceMock.login).toHaveBeenCalled();
+    });
+
+    it('rejects POST /api/auth/logout from a foreign Origin', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/logout')
+        .set('Origin', 'https://evil.example.com')
+        .expect(403);
+      expect(authServiceMock.logout).not.toHaveBeenCalled();
+    });
   });
 
-  afterAll(async () => await app.close());
-  beforeEach(() => jest.clearAllMocks());
+  describe('production: fail-closed on missing Origin', () => {
+    let app: INestApplication;
+    beforeAll(async () => (app = await buildApp('production')));
+    afterAll(async () => await app.close());
+    beforeEach(() => jest.clearAllMocks());
 
-  const creds = { email: 'a@co.test', password: 'secret123' };
+    it('rejects a browser POST with no Origin in production (403)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .send(creds)
+        .expect(403);
+      expect(authServiceMock.login).not.toHaveBeenCalled();
+    });
 
-  it('allows POST /api/auth/login from the configured Origin', async () => {
-    await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .set('Origin', ALLOWED_ORIGIN)
-      .send(creds)
-      .expect(201);
-    expect(authServiceMock.login).toHaveBeenCalled();
-  });
-
-  it('rejects POST /api/auth/login from a foreign Origin with 403 and never calls the service', async () => {
-    await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .set('Origin', 'https://evil.example.com')
-      .send(creds)
-      .expect(403);
-    expect(authServiceMock.login).not.toHaveBeenCalled();
-  });
-
-  it('allows a request with no Origin header (curl / server-to-server)', async () => {
-    await request(app.getHttpServer())
-      .post('/api/auth/login')
-      .send(creds)
-      .expect(201);
-    expect(authServiceMock.login).toHaveBeenCalled();
-  });
-
-  it('rejects POST /api/auth/logout from a foreign Origin', async () => {
-    await request(app.getHttpServer())
-      .post('/api/auth/logout')
-      .set('Origin', 'https://evil.example.com')
-      .expect(403);
-    expect(authServiceMock.logout).not.toHaveBeenCalled();
+    it('still allows the configured Origin in production', async () => {
+      await request(app.getHttpServer())
+        .post('/api/auth/login')
+        .set('Origin', ALLOWED_ORIGIN)
+        .send(creds)
+        .expect(201);
+    });
   });
 });

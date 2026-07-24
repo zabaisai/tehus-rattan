@@ -147,20 +147,29 @@ describe('axios refresh interceptor', () => {
     expect(mockedPost).not.toHaveBeenCalled();
   });
 
-  it('a failed refresh clears the local session and never retries indefinitely', async () => {
-    mockedPost.mockRejectedValue(new Error('refresh failed'));
-    const originalLocation = window.location;
-    // jsdom's window.location.href assignment doesn't actually navigate,
-    // but it does throw "Not implemented" noise — stub it so the
-    // assertion below can observe the attempted redirect cleanly.
+  function stubLocation() {
+    const original = window.location;
     Reflect.deleteProperty(window, 'location');
     Object.defineProperty(window, 'location', {
-      value: { ...originalLocation, href: '' },
+      value: { ...original, href: '', pathname: '/dashboard' },
       writable: true,
       configurable: true,
     });
+    return () =>
+      Object.defineProperty(window, 'location', {
+        value: original,
+        writable: true,
+        configurable: true,
+      });
+  }
 
-    localStorage.setItem('token', 'stale-token');
+  const refreshCallCount = () =>
+    mockedPost.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/auth/refresh')).length;
+
+  it('a genuinely invalid refresh (two failures) clears the session and redirects — bounded, no loop', async () => {
+    // Both attempts fail → session is really gone.
+    mockedPost.mockRejectedValue(new Error('refresh failed'));
+    const restore = stubLocation();
 
     const { default: api } = await import('./axios');
     const handler = getResponseErrorHandler(api);
@@ -168,18 +177,30 @@ describe('axios refresh interceptor', () => {
     await handler(buildAxiosError('/platform/companies')).catch(() => {});
 
     expect(window.location.href).toContain('/login');
-    // Only the one refresh attempt — a failed refresh must not retry the
-    // original request or loop.
-    const refreshCalls = mockedPost.mock.calls.filter((call: unknown[]) =>
-      String(call[0]).includes('/auth/refresh'),
-    );
-    expect(refreshCalls).toHaveLength(1);
+    // Exactly one initial attempt + one recovery retry, then it gives up — no
+    // unbounded loop.
+    expect(refreshCallCount()).toBe(2);
+    restore();
+  });
 
-    Object.defineProperty(window, 'location', {
-      value: originalLocation,
-      writable: true,
-      configurable: true,
-    });
+  it('a recoverable race (refresh 401 then 200) refreshes without logging out', async () => {
+    // First attempt fails (token spent by another tab), retry with the
+    // now-current cookie succeeds → NO session-invalidated, NO redirect.
+    mockedPost
+      .mockRejectedValueOnce(new Error('token already rotated'))
+      .mockResolvedValueOnce({ data: { token: 'recovered-token' } });
+    const restore = stubLocation();
+
+    const { default: api } = await import('./axios');
+    const { getAccessToken } = await import('./auth-token');
+    const handler = getResponseErrorHandler(api);
+
+    await handler(buildAxiosError('/platform/companies')).catch(() => {});
+
+    expect(window.location.href).not.toContain('/login');
+    expect(getAccessToken()).toBe('recovered-token');
+    expect(refreshCallCount()).toBe(2);
+    restore();
   });
 
   it('retries the original request at most once even if the retry also 401s', async () => {
@@ -197,5 +218,63 @@ describe('axios refresh interceptor', () => {
 
     await expect(handler(alreadyRetried)).rejects.toBeDefined();
     expect(mockedPost).not.toHaveBeenCalled();
+  });
+
+  describe('cross-tab refresh coordination (Web Locks)', () => {
+    it('serializes refresh through the Web Locks API when available', async () => {
+      const requestMock = vi.fn(async (name: string, _opts: unknown, cb: () => Promise<unknown>) => cb());
+      Object.defineProperty(navigator, 'locks', {
+        value: { request: requestMock },
+        writable: true,
+        configurable: true,
+      });
+      mockedPost.mockResolvedValue({ data: { token: 'locked-token' } });
+
+      const { refreshAccessToken } = await import('./axios');
+      const token = await refreshAccessToken();
+
+      expect(token).toBe('locked-token');
+      // Acquired the stable cross-tab lock name, exclusively, with a timeout signal.
+      expect(requestMock).toHaveBeenCalledTimes(1);
+      expect(requestMock.mock.calls[0][0]).toBe('tehus-auth-refresh');
+      expect(requestMock.mock.calls[0][1]).toMatchObject({ mode: 'exclusive' });
+
+      Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'locks');
+    });
+
+    it('falls back to an unlocked refresh when Web Locks is unavailable (no loop)', async () => {
+      // Ensure no Web Locks on navigator.
+      Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'locks');
+      mockedPost.mockResolvedValue({ data: { token: 'fallback-token' } });
+
+      const { refreshAccessToken } = await import('./axios');
+      const token = await refreshAccessToken();
+
+      expect(token).toBe('fallback-token');
+      expect(refreshCallCount()).toBe(1);
+    });
+
+    it('falls back to an unlocked refresh if acquiring the lock times out (abort)', async () => {
+      // A lock manager that rejects with an AbortError (as a timeout would).
+      const requestMock = vi.fn(async (_n: string, opts: { signal?: AbortSignal }) => {
+        const err = new DOMException('aborted', 'AbortError');
+        // Simulate the abort path.
+        if (opts?.signal) throw err;
+        throw err;
+      });
+      Object.defineProperty(navigator, 'locks', {
+        value: { request: requestMock },
+        writable: true,
+        configurable: true,
+      });
+      mockedPost.mockResolvedValue({ data: { token: 'after-timeout-token' } });
+
+      const { refreshAccessToken } = await import('./axios');
+      const token = await refreshAccessToken();
+
+      // Lock failed → unlocked refresh still succeeded.
+      expect(token).toBe('after-timeout-token');
+      Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'locks');
+    });
   });
 });

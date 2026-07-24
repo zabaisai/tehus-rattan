@@ -28,9 +28,25 @@ describe('CookieOriginGuard', () => {
     );
   });
 
-  it('allows a request with no Origin header (curl / server-to-server)', () => {
+  it('rejects the literal Origin "null" (opaque/sandboxed origin) with 403', () => {
     const guard = guardWith({ FRONTEND_URL: 'https://crm-staging.tehusrattan.com', NODE_ENV: 'production' });
+    expect(() => guard.canActivate(ctx('null'))).toThrow(ForbiddenException);
+  });
+
+  it('allows a missing Origin in non-production (curl / supertest)', () => {
+    const guard = guardWith({ FRONTEND_URL: 'https://crm.example.com', NODE_ENV: 'development' });
     expect(guard.canActivate(ctx(undefined))).toBe(true);
+  });
+
+  it('fails closed on a missing Origin in production (browser endpoints always send Origin)', () => {
+    const guard = guardWith({ FRONTEND_URL: 'https://crm.example.com', NODE_ENV: 'production' });
+    expect(() => guard.canActivate(ctx(undefined))).toThrow(ForbiddenException);
+  });
+
+  it('fails closed in production when no allowed origins are configured (no FRONTEND_URL)', () => {
+    const guard = guardWith({ NODE_ENV: 'production' });
+    expect(() => guard.canActivate(ctx('https://crm.example.com'))).toThrow(ForbiddenException);
+    expect(() => guard.canActivate(ctx(undefined))).toThrow(ForbiddenException);
   });
 
   it('allows http://localhost:3000 in non-production only', () => {
