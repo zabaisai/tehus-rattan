@@ -13,9 +13,9 @@
 # deploy.sh — it only ever runs when a human runs it deliberately.
 set -euo pipefail
 
-COMPOSE_FILE="docker-compose.staging.yml"
-ENV_FILE=".env.staging"
-BACKUP_DIR="/opt/tehus-crm/backups"
+COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.staging.yml}"
+ENV_FILE="${ENV_FILE:-.env.staging}"
+BACKUP_DIR="${BACKUP_DIR:-/opt/tehus-crm/backups}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -40,6 +40,18 @@ BACKUP_PATH="$BACKUP_DIR/$BACKUP_NAME"
 if [ ! -f "$BACKUP_PATH" ]; then
   echo "ERROR: backup not found: $BACKUP_PATH" >&2
   exit 1
+fi
+
+# Integrity gate: if a .sha256 sidecar exists, the backup MUST match it before
+# we touch any database — a corrupted/truncated dump must never be restored.
+if [ -f "$BACKUP_PATH.sha256" ]; then
+  echo "Verifying checksum..."
+  if ! ( cd "$BACKUP_DIR" && sha256sum -c "$BACKUP_NAME.sha256" ); then
+    echo "ERROR: checksum verification FAILED for $BACKUP_NAME — aborting restore." >&2
+    exit 1
+  fi
+else
+  echo "WARN: no $BACKUP_NAME.sha256 sidecar found — restoring without an integrity check." >&2
 fi
 if [ ! -f "$ENV_FILE" ]; then
   echo "ERROR: $ENV_FILE not found" >&2
