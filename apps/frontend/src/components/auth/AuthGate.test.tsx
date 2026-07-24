@@ -7,8 +7,10 @@ const replace = vi.fn();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace, push: vi.fn() }),
 }));
+// The unavailable screen pulls in retryBootstrap; stub it so the render is inert.
+vi.mock('@/lib/auth-bootstrap', () => ({ retryBootstrap: vi.fn() }));
 
-function setStatus(status: 'bootstrapping' | 'authenticated' | 'anonymous') {
+function setStatus(status: 'bootstrapping' | 'authenticated' | 'anonymous' | 'unavailable') {
   useAuthStore.setState({ status });
 }
 
@@ -48,6 +50,19 @@ describe('AuthGate', () => {
       </AuthGate>,
     );
     expect(screen.getByText('PRIVATE')).toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('when unavailable, shows a retry screen — not private content, not a redirect to /login', () => {
+    setStatus('unavailable');
+    render(
+      <AuthGate>
+        <div>PRIVATE</div>
+      </AuthGate>,
+    );
+    expect(screen.queryByText('PRIVATE')).not.toBeInTheDocument();
+    expect(screen.getByText('Reintentar')).toBeInTheDocument();
+    expect(screen.getByText('No pudimos conectar con el servidor')).toBeInTheDocument();
     expect(replace).not.toHaveBeenCalled();
   });
 });
