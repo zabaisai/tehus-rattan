@@ -1,30 +1,29 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 import { useAuthStore } from "@/store/auth.store";
-import { User } from "@/types";
+import { getAccessToken, setAccessToken } from "@/lib/auth-token";
+import { broadcastAuthEvent } from "@/lib/auth-events";
 
 const api = axios.create({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
-  // Needed so the httpOnly device-id/refresh-token cookies set by the
-  // backend (see apps/backend/src/modules/sessions) actually travel on
-  // cross-origin requests (frontend and backend are different
-  // subdomains in staging). Auth itself is unaffected — the JWT still
-  // travels only as an Authorization: Bearer header, never a cookie.
+  // Needed so the httpOnly device-id/refresh-token cookies set by the backend
+  // (see apps/backend/src/modules/sessions) travel on requests. The access JWT
+  // itself is NOT a cookie — it travels only as an Authorization: Bearer header
+  // and lives only in tab memory (lib/auth-token.ts).
   withCredentials: true,
 });
 
+// Attach the in-memory access token. Never reads localStorage/cookies.
 api.interceptors.request.use((config) => {
-  const token =
-    typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-// Requests to these never trigger a silent refresh on 401 — a failed login
-// is a real credentials error (not an expired access token), a failed
-// refresh must not try to refresh itself, and onboarding is a public,
-// pre-authentication flow.
+// Requests to these never trigger a silent refresh on 401 — a failed login is
+// a real credentials error (not an expired access token), a failed refresh must
+// not try to refresh itself, and onboarding is a public pre-auth flow.
 const NO_REFRESH_PATHS = ["/auth/login", "/auth/refresh", "/auth/logout", "/onboarding"];
 
 function shouldSkipRefresh(url: string | undefined): boolean {
@@ -32,44 +31,48 @@ function shouldSkipRefresh(url: string | undefined): boolean {
   return NO_REFRESH_PATHS.some((path) => url.includes(path));
 }
 
-function clearSessionAndRedirect() {
+let redirected = false;
+function handleSessionInvalidated() {
   if (typeof window === "undefined") return;
   useAuthStore.getState().clearSession();
-  window.location.href = "/login";
+  // Tell other tabs their session is gone too.
+  broadcastAuthEvent("session-invalidated");
+  // Redirect at most once, and never away from the login page itself.
+  if (!redirected && window.location.pathname !== "/login") {
+    redirected = true;
+    window.location.href = "/login";
+  }
 }
 
-// Shared across every concurrent 401 — the first one to hit this creates
-// the promise and starts the real POST /auth/refresh; every other request
-// that 401s while it's in flight awaits this SAME promise instead of
-// firing its own refresh (which would each rotate the one-use refresh
-// token and race each other). Cleared once the attempt settles, so the
-// next 401 after that starts a fresh one.
+// Shared across every concurrent 401 in this tab — the first to hit this creates
+// the promise and starts the real POST /auth/refresh; every other request that
+// 401s while it is in flight awaits this SAME promise instead of firing its own
+// refresh (which would each rotate the one-use refresh token and race). Cleared
+// once the attempt settles, so the next 401 after that starts a fresh one.
 let refreshPromise: Promise<string | null> | null = null;
 
 async function performRefresh(): Promise<string | null> {
   try {
-    const { data } = await axios.post<{
-      token: string;
-      user: { id: string; email: string; name: string };
-    }>(`${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`, undefined, {
-      withCredentials: true,
-    });
-
-    // Reuses the existing auth store mechanism, but deliberately keeps
-    // whatever full user (with role/companyId) is already in the store
-    // rather than the refresh response's user — that response only ever
-    // carries {id, email, name} (see AuthService.issueSession), and
-    // overwriting a real role/companyId with undefined would silently
-    // break every role-gated check in the app until the next full reload.
-    // The fallback (no user in the store yet) is provisional — the next
-    // guarded page load already re-fetches /auth/me regardless.
-    const currentUser = useAuthStore.getState().user;
-    useAuthStore.getState().setSession(currentUser ?? (data.user as User), data.token);
-
+    const { data } = await axios.post<{ token: string }>(
+      `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
+      undefined,
+      { withCredentials: true },
+    );
+    setAccessToken(data.token);
     return data.token;
   } catch {
     return null;
   }
+}
+
+// Exposed so the bootstrap flow reuses the exact same single-flight refresh.
+export function refreshAccessToken(): Promise<string | null> {
+  if (!refreshPromise) {
+    refreshPromise = performRefresh().finally(() => {
+      refreshPromise = null;
+    });
+  }
+  return refreshPromise;
 }
 
 api.interceptors.response.use(
@@ -88,21 +91,14 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
-    // Ensures this exact request is retried at most once, even if the
-    // retried attempt also comes back 401 (session genuinely gone) — it
-    // will fall through to the branch above instead of looping.
+    // Retry this exact request at most once — if the retried attempt also 401s
+    // (session genuinely gone) it falls through above instead of looping.
     originalRequest._retry = true;
 
-    if (!refreshPromise) {
-      refreshPromise = performRefresh().finally(() => {
-        refreshPromise = null;
-      });
-    }
-
-    const newToken = await refreshPromise;
+    const newToken = await refreshAccessToken();
 
     if (!newToken) {
-      clearSessionAndRedirect();
+      handleSessionInvalidated();
       return Promise.reject(error);
     }
 

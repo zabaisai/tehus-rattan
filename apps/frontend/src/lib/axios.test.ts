@@ -36,6 +36,17 @@ function getResponseErrorHandler(api: AxiosInstance) {
   return manager.handlers[manager.handlers.length - 1].rejected;
 }
 
+function getRequestHandler(api: AxiosInstance) {
+  const manager = api.interceptors.request as unknown as {
+    handlers: Array<{
+      fulfilled: (
+        config: InternalAxiosRequestConfig,
+      ) => InternalAxiosRequestConfig;
+    }>;
+  };
+  return manager.handlers[0].fulfilled;
+}
+
 describe('axios refresh interceptor', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -45,6 +56,46 @@ describe('axios refresh interceptor', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('attaches the Authorization header from the in-memory token, never localStorage', async () => {
+    // Import axios and its auth-token from the SAME (post-reset) module graph.
+    const { default: api } = await import('./axios');
+    const { setAccessToken } = await import('./auth-token');
+    const requestHandler = getRequestHandler(api);
+
+    // A stale localStorage token must be ignored entirely.
+    localStorage.setItem('token', 'stale-localStorage-token');
+    setAccessToken('memory-token');
+
+    const config = { headers: {} } as InternalAxiosRequestConfig;
+    const result = requestHandler(config);
+
+    expect(result.headers.Authorization).toBe('Bearer memory-token');
+    expect(String(result.headers.Authorization)).not.toContain('stale-localStorage-token');
+  });
+
+  it('sends no Authorization header when there is no in-memory token', async () => {
+    const { default: api } = await import('./axios');
+    const requestHandler = getRequestHandler(api);
+
+    const config = { headers: {} } as InternalAxiosRequestConfig;
+    const result = requestHandler(config);
+
+    expect(result.headers.Authorization).toBeUndefined();
+  });
+
+  it('a successful refresh stores the new token in memory (not in localStorage)', async () => {
+    mockedPost.mockResolvedValue({ data: { token: 'refreshed-token' } });
+
+    const { default: api } = await import('./axios');
+    const { getAccessToken } = await import('./auth-token');
+    const handler = getResponseErrorHandler(api);
+
+    await handler(buildAxiosError('/platform/companies')).catch(() => {});
+
+    expect(getAccessToken()).toBe('refreshed-token');
+    expect(localStorage.getItem('token')).toBeNull();
   });
 
   it('two simultaneous 401s trigger exactly one POST /auth/refresh, not two', async () => {
