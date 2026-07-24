@@ -161,8 +161,15 @@ export class SessionsService {
     const newHash = hashToken(newRefreshToken);
     const now = new Date();
 
-    await this.prisma.userSession.update({
-      where: { id: session.id },
+    // Compare-and-swap: only rotate if the row is STILL ACTIVE and STILL holds
+    // the exact hash we validated. Two concurrent refreshes with the same token
+    // both read the row above, but only the first UPDATE matches
+    // `refreshTokenHash: hash` — Postgres serializes them, so the winner flips
+    // the hash and the loser's WHERE no longer matches (count 0). This closes
+    // the race where both used to "succeed" with different tokens, leaving the
+    // browser cookie desynced from the stored hash.
+    const swap = await this.prisma.userSession.updateMany({
+      where: { id: session.id, status: 'ACTIVE', refreshTokenHash: hash },
       data: {
         refreshTokenHash: newHash,
         lastSeenAt: now,
@@ -172,6 +179,11 @@ export class SessionsService {
         deviceType: context.deviceType,
       },
     });
+
+    // Lost the race (another refresh already consumed this token) — fail
+    // generically WITHOUT overwriting the winner's new hash and WITHOUT
+    // revoking the session, so the winning tab stays valid.
+    if (swap.count !== 1) return null;
 
     return {
       sessionId: session.id,
