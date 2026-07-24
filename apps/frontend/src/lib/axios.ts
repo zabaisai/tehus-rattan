@@ -44,31 +44,69 @@ function handleSessionInvalidated() {
   }
 }
 
-// Shared across every concurrent 401 in this tab — the first to hit this creates
-// the promise and starts the real POST /auth/refresh; every other request that
-// 401s while it is in flight awaits this SAME promise instead of firing its own
-// refresh (which would each rotate the one-use refresh token and race). Cleared
-// once the attempt settles, so the next 401 after that starts a fresh one.
+const REFRESH_URL = `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`;
+const CROSS_TAB_LOCK = 'tehus-auth-refresh';
+const LOCK_TIMEOUT_MS = 5000;
+
+// Shared across every concurrent 401 in THIS tab — the first to hit this creates
+// the promise and starts one refresh; every other request that 401s while it is
+// in flight awaits this SAME promise. Cleared once it settles.
 let refreshPromise: Promise<string | null> | null = null;
 
-async function performRefresh(): Promise<string | null> {
+// One POST /auth/refresh, with a single retry. A 401 can be a *recoverable*
+// race: another tab just rotated the shared httpOnly cookie, so the token this
+// request sent is already spent. Retrying once uses the now-current cookie and
+// succeeds. Two failures in a row mean the session is genuinely gone → null
+// (the caller logs out). Never loops beyond one retry, so there is no storm.
+async function attemptRefresh(): Promise<string | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { data } = await axios.post<{ token: string }>(REFRESH_URL, undefined, {
+        withCredentials: true,
+      });
+      setAccessToken(data.token);
+      return data.token;
+    } catch {
+      if (attempt === 1) return null;
+    }
+  }
+  return null;
+}
+
+// Serialize refresh ACROSS TABS with the Web Locks API so two tabs never rotate
+// the same refresh token at the same instant. Each tab still makes its OWN
+// request and keeps its OWN access token in memory — the lock only orders them,
+// it never shares a token. Falls back to an unlocked refresh when Web Locks is
+// unavailable or acquiring the lock times out (a stuck holder must never block
+// refresh forever); the per-request retry above plus the backend compare-and-
+// swap keep that fallback race-safe and loop-free.
+async function refreshWithCrossTabLock(): Promise<string | null> {
+  const locks =
+    typeof navigator !== 'undefined' ? navigator.locks : undefined;
+  if (!locks || typeof locks.request !== 'function') {
+    return attemptRefresh();
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LOCK_TIMEOUT_MS);
   try {
-    const { data } = await axios.post<{ token: string }>(
-      `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`,
-      undefined,
-      { withCredentials: true },
+    return await locks.request(
+      CROSS_TAB_LOCK,
+      { mode: 'exclusive', signal: controller.signal },
+      () => attemptRefresh(),
     );
-    setAccessToken(data.token);
-    return data.token;
   } catch {
-    return null;
+    // Lock acquisition aborted (timeout) or unsupported options → unlocked.
+    return attemptRefresh();
+  } finally {
+    clearTimeout(timer);
   }
 }
 
 // Exposed so the bootstrap flow reuses the exact same single-flight refresh.
 export function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
-    refreshPromise = performRefresh().finally(() => {
+    refreshPromise = refreshWithCrossTabLock().finally(() => {
       refreshPromise = null;
     });
   }
