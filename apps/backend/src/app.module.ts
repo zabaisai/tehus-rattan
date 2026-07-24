@@ -2,7 +2,8 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv } from './common/config/env.validation';
@@ -68,9 +69,10 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
   providers: [
     AppService,
     // Global HTTP rate limiting. Individual routes tighten or skip it with
-    // @Throttle / @SkipThrottle. Uses req.ip, which respects the
-    // `trust proxy = 1` set in main.ts (the single Caddy hop).
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // @Throttle / @SkipThrottle. Per-IP for every route (respecting the
+    // `trust proxy = 1` set in main.ts, the single Caddy hop) EXCEPT
+    // POST /auth/refresh, which is bucketed per device — see AppThrottlerGuard.
+    { provide: APP_GUARD, useClass: AppThrottlerGuard },
   ],
 })
 export class AppModule implements NestModule {

@@ -235,6 +235,49 @@ describe('SessionsService', () => {
       const result = await service.rotateRefreshToken('never-issued-token', buildContext());
       expect(result).toBeNull();
     });
+
+    it('lets exactly one of two concurrent rotations with the same token win (compare-and-swap)', async () => {
+      const { refreshToken } = await service.recordLoginSuccess({ user: baseUser, context: buildContext() });
+      const originalHash = hashToken(refreshToken);
+
+      // Force the race window: both rotations must READ the session (findUnique)
+      // before EITHER performs its write. A 2-party barrier releases the reads
+      // only once both have entered findUnique, so both see the same pre-write
+      // state — exactly the interleaving that used to let both "succeed".
+      const realFindUnique = prisma.userSession.findUnique;
+      let entered = 0;
+      let release!: () => void;
+      const barrier = new Promise<void>((r) => (release = r));
+      prisma.userSession.findUnique = jest.fn(async (args: any) => {
+        const row = await realFindUnique(args);
+        if (++entered === 2) release();
+        await barrier;
+        return row;
+      });
+
+      const [a, b] = await Promise.all([
+        service.rotateRefreshToken(refreshToken, buildContext()),
+        service.rotateRefreshToken(refreshToken, buildContext()),
+      ]);
+
+      // Exactly one winner (success), one loser (generic null).
+      const winners = [a, b].filter(Boolean);
+      const losers = [a, b].filter((x) => x === null);
+      expect(winners).toHaveLength(1);
+      expect(losers).toHaveLength(1);
+
+      // The final stored hash matches ONLY the winner's new token.
+      const stored = sessionsStore.get('user-1:device-1-hash');
+      expect(stored.refreshTokenHash).toBe(hashToken(winners[0]!.refreshToken));
+      expect(stored.refreshTokenHash).not.toBe(originalHash);
+
+      // The session was NOT revoked or corrupted — still ACTIVE.
+      expect(stored.status).toBe('ACTIVE');
+
+      // The original token is now invalid for any further rotation.
+      const reuse = await service.rotateRefreshToken(refreshToken, buildContext());
+      expect(reuse).toBeNull();
+    });
   });
 
   describe('closeSessionByRefreshToken (logout)', () => {

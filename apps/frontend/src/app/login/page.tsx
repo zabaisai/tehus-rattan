@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
+import { ConnectionUnavailable } from '@/components/auth/ConnectionUnavailable';
 
 type ApiError = {
   response?: {
@@ -15,12 +16,22 @@ type ApiError = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const status = useAuthStore((s) => s.status);
   const setSession = useAuthStore((s) => s.setSession);
+  const setUser = useAuthStore((s) => s.setUser);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Already logged in (e.g. bootstrap found a live session, or another tab) —
+  // don't show the login form, go to the app.
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/dashboard');
+    }
+  }, [status, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,16 +41,16 @@ export default function LoginPage() {
     try {
       const { token, user } = await login(email, password);
       // The login response only carries id/email/name. role and companyId
-      // (needed right away for role-gated nav like the platform section)
-      // only come from /auth/me, so fetch the full profile before
-      // navigating instead of waiting for a later remount to backfill it.
+      // (needed right away for role-gated nav like the platform section) only
+      // come from /auth/me, so fetch the full profile before navigating. The
+      // token is stored ONLY in memory (setSession → lib/auth-token.ts).
       setSession(user, token);
       const fullUser = await getMe();
-      setSession(fullUser, token);
+      setUser(fullUser);
 
       // A global SUPER_ADMIN (companyId null) has no company to scope the
-      // normal CRM dashboard to — every business query on it expects a
-      // real companyId and 500s. Send them straight to the platform area.
+      // normal CRM dashboard to — every business query on it expects a real
+      // companyId and 500s. Send them straight to the platform area.
       const isPlatformSuperAdmin =
         fullUser.role === 'SUPER_ADMIN' && fullUser.companyId === null;
       router.push(
@@ -51,6 +62,22 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // The server was unreachable during bootstrap (429 / network / 5xx): show the
+  // retry screen, not a form that implies the session expired.
+  if (status === 'unavailable') {
+    return <ConnectionUnavailable />;
+  }
+
+  // While the initial bootstrap runs, or when already authenticated (redirect
+  // pending), don't flash the login form.
+  if (status !== 'anonymous') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-stone-50">
+        <p className="text-sm text-stone-500">Cargando...</p>
+      </div>
+    );
   }
 
   return (

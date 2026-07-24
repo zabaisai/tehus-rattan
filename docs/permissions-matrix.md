@@ -54,6 +54,7 @@ Controllers use two patterns:
 - Changing `AGENT` capabilities is a business decision and is not part of the current stabilization changes.
 - WhatsApp integration responses never include `accessToken` or `accessTokenEncrypted`, regardless of role.
 - Public endpoints are rate-limited (`@nestjs/throttler`, global `ThrottlerGuard`): strict on login/refresh/onboarding, high on the webhook, health exempt. `POST /webhook` additionally requires a valid Meta X-Hub-Signature-256 (fail-closed). See `docs/WEBHOOK_SECURITY.md`.
+- The cookie-based auth POSTs (`login`/`refresh`/`logout`) carry `CookieOriginGuard` (explicit Origin allowlist) on top of the refresh cookie's `SameSite=lax`. The access JWT is memory-only in the browser (never localStorage/cookie); the refresh token is opaque, SHA-256-hashed in the DB, and lives only in an httpOnly cookie. See `docs/AUTH_SESSION_SECURITY.md`.
 - Company fiscal identity (`legalName`, `taxId`, `address`, `quoteFooter`) is edited only via `PATCH /companies/me` (`ADMIN`/`SUPER_ADMIN`, JWT `companyId`). `GET /quotes/:id` returns the quote's **owning** company identity (isolated by `where: { id, companyId }`) so a quote never carries another company's fiscal data. See `docs/COMPANY_FISCAL_IDENTITY.md`.
 
 ## Recently Stabilized Ownership Checks
