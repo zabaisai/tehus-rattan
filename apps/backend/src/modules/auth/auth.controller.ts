@@ -12,6 +12,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import type { Request as ExpressRequest, Response } from 'express';
 import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
+import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 import {
   THROTTLE_TTL_MS,
   THROTTLE_LIMITS,
@@ -49,6 +50,7 @@ export class AuthController {
   }
 
   @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.auth } })
+  @UseGuards(CookieOriginGuard)
   @Post('login')
   async login(
     @Body() body: LoginDto,
@@ -70,6 +72,7 @@ export class AuthController {
   // a fresh access JWT. A missing/invalid/revoked/expired session all fail
   // the same generic way (see AuthService.refresh).
   @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.refresh } })
+  @UseGuards(CookieOriginGuard)
   @Post('refresh')
   async refresh(
     @Req() req: ExpressRequest,
@@ -88,6 +91,7 @@ export class AuthController {
   // Closes only the session tied to this browser's refresh-token cookie —
   // never other devices. Always clears the cookie client-side regardless
   // of whether a matching session was found server-side.
+  @UseGuards(CookieOriginGuard)
   @Post('logout')
   async logout(
     @Req() req: ExpressRequest,

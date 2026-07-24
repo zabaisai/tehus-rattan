@@ -5,6 +5,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 import { UsersModule } from '../users/users.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { ACCESS_TOKEN_EXPIRES_IN } from '../sessions/sessions.constants';
@@ -28,7 +29,7 @@ import { ACCESS_TOKEN_EXPIRES_IN } from '../sessions/sessions.constants';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
+  providers: [AuthService, JwtStrategy, CookieOriginGuard],
   exports: [AuthService],
 })
 export class AuthModule {}
