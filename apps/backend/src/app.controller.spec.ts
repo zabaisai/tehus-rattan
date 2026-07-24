@@ -25,11 +25,31 @@ describe('AppController', () => {
     });
   });
 
+  describe('liveness', () => {
+    it('returns { status: "ok" } WITHOUT touching the database', () => {
+      expect(appController.getLiveness()).toEqual({ status: 'ok' });
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('version', () => {
+    it('returns a minimal release payload (no secrets), "unknown" when unset', () => {
+      const v = appController.getVersion();
+      expect(v).toEqual({ status: 'ok', release: 'unknown', builtAt: 'unknown' });
+    });
+  });
+
   describe('health', () => {
     it('returns { status: "ok" } when the database is reachable', async () => {
       prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
 
       await expect(appController.getHealth()).resolves.toEqual({ status: 'ok' });
+    });
+
+    it('readiness returns { status: "ok" } when the database is reachable', async () => {
+      prisma.$queryRaw.mockResolvedValue([{ '?column?': 1 }]);
+
+      await expect(appController.getReadiness()).resolves.toEqual({ status: 'ok' });
     });
 
     it('throws 503 without leaking the database error when unreachable', async () => {
