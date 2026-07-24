@@ -39,7 +39,7 @@ Relación 1:1 con `Company` (`companyId` es único).
 2. `WhatsappService` busca la integración conectada de esa empresa vía `WhatsAppIntegrationService.findConnectedByCompanyId(companyId)`.
 3. Si no hay integración conectada, o le falta `accessTokenEncrypted`, se lanza `NotFoundException('WhatsApp no conectado para esta empresa')` — no se realiza ninguna llamada a Meta.
 4. Se descifra `accessTokenEncrypted` (ver sección 5) para obtener el token real.
-5. Se envía el mensaje a `https://graph.facebook.com/{WHATSAPP_GRAPH_API_VERSION}/{phoneNumberId}/messages` (versión configurable por entorno, default `v19.0`; ver [`docs/WEBHOOK_SECURITY.md`](./WEBHOOK_SECURITY.md)) usando el `phoneNumberId` de **esa** integración y `Authorization: Bearer <token descifrado>`.
+5. Se envía el mensaje a `https://graph.facebook.com/{WHATSAPP_GRAPH_API_VERSION}/{phoneNumberId}/messages` (versión obligatoria por entorno, **sin default en el código**; ver [`docs/WEBHOOK_SECURITY.md`](./WEBHOOK_SECURITY.md)) usando el `phoneNumberId` de **esa** integración y `Authorization: Bearer <token descifrado>`.
 6. Ya **no** se usan `WHATSAPP_PHONE_NUMBER_ID` ni `WHATSAPP_TOKEN` globales en ningún punto del envío.
 
 ## 5. Endpoints de gestión

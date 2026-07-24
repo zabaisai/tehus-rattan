@@ -1,4 +1,4 @@
-import { validateEnv, DEFAULT_GRAPH_API_VERSION } from './env.validation';
+import { validateEnv } from './env.validation';
 
 describe('validateEnv', () => {
   const base = { JWT_SECRET: 'x'.repeat(32) };
@@ -43,7 +43,7 @@ describe('validateEnv', () => {
     ).not.toThrow();
     expect(() =>
       validateEnv({ ...base, WHATSAPP_GRAPH_API_VERSION: '19' }),
-    ).toThrow(/WHATSAPP_GRAPH_API_VERSION must look like/);
+    ).toThrow(/WHATSAPP_GRAPH_API_VERSION must be in the form/);
     expect(() =>
       validateEnv({ ...base, WHATSAPP_GRAPH_API_VERSION: 'latest' }),
     ).toThrow(/WHATSAPP_GRAPH_API_VERSION/);
@@ -57,9 +57,5 @@ describe('validateEnv', () => {
       // must not appear in the message.
       expect((e as Error).message).not.toContain('super-secret-value');
     }
-  });
-
-  it('exposes a well-formed default Graph API version', () => {
-    expect(DEFAULT_GRAPH_API_VERSION).toMatch(/^v\d+\.\d+$/);
   });
 });

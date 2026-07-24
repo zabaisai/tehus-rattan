@@ -1,5 +1,11 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import axios from 'axios';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { WhatsappService } from './whatsapp.service';
 import { WhatsAppTokenCryptoService } from '../whatsapp-integration/whatsapp-token-crypto.service';
 
@@ -8,6 +14,20 @@ const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 // Test-only key, never read from .env and never logged.
 const TEST_ENCRYPTION_KEY = 'e2e-test-only-encryption-key-do-not-use';
+// A fixture Graph API version — a test value, NOT a production default. The
+// service has no hardcoded fallback (that is asserted below).
+const TEST_GRAPH_VERSION = 'v20.0';
+
+// Builds a WhatsappService with a controllable Graph API version.
+function buildConfig(graphVersion: string | undefined) {
+  return {
+    get: jest.fn((key: string) => {
+      if (key === 'WHATSAPP_TOKEN_ENCRYPTION_KEY') return TEST_ENCRYPTION_KEY;
+      if (key === 'WHATSAPP_GRAPH_API_VERSION') return graphVersion;
+      return undefined;
+    }),
+  };
+}
 
 describe('WhatsappService', () => {
   let whatsappIntegrationService: any;
@@ -19,13 +39,7 @@ describe('WhatsappService', () => {
     jest.clearAllMocks();
 
     whatsappIntegrationService = { findConnectedByCompanyId: jest.fn() };
-    const configService = {
-      get: jest.fn((key: string) =>
-        key === 'WHATSAPP_TOKEN_ENCRYPTION_KEY'
-          ? TEST_ENCRYPTION_KEY
-          : undefined,
-      ),
-    };
+    const configService = buildConfig(TEST_GRAPH_VERSION);
     tokenCryptoService = new WhatsAppTokenCryptoService(configService as any);
 
     connectedIntegration = {
@@ -55,7 +69,7 @@ describe('WhatsappService', () => {
     ).toHaveBeenCalledWith('company-a');
 
     expect(mockedAxios.post).toHaveBeenCalledWith(
-      'https://graph.facebook.com/v19.0/1234567890/messages',
+      `https://graph.facebook.com/${TEST_GRAPH_VERSION}/1234567890/messages`,
       {
         messaging_product: 'whatsapp',
         to: '50255551111',
@@ -175,5 +189,69 @@ describe('WhatsappService', () => {
     expect(serialized).not.toContain('fake-meta-access-token');
     expect(serialized).not.toContain(connectedIntegration.accessTokenEncrypted);
     expect(serialized).not.toContain('Bearer');
+  });
+
+  describe('Graph API version (no hardcoded fallback)', () => {
+    function serviceWith(graphVersion: string | undefined) {
+      const config = buildConfig(graphVersion);
+      const crypto = new WhatsAppTokenCryptoService(config as any);
+      const integrationSvc = { findConnectedByCompanyId: jest.fn() };
+      integrationSvc.findConnectedByCompanyId.mockResolvedValue({
+        id: 'integration-a',
+        companyId: 'company-a',
+        phoneNumberId: '1234567890',
+        accessTokenEncrypted: crypto.encrypt('fake-meta-access-token'),
+      });
+      return new WhatsappService(integrationSvc as any, crypto, config as any);
+    }
+
+    it('builds the URL from the configured version (a valid v<major>.<minor>)', async () => {
+      const svc = serviceWith('v21.0');
+      mockedAxios.post.mockResolvedValue({ data: {} });
+
+      await svc.sendMessage('company-a', '50255551111', 'Hola');
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        'https://graph.facebook.com/v21.0/1234567890/messages',
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+
+    it('throws a controlled config error and never calls axios when the version is absent', async () => {
+      const svc = serviceWith(undefined);
+
+      await expect(
+        svc.sendMessage('company-a', '50255551111', 'Hola'),
+      ).rejects.toBeInstanceOf(InternalServerErrorException);
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+    });
+
+    it('throws and never calls axios when the version has an invalid format', async () => {
+      const svc = serviceWith('nineteen');
+
+      await expect(
+        svc.sendMessage('company-a', '50255551111', 'Hola'),
+      ).rejects.toBeInstanceOf(InternalServerErrorException);
+      expect(mockedAxios.post).not.toHaveBeenCalled();
+    });
+
+    it('the controlled error never leaks the variable name or an internal value', async () => {
+      const svc = serviceWith(undefined);
+      try {
+        await svc.sendMessage('company-a', '50255551111', 'Hola');
+        fail('should have thrown');
+      } catch (e) {
+        const message = (e as Error).message;
+        expect(message).toBe('WhatsApp no está configurado correctamente');
+        expect(message).not.toContain('WHATSAPP_GRAPH_API_VERSION');
+      }
+    });
+
+    it('has no hardcoded Graph API version literal in the service source', () => {
+      const source = readFileSync(join(__dirname, 'whatsapp.service.ts'), 'utf8');
+      expect(source).not.toContain('v19.0');
+      expect(source).not.toMatch(/graph\.facebook\.com\/v\d/);
+    });
   });
 });

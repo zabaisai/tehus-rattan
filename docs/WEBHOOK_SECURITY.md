@@ -42,7 +42,7 @@ empresa ni el verify token.
 | --- | --- |
 | `WHATSAPP_WEBHOOK_ENABLED` | `"true"` exige `WHATSAPP_APP_SECRET` + `WHATSAPP_VERIFY_TOKEN` al arrancar (falla claro si faltan). Por defecto no habilitado. |
 | `WHATSAPP_APP_SECRET` | App Secret de Meta para la firma. Sin él, el POST del webhook se rechaza (503). |
-| `WHATSAPP_GRAPH_API_VERSION` | Versión de Graph API para envíos salientes (formato `v<major>.<minor>`). Default `v19.0` (última verificada; ajústala a la versión que valides con Meta). Reemplaza el valor antes hardcodeado. |
+| `WHATSAPP_GRAPH_API_VERSION` | Versión de Graph API para envíos salientes (formato `v<major>.<minor>`). **Obligatoria para enviar; sin default en el código.** Configúrala solo tras verificar una versión soportada en tu cuenta y en la documentación oficial de Meta. Si falta o tiene formato inválido, los envíos salientes fallan con un error de configuración controlado (no se llama a Meta); los webhooks entrantes no se ven afectados. |
 | `THROTTLE_TTL` | Ventana de rate limiting en ms (default 60000). |
 | `THROTTLE_DEFAULT_LIMIT` | Límite global generoso (default 300). |
 | `THROTTLE_AUTH_LIMIT` | Login (default 10). |
@@ -90,8 +90,17 @@ instancias, migrar a un store compartido (p. ej. Redis) — pendiente.
 - `403 Forbidden` — verify token incorrecto en el `GET` del webhook; o
   `BusinessTenantGuard` en rutas de empresa.
 - `429 Too Many Requests` — límite de rate excedido (con `Retry-After`).
-- `503 Service Unavailable` — webhook habilitado pero `WHATSAPP_APP_SECRET`
-  ausente (fail-closed).
+- `503 Service Unavailable` — `WHATSAPP_APP_SECRET` ausente al recibir un POST
+  del webhook (fail-closed); mensaje genérico, sin filtrar el nombre ni el valor
+  de la variable.
+
+**Defensa en profundidad:** cuando `WHATSAPP_WEBHOOK_ENABLED=true`, la
+validación de entorno impide **arrancar** sin `WHATSAPP_APP_SECRET` (ni
+`WHATSAPP_VERIFY_TOKEN`). Por eso, en staging bien configurado, el `503` del
+guard es una **defensa secundaria** que normalmente no se alcanza: si la app
+está arriba, el secret ya está presente. El guard sigue siendo fail-closed para
+cubrir configuraciones parciales o el webhook deshabilitado (sin secret →
+rechaza sin procesar).
 
 ## 6. Cómo probar con una firma ficticia (sin Meta real)
 
@@ -129,12 +138,35 @@ Solo se persiste **texto**. Otros tipos (imagen, audio, video, documento,
 sticker, ubicación, interactivos, plantillas) se reconocen y se omiten con un
 log del tipo — no fallan.
 
-## 10. Pendientes (fases siguientes)
+## 10. Limitaciones actuales
+
+Decisiones conscientes de esta fase; ninguna se implementa ahora.
+
+1. **Rate limiting en memoria.** El store del throttler es por instancia.
+   Adecuado para **una sola instancia** en staging. Si se escala a varias
+   instancias, debe usarse almacenamiento compartido (p. ej. Redis) para que el
+   límite sea consistente entre ellas. No se implementa Redis ahora.
+2. **Procesamiento después del ACK.** El controlador confirma rápido a Meta
+   (`200 OK`) y procesa de forma asíncrona; todavía **no** usa una cola durable.
+   Una caída del proceso podría perder un evento ya confirmado. Antes de
+   producción se recomienda una cola con idempotencia. No se implementa la cola
+   ahora.
+3. **Archivos estáticos.** `/uploads` se sirve fuera del pipeline de NestJS y
+   **no** pasa por el `ThrottlerGuard`. Su protección debe hacerse en el
+   proxy/CDN (Caddy) o por otro mecanismo. No se añade un plugin no estándar de
+   Caddy ahora.
+4. **Alcance del rate limiting.** Protege contra abuso básico; **no** sustituye
+   un WAF, protección distribuida (DDoS) ni bloqueo por cuenta. Los límites son
+   defaults razonables y pueden requerir ajuste según el tráfico real.
+
+## 11. Pendientes (fases siguientes)
 
 - Multimedia entrante (imagen/audio/video/documento) y su descarga segura.
 - Estados de entrega/lectura (`value.statuses`) → actualizar `Message.status`.
 - Plantillas (envío saliente con plantillas aprobadas).
 - Store de rate limiting compartido (Redis) para múltiples instancias.
+- Cola durable con idempotencia para el procesamiento post-ACK.
 - Protección de `/uploads/*` (hoy estáticos y enumerables, sin auth).
 - Verify token del `GET` con comparación de tiempo constante (hoy `===`).
+- Bloqueo por cuenta y protección distribuida (WAF/CDN).
 - Embedded Signup / OAuth real de Meta.

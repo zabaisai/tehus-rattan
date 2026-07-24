@@ -5,7 +5,10 @@
 
 type Env = Record<string, string | undefined>;
 
-const GRAPH_API_VERSION_FORMAT = /^v\d+\.\d+$/;
+// The only accepted shape for WHATSAPP_GRAPH_API_VERSION: v<major>.<minor>.
+// There is intentionally NO default version baked into the code — the operator
+// must set a version they have verified as supported in Meta's official docs.
+export const GRAPH_API_VERSION_FORMAT = /^v\d+\.\d+$/;
 
 export function validateEnv(config: Env): Env {
   const errors: string[] = [];
@@ -34,7 +37,7 @@ export function validateEnv(config: Env): Env {
   const graphVersion = config.WHATSAPP_GRAPH_API_VERSION?.trim();
   if (graphVersion && !GRAPH_API_VERSION_FORMAT.test(graphVersion)) {
     errors.push(
-      'WHATSAPP_GRAPH_API_VERSION must look like "v19.0" (v<major>.<minor>)',
+      'WHATSAPP_GRAPH_API_VERSION must be in the form v<major>.<minor>',
     );
   }
 
@@ -44,9 +47,3 @@ export function validateEnv(config: Env): Env {
 
   return config;
 }
-
-// The Graph API version used for outbound WhatsApp calls. Reads from config,
-// defaulting to the last version this codebase was verified against. Kept as
-// an explicit, documented default (not a silent magic string) so ops can bump
-// it via env without a code change. See docs/WEBHOOK_SECURITY.md.
-export const DEFAULT_GRAPH_API_VERSION = 'v19.0';

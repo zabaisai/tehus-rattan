@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,7 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-integration.service';
 import { WhatsAppTokenCryptoService } from '../whatsapp-integration/whatsapp-token-crypto.service';
-import { DEFAULT_GRAPH_API_VERSION } from '../../common/config/env.validation';
+import { GRAPH_API_VERSION_FORMAT } from '../../common/config/env.validation';
 
 @Injectable()
 export class WhatsappService {
@@ -49,9 +50,7 @@ export class WhatsappService {
       );
     }
 
-    const graphVersion =
-      this.config.get<string>('WHATSAPP_GRAPH_API_VERSION')?.trim() ||
-      DEFAULT_GRAPH_API_VERSION;
+    const graphVersion = this.resolveGraphApiVersion();
     const url = `https://graph.facebook.com/${graphVersion}/${integration.phoneNumberId}/messages`;
 
     try {
@@ -86,5 +85,26 @@ export class WhatsappService {
       );
       throw new BadRequestException('No se pudo enviar el mensaje de WhatsApp');
     }
+  }
+
+  // The Graph API version is mandatory config with NO hardcoded fallback: the
+  // operator must set a version verified against Meta's official docs. If it is
+  // missing or malformed we refuse to call Meta and surface a controlled,
+  // generic configuration error — never leaking the variable name or value.
+  private resolveGraphApiVersion(): string {
+    const version = this.config
+      .get<string>('WHATSAPP_GRAPH_API_VERSION')
+      ?.trim();
+
+    if (!version || !GRAPH_API_VERSION_FORMAT.test(version)) {
+      this.logger.error(
+        'Versión de Graph API de WhatsApp no configurada o con formato inválido',
+      );
+      throw new InternalServerErrorException(
+        'WhatsApp no está configurado correctamente',
+      );
+    }
+
+    return version;
   }
 }
