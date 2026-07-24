@@ -6,7 +6,14 @@ import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // rawBody: true makes Nest's built-in body parser keep the exact bytes it
+  // received on req.rawBody (a Buffer), which WhatsAppSignatureGuard needs to
+  // verify Meta's X-Hub-Signature-256 against the untouched payload. The
+  // parsed JSON body stays available as usual — this only preserves the raw
+  // copy alongside it.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
 
   // Behind the Caddy reverse proxy in staging/production, Express only sees
   // requests arriving over plain HTTP from the proxy itself. Without this,

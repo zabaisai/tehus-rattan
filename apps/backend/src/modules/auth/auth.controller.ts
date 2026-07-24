@@ -9,8 +9,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import type { Request as ExpressRequest, Response } from 'express';
 import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
+import {
+  THROTTLE_TTL_MS,
+  THROTTLE_LIMITS,
+} from '../../common/throttle/throttle.config';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -36,12 +41,14 @@ export class AuthController {
   // outright (see jwt.strategy.ts) — so the token this endpoint returns
   // authenticates nothing against any guarded route. It is fully inert,
   // not merely "legacy"; this is intentional rather than an oversight.
+  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding } })
   @UseGuards(OnboardingInviteGuard)
   @Post('register')
   register(@Body() body: RegisterDto) {
     return this.authService.register(body);
   }
 
+  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.auth } })
   @Post('login')
   async login(
     @Body() body: LoginDto,
@@ -62,6 +69,7 @@ export class AuthController {
   // never be reachable from JS given it's httpOnly), rotates it, and mints
   // a fresh access JWT. A missing/invalid/revoked/expired session all fail
   // the same generic way (see AuthService.refresh).
+  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.refresh } })
   @Post('refresh')
   async refresh(
     @Req() req: ExpressRequest,
