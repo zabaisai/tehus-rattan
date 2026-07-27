@@ -90,6 +90,9 @@ function build(overrides: any = {}) {
   const management = {
     disconnectForCompany: jest.fn().mockResolvedValue({ status: 'DISCONNECTED' }),
   } as any;
+  const notifications = {
+    emitToCompanyRoles: jest.fn().mockResolvedValue(undefined),
+  } as any;
   metaClient.sendText = metaClient.sendText ?? jest.fn().mockResolvedValue(undefined);
 
   const service = new WhatsAppEmbeddedSignupService(
@@ -101,6 +104,7 @@ function build(overrides: any = {}) {
     auditLog,
     integrationService,
     management,
+    notifications,
   );
   return {
     service,
@@ -113,6 +117,7 @@ function build(overrides: any = {}) {
     auditLog,
     integrationService,
     management,
+    notifications,
     savedIntegration,
   };
 }

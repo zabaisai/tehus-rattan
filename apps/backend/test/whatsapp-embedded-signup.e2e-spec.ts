@@ -15,6 +15,7 @@ import { WhatsAppEmbeddedSignupStateService } from '../src/modules/whatsapp-inte
 import { WhatsAppTokenCryptoService } from '../src/modules/whatsapp-integration/whatsapp-token-crypto.service';
 import { WhatsAppMetaClientService } from '../src/modules/whatsapp-integration/whatsapp-meta-client.service';
 import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
+import { NotificationsService } from '../src/modules/notifications/notifications.service';
 import {
   buildFakeSessionPrisma,
   encodeSid,
@@ -84,7 +85,9 @@ function buildFakePrisma() {
             (!where.status || i.status === where.status),
         ) ?? null,
       upsert: async ({ where, create, update }: any) => {
-        const existing = integrations.find((i) => i.companyId === where.companyId);
+        const existing = integrations.find(
+          (i) => i.companyId === where.companyId,
+        );
         if (existing) {
           Object.assign(existing, update);
           return existing;
@@ -118,7 +121,13 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
 
   const token = (role: string, companyId: string) =>
     jwt.sign(
-      { sub: `user-${companyId}`, email: 'u@e2e.local', role, companyId, sid: encodeSid(`user-${companyId}`, companyId) },
+      {
+        sub: `user-${companyId}`,
+        email: 'u@e2e.local',
+        role,
+        companyId,
+        sid: encodeSid(`user-${companyId}`, companyId),
+      },
       { expiresIn: '5m' },
     );
 
@@ -133,9 +142,16 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
       configId: () => 'config-id',
       graphVersion: () => 'v25.0',
       exchangeCode: jest.fn().mockResolvedValue('SECRET-TOKEN'),
-      listPhoneNumbers: jest.fn().mockResolvedValue([
-        { id: PHONE, displayPhoneNumber: '+57 300 555 4521', verifiedName: 'Tehus QA', platformType: 'CLOUD_API' },
-      ]),
+      listPhoneNumbers: jest
+        .fn()
+        .mockResolvedValue([
+          {
+            id: PHONE,
+            displayPhoneNumber: '+57 300 555 4521',
+            verifiedName: 'Tehus QA',
+            platformType: 'CLOUD_API',
+          },
+        ]),
       subscribeAppToWaba: jest.fn().mockResolvedValue(undefined),
       sendText: jest.fn().mockResolvedValue(undefined),
     };
@@ -161,10 +177,25 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
         { provide: PrismaService, useValue: store.client },
         { provide: WhatsAppMetaClientService, useValue: metaMock },
         {
+          provide: NotificationsService,
+          useValue: {
+            emitToCompanyRoles: jest.fn().mockResolvedValue(undefined),
+          },
+        },
+        {
           provide: PlatformAuditLogService,
           useValue: { record: jest.fn().mockResolvedValue(undefined) },
         },
-        { provide: WhatsAppIntegrationManagementService, useValue: { getForCompany: jest.fn(), disconnectForCompany: jest.fn().mockResolvedValue({ status: 'DISCONNECTED' }), connectOrUpdateForCompany: jest.fn() } },
+        {
+          provide: WhatsAppIntegrationManagementService,
+          useValue: {
+            getForCompany: jest.fn(),
+            disconnectForCompany: jest
+              .fn()
+              .mockResolvedValue({ status: 'DISCONNECTED' }),
+            connectOrUpdateForCompany: jest.fn(),
+          },
+        },
         WhatsAppIntegrationService,
         WhatsAppTokenCryptoService,
         WhatsAppEmbeddedSignupStateService,
@@ -174,7 +205,13 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
 
     app = moduleRef.createNestApplication();
     app.setGlobalPrefix('api');
-    app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+    app.useGlobalPipes(
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
     await app.init();
     jwt = new JwtService({ secret: TEST_JWT_SECRET });
   });
@@ -215,7 +252,12 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
       wabaId: WABA,
       accessToken: 'attacker-supplied', // non-whitelisted
     }).expect(400);
-    await complete('ADMIN', 'company-a', { state: 'short', code: 'c', phoneNumberId: PHONE, wabaId: WABA }).expect(400);
+    await complete('ADMIN', 'company-a', {
+      state: 'short',
+      code: 'c',
+      phoneNumberId: PHONE,
+      wabaId: WABA,
+    }).expect(400);
   });
 
   it('completes the flow, persists CONNECTED and never returns a token', async () => {
@@ -239,8 +281,15 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
 
   it('enforces single-use state (a consumed state cannot be replayed)', async () => {
     const res = await start('ADMIN', 'company-c').expect(200);
-    const body = { state: res.body.state, code: 'c1', phoneNumberId: '100000000000009', wabaId: WABA };
-    metaMock.listPhoneNumbers.mockResolvedValueOnce([{ id: '100000000000009', displayPhoneNumber: '+57 300 000 0000' }]);
+    const body = {
+      state: res.body.state,
+      code: 'c1',
+      phoneNumberId: '100000000000009',
+      wabaId: WABA,
+    };
+    metaMock.listPhoneNumbers.mockResolvedValueOnce([
+      { id: '100000000000009', displayPhoneNumber: '+57 300 000 0000' },
+    ]);
     await complete('ADMIN', 'company-c', body).expect(200);
     // Replaying the same state → generic 400.
     await complete('ADMIN', 'company-c', body).expect(400);
