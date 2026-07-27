@@ -23,7 +23,7 @@ function buildDto(
     admin: {
       name: 'Admin Tehus',
       email: 'admin@tehus.test',
-      password: 'supersecret123',
+      password: 'SuperSecret!123',
     },
     ...overrides,
   };
@@ -174,7 +174,7 @@ describe('OnboardingService', () => {
         {
           name: 'Asesor Uno',
           email: 'asesor1@tehus.test',
-          password: 'agentpass123',
+          password: 'AgentPass!123',
         },
       ],
     });
@@ -274,7 +274,7 @@ describe('OnboardingService', () => {
         {
           name: 'Intento Admin',
           email: 'intento@tehus.test',
-          password: 'agentpass123',
+          password: 'AgentPass!123',
           role: 'AGENT',
         },
       ],
@@ -312,7 +312,7 @@ describe('OnboardingService', () => {
         {
           name: 'Duplicado',
           email: 'admin@tehus.test',
-          password: 'agentpass123',
+          password: 'AgentPass!123',
         },
       ],
     });
@@ -452,7 +452,7 @@ describe('OnboardingService', () => {
         {
           name: 'Asesor Falla',
           email: 'asesor-falla@tehus.test',
-          password: 'agentpass123',
+          password: 'AgentPass!123',
         },
       ],
     });

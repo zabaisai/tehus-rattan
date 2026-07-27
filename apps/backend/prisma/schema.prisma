@@ -33,10 +33,10 @@ model Company {
   // Per-company fiscal identity used to render quotes/printable documents.
   // All optional and additive — an empty field is simply omitted from the
   // printed document, never replaced by a global/hardcoded fallback.
-  legalName        String? // Razón social
-  taxId            String? // Identificación fiscal / NIT
-  address          String? // Dirección
-  quoteFooter      String? // Texto/condiciones opcionales para el pie de cotizaciones
+  legalName   String? // Razón social
+  taxId       String? // Identificación fiscal / NIT
+  address     String? // Dirección
+  quoteFooter String? // Texto/condiciones opcionales para el pie de cotizaciones
 
   users               User[]
   contacts            Contact[]
@@ -83,9 +83,10 @@ model User {
   invitationCodesUsed    InvitationCode[] @relation("InvitationCodeUsedBy")
   invitationCodesRevoked InvitationCode[] @relation("InvitationCodeRevokedBy")
 
-  sessions        UserSession[] @relation("UserSessionUser")
-  sessionsRevoked UserSession[] @relation("UserSessionRevokedBy")
-  loginEvents     LoginEvent[]
+  sessions            UserSession[]        @relation("UserSessionUser")
+  sessionsRevoked     UserSession[]        @relation("UserSessionRevokedBy")
+  loginEvents         LoginEvent[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -734,4 +735,27 @@ model LoginEvent {
   @@index([status])
   @@index([createdAt])
   @@map("login_events")
+}
+
+// Single-use, short-lived password-recovery tokens. Only the SHA-256 hex digest
+// of the opaque token is ever stored (tokenHash) — the plaintext lives only in
+// the emailed link and is never persisted, logged, or returned by the API. A new
+// request invalidates the user's prior still-active tokens; consumption is
+// atomic (see PasswordResetService). requestedIpPreview reuses the same
+// truncated-IP anonymization as sessions (ip.util.ts) — never a raw address.
+model PasswordResetToken {
+  id                 String    @id @default(cuid())
+  userId             String
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  usedAt             DateTime?
+  revokedAt          DateTime?
+  requestedIpPreview String?
+  createdAt          DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }

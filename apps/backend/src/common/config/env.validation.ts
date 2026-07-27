@@ -41,6 +41,34 @@ export function validateEnv(config: Env): Env {
     );
   }
 
+  // Opt-in flag for transactional email (password recovery). When enabled, the
+  // SMTP settings the MailService needs are required; when disabled (default in
+  // dev/tests), the recovery endpoints still work — email is a controlled no-op.
+  const passwordResetEnabled =
+    config.PASSWORD_RESET_ENABLED?.trim() === 'true';
+  if (passwordResetEnabled) {
+    for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM_EMAIL']) {
+      if (!config[key]?.trim()) {
+        errors.push(`${key} is required when PASSWORD_RESET_ENABLED=true`);
+      }
+    }
+    if (!config.PASSWORD_RESET_URL?.trim()) {
+      errors.push('PASSWORD_RESET_URL is required when PASSWORD_RESET_ENABLED=true');
+    }
+  }
+
+  // Format-check the reset URL whenever it is set (must be an absolute http(s)
+  // URL — the emailed link is only ever built from this, never a client value).
+  const resetUrl = config.PASSWORD_RESET_URL?.trim();
+  if (resetUrl && !/^https?:\/\/.+/i.test(resetUrl)) {
+    errors.push('PASSWORD_RESET_URL must be an absolute http(s) URL');
+  }
+
+  const ttl = config.PASSWORD_RESET_TOKEN_TTL_MINUTES?.trim();
+  if (ttl && !(Number.isInteger(Number(ttl)) && Number(ttl) > 0)) {
+    errors.push('PASSWORD_RESET_TOKEN_TTL_MINUTES must be a positive integer');
+  }
+
   if (errors.length > 0) {
     throw new Error(`Invalid environment configuration:\n- ${errors.join('\n- ')}`);
   }

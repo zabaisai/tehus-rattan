@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 import { ConnectionUnavailable } from '@/components/auth/ConnectionUnavailable';
@@ -24,6 +25,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetNotice, setResetNotice] = useState('');
 
   // Already logged in (e.g. bootstrap found a live session, or another tab) —
   // don't show the login form, go to the app.
@@ -32,6 +34,20 @@ export default function LoginPage() {
       router.replace('/dashboard');
     }
   }, [status, router]);
+
+  // Show the success banner after a password reset (reset page redirects here
+  // with ?reset=1), then strip the query so a refresh doesn't keep showing it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reset') === '1') {
+      // Client-only read (window) — must run after mount to avoid a hydration
+      // mismatch, so the setState here is intentional.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setResetNotice('Contraseña actualizada correctamente. Ya puedes iniciar sesión.');
+      window.history.replaceState(null, '', '/login');
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -90,6 +106,16 @@ export default function LoginPage() {
           <p className="mt-1 text-sm text-stone-500">CRM interno</p>
         </div>
 
+        {resetNotice && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
+          >
+            {resetNotice}
+          </p>
+        )}
+
         <form
           onSubmit={handleSubmit}
           className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm"
@@ -130,8 +156,17 @@ export default function LoginPage() {
             />
           </div>
 
+          <div className="mb-4 -mt-1 text-right">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-stone-500 transition-colors hover:text-stone-700"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+
           {error && (
-            <p className="mb-4 text-sm text-red-600">{error}</p>
+            <p role="alert" aria-live="assertive" className="mb-4 text-sm text-red-600">{error}</p>
           )}
 
           <button

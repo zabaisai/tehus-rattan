@@ -34,6 +34,10 @@ export const THROTTLE_LIMITS = {
   refresh: positiveIntFromEnv('THROTTLE_REFRESH_LIMIT', 30),
   // Onboarding + legacy register: throttle invite-code guessing.
   onboarding: positiveIntFromEnv('THROTTLE_ONBOARDING_LIMIT', 15),
+  // Password recovery (forgot/reset): strict, PER-IP (a credential-sensitive
+  // endpoint — deliberately not device-bucketed). Per-account abuse is
+  // additionally bounded by a resend cooldown in PasswordResetTokenService.
+  passwordReset: positiveIntFromEnv('THROTTLE_PASSWORD_RESET_LIMIT', 5),
   // Webhook POST: high enough to absorb legitimate Meta bursts.
   webhook: positiveIntFromEnv('THROTTLE_WEBHOOK_LIMIT', 600),
   // Webhook GET verify handshake: modest.
