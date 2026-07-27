@@ -86,6 +86,8 @@ describe('WhatsAppIntegrationController (e2e)', () => {
             complete: jest.fn(),
             reconnect: jest.fn(),
             getConnectionStatus: jest.fn(),
+            disconnectLocal: jest.fn(),
+            sendTest: jest.fn(),
           },
         },
       ],
@@ -304,11 +306,11 @@ describe('WhatsAppIntegrationController (e2e)', () => {
   });
 
   describe('POST /api/whatsapp-integrations/me/disconnect', () => {
-    it('allows ADMIN, uses the companyId from the JWT, and never returns accessTokenEncrypted', async () => {
-      managementServiceMock.disconnectForCompany.mockResolvedValue({
-        ...safeIntegrationResponse,
-        status: 'DISCONNECTED',
-      });
+    it('allows ADMIN, routes through local-disconnect with the companyId from the JWT, and never returns accessTokenEncrypted', async () => {
+      const embeddedSignupServiceMock = app.get(WhatsAppEmbeddedSignupService);
+      (embeddedSignupServiceMock.disconnectLocal as jest.Mock).mockResolvedValue(
+        { ...safeIntegrationResponse, status: 'DISCONNECTED' },
+      );
       const token = signToken('ADMIN', 'company-admin');
 
       const res = await request(app.getHttpServer())
@@ -316,14 +318,17 @@ describe('WhatsAppIntegrationController (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(201);
 
-      expect(managementServiceMock.disconnectForCompany).toHaveBeenCalledWith(
+      expect(embeddedSignupServiceMock.disconnectLocal).toHaveBeenCalledWith(
         'company-admin',
+        expect.objectContaining({ userId: 'user-1' }),
       );
       expect(res.body.status).toBe('DISCONNECTED');
       expect(res.body).not.toHaveProperty('accessTokenEncrypted');
     });
 
     it('rejects AGENT with 403', async () => {
+      const embeddedSignupServiceMock = app.get(WhatsAppEmbeddedSignupService);
+      (embeddedSignupServiceMock.disconnectLocal as jest.Mock).mockClear();
       const token = signToken('AGENT', 'company-agent');
 
       await request(app.getHttpServer())
@@ -331,7 +336,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(403);
 
-      expect(managementServiceMock.disconnectForCompany).not.toHaveBeenCalled();
+      expect(embeddedSignupServiceMock.disconnectLocal).not.toHaveBeenCalled();
     });
   });
 });

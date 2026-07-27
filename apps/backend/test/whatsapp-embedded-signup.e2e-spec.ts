@@ -9,6 +9,7 @@ import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { WhatsAppIntegrationController } from '../src/modules/whatsapp-integration/whatsapp-integration.controller';
 import { WhatsAppIntegrationManagementService } from '../src/modules/whatsapp-integration/whatsapp-integration-management.service';
+import { WhatsAppIntegrationService } from '../src/modules/whatsapp-integration/whatsapp-integration.service';
 import { WhatsAppEmbeddedSignupService } from '../src/modules/whatsapp-integration/whatsapp-embedded-signup.service';
 import { WhatsAppEmbeddedSignupStateService } from '../src/modules/whatsapp-integration/whatsapp-embedded-signup-state.service';
 import { WhatsAppTokenCryptoService } from '../src/modules/whatsapp-integration/whatsapp-token-crypto.service';
@@ -76,6 +77,12 @@ function buildFakePrisma() {
             (where.companyId && i.companyId === where.companyId) ||
             (where.phoneNumberId && i.phoneNumberId === where.phoneNumberId),
         ) ?? null,
+      findFirst: async ({ where }: any) =>
+        integrations.find(
+          (i) =>
+            i.companyId === where.companyId &&
+            (!where.status || i.status === where.status),
+        ) ?? null,
       upsert: async ({ where, create, update }: any) => {
         const existing = integrations.find((i) => i.companyId === where.companyId);
         if (existing) {
@@ -130,6 +137,7 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
         { id: PHONE, displayPhoneNumber: '+57 300 555 4521', verifiedName: 'Tehus QA', platformType: 'CLOUD_API' },
       ]),
       subscribeAppToWaba: jest.fn().mockResolvedValue(undefined),
+      sendText: jest.fn().mockResolvedValue(undefined),
     };
 
     const config = {
@@ -152,8 +160,12 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
         { provide: ConfigService, useValue: config },
         { provide: PrismaService, useValue: store.client },
         { provide: WhatsAppMetaClientService, useValue: metaMock },
-        { provide: PlatformAuditLogService, useValue: { record: jest.fn() } },
-        { provide: WhatsAppIntegrationManagementService, useValue: { getForCompany: jest.fn(), disconnectForCompany: jest.fn(), connectOrUpdateForCompany: jest.fn() } },
+        {
+          provide: PlatformAuditLogService,
+          useValue: { record: jest.fn().mockResolvedValue(undefined) },
+        },
+        { provide: WhatsAppIntegrationManagementService, useValue: { getForCompany: jest.fn(), disconnectForCompany: jest.fn().mockResolvedValue({ status: 'DISCONNECTED' }), connectOrUpdateForCompany: jest.fn() } },
+        WhatsAppIntegrationService,
         WhatsAppTokenCryptoService,
         WhatsAppEmbeddedSignupStateService,
         WhatsAppEmbeddedSignupService,
@@ -266,5 +278,43 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
       .expect(200);
     expect(res.body.status).toBe('CONNECTED');
     expect(JSON.stringify(res.body)).not.toMatch(/token/i);
+    // Enriched, non-secret fields present.
+    expect(res.body).toHaveProperty('webhookStatus');
+    expect(res.body).toHaveProperty('actionRequired');
+    expect(res.body).toHaveProperty('coexistence');
+  });
+
+  it('POST /me/test validates E.164 and sends via the connected integration', async () => {
+    // Bad format → 400 (DTO validation), no send.
+    await request(app.getHttpServer())
+      .post('/api/whatsapp-integrations/me/test')
+      .set('Authorization', `Bearer ${token('ADMIN', 'company-a')}`)
+      .send({ to: '3001234567' })
+      .expect(400);
+    // Valid E.164 → 200; a text is sent through the Meta client.
+    const before = metaMock.sendText.mock.calls.length;
+    const res = await request(app.getHttpServer())
+      .post('/api/whatsapp-integrations/me/test')
+      .set('Authorization', `Bearer ${token('ADMIN', 'company-a')}`)
+      .send({ to: '+573001234567' })
+      .expect(200);
+    expect(res.body).toEqual({ status: 'ok' });
+    expect(metaMock.sendText.mock.calls.length).toBe(before + 1);
+  });
+
+  it('POST /me/test is rejected for AGENT (403)', async () => {
+    await request(app.getHttpServer())
+      .post('/api/whatsapp-integrations/me/test')
+      .set('Authorization', `Bearer ${token('AGENT', 'company-a')}`)
+      .send({ to: '+573001234567' })
+      .expect(403);
+  });
+
+  it('POST /me/disconnect is local-only (ADMIN allowed, returns DISCONNECTED)', async () => {
+    const res = await request(app.getHttpServer())
+      .post('/api/whatsapp-integrations/me/disconnect')
+      .set('Authorization', `Bearer ${token('ADMIN', 'company-a')}`)
+      .expect(201);
+    expect(res.body.status).toBe('DISCONNECTED');
   });
 });

@@ -36,6 +36,8 @@ describe('WhatsAppIntegrationController', () => {
       complete: jest.fn(),
       reconnect: jest.fn(),
       getConnectionStatus: jest.fn(),
+      disconnectLocal: jest.fn(),
+      sendTest: jest.fn(),
     };
     controller = new WhatsAppIntegrationController(
       managementService,
@@ -139,22 +141,23 @@ describe('WhatsAppIntegrationController', () => {
   });
 
   describe('POST /me/disconnect', () => {
-    it('calls disconnectForCompany with req.user.companyId', async () => {
-      managementService.disconnectForCompany.mockResolvedValue({
+    it('routes through the local-disconnect service with req.user.companyId', async () => {
+      embeddedSignupService.disconnectLocal.mockResolvedValue({
         ...safeResponse,
         status: 'DISCONNECTED',
       });
 
       await controller.disconnectMyIntegration(buildRequest('company-a'));
 
-      expect(managementService.disconnectForCompany).toHaveBeenCalledWith(
+      expect(embeddedSignupService.disconnectLocal).toHaveBeenCalledWith(
         'company-a',
+        expect.objectContaining({ userId: 'user-1' }),
       );
     });
 
     it('returns exactly the safe response from the service, without accessTokenEncrypted', async () => {
       const disconnected = { ...safeResponse, status: 'DISCONNECTED' };
-      managementService.disconnectForCompany.mockResolvedValue(disconnected);
+      embeddedSignupService.disconnectLocal.mockResolvedValue(disconnected);
 
       const result = await controller.disconnectMyIntegration(
         buildRequest('company-a'),

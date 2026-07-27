@@ -77,8 +77,20 @@ function build(overrides: any = {}) {
   };
   const tokenCrypto = {
     encrypt: jest.fn().mockReturnValue('iv:tag:cipher'),
+    decrypt: jest.fn().mockReturnValue('SECRET-BUSINESS-TOKEN'),
   } as any;
   const auditLog = { record: jest.fn().mockResolvedValue(undefined) } as any;
+  const integrationService = {
+    findConnectedByCompanyId: jest.fn().mockResolvedValue({
+      phoneNumberId: '100000000000001',
+      accessTokenEncrypted: 'iv:tag:cipher',
+    }),
+    ...overrides.integrationService,
+  } as any;
+  const management = {
+    disconnectForCompany: jest.fn().mockResolvedValue({ status: 'DISCONNECTED' }),
+  } as any;
+  metaClient.sendText = metaClient.sendText ?? jest.fn().mockResolvedValue(undefined);
 
   const service = new WhatsAppEmbeddedSignupService(
     prisma,
@@ -87,6 +99,8 @@ function build(overrides: any = {}) {
     metaClient,
     tokenCrypto,
     auditLog,
+    integrationService,
+    management,
   );
   return {
     service,
@@ -97,6 +111,8 @@ function build(overrides: any = {}) {
     metaClient,
     tokenCrypto,
     auditLog,
+    integrationService,
+    management,
     savedIntegration,
   };
 }
@@ -119,7 +135,7 @@ describe('WhatsAppEmbeddedSignupService', () => {
       );
       expect(auditLog.record).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ action: 'WHATSAPP_EMBEDDED_SIGNUP_STARTED' }),
+        expect.objectContaining({ action: 'WHATSAPP_SIGNUP_STARTED' }),
       );
     });
 
@@ -214,7 +230,7 @@ describe('WhatsAppEmbeddedSignupService', () => {
       );
       expect(auditLog.record).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ action: 'WHATSAPP_EMBEDDED_SIGNUP_FAILED' }),
+        expect.objectContaining({ action: 'WHATSAPP_SIGNUP_FAILED' }),
       );
     });
 
@@ -265,16 +281,69 @@ describe('WhatsAppEmbeddedSignupService', () => {
   });
 
   describe('reconnect', () => {
-    it('issues a new state, flags the integration REAUTH_REQUIRED and audits', async () => {
+    it('issues a new state WITHOUT degrading the current integration (cancel-safe) and audits', async () => {
       const { service, prisma, auditLog } = build();
       const res = await service.reconnect('company-a', actor);
       expect(res.state).toBe('plain-state');
-      expect(prisma.whatsAppIntegration.updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { status: 'REAUTH_REQUIRED' } }),
+      // The existing integration must NOT be flipped to REAUTH_REQUIRED on
+      // start — otherwise cancelling the popup would leave it degraded.
+      expect(prisma.whatsAppIntegration.updateMany).not.toHaveBeenCalled();
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: 'WHATSAPP_RECONNECTED' }),
+      );
+    });
+  });
+
+  describe('disconnectLocal', () => {
+    it('disconnects locally and audits WHATSAPP_DISCONNECTED_LOCAL (no Meta call)', async () => {
+      const { service, management, auditLog } = build();
+      await service.disconnectLocal('company-a', actor);
+      expect(management.disconnectForCompany).toHaveBeenCalledWith('company-a');
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: 'WHATSAPP_DISCONNECTED_LOCAL' }),
+      );
+    });
+  });
+
+  describe('sendTest', () => {
+    it('sends one text via the connected integration and audits the test', async () => {
+      const { service, metaClient, tokenCrypto, auditLog } = build();
+      const res = await service.sendTest('company-a', actor, '+573001234567');
+      expect(res).toEqual({ status: 'ok' });
+      expect(tokenCrypto.decrypt).toHaveBeenCalledWith('iv:tag:cipher');
+      expect(metaClient.sendText).toHaveBeenCalledWith(
+        '100000000000001',
+        'SECRET-BUSINESS-TOKEN',
+        '+573001234567',
+        expect.any(String),
       );
       expect(auditLog.record).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ action: 'WHATSAPP_RECONNECT_STARTED' }),
+        expect.objectContaining({ action: 'WHATSAPP_CONNECTION_TESTED' }),
+      );
+    });
+
+    it('rejects when the company is not connected', async () => {
+      const { service } = build({
+        integrationService: { findConnectedByCompanyId: jest.fn().mockResolvedValue(null) },
+      });
+      await expect(
+        service.sendTest('company-a', actor, '+573001234567'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('maps a Meta send failure to a generic error and still audits', async () => {
+      const { service, auditLog } = build({
+        metaClient: { sendText: jest.fn().mockRejectedValue(new MetaSignupError('SEND_FAILED')) },
+      });
+      await expect(
+        service.sendTest('company-a', actor, '+573001234567'),
+      ).rejects.toBeInstanceOf(BadRequestException);
+      expect(auditLog.record).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ action: 'WHATSAPP_CONNECTION_TESTED', reason: 'failed' }),
       );
     });
   });
@@ -295,6 +364,29 @@ describe('WhatsAppEmbeddedSignupService', () => {
       expect(res.status).toBe('CONNECTED');
       expect(res).not.toHaveProperty('accessTokenEncrypted');
       expect(res.maskedPhoneNumber).toMatch(/4521$/);
+      // Enriched, non-secret fields.
+      expect(res.coexistence).toBe(false);
+      expect(res.webhookStatus).toBe('SUBSCRIBED');
+      expect(res.actionRequired).toBe(false);
+      expect(res).toHaveProperty('errorCode', null);
+    });
+
+    it('flags actionRequired + errorCode when the integration is in ERROR', async () => {
+      const { service, prisma } = build();
+      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+        status: 'ERROR',
+        connectionMethod: 'COEXISTENCE',
+        displayPhoneNumber: '+57 300 555 4521',
+        businessName: 'Tehus QA',
+        connectedAt: new Date(),
+        lastCheckedAt: new Date(),
+        lastErrorCode: 'CODE_EXCHANGE_FAILED',
+      });
+      const res: any = await service.getConnectionStatus('company-a');
+      expect(res.actionRequired).toBe(true);
+      expect(res.errorCode).toBe('CODE_EXCHANGE_FAILED');
+      expect(res.coexistence).toBe(true);
+      expect(res.webhookStatus).toBe('UNKNOWN');
     });
 
     it('is CONNECTING when no integration exists yet but a state is active', async () => {
