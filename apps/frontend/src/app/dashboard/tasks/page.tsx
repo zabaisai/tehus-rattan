@@ -2,10 +2,11 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Check, Trash2, Pencil } from 'lucide-react';
+import { Plus, Check, Trash2, Pencil, CheckSquare } from 'lucide-react';
 import { getTasks, createTask, updateTask, completeTask, deleteTask } from '@/lib/tasks';
 import { Task } from '@/types';
 import { TaskModal, TaskFormData } from '@/components/tasks/TaskModal';
+import { EmptyState } from '@/components/ui/EmptyState';
 
 const priorityColors: Record<string, string> = {
   LOW: 'bg-stone-100 text-stone-600',
@@ -86,13 +87,14 @@ function TaskRow({
   ].filter(Boolean);
 
   return (
-    <div className="flex items-center justify-between border-b border-stone-100 px-3 py-2.5 last:border-0">
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="flex flex-col gap-2 border-b border-stone-100 px-3 py-2.5 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-2.5">
         <button
           onClick={() => onComplete(task.id)}
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-stone-300 text-transparent hover:border-stone-500 hover:text-stone-500"
+          aria-label="Completar tarea"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-300 text-transparent hover:border-stone-500 hover:text-stone-500"
         >
-          <Check size={12} />
+          <Check size={13} />
         </button>
         <div className="min-w-0">
           <p className="truncate text-sm text-stone-800">{task.title}</p>
@@ -101,7 +103,7 @@ function TaskRow({
           )}
         </div>
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2 pl-10 sm:pl-0">
         {statusLabels[task.status] && task.status === 'IN_PROGRESS' && (
           <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
             {statusLabels[task.status]}
@@ -112,13 +114,15 @@ function TaskRow({
         </span>
         <button
           onClick={() => onEdit(task)}
-          className="rounded p-1 text-stone-300 hover:bg-stone-100 hover:text-stone-600"
+          aria-label="Editar tarea"
+          className="rounded p-1.5 text-stone-300 hover:bg-stone-100 hover:text-stone-600"
         >
           <Pencil size={13} />
         </button>
         <button
           onClick={() => onDelete(task.id)}
-          className="rounded p-1 text-stone-300 hover:bg-red-50 hover:text-red-600"
+          aria-label="Eliminar tarea"
+          className="rounded p-1.5 text-stone-300 hover:bg-red-50 hover:text-red-600"
         >
           <Trash2 size={13} />
         </button>
@@ -211,21 +215,21 @@ export default function TasksPage() {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-stone-900">Tareas</h2>
         <button
           onClick={() => setModalOpen(true)}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
         >
           <Plus size={16} />
           Nueva tarea
         </button>
       </div>
 
-      {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
+      {isLoading && <p className="py-10 text-center text-sm text-stone-400">Cargando...</p>}
 
       {!isLoading && (tasks?.length ?? 0) === 0 && (
-        <p className="text-sm text-stone-400">No hay tareas.</p>
+        <EmptyState icon={CheckSquare} message="No hay tareas." />
       )}
 
       <TaskGroup title="Vencidas" tasks={groups.overdue} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} accent="text-red-600" />

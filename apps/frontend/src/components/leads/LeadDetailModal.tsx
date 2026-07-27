@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Pencil, Trash2, Check, Plus, FileText } from 'lucide-react';
+import { Pencil, Trash2, Check, Plus, FileText, X } from 'lucide-react';
 import { getLead, updateLead, markLeadWon, markLeadLost } from '@/lib/leads';
 import { changeLeadStage } from '@/lib/pipeline';
 import { getCompanyUsers } from '@/lib/users';
@@ -16,6 +16,7 @@ import {
 import { AddProductToLeadModal } from './AddProductToLeadModal';
 import { CreateQuoteModal } from '@/components/quotes/CreateQuoteModal';
 import { PipelineStage, AddLeadProductPayload, Quote } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -283,15 +284,8 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
   const sortedStages = [...stages].sort((a, b) => a.order - b.order);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">Detalle del lead</h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={18} />
-          </button>
-        </div>
-
+    <>
+      <Modal title="Detalle del lead" onClose={onClose} maxWidth="2xl">
         {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
         {isError && <p className="text-sm text-red-600">No se pudo cargar el lead.</p>}
 
@@ -379,8 +373,8 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
               )}
 
               {(leadProducts?.length ?? 0) > 0 && (
-                <div className="overflow-hidden rounded-md border border-stone-200">
-                  <table className="w-full text-left text-xs">
+                <div className="overflow-x-auto rounded-md border border-stone-200">
+                  <table className="w-full min-w-[480px] text-left text-xs">
                     <thead className="bg-stone-50 text-stone-500">
                       <tr>
                         <th className="px-2 py-1.5 font-medium">Producto</th>
@@ -695,7 +689,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
             </div>
           </form>
         )}
-      </div>
+      </Modal>
 
       {addProductModalOpen && (
         <AddProductToLeadModal
@@ -711,6 +705,6 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
           onCreated={handleQuoteCreated}
         />
       )}
-    </div>
+    </>
   );
 }

@@ -1,10 +1,14 @@
 'use client';
 
 interface DocumentSignatureBlockProps {
-  // "dual" = FIRMA TEHUS + FIRMA CLIENTE side by side, used by
+  // "dual" = company signature + client signature side by side, used by
   // SaleInvoiceTemplate and RepairTemplate.
   // "single" = FIRMA Y NOMBRE DE RECIBIDO, used by RemissionTemplate.
   variant: 'dual' | 'single';
+  // Company name shown on the left signature line of the "dual" variant.
+  // Falls back to a neutral "Firma empresa" when absent — never a hardcoded
+  // company name.
+  companyName?: string;
   receiverName?: string;
   onReceiverNameChange?: (value: string) => void;
 }
@@ -16,6 +20,7 @@ interface DocumentSignatureBlockProps {
 // instead, exactly like the "FIRMA CLIENTE" side already is in the source.
 export function DocumentSignatureBlock({
   variant,
+  companyName,
   receiverName,
   onReceiverNameChange,
 }: DocumentSignatureBlockProps) {
@@ -51,7 +56,9 @@ export function DocumentSignatureBlock({
     <div className="mb-3 flex gap-6">
       <div className="flex-1 text-center">
         <div className="h-10 border-b border-stone-800" />
-        <p className="mt-1 text-xs font-bold uppercase tracking-wide">Firma Tehus</p>
+        <p className="mt-1 text-xs font-bold uppercase tracking-wide">
+          Firma {companyName || 'empresa'}
+        </p>
       </div>
       <div className="flex-1 text-center">
         <div className="h-10 border-b border-stone-800" />

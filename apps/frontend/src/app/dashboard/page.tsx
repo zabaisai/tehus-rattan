@@ -18,6 +18,7 @@ import {
   getOverdueTasksCount,
   getPendingConversationsCount,
 } from '@/lib/analytics';
+import { getMyCompany } from '@/lib/companies';
 import { StatCard } from '@/components/dashboard/StatCard';
 
 function formatCurrency(value: number) {
@@ -31,6 +32,18 @@ function formatCurrency(value: number) {
 export default function DashboardHomePage() {
   const user = useAuthStore((s) => s.user);
 
+  // The subtitle names the logged-in company (never a hardcoded tenant). This
+  // dashboard is only reached by company-scoped users; a platform SUPER_ADMIN
+  // (companyId null) is redirected to the platform area before it mounts.
+  const { data: company } = useQuery({
+    queryKey: ['company-me'],
+    queryFn: getMyCompany,
+    enabled: !!user?.companyId,
+  });
+  const subtitle = company
+    ? `Resumen general de ${company.name}.`
+    : 'Resumen general.';
+
   const { data: overview } = useQuery({ queryKey: ['analytics-overview'], queryFn: getOverview });
   const { data: byStage } = useQuery({ queryKey: ['analytics-stages'], queryFn: getLeadsByStage });
   const { data: agents } = useQuery({ queryKey: ['analytics-agents'], queryFn: getAgentPerformance });
@@ -43,7 +56,7 @@ export default function DashboardHomePage() {
   return (
     <div>
       <h2 className="text-xl font-semibold text-stone-900">Hola, {user?.name ?? ''}</h2>
-      <p className="mt-1 text-sm text-stone-500">Resumen general de Tehus Rattan.</p>
+      <p className="mt-1 text-sm text-stone-500">{subtitle}</p>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
@@ -118,10 +131,10 @@ export default function DashboardHomePage() {
               {agents.map((agent) => (
                 <div
                   key={agent.agentId}
-                  className="flex items-center justify-between border-b border-stone-100 pb-2 text-sm last:border-0"
+                  className="flex flex-col gap-1 border-b border-stone-100 pb-2 text-sm last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                 >
-                  <span className="text-stone-700">{agent.agentName}</span>
-                  <div className="flex items-center gap-3 text-xs text-stone-500">
+                  <span className="truncate text-stone-700">{agent.agentName}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
                     <span>{agent.openLeads} abiertos</span>
                     <span className="text-emerald-600">{agent.wonCount} ganados</span>
                     <span className="font-medium text-stone-800">

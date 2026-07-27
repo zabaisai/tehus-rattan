@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { Product } from '@/types';
 import { PRODUCT_CATEGORIES } from '@/lib/products';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -56,17 +56,7 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            {isEditing ? 'Editar producto' : 'Nuevo producto'}
-          </h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal title={isEditing ? 'Editar producto' : 'Nuevo producto'} onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label className="mb-1 block text-xs font-medium text-stone-600">
@@ -177,7 +167,6 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

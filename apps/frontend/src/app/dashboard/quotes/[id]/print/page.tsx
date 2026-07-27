@@ -38,7 +38,7 @@ export default function QuotePrintPage() {
 
   return (
     <div>
-      <div className="print-hidden mb-4 flex items-center justify-between">
+      <div className="print-hidden mb-4 flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => router.push('/dashboard/quotes')}
@@ -55,7 +55,8 @@ export default function QuotePrintPage() {
             className="flex items-center gap-1.5 rounded-md bg-[#A57014] px-4 py-2 text-sm font-medium text-white hover:bg-[#8c5f10]"
           >
             <Printer size={16} />
-            Imprimir / Guardar como PDF
+            <span className="hidden sm:inline">Imprimir / Guardar como PDF</span>
+            <span className="sm:hidden">Imprimir</span>
           </button>
         )}
       </div>

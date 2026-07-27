@@ -25,6 +25,12 @@ export class CompaniesService {
       accentColor?: string;
       backgroundColor?: string;
       settings?: Prisma.InputJsonValue;
+      // Nullable so the settings form can clear a fiscal field (sets the
+      // column back to NULL) rather than only ever setting a new value.
+      legalName?: string | null;
+      taxId?: string | null;
+      address?: string | null;
+      quoteFooter?: string | null;
     },
   ) {
     try {

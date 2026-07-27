@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
 import { CreateOnboardingCompanyDto } from './dto/create-onboarding-company.dto';
+import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
 function buildDto(
   overrides: Partial<CreateOnboardingCompanyDto> = {},
@@ -22,10 +23,10 @@ function buildDto(
     admin: {
       name: 'Admin Tehus',
       email: 'admin@tehus.test',
-      password: 'supersecret123',
+      password: 'SuperSecret!123',
     },
     ...overrides,
-  } as CreateOnboardingCompanyDto;
+  };
 }
 
 const fakeLogoFile = (overrides: Partial<any> = {}) => ({
@@ -36,10 +37,22 @@ const fakeLogoFile = (overrides: Partial<any> = {}) => ({
   ...overrides,
 });
 
+const VALID_INVITE_CODE = 'TEHUS-AAAA-BBBB-CCCC-DDDD';
+
+const FAKE_CONTEXT: SessionRequestContext = {
+  deviceIdHash: 'onboarding-device-hash',
+  ipPreview: '181.60.12.0',
+  browser: 'Chrome 120',
+  operatingSystem: 'Windows 10',
+  deviceType: 'DESKTOP',
+};
+
 describe('OnboardingService', () => {
   let prisma: any;
   let companyBrandingService: any;
   let authService: any;
+  let auditLogService: any;
+  let sessionsService: any;
   let service: OnboardingService;
   let idCounter: number;
 
@@ -83,6 +96,18 @@ describe('OnboardingService', () => {
         ),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      invitationCode: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'invitation-1',
+          status: 'ACTIVE',
+          expiresAt: null,
+          codePreview: 'TEHUS-****-****-****-DDDD',
+        }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        update: jest.fn((args: any) =>
+          Promise.resolve({ id: args.where.id, ...args.data }),
+        ),
+      },
       $transaction: jest.fn((arg: any) =>
         Array.isArray(arg) ? Promise.all(arg) : arg(prisma),
       ),
@@ -103,7 +128,10 @@ describe('OnboardingService', () => {
           secondaryLogoUrl: null,
         };
         const field = type === 'secondary' ? 'secondaryLogoUrl' : 'logoUrl';
-        const updated = { ...current, [field]: `/uploads/branding/${companyId}/${type}.png` };
+        const updated = {
+          ...current,
+          [field]: `/uploads/branding/${companyId}/${type}.png`,
+        };
         brandingStore.set(companyId, updated);
         return Promise.resolve({
           companyId,
@@ -120,17 +148,43 @@ describe('OnboardingService', () => {
       })),
     };
 
-    service = new OnboardingService(prisma, companyBrandingService, authService);
+    auditLogService = {
+      record: jest.fn().mockResolvedValue(undefined),
+    };
+
+    sessionsService = {
+      recordLoginSuccess: jest.fn().mockResolvedValue({
+        sessionId: 'onboarding-session-1',
+        refreshToken: 'onboarding-plain-refresh-token',
+      }),
+    };
+
+    service = new OnboardingService(
+      prisma,
+      companyBrandingService,
+      authService,
+      auditLogService,
+      sessionsService,
+    );
   });
 
   it('creates company + admin + agents + pipeline + stages in one pass', async () => {
     const dto = buildDto({
       agents: [
-        { name: 'Asesor Uno', email: 'asesor1@tehus.test', password: 'agentpass123' },
+        {
+          name: 'Asesor Uno',
+          email: 'asesor1@tehus.test',
+          password: 'AgentPass!123',
+        },
       ],
     });
 
-    const result = await service.createCompany(dto);
+    const result = await service.createCompany(
+      dto,
+      undefined,
+      VALID_INVITE_CODE,
+      FAKE_CONTEXT,
+    );
 
     expect(prisma.company.create).toHaveBeenCalledTimes(1);
     expect(prisma.user.create).toHaveBeenCalledTimes(2);
@@ -158,6 +212,7 @@ describe('OnboardingService', () => {
         role: 'ADMIN',
         companyId: result.company.id,
       }),
+      'onboarding-session-1',
     );
     expect(result.token).toBe(`fake-jwt-for-${result.admin.id}`);
     expect(result.user).toEqual({
@@ -167,9 +222,35 @@ describe('OnboardingService', () => {
     });
   });
 
+  it('creates a real, trackable UserSession (via SessionsService) as part of the same transaction, and returns a refreshToken for the cookie', async () => {
+    const result = await service.createCompany(
+      buildDto(),
+      undefined,
+      VALID_INVITE_CODE,
+      FAKE_CONTEXT,
+    );
+
+    expect(sessionsService.recordLoginSuccess).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: expect.objectContaining({ role: 'ADMIN' }),
+        context: FAKE_CONTEXT,
+      }),
+      prisma, // the transaction client — same object as the mock's `tx`
+    );
+    // The service itself returns refreshToken — OnboardingController is
+    // the layer responsible for stripping it before the JSON response and
+    // moving it into the httpOnly cookie instead (see its own spec).
+    expect(result.refreshToken).toBe('onboarding-plain-refresh-token');
+  });
+
   it('saves commercial config as settings JSON on the company', async () => {
     const dto = buildDto();
-    await service.createCompany(dto);
+    await service.createCompany(
+      dto,
+      undefined,
+      VALID_INVITE_CODE,
+      FAKE_CONTEXT,
+    );
 
     expect(prisma.company.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -193,13 +274,18 @@ describe('OnboardingService', () => {
         {
           name: 'Intento Admin',
           email: 'intento@tehus.test',
-          password: 'agentpass123',
+          password: 'AgentPass!123',
           role: 'AGENT',
         },
       ],
     });
 
-    await service.createCompany(dto);
+    await service.createCompany(
+      dto,
+      undefined,
+      VALID_INVITE_CODE,
+      FAKE_CONTEXT,
+    );
 
     const agentCreateCall = prisma.user.create.mock.calls[1][0];
     expect(agentCreateCall.data.role).toBe('AGENT');
@@ -208,7 +294,14 @@ describe('OnboardingService', () => {
   it('rejects when the admin email already exists in the database', async () => {
     prisma.user.findMany.mockResolvedValue([{ email: 'admin@tehus.test' }]);
 
-    await expect(service.createCompany(buildDto())).rejects.toThrow(ConflictException);
+    await expect(
+      service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      ),
+    ).rejects.toThrow(ConflictException);
     expect(prisma.company.create).not.toHaveBeenCalled();
     expect(authService.issueSession).not.toHaveBeenCalled();
   });
@@ -216,14 +309,134 @@ describe('OnboardingService', () => {
   it('rejects when the same email appears twice within the payload', async () => {
     const dto = buildDto({
       agents: [
-        { name: 'Duplicado', email: 'admin@tehus.test', password: 'agentpass123' },
+        {
+          name: 'Duplicado',
+          email: 'admin@tehus.test',
+          password: 'AgentPass!123',
+        },
       ],
     });
 
-    await expect(service.createCompany(dto)).rejects.toThrow(ConflictException);
+    await expect(
+      service.createCompany(dto, undefined, VALID_INVITE_CODE, FAKE_CONTEXT),
+    ).rejects.toThrow(ConflictException);
     expect(prisma.user.findMany).not.toHaveBeenCalled();
     expect(prisma.company.create).not.toHaveBeenCalled();
     expect(authService.issueSession).not.toHaveBeenCalled();
+  });
+
+  it('rejects when no invitation code is provided', async () => {
+    await expect(
+      service.createCompany(buildDto(), undefined, '', FAKE_CONTEXT),
+    ).rejects.toThrow('El código de invitación es requerido');
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invitation code that does not match any stored hash', async () => {
+    prisma.invitationCode.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      ),
+    ).rejects.toThrow('Código de invitación inválido');
+    expect(prisma.company.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects a revoked invitation code', async () => {
+    prisma.invitationCode.findUnique.mockResolvedValue({
+      id: 'invitation-1',
+      status: 'REVOKED',
+      expiresAt: null,
+    });
+
+    await expect(
+      service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      ),
+    ).rejects.toThrow('Código de invitación revocado');
+  });
+
+  it('rejects an already-used invitation code', async () => {
+    prisma.invitationCode.findUnique.mockResolvedValue({
+      id: 'invitation-1',
+      status: 'USED',
+      expiresAt: null,
+    });
+
+    await expect(
+      service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      ),
+    ).rejects.toThrow('Código de invitación ya utilizado');
+  });
+
+  it('rejects an expired invitation code', async () => {
+    prisma.invitationCode.findUnique.mockResolvedValue({
+      id: 'invitation-1',
+      status: 'ACTIVE',
+      expiresAt: new Date(Date.now() - 1000),
+    });
+
+    await expect(
+      service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      ),
+    ).rejects.toThrow('Código de invitación vencido');
+  });
+
+  it('marks the invitation code as used exactly once and links it to the created company', async () => {
+    const result = await service.createCompany(
+      buildDto(),
+      undefined,
+      VALID_INVITE_CODE,
+      FAKE_CONTEXT,
+    );
+
+    expect(prisma.invitationCode.updateMany).toHaveBeenCalledTimes(1);
+    expect(prisma.invitationCode.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: 'invitation-1',
+          status: 'ACTIVE',
+        }),
+        data: { status: 'USED', usedAt: expect.any(Date) },
+      }),
+    );
+    expect(prisma.invitationCode.update).toHaveBeenCalledWith({
+      where: { id: 'invitation-1' },
+      data: { companyId: result.company.id, usedByUserId: result.admin.id },
+    });
+    expect(auditLogService.record).toHaveBeenCalledWith(
+      prisma,
+      expect.objectContaining({ action: 'USE_INVITATION_CODE' }),
+    );
+  });
+
+  it('rejects when a concurrent request already claimed the invitation code', async () => {
+    prisma.invitationCode.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      ),
+    ).rejects.toThrow('Código de invitación ya utilizado');
+    expect(prisma.company.create).not.toHaveBeenCalled();
   });
 
   it('does not create the pipeline if creating an agent fails (no half-created company)', async () => {
@@ -236,11 +449,17 @@ describe('OnboardingService', () => {
 
     const dto = buildDto({
       agents: [
-        { name: 'Asesor Falla', email: 'asesor-falla@tehus.test', password: 'agentpass123' },
+        {
+          name: 'Asesor Falla',
+          email: 'asesor-falla@tehus.test',
+          password: 'AgentPass!123',
+        },
       ],
     });
 
-    await expect(service.createCompany(dto)).rejects.toThrow('boom');
+    await expect(
+      service.createCompany(dto, undefined, VALID_INVITE_CODE, FAKE_CONTEXT),
+    ).rejects.toThrow('boom');
     expect(prisma.pipeline.create).not.toHaveBeenCalled();
     expect(prisma.pipelineStage.create).not.toHaveBeenCalled();
     expect(authService.issueSession).not.toHaveBeenCalled();
@@ -248,10 +467,17 @@ describe('OnboardingService', () => {
 
   it('appends a numeric suffix to the slug when the base slug is taken', async () => {
     prisma.company.findUnique.mockImplementation(({ where }: any) =>
-      where.slug === 'tehus-rattan' ? Promise.resolve({ id: 'existing' }) : Promise.resolve(null),
+      where.slug === 'tehus-rattan'
+        ? Promise.resolve({ id: 'existing' })
+        : Promise.resolve(null),
     );
 
-    const result = await service.createCompany(buildDto());
+    const result = await service.createCompany(
+      buildDto(),
+      undefined,
+      VALID_INVITE_CODE,
+      FAKE_CONTEXT,
+    );
 
     expect(result.company.slug).toBe('tehus-rattan-2');
   });
@@ -272,7 +498,11 @@ describe('OnboardingService', () => {
       const dto = await service.parsePayload(raw);
 
       expect(dto.company.name).toBe('Tehus Rattan');
-      expect(dto.pipeline.stages).toEqual(['Nuevo lead', 'Contactado', 'Cerrado ganado']);
+      expect(dto.pipeline.stages).toEqual([
+        'Nuevo lead',
+        'Contactado',
+        'Cerrado ganado',
+      ]);
     });
 
     it('rejects an invalid JSON string in the "data" field', async () => {
@@ -282,7 +512,9 @@ describe('OnboardingService', () => {
     });
 
     it('rejects a payload missing required fields', async () => {
-      await expect(service.parsePayload({ company: { name: 'X' } })).rejects.toThrow();
+      await expect(
+        service.parsePayload({ company: { name: 'X' } }),
+      ).rejects.toThrow();
     });
   });
 
@@ -293,7 +525,12 @@ describe('OnboardingService', () => {
       });
 
       await expect(
-        service.createCompany(buildDto(), { logo: fakeLogoFile() }),
+        service.createCompany(
+          buildDto(),
+          { logo: fakeLogoFile() },
+          VALID_INVITE_CODE,
+          FAKE_CONTEXT,
+        ),
       ).rejects.toThrow('invalid logo');
 
       expect(prisma.user.findMany).not.toHaveBeenCalled();
@@ -301,7 +538,12 @@ describe('OnboardingService', () => {
     });
 
     it('uploads a primary logo and returns its logoUrl', async () => {
-      const result = await service.createCompany(buildDto(), { logo: fakeLogoFile() });
+      const result = await service.createCompany(
+        buildDto(),
+        { logo: fakeLogoFile() },
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
 
       expect(companyBrandingService.uploadLogo).toHaveBeenCalledWith(
         result.company.id,
@@ -317,10 +559,15 @@ describe('OnboardingService', () => {
     });
 
     it('uploads both a primary and secondary logo', async () => {
-      const result = await service.createCompany(buildDto(), {
-        logo: fakeLogoFile(),
-        secondaryLogo: fakeLogoFile({ originalname: 'secondary.png' }),
-      });
+      const result = await service.createCompany(
+        buildDto(),
+        {
+          logo: fakeLogoFile(),
+          secondaryLogo: fakeLogoFile({ originalname: 'secondary.png' }),
+        },
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
 
       expect(companyBrandingService.uploadLogo).toHaveBeenCalledTimes(2);
       expect(result.company.logoUrl).toMatch(/^\/uploads\/branding\//);
@@ -328,7 +575,12 @@ describe('OnboardingService', () => {
     });
 
     it('works with no logo files at all (JSON compatibility)', async () => {
-      const result = await service.createCompany(buildDto());
+      const result = await service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
 
       expect(companyBrandingService.uploadLogo).not.toHaveBeenCalled();
       expect(result.company.logoUrl).toBeNull();
@@ -336,10 +588,17 @@ describe('OnboardingService', () => {
     });
 
     it('cleans up the created company if saving the logo fails after the transaction', async () => {
-      companyBrandingService.uploadLogo.mockRejectedValue(new Error('disk full'));
+      companyBrandingService.uploadLogo.mockRejectedValue(
+        new Error('disk full'),
+      );
 
       await expect(
-        service.createCompany(buildDto(), { logo: fakeLogoFile() }),
+        service.createCompany(
+          buildDto(),
+          { logo: fakeLogoFile() },
+          VALID_INVITE_CODE,
+          FAKE_CONTEXT,
+        ),
       ).rejects.toThrow('disk full');
 
       expect(prisma.pipelineStage.deleteMany).toHaveBeenCalled();
@@ -349,6 +608,13 @@ describe('OnboardingService', () => {
       // A logo failure means the company is rolled back — no session should
       // ever be issued for a company that no longer exists.
       expect(authService.issueSession).not.toHaveBeenCalled();
+      // The invitation code must be restored to ACTIVE so the same code can
+      // be retried once the underlying logo problem is fixed.
+      expect(prisma.invitationCode.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'ACTIVE' }),
+        }),
+      );
     });
   });
 });

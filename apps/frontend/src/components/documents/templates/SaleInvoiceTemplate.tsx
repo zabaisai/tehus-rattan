@@ -7,9 +7,15 @@ import { DocumentTotalsBlock } from '../DocumentTotalsBlock';
 import { DocumentTermsAndConditions } from '../DocumentTermsAndConditions';
 import { DocumentSignatureBlock } from '../DocumentSignatureBlock';
 import { DocumentFooter } from '../DocumentFooter';
-import { DocumentClient, DocumentItem, SaleInvoiceMeta } from '@/types/documents';
+import {
+  DocumentClient,
+  DocumentCompanyIdentity,
+  DocumentItem,
+  SaleInvoiceMeta,
+} from '@/types/documents';
 
 interface SaleInvoiceTemplateProps {
+  company: DocumentCompanyIdentity;
   meta: SaleInvoiceMeta;
   onMetaChange: (meta: SaleInvoiceMeta) => void;
   client: DocumentClient;
@@ -23,6 +29,7 @@ interface SaleInvoiceTemplateProps {
 }
 
 export function SaleInvoiceTemplate({
+  company,
   meta,
   onMetaChange,
   client,
@@ -40,6 +47,7 @@ export function SaleInvoiceTemplate({
   return (
     <div>
       <DocumentHeader
+        company={company}
         title="Cotización / Factura de venta"
         fields={[
           {
@@ -101,9 +109,9 @@ export function SaleInvoiceTemplate({
         />
       </div>
 
-      <DocumentTermsAndConditions />
-      <DocumentSignatureBlock variant="dual" />
-      <DocumentFooter />
+      <DocumentTermsAndConditions terms={company.quoteFooter} />
+      <DocumentSignatureBlock variant="dual" companyName={company.name} />
+      <DocumentFooter company={company} />
     </div>
   );
 }

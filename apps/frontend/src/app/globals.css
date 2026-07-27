@@ -24,3 +24,14 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* iOS Safari zooms the page in on focus when a form field's computed font
+   size is under 16px. Every form in this app uses text-sm (14px), so this
+   forces 16px only up to the sm breakpoint instead of bumping every input. */
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

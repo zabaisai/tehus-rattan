@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
 import * as bcrypt from 'bcryptjs';
@@ -6,11 +11,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
+import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
 import {
   CompanyBrandingService,
   UploadedLogoFile,
 } from '../companies/company-branding.service';
 import { CreateOnboardingCompanyDto } from './dto/create-onboarding-company.dto';
+import {
+  hashInvitationCode,
+  normalizeInvitationCode,
+} from '../invitation-codes/invitation-code.util';
+import { SessionsService } from '../sessions/sessions.service';
+import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
 export interface OnboardingLogoFiles {
   logo?: UploadedLogoFile;
@@ -46,6 +58,8 @@ export class OnboardingService {
     private prisma: PrismaService,
     private companyBrandingService: CompanyBrandingService,
     private authService: AuthService,
+    private auditLogService: PlatformAuditLogService,
+    private sessionsService: SessionsService,
   ) {}
 
   // Accepts either a plain JSON body (existing behavior, unchanged) or a
@@ -78,7 +92,9 @@ export class OnboardingService {
       try {
         return JSON.parse((rawBody as Record<string, unknown>).data as string);
       } catch {
-        throw new BadRequestException('El campo "data" debe ser un JSON válido');
+        throw new BadRequestException(
+          'El campo "data" debe ser un JSON válido',
+        );
       }
     }
     return (rawBody ?? {}) as Record<string, unknown>;
@@ -88,7 +104,8 @@ export class OnboardingService {
     const messages: string[] = [];
     const walk = (list: ValidationError[]) => {
       for (const error of list) {
-        if (error.constraints) messages.push(...Object.values(error.constraints));
+        if (error.constraints)
+          messages.push(...Object.values(error.constraints));
         if (error.children?.length) walk(error.children);
       }
     };
@@ -96,15 +113,26 @@ export class OnboardingService {
     return messages;
   }
 
-  async createCompany(dto: CreateOnboardingCompanyDto, files?: OnboardingLogoFiles) {
+  async createCompany(
+    dto: CreateOnboardingCompanyDto,
+    files: OnboardingLogoFiles | undefined,
+    inviteCode: unknown,
+    context: SessionRequestContext,
+  ) {
     // Validate any logo files (extension, mimetype, size, magic bytes) as
     // the very first thing — before any database access at all — so a bad
     // file rejects the whole request with zero reads or writes, instead of
     // leaving a company (or even a wasted duplicate-email lookup) behind.
-    if (files?.logo) this.companyBrandingService.assertValidLogoFile(files.logo);
+    if (files?.logo)
+      this.companyBrandingService.assertValidLogoFile(files.logo);
     if (files?.secondaryLogo) {
       this.companyBrandingService.assertValidLogoFile(files.secondaryLogo);
     }
+
+    if (typeof inviteCode !== 'string' || !inviteCode.trim()) {
+      throw new BadRequestException('El código de invitación es requerido');
+    }
+    const codeHash = hashInvitationCode(normalizeInvitationCode(inviteCode));
 
     const adminEmail = dto.admin.email.trim().toLowerCase();
     const agents = dto.agents ?? [];
@@ -148,6 +176,59 @@ export class OnboardingService {
     };
 
     const result = await this.prisma.$transaction(async (tx) => {
+      const invitation = await tx.invitationCode.findUnique({
+        where: { codeHash },
+      });
+
+      if (!invitation) {
+        this.logger.warn(
+          'Intento de onboarding con código de invitación inválido',
+        );
+        throw new BadRequestException('Código de invitación inválido');
+      }
+      if (invitation.status === 'REVOKED') {
+        this.logger.warn(
+          `Intento de onboarding con código revocado (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación revocado');
+      }
+      if (invitation.status === 'USED') {
+        this.logger.warn(
+          `Intento de onboarding con código ya utilizado (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación ya utilizado');
+      }
+      const isExpired =
+        invitation.status === 'EXPIRED' ||
+        (invitation.expiresAt !== null &&
+          invitation.expiresAt.getTime() <= Date.now());
+      if (isExpired) {
+        this.logger.warn(
+          `Intento de onboarding con código vencido (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación vencido');
+      }
+
+      // Atomic conditional claim: if a concurrent request already consumed,
+      // revoked, or the code expired in the instant between the read above
+      // and here, `count` comes back 0 and this whole transaction rolls
+      // back — at most one of two simultaneous requests with the same code
+      // can ever get past this point.
+      const claim = await tx.invitationCode.updateMany({
+        where: {
+          id: invitation.id,
+          status: 'ACTIVE',
+          OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        },
+        data: { status: 'USED', usedAt: new Date() },
+      });
+      if (claim.count === 0) {
+        this.logger.warn(
+          `Código de invitación perdió la carrera de uso concurrente (invitationId=${invitation.id})`,
+        );
+        throw new BadRequestException('Código de invitación ya utilizado');
+      }
+
       const company = await tx.company.create({
         data: {
           name: companyName,
@@ -177,6 +258,26 @@ export class OnboardingService {
           companyId: company.id,
         },
       });
+
+      // Part of this same transaction on purpose — see recordLoginSuccess's
+      // `writer` param — so a failure anywhere later in onboarding (an
+      // agent create, a pipeline stage, the invitation claim) rolls this
+      // back too. There must never be a UserSession/LoginEvent "successful
+      // login" row for a company that doesn't end up existing.
+      const { sessionId, refreshToken } =
+        await this.sessionsService.recordLoginSuccess(
+          {
+            user: {
+              id: admin.id,
+              email: admin.email,
+              name: admin.name,
+              role: admin.role,
+              companyId: admin.companyId,
+            },
+            context,
+          },
+          tx,
+        );
 
       const createdAgents: SafeUser[] = [];
       for (let i = 0; i < agents.length; i++) {
@@ -212,7 +313,39 @@ export class OnboardingService {
         stages.push(stage);
       }
 
-      return { company, admin, createdAgents, pipeline, stages };
+      await tx.invitationCode.update({
+        where: { id: invitation.id },
+        data: { companyId: company.id, usedByUserId: admin.id },
+      });
+
+      // If this write fails, the transaction rolls back the invitation
+      // consumption (and the company/admin) too — using a code must never
+      // go unlogged.
+      await this.auditLogService.record(tx, {
+        actorUserId: admin.id,
+        actorRole: 'ADMIN',
+        affectedCompanyId: company.id,
+        action: 'USE_INVITATION_CODE',
+        entityType: 'InvitationCode',
+        entityId: invitation.id,
+        metadata: {
+          invitationId: invitation.id,
+          codePreview: invitation.codePreview,
+          companyId: company.id,
+          companyName: company.name,
+        },
+      });
+
+      return {
+        company,
+        admin,
+        createdAgents,
+        pipeline,
+        stages,
+        invitationId: invitation.id,
+        sessionId,
+        refreshToken,
+      };
     });
 
     let logoUrl = result.company.logoUrl;
@@ -243,7 +376,11 @@ export class OnboardingService {
         // uploaded file can't be part of the same Postgres transaction) —
         // so a logo failure here is compensated with an explicit cleanup
         // instead of leaving a company with a half-applied logo.
-        await this.cleanupFailedCompany(result.company.id, result.pipeline.id);
+        await this.cleanupFailedCompany(
+          result.company.id,
+          result.pipeline.id,
+          result.invitationId,
+        );
         throw err;
       }
     }
@@ -252,8 +389,13 @@ export class OnboardingService {
     // successfully committed — never before, so a failed request can never
     // hand back a token for a company that doesn't actually exist. Agents
     // never reach this point at all, since only the admin created above is
-    // ever passed in here.
-    const session = this.authService.issueSession(result.admin);
+    // ever passed in here. sessionId embeds the UserSession created inside
+    // the transaction above, so this access token is immediately subject
+    // to the same sid-based revocation as one from a real /auth/login.
+    const session = this.authService.issueSession(
+      result.admin,
+      result.sessionId,
+    );
 
     return {
       message: 'Empresa creada correctamente',
@@ -275,12 +417,14 @@ export class OnboardingService {
       })),
       token: session.token,
       user: session.user,
+      refreshToken: result.refreshToken,
     };
   }
 
   private async cleanupFailedCompany(
     companyId: string,
     pipelineId: string,
+    invitationId: string,
   ): Promise<void> {
     try {
       await this.prisma.$transaction([
@@ -288,6 +432,19 @@ export class OnboardingService {
         this.prisma.pipeline.delete({ where: { id: pipelineId } }),
         this.prisma.user.deleteMany({ where: { companyId } }),
         this.prisma.company.delete({ where: { id: companyId } }),
+        // The onboarding attempt failed overall (logo upload, in this case)
+        // — the invitation must not stay burned for a company that was
+        // just deleted. Give it back its ACTIVE state so the same code can
+        // be retried.
+        this.prisma.invitationCode.update({
+          where: { id: invitationId },
+          data: {
+            status: 'ACTIVE',
+            usedAt: null,
+            usedByUserId: null,
+            companyId: null,
+          },
+        }),
       ]);
     } catch (cleanupError) {
       // Never swallow this — an onboarding company that fails to clean up
@@ -298,7 +455,12 @@ export class OnboardingService {
         cleanupError instanceof Error ? cleanupError.stack : cleanupError,
       );
     } finally {
-      const uploadsDir = path.join(process.cwd(), 'uploads', 'branding', companyId);
+      const uploadsDir = path.join(
+        process.cwd(),
+        'uploads',
+        'branding',
+        companyId,
+      );
       fs.rmSync(uploadsDir, { recursive: true, force: true });
     }
   }
@@ -319,7 +481,9 @@ export class OnboardingService {
 
     // A handful of sequential lookups is fine here — onboarding is a rare,
     // invite-gated action, not a high-traffic path.
-    while (await this.prisma.company.findUnique({ where: { slug: candidate } })) {
+    while (
+      await this.prisma.company.findUnique({ where: { slug: candidate } })
+    ) {
       candidate = `${base}-${suffix}`;
       suffix++;
     }

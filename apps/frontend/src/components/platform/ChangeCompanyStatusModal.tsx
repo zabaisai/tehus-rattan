@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { CompanyStatus } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -82,20 +82,7 @@ export function ChangeCompanyStatusModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            {copy.title}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-stone-400 hover:text-stone-700"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal title={copy.title} onClose={onClose} maxWidth="sm">
         <p className="mb-4 text-sm text-stone-600">
           {copy.message(companyName)}
         </p>
@@ -137,7 +124,6 @@ export function ChangeCompanyStatusModal({
             {saving ? 'Guardando...' : copy.confirmLabel}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -9,9 +9,9 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  MinLength,
   ValidateNested,
 } from 'class-validator';
+import { IsStrongPassword } from '../../../common/password/password-policy';
 
 export class OnboardingCompanyInfoDto {
   @IsString()
@@ -110,7 +110,7 @@ export class OnboardingAdminDto {
   email!: string;
 
   @IsString()
-  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+  @IsStrongPassword()
   password!: string;
 }
 
@@ -123,7 +123,7 @@ export class OnboardingAgentDto {
   email!: string;
 
   @IsString()
-  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
+  @IsStrongPassword()
   password!: string;
 
   @IsOptional()

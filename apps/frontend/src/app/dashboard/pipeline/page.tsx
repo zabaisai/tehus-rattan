@@ -38,13 +38,13 @@ export default function PipelinePage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-xl font-semibold text-stone-900">
           {defaultPipeline.name}
         </h2>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
         >
           <Plus size={16} />
           Nuevo lead

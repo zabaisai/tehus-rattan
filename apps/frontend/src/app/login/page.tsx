@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
+import { ConnectionUnavailable } from '@/components/auth/ConnectionUnavailable';
 
 type ApiError = {
   response?: {
@@ -15,12 +17,37 @@ type ApiError = {
 
 export default function LoginPage() {
   const router = useRouter();
+  const status = useAuthStore((s) => s.status);
   const setSession = useAuthStore((s) => s.setSession);
+  const setUser = useAuthStore((s) => s.setUser);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [resetNotice, setResetNotice] = useState('');
+
+  // Already logged in (e.g. bootstrap found a live session, or another tab) —
+  // don't show the login form, go to the app.
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/dashboard');
+    }
+  }, [status, router]);
+
+  // Show the success banner after a password reset (reset page redirects here
+  // with ?reset=1), then strip the query so a refresh doesn't keep showing it.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('reset') === '1') {
+      // Client-only read (window) — must run after mount to avoid a hydration
+      // mismatch, so the setState here is intentional.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setResetNotice('Contraseña actualizada correctamente. Ya puedes iniciar sesión.');
+      window.history.replaceState(null, '', '/login');
+    }
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,16 +57,16 @@ export default function LoginPage() {
     try {
       const { token, user } = await login(email, password);
       // The login response only carries id/email/name. role and companyId
-      // (needed right away for role-gated nav like the platform section)
-      // only come from /auth/me, so fetch the full profile before
-      // navigating instead of waiting for a later remount to backfill it.
+      // (needed right away for role-gated nav like the platform section) only
+      // come from /auth/me, so fetch the full profile before navigating. The
+      // token is stored ONLY in memory (setSession → lib/auth-token.ts).
       setSession(user, token);
       const fullUser = await getMe();
-      setSession(fullUser, token);
+      setUser(fullUser);
 
       // A global SUPER_ADMIN (companyId null) has no company to scope the
-      // normal CRM dashboard to — every business query on it expects a
-      // real companyId and 500s. Send them straight to the platform area.
+      // normal CRM dashboard to — every business query on it expects a real
+      // companyId and 500s. Send them straight to the platform area.
       const isPlatformSuperAdmin =
         fullUser.role === 'SUPER_ADMIN' && fullUser.companyId === null;
       router.push(
@@ -53,6 +80,22 @@ export default function LoginPage() {
     }
   }
 
+  // The server was unreachable during bootstrap (429 / network / 5xx): show the
+  // retry screen, not a form that implies the session expired.
+  if (status === 'unavailable') {
+    return <ConnectionUnavailable />;
+  }
+
+  // While the initial bootstrap runs, or when already authenticated (redirect
+  // pending), don't flash the login form.
+  if (status !== 'anonymous') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-stone-50">
+        <p className="text-sm text-stone-500">Cargando...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
       <div className="w-full max-w-sm">
@@ -62,6 +105,16 @@ export default function LoginPage() {
           </h1>
           <p className="mt-1 text-sm text-stone-500">CRM interno</p>
         </div>
+
+        {resetNotice && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
+          >
+            {resetNotice}
+          </p>
+        )}
 
         <form
           onSubmit={handleSubmit}
@@ -103,8 +156,17 @@ export default function LoginPage() {
             />
           </div>
 
+          <div className="mb-4 -mt-1 text-right">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-stone-500 transition-colors hover:text-stone-700"
+            >
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
+
           {error && (
-            <p className="mb-4 text-sm text-red-600">{error}</p>
+            <p role="alert" aria-live="assertive" className="mb-4 text-sm text-red-600">{error}</p>
           )}
 
           <button

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { X } from 'lucide-react';
 import { createQuoteFromLead } from '@/lib/quotes';
 import { Quote } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -49,15 +49,7 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">Crear cotización</h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal title="Crear cotización" onClose={onClose} maxWidth="md" stackedZIndex>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label className="mb-1 block text-xs font-medium text-stone-600">
@@ -132,7 +124,6 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { getContacts } from '@/lib/contacts';
 import { getCompanyUsers } from '@/lib/users';
 import { createLead } from '@/lib/leads';
 import { PipelineStage } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -82,15 +82,7 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-sm rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">Nuevo lead</h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal title="Nuevo lead" onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
             <label className="mb-1 block text-xs font-medium text-stone-600">Título</label>
@@ -201,7 +193,6 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 }

@@ -6,8 +6,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { PlatformCompaniesController } from '../src/modules/platform/platform-companies.controller';
 import { PlatformCompaniesService } from '../src/modules/platform/platform-companies.service';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 // Test-only secret, never read from .env and never logged.
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
@@ -30,7 +35,13 @@ describe('PlatformCompaniesController (e2e)', () => {
 
   const signToken = (role: string, companyId: string | null) =>
     jwtService.sign(
-      { sub: 'user-1', email: 'platform@tehus.test', role, companyId },
+      {
+        sub: 'user-1',
+        email: 'platform@tehus.test',
+        role,
+        companyId,
+        sid: encodeSid('user-1', companyId),
+      },
       { expiresIn: '5m' },
     );
 
@@ -49,6 +60,7 @@ describe('PlatformCompaniesController (e2e)', () => {
             },
           },
         },
+        { provide: PrismaService, useValue: buildFakeSessionPrisma() },
         {
           provide: PlatformCompaniesService,
           useValue: companiesServiceMock,
@@ -296,9 +308,7 @@ describe('PlatformCompaniesController (e2e)', () => {
         .send({ status: 'SUSPENDED', reason: 'a'.repeat(501) })
         .expect(400);
 
-      expect(
-        companiesServiceMock.updateCompanyStatus,
-      ).not.toHaveBeenCalled();
+      expect(companiesServiceMock.updateCompanyStatus).not.toHaveBeenCalled();
     });
 
     it('rejects an invalid status value with 400', async () => {
@@ -310,9 +320,7 @@ describe('PlatformCompaniesController (e2e)', () => {
         .send({ status: 'NOT_A_STATUS' })
         .expect(400);
 
-      expect(
-        companiesServiceMock.updateCompanyStatus,
-      ).not.toHaveBeenCalled();
+      expect(companiesServiceMock.updateCompanyStatus).not.toHaveBeenCalled();
     });
 
     it('rejects a SUPER_ADMIN scoped to a company with 403', async () => {
@@ -324,9 +332,7 @@ describe('PlatformCompaniesController (e2e)', () => {
         .send({ status: 'SUSPENDED' })
         .expect(403);
 
-      expect(
-        companiesServiceMock.updateCompanyStatus,
-      ).not.toHaveBeenCalled();
+      expect(companiesServiceMock.updateCompanyStatus).not.toHaveBeenCalled();
     });
   });
 
@@ -334,7 +340,13 @@ describe('PlatformCompaniesController (e2e)', () => {
     const safeOverview = {
       company: { id: 'company-a', name: 'Company A' },
       users: { total: 1, active: 1, items: [] },
-      counts: { contacts: 0, leads: 0, conversations: 0, tasks: 0, products: 0 },
+      counts: {
+        contacts: 0,
+        leads: 0,
+        conversations: 0,
+        tasks: 0,
+        products: 0,
+      },
       whatsapp: {
         connected: false,
         status: null,

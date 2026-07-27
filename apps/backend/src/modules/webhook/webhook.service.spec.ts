@@ -163,4 +163,139 @@ describe('WebhookService', () => {
     expect(conversationsService.findOrCreate).not.toHaveBeenCalled();
     expect(messagesService.create).not.toHaveBeenCalled();
   });
+
+  describe('batch processing (never only entry[0]/changes[0]/messages[0])', () => {
+    beforeEach(() => {
+      whatsappIntegrationService.findConnectedByPhoneNumberId.mockResolvedValue(
+        connectedIntegration,
+      );
+      messagesService.findByWamid.mockResolvedValue(null);
+      prisma.contact.findFirst.mockResolvedValue({ id: 'contact-a' });
+      conversationsService.findOrCreate.mockResolvedValue({ id: 'conversation-a' });
+      messagesService.create.mockResolvedValue({ id: 'message-a' });
+      automationsService.processMessage.mockResolvedValue(undefined);
+    });
+
+    const textMessage = (id: string, from = '50255551111', body = 'Hola') => ({
+      id,
+      from,
+      type: 'text',
+      text: { body },
+    });
+
+    const value = (messages: any[]) => ({
+      metadata: { phone_number_id: '1234567890' },
+      contacts: [{ wa_id: '50255551111', profile: { name: 'Jane Doe' } }],
+      messages,
+    });
+
+    it('processes messages across multiple entries', async () => {
+      await service.processWebhook({
+        entry: [
+          { changes: [{ value: value([textMessage('wamid.1')]) }] },
+          { changes: [{ value: value([textMessage('wamid.2')]) }] },
+        ],
+      });
+
+      const created = messagesService.create.mock.calls.map((c: any) => c[0].wamid);
+      expect(created).toEqual(['wamid.1', 'wamid.2']);
+    });
+
+    it('processes multiple changes within one entry', async () => {
+      await service.processWebhook({
+        entry: [
+          {
+            changes: [
+              { value: value([textMessage('wamid.1')]) },
+              { value: value([textMessage('wamid.2')]) },
+            ],
+          },
+        ],
+      });
+      expect(messagesService.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('processes every message inside a single change', async () => {
+      await service.processWebhook({
+        entry: [
+          {
+            changes: [
+              { value: value([textMessage('wamid.1'), textMessage('wamid.2')]) },
+            ],
+          },
+        ],
+      });
+      const created = messagesService.create.mock.calls.map((c: any) => c[0].wamid);
+      expect(created).toEqual(['wamid.1', 'wamid.2']);
+    });
+
+    it('skips unsupported message types but still processes text in the same batch', async () => {
+      await service.processWebhook({
+        entry: [
+          {
+            changes: [
+              {
+                value: value([
+                  { id: 'wamid.img', from: '50255551111', type: 'image', image: { id: 'x' } },
+                  textMessage('wamid.txt'),
+                ]),
+              },
+            ],
+          },
+        ],
+      });
+      const created = messagesService.create.mock.calls.map((c: any) => c[0].wamid);
+      expect(created).toEqual(['wamid.txt']); // the image was ignored
+    });
+
+    it('isolates a per-message failure and continues the batch', async () => {
+      messagesService.create
+        .mockRejectedValueOnce(new Error('db blip'))
+        .mockResolvedValueOnce({ id: 'message-b' });
+
+      await expect(
+        service.processWebhook({
+          entry: [
+            {
+              changes: [
+                { value: value([textMessage('wamid.1'), textMessage('wamid.2')]) },
+              ],
+            },
+          ],
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(messagesService.create).toHaveBeenCalledTimes(2); // both attempted
+    });
+
+    it('safely ignores a status-only payload (delivery/read updates, no messages)', async () => {
+      await expect(
+        service.processWebhook({
+          entry: [
+            {
+              changes: [
+                {
+                  value: {
+                    metadata: { phone_number_id: '1234567890' },
+                    statuses: [{ id: 'wamid.1', status: 'delivered' }],
+                  },
+                },
+              ],
+            },
+          ],
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(
+        whatsappIntegrationService.findConnectedByPhoneNumberId,
+      ).not.toHaveBeenCalled();
+      expect(messagesService.create).not.toHaveBeenCalled();
+    });
+
+    it('does not throw on an empty or missing entry array', async () => {
+      await expect(service.processWebhook({})).resolves.toBeUndefined();
+      await expect(service.processWebhook({ entry: [] })).resolves.toBeUndefined();
+      expect(messagesService.create).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -1,15 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import { PrintableDocumentShell } from './PrintableDocumentShell';
 import { SaleInvoiceTemplate } from './templates/SaleInvoiceTemplate';
 import { RepairTemplate } from './templates/RepairTemplate';
 import { RemissionTemplate } from './templates/RemissionTemplate';
 import { DOCUMENT_TEMPLATE_LABELS } from '@/lib/document-templates';
+import { getMyCompany } from '@/lib/companies';
+import { toDocumentCompanyIdentity } from '@/lib/document-company';
 import {
   DocumentTemplateType,
   DocumentClient,
+  DocumentCompanyIdentity,
   DocumentTransport,
   DocumentReceiver,
   DocumentItem,
@@ -35,6 +39,13 @@ function emptyReceiver(): DocumentReceiver {
 // Quote/QuoteItem API yet (see the follow-up commit that connects them).
 export function DocumentCalculator() {
   const [templateType, setTemplateType] = useState<DocumentTemplateType>('SALE_INVOICE');
+
+  // The document is issued by the logged-in user's own company. Its fiscal
+  // identity heads and foots the document — never a hardcoded/global company.
+  const { data: company } = useQuery({ queryKey: ['company-me'], queryFn: getMyCompany });
+  const companyIdentity: DocumentCompanyIdentity = company
+    ? toDocumentCompanyIdentity(company)
+    : { name: '' };
 
   const [invoiceMeta, setInvoiceMeta] = useState<SaleInvoiceMeta>({
     accountNumber: '',
@@ -101,6 +112,7 @@ export function DocumentCalculator() {
       <PrintableDocumentShell>
         {templateType === 'SALE_INVOICE' && (
           <SaleInvoiceTemplate
+            company={companyIdentity}
             meta={invoiceMeta}
             onMetaChange={setInvoiceMeta}
             client={invoiceClient}
@@ -116,6 +128,7 @@ export function DocumentCalculator() {
 
         {templateType === 'REPAIR' && (
           <RepairTemplate
+            company={companyIdentity}
             meta={repairMeta}
             onMetaChange={setRepairMeta}
             client={repairClient}
@@ -131,6 +144,7 @@ export function DocumentCalculator() {
 
         {templateType === 'REMISSION' && (
           <RemissionTemplate
+            company={companyIdentity}
             meta={remissionMeta}
             onMetaChange={setRemissionMeta}
             transport={transport}

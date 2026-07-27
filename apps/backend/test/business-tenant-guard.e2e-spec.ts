@@ -6,12 +6,17 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { ContactsController } from '../src/modules/contacts/contacts.controller';
 import { ContactsService } from '../src/modules/contacts/contacts.service';
 import { PlatformCompaniesController } from '../src/modules/platform/platform-companies.controller';
 import { PlatformCompaniesService } from '../src/modules/platform/platform-companies.service';
 import { WebhookController } from '../src/modules/webhook/webhook.controller';
 import { WebhookService } from '../src/modules/webhook/webhook.service';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 // Test-only secret, never read from .env and never logged.
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
@@ -39,7 +44,13 @@ describe('BusinessTenantGuard (e2e)', () => {
 
   const signToken = (role: string, companyId: string | null) =>
     jwtService.sign(
-      { sub: 'user-1', email: 'user@example.com', role, companyId },
+      {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role,
+        companyId,
+        sid: encodeSid('user-1', companyId),
+      },
       { expiresIn: '5m' },
     );
 
@@ -60,8 +71,14 @@ describe('BusinessTenantGuard (e2e)', () => {
               if (key === 'JWT_SECRET') return TEST_JWT_SECRET;
               throw new Error(`Unexpected config key requested: ${key}`);
             },
+            // WhatsAppSignatureGuard (on POST /api/webhook) reads this.
+            get: (key: string) =>
+              key === 'WHATSAPP_APP_SECRET'
+                ? 'e2e-test-only-app-secret'
+                : undefined,
           },
         },
+        { provide: PrismaService, useValue: buildFakeSessionPrisma() },
         { provide: ContactsService, useValue: contactsServiceMock },
         { provide: PlatformCompaniesService, useValue: companiesServiceMock },
         { provide: WebhookService, useValue: webhookServiceMock },
@@ -153,14 +170,19 @@ describe('BusinessTenantGuard (e2e)', () => {
     });
   });
 
-  describe('POST /api/webhook (public, no JWT, unaffected)', () => {
-    it('is never blocked by BusinessTenantGuard or AuthGuard — no Authorization header needed', async () => {
-      await request(app.getHttpServer())
+  describe('POST /api/webhook (no JWT — gated by signature, not by tenant/auth guards)', () => {
+    it('is not rejected by BusinessTenantGuard/AuthGuard, but the signature guard blocks an unsigned request (401, not 403/tenant)', async () => {
+      const res = await request(app.getHttpServer())
         .post('/api/webhook')
         .send({ entry: [] })
-        .expect(200);
+        .expect(401);
 
-      expect(webhookServiceMock.processWebhook).toHaveBeenCalled();
+      // 401 from the WhatsApp signature guard — NOT the tenant guard's 403
+      // message, proving the block is signature-based, not JWT/tenant-based.
+      expect(res.body.message).not.toBe(
+        'Este endpoint requiere un usuario asociado a una empresa',
+      );
+      expect(webhookServiceMock.processWebhook).not.toHaveBeenCalled();
     });
   });
 });

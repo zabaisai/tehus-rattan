@@ -11,10 +11,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { ContactsController } from '../src/modules/contacts/contacts.controller';
 import { ContactsService } from '../src/modules/contacts/contacts.service';
 import { SupportSessionsController } from '../src/modules/platform/support-sessions.controller';
 import { SupportSessionsService } from '../src/modules/platform/support-sessions.service';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 // Test-only secret, never read from .env and never logged.
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
@@ -42,7 +47,13 @@ describe('SupportSessionsController (e2e)', () => {
 
   const signToken = (role: string, companyId: string | null) =>
     jwtService.sign(
-      { sub: 'user-1', email: 'platform@tehus.test', role, companyId },
+      {
+        sub: 'user-1',
+        email: 'platform@tehus.test',
+        role,
+        companyId,
+        sid: encodeSid('user-1', companyId),
+      },
       { expiresIn: '5m' },
     );
 
@@ -61,6 +72,7 @@ describe('SupportSessionsController (e2e)', () => {
             },
           },
         },
+        { provide: PrismaService, useValue: buildFakeSessionPrisma() },
         {
           provide: SupportSessionsService,
           useValue: supportSessionsServiceMock,

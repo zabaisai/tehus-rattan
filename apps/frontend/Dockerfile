@@ -27,6 +27,11 @@ FROM node:${NODE_VERSION} AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 
+# Deployed-version identity for traceability (not consumed by the app at
+# runtime — NEXT_PUBLIC_* is inlined at build — but useful on the image label).
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.revision=$GIT_SHA
+
 RUN addgroup -S nodeapp && adduser -S nextjs -G nodeapp
 
 COPY --from=builder /app/public ./public

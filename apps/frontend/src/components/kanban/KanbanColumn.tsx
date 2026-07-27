@@ -13,13 +13,17 @@ function formatCurrency(value: number) {
 
 export function KanbanColumn({
   stage,
+  stages,
   onLeadClick,
+  onMoveStage,
 }: {
   stage: KanbanStage;
+  stages: { id: string; name: string }[];
   onLeadClick: (leadId: string) => void;
+  onMoveStage: (leadId: string, newStageId: string) => void;
 }) {
   return (
-    <div className="flex w-72 shrink-0 flex-col rounded-lg bg-stone-100">
+    <div className="flex w-[85vw] max-w-xs shrink-0 flex-col rounded-lg bg-stone-100 sm:w-72 sm:max-w-none">
       <div className="border-b border-stone-200 px-3 py-2.5">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-stone-800">{stage.name}</h3>
@@ -43,8 +47,18 @@ export function KanbanColumn({
             style={{ minHeight: 80 }}
           >
             {stage.leads.map((lead, index) => (
-              <LeadCard key={lead.id} lead={lead} index={index} onOpen={onLeadClick} />
+              <LeadCard
+                key={lead.id}
+                lead={lead}
+                index={index}
+                onOpen={onLeadClick}
+                stages={stages}
+                onMoveStage={onMoveStage}
+              />
             ))}
+            {stage.leads.length === 0 && (
+              <p className="px-1 py-3 text-center text-xs text-stone-400">Sin leads en esta etapa.</p>
+            )}
             {provided.placeholder}
           </div>
         )}

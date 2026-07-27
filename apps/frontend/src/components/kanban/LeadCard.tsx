@@ -14,10 +14,14 @@ export function LeadCard({
   lead,
   index,
   onOpen,
+  stages,
+  onMoveStage,
 }: {
   lead: Lead;
   index: number;
   onOpen: (leadId: string) => void;
+  stages: { id: string; name: string }[];
+  onMoveStage: (leadId: string, newStageId: string) => void;
 }) {
   return (
     <Draggable draggableId={lead.id} index={index}>
@@ -51,6 +55,34 @@ export function LeadCard({
                 {lead.agent.name}
               </span>
             )}
+          </div>
+
+          {/* Mobile/tablet: dragging a card is impractical on touch, so this
+              select is the primary way to change stage below lg. Stopping
+              propagation keeps @hello-pangea/dnd's drag-handle listeners
+              (bound to this whole card) from swallowing the tap. */}
+          <div
+            className="mt-2 lg:hidden"
+            onClick={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+          >
+            <label className="sr-only" htmlFor={`move-stage-${lead.id}`}>
+              Mover a etapa
+            </label>
+            <select
+              id={`move-stage-${lead.id}`}
+              value={lead.stageId}
+              onChange={(e) => onMoveStage(lead.id, e.target.value)}
+              className="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+            >
+              {stages.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.id === lead.stageId ? '● ' : ''}
+                  {s.name}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       )}

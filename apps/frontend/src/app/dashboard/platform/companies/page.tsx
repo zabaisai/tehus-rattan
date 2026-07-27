@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { getPlatformCompanies, updatePlatformCompanyStatus } from '@/lib/platform';
@@ -36,6 +37,7 @@ function formatDate(value: string) {
 
 export default function PlatformCompaniesPage() {
   const user = useAuthStore((s) => s.user);
+  const router = useRouter();
   const isPlatformSuperAdmin =
     user?.role === 'SUPER_ADMIN' && user?.companyId === null;
   const queryClient = useQueryClient();
@@ -115,7 +117,7 @@ export default function PlatformCompaniesPage() {
 
   return (
     <div>
-      <div className="mb-5 flex items-center justify-between">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-stone-900">Empresas</h2>
           <p className="mt-1 text-sm text-stone-500">
@@ -124,7 +126,7 @@ export default function PlatformCompaniesPage() {
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
         >
           <Plus size={16} />
           Nueva empresa
@@ -163,7 +165,101 @@ export default function PlatformCompaniesPage() {
         <p className="mb-3 text-sm text-emerald-600">{successMessage}</p>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+      {isLoading && (
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 lg:hidden">
+          Cargando...
+        </p>
+      )}
+      {!isLoading && isError && (
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-red-600 lg:hidden">
+          No se pudo cargar el listado de empresas.
+        </p>
+      )}
+      {!isLoading && !isError && (companies?.length ?? 0) === 0 && (
+        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 lg:hidden">
+          No hay empresas.
+        </p>
+      )}
+
+      {/* Móvil y tablet (<lg): tarjetas en vez de tabla, para que las acciones
+          no se apilen y agranden las filas como pasaba a 768px con la tabla. */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:hidden">
+        {companies?.map((company) => (
+          <div key={company.id} className="rounded-lg border border-stone-200 bg-white p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-stone-900">{company.name}</p>
+                <p className="mt-0.5 text-xs text-stone-500">{company.phone || '-'}</p>
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[company.status]}`}
+              >
+                {statusLabels[company.status]}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-stone-600">
+              <div>
+                <p className="text-stone-400">Usuarios</p>
+                <p>{company.activeUsers} / {company.totalUsers}</p>
+              </div>
+              <div>
+                <p className="text-stone-400">Leads</p>
+                <p>{company.totalLeads}</p>
+              </div>
+              <div>
+                <p className="text-stone-400">WhatsApp</p>
+                <p>{company.whatsappConnected ? 'Sí' : 'No'}</p>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-stone-100 pt-3">
+              <button
+                onClick={() => setDetailCompanyId(company.id)}
+                className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-700"
+              >
+                Ver detalle
+              </button>
+              <button
+                onClick={() => router.push(`/dashboard/platform/activity/${company.id}`)}
+                className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-700"
+              >
+                Ver actividad
+              </button>
+              <button
+                onClick={() => setSupportOverviewCompanyId(company.id)}
+                className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-700"
+              >
+                Ver soporte
+              </button>
+              {company.status === 'ACTIVE' && (
+                <button
+                  onClick={() => openStatusChange(company, 'SUSPENDED')}
+                  className="rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700"
+                >
+                  Suspender
+                </button>
+              )}
+              {company.status === 'SUSPENDED' && (
+                <button
+                  onClick={() => openStatusChange(company, 'ACTIVE')}
+                  className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700"
+                >
+                  Reactivar
+                </button>
+              )}
+              {(company.status === 'ACTIVE' || company.status === 'SUSPENDED') && (
+                <button
+                  onClick={() => openStatusChange(company, 'DELETED')}
+                  className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600"
+                >
+                  Marcar eliminada
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white lg:block">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
@@ -245,6 +341,13 @@ export default function PlatformCompaniesPage() {
                       className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
                     >
                       Ver detalle
+                    </button>
+
+                    <button
+                      onClick={() => router.push(`/dashboard/platform/activity/${company.id}`)}
+                      className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                    >
+                      Ver actividad
                     </button>
 
                     <button

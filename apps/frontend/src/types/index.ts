@@ -287,6 +287,24 @@ export interface QuoteLeadRef {
   status: string;
 }
 
+// The fiscal identity of the company that OWNS the quote, resolved server-side
+// and returned by GET /quotes/:id. This is the authoritative source for the
+// printable document — never the viewer's own company or a hardcoded footer.
+export interface QuoteCompanyIdentity {
+  id: string;
+  name: string;
+  legalName: string | null;
+  taxId: string | null;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  city: string | null;
+  country: string | null;
+  website: string | null;
+  logoUrl: string | null;
+  quoteFooter: string | null;
+}
+
 export interface QuoteItem {
   id: string;
   name: string;
@@ -320,6 +338,9 @@ export interface Quote {
   lead: QuoteLeadRef;
   // Only present on GET /quotes/:id — the list endpoint doesn't include items.
   items?: QuoteItem[];
+  // Only present on GET /quotes/:id — the owning company's fiscal identity,
+  // used to render the printable document.
+  company?: QuoteCompanyIdentity;
 }
 
 export interface CreateQuoteFromLeadPayload {
@@ -383,6 +404,11 @@ export interface Company {
   website: string | null;
   description: string | null;
   settings: Record<string, unknown> | null;
+  // Per-company fiscal identity (used to render quotes). All optional.
+  legalName: string | null;
+  taxId: string | null;
+  address: string | null;
+  quoteFooter: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -399,6 +425,12 @@ export interface UpdateCompanyPayload {
   primaryColor?: string;
   accentColor?: string;
   backgroundColor?: string;
+  // Fiscal fields accept null so the settings form can clear them explicitly
+  // (undefined would omit the field and leave the previous value in place).
+  legalName?: string | null;
+  taxId?: string | null;
+  address?: string | null;
+  quoteFooter?: string | null;
 }
 
 export interface CompanyLogoUploadResult {
@@ -615,3 +647,138 @@ export interface PlatformAuditLog {
   userAgent: string | null;
   createdAt: string;
 }
+
+export type InvitationCodeStatus = "ACTIVE" | "USED" | "REVOKED" | "EXPIRED";
+
+export interface InvitationCodeUserRef {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface InvitationCode {
+  id: string;
+  codePreview: string;
+  intendedCompanyName: string;
+  intendedContactEmail: string | null;
+  status: InvitationCodeStatus;
+  expiresAt: string | null;
+  createdAt: string;
+  createdByUserId: string;
+  createdBy: InvitationCodeUserRef;
+  usedAt: string | null;
+  usedByUserId: string | null;
+  usedBy: InvitationCodeUserRef | null;
+  companyId: string | null;
+  company: { id: string; name: string } | null;
+  revokedAt: string | null;
+  revokedByUserId: string | null;
+  revokedBy: InvitationCodeUserRef | null;
+}
+
+export interface CreateInvitationCodePayload {
+  intendedCompanyName: string;
+  intendedContactEmail?: string;
+  expiresAt?: string;
+}
+
+// The only response that ever carries the plaintext code — never persisted,
+// never returned again by any other endpoint.
+export interface CreateInvitationCodeResult extends InvitationCode {
+  code: string;
+}
+
+// ─────────────────────────────────────────────
+// ACTIVITY, SESSIONS & DEVICES (platform monitoring)
+// ─────────────────────────────────────────────
+export type UserSessionStatus = "ACTIVE" | "LOGGED_OUT" | "REVOKED" | "EXPIRED";
+export type DeviceType = "DESKTOP" | "MOBILE" | "TABLET" | "UNKNOWN";
+export type CompanyActivityStatus =
+  | "ACTIVE_TODAY"
+  | "ACTIVE_WEEK"
+  | "ACTIVE_MONTH"
+  | "INACTIVE";
+
+export interface PlatformActivitySummary {
+  companiesActiveToday: number;
+  companiesActive7d: number;
+  companiesActive30d: number;
+  companiesInactive30d: number;
+  totalCompanies: number;
+  activeSessions: number;
+  recognizedDevices: number;
+  recentFailedLogins: number;
+}
+
+export interface PlatformSessionUserRef {
+  id: string;
+  name: string;
+  email: string;
+}
+
+// The full IP, any raw user agent, and any token/hash/deviceId are never
+// part of this type — the API never returns them, only the
+// already-truncated ipPreview (e.g. "181.60.12.0") and the browser/OS/
+// deviceType already parsed out of the user agent server-side.
+export interface PlatformUserSession {
+  id: string;
+  userId: string;
+  status: UserSessionStatus;
+  ipPreview: string | null;
+  browser: string | null;
+  operatingSystem: string | null;
+  deviceType: DeviceType;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  lastLoginAt: string;
+  lastActivityAt: string;
+  loggedOutAt: string | null;
+  revokedAt: string | null;
+  revokedByUserId: string | null;
+  user: PlatformSessionUserRef;
+}
+
+export interface PlatformSessionsPage {
+  items: PlatformUserSession[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PlatformRecentLogin {
+  id: string;
+  createdAt: string;
+  ipPreview: string | null;
+  browser: string | null;
+  operatingSystem: string | null;
+  deviceType: DeviceType;
+  user: PlatformSessionUserRef;
+}
+
+export interface PlatformCompanyActivityNoHistory {
+  company: { id: string; name: string };
+  hasHistoricalData: false;
+  message: string;
+}
+
+export interface PlatformCompanyActivityWithHistory {
+  company: { id: string; name: string };
+  hasHistoricalData: true;
+  lastActivityAt: string | null;
+  activityStatus: CompanyActivityStatus;
+  totalUsers: number;
+  usersActive7d: number;
+  usersActive30d: number;
+  usersActive90d: number;
+  usersNeverLoggedIn: { id: string; name: string; email: string; role: Role }[];
+  totalSessions: number;
+  activeSessions: number;
+  recognizedDevices: number;
+  recentLogins: PlatformRecentLogin[];
+  dailyHistory: { date: string; count: number }[];
+}
+
+export type PlatformCompanyActivity =
+  | PlatformCompanyActivityNoHistory
+  | PlatformCompanyActivityWithHistory;

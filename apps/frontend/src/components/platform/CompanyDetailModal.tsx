@@ -1,9 +1,9 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { X } from 'lucide-react';
 import { getPlatformCompany } from '@/lib/platform';
 import { CompanyStatus } from '@/types';
+import { Modal } from '@/components/ui/Modal';
 
 const statusLabels: Record<CompanyStatus, string> = {
   ACTIVE: 'Activa',
@@ -41,20 +41,7 @@ export function CompanyDetailModal({
   });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">
-            Detalle de empresa
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-stone-400 hover:text-stone-700"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal title="Detalle de empresa" onClose={onClose} maxWidth="lg">
         {isLoading && (
           <p className="text-sm text-stone-400">Cargando...</p>
         )}
@@ -200,7 +187,6 @@ export function CompanyDetailModal({
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

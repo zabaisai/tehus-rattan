@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Upload, FileSpreadsheet } from 'lucide-react';
+import { Upload, FileSpreadsheet } from 'lucide-react';
 import { ProductImportSummary } from '@/types';
 import {
   validateProductImportFile,
   MAX_PRODUCT_IMPORT_FILE_SIZE_MB,
   MAX_PRODUCT_IMPORT_ROWS,
 } from '@/lib/products';
+import { Modal } from '@/components/ui/Modal';
 
 type ApiError = {
   response?: {
@@ -67,15 +68,7 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-      <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-lg">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-stone-900">Importar Excel</h3>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={18} />
-          </button>
-        </div>
-
+    <Modal title="Importar Excel" onClose={onClose} maxWidth="md">
         {!summary && (
           <>
             <p className="mb-1 text-xs text-stone-500">
@@ -196,7 +189,6 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }

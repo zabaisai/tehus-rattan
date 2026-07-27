@@ -6,13 +6,20 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
+import { PrismaService } from '../src/prisma/prisma.service';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 // Test-only secret, never read from .env and never logged.
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
 const WRONG_JWT_SECRET = 'e2e-test-only-wrong-secret';
 
-// JwtStrategy only reads the payload fields below; it does not query
-// PrismaService, so no Prisma mock is required for this guard.
+// JwtStrategy now also looks up the token's `sid` against UserSession (see
+// jwt.strategy.ts) — a Prisma mock is required so DI can construct it, even
+// though the badly-signed/expired-token cases below still fail on
+// signature/expiry before ever reaching that lookup.
 @Controller('protected')
 class ProtectedTestController {
   @UseGuards(AuthGuard('jwt'))
@@ -41,6 +48,7 @@ describe('AuthGuard (jwt) e2e', () => {
             },
           },
         },
+        { provide: PrismaService, useValue: buildFakeSessionPrisma() },
       ],
     }).compile();
 
@@ -95,6 +103,7 @@ describe('AuthGuard (jwt) e2e', () => {
         email: 'user@example.com',
         role: 'AGENT',
         companyId: 'company-a',
+        sid: encodeSid('user-1', 'company-a'),
       },
       { expiresIn: '5m' },
     );

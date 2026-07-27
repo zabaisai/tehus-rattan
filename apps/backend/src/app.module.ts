@@ -1,7 +1,16 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { HttpLoggerInterceptor } from './common/logging/http-logger.interceptor';
+import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { validateEnv } from './common/config/env.validation';
+import { THROTTLE_TTL_MS, THROTTLE_LIMITS } from './common/throttle/throttle.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
@@ -20,20 +29,27 @@ import { ProductsModule } from './modules/products/products.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
 import { QuotesModule } from './modules/quotes/quotes.module';
+import { InvitationCodesModule } from './modules/invitation-codes/invitation-codes.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
+import { PasswordRecoveryModule } from './modules/auth/password-recovery/password-recovery.module';
+import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      validate: (config) => {
-        if (!config.JWT_SECRET?.trim()) {
-          throw new Error('JWT_SECRET is required');
-        }
-
-        return config;
-      },
+      validate: validateEnv,
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'default',
+        ttl: THROTTLE_TTL_MS,
+        limit: THROTTLE_LIMITS.default,
+      },
+    ]),
+    ScheduleModule.forRoot(),
     PrismaModule,
+    SessionsModule,
     AuthModule,
     CompaniesModule,
     UsersModule,
@@ -51,8 +67,27 @@ import { QuotesModule } from './modules/quotes/quotes.module';
     PlatformModule,
     OnboardingModule,
     QuotesModule,
+    InvitationCodesModule,
+    PasswordRecoveryModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Global HTTP rate limiting. Individual routes tighten or skip it with
+    // @Throttle / @SkipThrottle. Per-IP for every route (respecting the
+    // `trust proxy = 1` set in main.ts, the single Caddy hop) EXCEPT
+    // POST /auth/refresh, which is bucketed per device — see AppThrottlerGuard.
+    { provide: APP_GUARD, useClass: AppThrottlerGuard },
+    // Consistent error shaping + never leaking a stack trace in a 500 body.
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    // One safe access-log line per request (no headers/cookies/body logged).
+    { provide: APP_INTERCEPTOR, useClass: HttpLoggerInterceptor },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // RequestIdMiddleware first so every downstream log line + the device-id
+    // middleware run with a correlation id already attached to the request.
+    consumer.apply(RequestIdMiddleware, DeviceIdMiddleware).forRoutes('*');
+  }
+}

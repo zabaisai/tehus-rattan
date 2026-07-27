@@ -6,10 +6,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { AnalyticsController } from '../src/modules/analytics/analytics.controller';
 import { AnalyticsService } from '../src/modules/analytics/analytics.service';
 import { AutomationsController } from '../src/modules/automations/automations.controller';
 import { AutomationsService } from '../src/modules/automations/automations.service';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 // Test-only secret, never read from .env and never logged.
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
@@ -34,7 +39,13 @@ describe('RolesGuard (e2e) — class-level @Roles enforcement', () => {
 
   const signToken = (role: string, companyId: string | null) =>
     jwtService.sign(
-      { sub: 'user-1', email: 'user@example.com', role, companyId },
+      {
+        sub: 'user-1',
+        email: 'user@example.com',
+        role,
+        companyId,
+        sid: encodeSid('user-1', companyId),
+      },
       { expiresIn: '5m' },
     );
 
@@ -53,6 +64,7 @@ describe('RolesGuard (e2e) — class-level @Roles enforcement', () => {
             },
           },
         },
+        { provide: PrismaService, useValue: buildFakeSessionPrisma() },
         { provide: AnalyticsService, useValue: analyticsServiceMock },
         { provide: AutomationsService, useValue: automationsServiceMock },
       ],
@@ -94,7 +106,9 @@ describe('RolesGuard (e2e) — class-level @Roles enforcement', () => {
         .set('Authorization', `Bearer ${token}`)
         .expect(200);
 
-      expect(analyticsServiceMock.getOverview).toHaveBeenCalledWith('company-a');
+      expect(analyticsServiceMock.getOverview).toHaveBeenCalledWith(
+        'company-a',
+      );
     });
 
     it('rejects a request without a JWT with 401', async () => {

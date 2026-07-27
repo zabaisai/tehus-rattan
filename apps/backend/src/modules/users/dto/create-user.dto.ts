@@ -4,15 +4,15 @@ import {
   IsEmail,
   IsOptional,
   IsIn,
-  MinLength,
 } from 'class-validator';
+import { IsStrongPassword } from '../../../common/password/password-policy';
 
 export class CreateUserDto {
   @IsEmail({}, { message: 'El email no es válido' })
   email!: string;
 
   @IsString()
-  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  @IsStrongPassword()
   password!: string;
 
   @IsString()

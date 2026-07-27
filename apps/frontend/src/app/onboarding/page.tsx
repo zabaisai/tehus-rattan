@@ -61,6 +61,7 @@ function mapOnboardingError(err: unknown): string {
 export default function OnboardingPage() {
   const router = useRouter();
   const setSession = useAuthStore((s) => s.setSession);
+  const setUser = useAuthStore((s) => s.setUser);
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -258,7 +259,7 @@ export default function OnboardingPage() {
         // /auth/me before sending the new admin into the dashboard.
         setSession(response.user, response.token);
         const fullUser = await getMe();
-        setSession(fullUser, response.token);
+        setUser(fullUser);
         router.push("/dashboard");
         return;
       }

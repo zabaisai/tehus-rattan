@@ -43,11 +43,16 @@ export function PrintableDocumentShell({ children }: PrintableDocumentShellProps
           }
         }
       `}</style>
-      <div
-        id="printable-document"
-        className="mx-auto w-full max-w-[850px] border border-stone-300 bg-white p-6 text-[13px] text-stone-900 shadow-sm print:max-w-none print:border-0 print:p-0 print:shadow-none"
-      >
-        {children}
+      {/* On phones/tablets the document keeps its real (Excel-derived) column
+          widths instead of squeezing them — it scrolls horizontally inside
+          this box rather than deforming, and print output is unaffected. */}
+      <div className="overflow-x-auto print:overflow-visible">
+        <div
+          id="printable-document"
+          className="mx-auto w-full min-w-[640px] max-w-[850px] border border-stone-300 bg-white p-3 text-[13px] text-stone-900 shadow-sm sm:p-6 print:min-w-0 print:max-w-none print:border-0 print:p-0 print:shadow-none"
+        >
+          {children}
+        </div>
       </div>
     </>
   );

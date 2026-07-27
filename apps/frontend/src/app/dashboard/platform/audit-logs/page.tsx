@@ -25,7 +25,23 @@ const actionLabels: Record<string, string> = {
   VIEW_SUPPORT_CONVERSATIONS: 'Ver conversaciones de soporte',
   VIEW_SUPPORT_CONVERSATION_DETAIL: 'Ver detalle de conversación de soporte',
   END_SUPPORT_SESSION: 'Cerrar sesión de soporte',
+  REVOKE_SESSION: 'Revocar sesión',
+  REVOKE_ALL_USER_SESSIONS: 'Revocar todas las sesiones del usuario',
+  REVOKE_ALL_COMPANY_SESSIONS: 'Revocar todas las sesiones de la empresa',
+  CREATE_INVITATION_CODE: 'Crear código de invitación',
+  REVOKE_INVITATION_CODE: 'Revocar código de invitación',
+  USE_INVITATION_CODE: 'Usar código de invitación',
 };
+
+// Fallback for any action string not in the map above (e.g. a new backend
+// action shipped before this list is updated): humanize the SNAKE_CASE code
+// into "Sentence case" instead of showing raw technical identifiers.
+function humanizeAction(action: string): string {
+  if (actionLabels[action]) return actionLabels[action];
+  const words = action.toLowerCase().replace(/_/g, ' ').trim();
+  if (!words) return action;
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
 
 const metadataLabels: Record<string, string> = {
   companyName: 'Nombre de empresa',
@@ -132,11 +148,11 @@ export default function PlatformAuditLogsPage() {
         </p>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-auto"
         >
           {actionFilterOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -150,7 +166,7 @@ export default function PlatformAuditLogsPage() {
           value={affectedCompanyId}
           onChange={(e) => setAffectedCompanyId(e.target.value)}
           placeholder="ID de empresa afectada"
-          className="w-56 rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-56"
         />
 
         <input
@@ -158,7 +174,7 @@ export default function PlatformAuditLogsPage() {
           value={actorUserId}
           onChange={(e) => setActorUserId(e.target.value)}
           placeholder="ID del actor"
-          className="w-56 rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-56"
         />
       </div>
 
@@ -208,7 +224,7 @@ export default function PlatformAuditLogsPage() {
                   {formatDate(log.createdAt)}
                 </td>
                 <td className="whitespace-nowrap px-4 py-2.5 text-stone-800">
-                  {actionLabels[log.action] ?? log.action}
+                  {humanizeAction(log.action)}
                 </td>
                 <td className="px-4 py-2.5">
                   <ActorCell log={log} />

@@ -16,7 +16,7 @@ model Company {
   updatedAt DateTime      @updatedAt
 
   // Informational company profile — display-only, never legal/fiscal/billing data.
-  slug             String?  @unique
+  slug             String? @unique
   logoUrl          String?
   secondaryLogoUrl String?
   primaryColor     String?
@@ -29,6 +29,14 @@ model Company {
   website          String?
   description      String?
   settings         Json?
+
+  // Per-company fiscal identity used to render quotes/printable documents.
+  // All optional and additive — an empty field is simply omitted from the
+  // printed document, never replaced by a global/hardcoded fallback.
+  legalName   String? // Razón social
+  taxId       String? // Identificación fiscal / NIT
+  address     String? // Dirección
+  quoteFooter String? // Texto/condiciones opcionales para el pie de cotizaciones
 
   users               User[]
   contacts            Contact[]
@@ -43,6 +51,9 @@ model Company {
   whatsappIntegration WhatsAppIntegration?
   auditLogs           AuditLog[]           @relation("AuditLogAffectedCompany")
   supportSessions     SupportSession[]
+  invitationCodesUsed InvitationCode[]
+  userSessions        UserSession[]
+  loginEvents         LoginEvent[]
 
   @@map("companies")
 }
@@ -67,6 +78,15 @@ model User {
   quotes          Quote[]
   auditLogs       AuditLog[]         @relation("AuditLogActor")
   supportSessions SupportSession[]
+
+  invitationCodesCreated InvitationCode[] @relation("InvitationCodeCreatedBy")
+  invitationCodesUsed    InvitationCode[] @relation("InvitationCodeUsedBy")
+  invitationCodesRevoked InvitationCode[] @relation("InvitationCodeRevokedBy")
+
+  sessions            UserSession[]        @relation("UserSessionUser")
+  sessionsRevoked     UserSession[]        @relation("UserSessionRevokedBy")
+  loginEvents         LoginEvent[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -399,7 +419,7 @@ enum QuoteStatus {
 }
 
 model QuoteItem {
-  id   String  @id @default(cuid())
+  id          String   @id @default(cuid())
   // Full snapshot of the LeadProduct/Product at the moment the quote was
   // created — name/description/category/unitPrice never follow later
   // catalog edits, so a sent quote always reflects what the client saw.
@@ -549,4 +569,193 @@ enum MessageStatus {
   READ
   FAILED
   RECEIVED
+}
+
+// ─────────────────────────────────────────────
+// INVITATION CODES (company onboarding gate)
+// ─────────────────────────────────────────────
+enum InvitationCodeStatus {
+  ACTIVE
+  USED
+  REVOKED
+  EXPIRED
+}
+
+model InvitationCode {
+  id          String @id @default(cuid())
+  // SHA-256 hex digest of the normalized plaintext code. The plaintext
+  // itself is never stored — only shown once, in the create-response.
+  codeHash    String @unique
+  // Masked display form for the admin panel, e.g. "TEHUS-****-****-****-A7F2".
+  codePreview String
+
+  intendedCompanyName  String
+  intendedContactEmail String?
+
+  status    InvitationCodeStatus @default(ACTIVE)
+  expiresAt DateTime?
+  createdAt DateTime             @default(now())
+
+  createdByUserId String
+  createdBy       User   @relation("InvitationCodeCreatedBy", fields: [createdByUserId], references: [id])
+
+  usedAt       DateTime?
+  usedByUserId String?
+  usedBy       User?     @relation("InvitationCodeUsedBy", fields: [usedByUserId], references: [id])
+  companyId    String?
+  company      Company?  @relation(fields: [companyId], references: [id])
+
+  revokedAt       DateTime?
+  revokedByUserId String?
+  revokedBy       User?     @relation("InvitationCodeRevokedBy", fields: [revokedByUserId], references: [id])
+
+  @@index([status])
+  @@index([createdByUserId])
+  @@index([companyId])
+  @@map("invitation_codes")
+}
+
+// ─────────────────────────────────────────────
+// SESSIONS, DEVICES & LOGIN ACTIVITY (platform monitoring)
+// ─────────────────────────────────────────────
+enum UserSessionStatus {
+  ACTIVE
+  LOGGED_OUT
+  REVOKED
+  EXPIRED
+}
+
+enum LoginEventStatus {
+  SUCCESS
+  FAILED
+}
+
+enum DeviceType {
+  DESKTOP
+  MOBILE
+  TABLET
+  UNKNOWN
+}
+
+// One row per (userId, deviceIdHash) pair — logging in again from the same
+// recognized browser updates this same row (status back to ACTIVE, fresh
+// refreshTokenHash/lastLoginAt) instead of creating a duplicate, so "number
+// of devices" is never inflated by repeat logins from the same browser.
+model UserSession {
+  id           String  @id @default(cuid())
+  userId       String
+  companyId    String?
+  // SHA-256 hex digest of the random, persistent, cookie-based device
+  // identifier — never the raw cookie value itself, and never derived from
+  // IP, fonts, canvas, or any other invasive fingerprinting signal (see
+  // DeviceIdMiddleware and buildSessionRequestContext).
+  deviceIdHash String
+
+  // SHA-256 hex digest of the opaque refresh token. The plaintext travels
+  // only in an httpOnly cookie and is never persisted anywhere.
+  refreshTokenHash String @unique
+
+  // Anonymized, already-truncated IP — the only form ever stored or
+  // returned: IPv4 has its last octet zeroed (181.60.12.0), IPv6 is
+  // truncated to its first 3 hextets (2001:db8:1234::). The precise
+  // address is never written to any column, log line, or API response —
+  // see ip.util.ts#truncateIp.
+  ipPreview String?
+
+  // No raw User-Agent is ever persisted — only the coarse fields parsed
+  // from it at write time (see user-agent.util.ts#parseUserAgent).
+  browser         String?
+  operatingSystem String?
+  deviceType      DeviceType @default(UNKNOWN)
+
+  status UserSessionStatus @default(ACTIVE)
+
+  firstSeenAt    DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+  lastLoginAt    DateTime @default(now())
+  // Throttled to at most one write every 5 minutes per session — see
+  // ActivityThrottleInterceptor. Reflects "the session is still open", not
+  // clicks or form content.
+  lastActivityAt DateTime @default(now())
+
+  loggedOutAt DateTime?
+  revokedAt   DateTime?
+
+  revokedByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation("UserSessionUser", fields: [userId], references: [id], onDelete: Cascade)
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  revokedBy User?    @relation("UserSessionRevokedBy", fields: [revokedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, deviceIdHash])
+  @@index([companyId])
+  @@index([status])
+  @@index([deviceIdHash])
+  @@index([lastActivityAt])
+  @@map("user_sessions")
+}
+
+// One row per login attempt, successful or not. Never linked to a password
+// or token — only enough to power the platform's login-activity view.
+model LoginEvent {
+  id String @id @default(cuid())
+
+  userId         String?
+  companyId      String?
+  // Kept even for FAILED attempts against a non-existent email (lowercased,
+  // trimmed) — this is an internal audit row behind PlatformGuard, not a
+  // client-facing message, so it does not itself "reveal" account
+  // existence to anyone attempting to log in.
+  emailAttempted String
+
+  status        LoginEventStatus
+  // A small fixed set of generic codes (e.g. INVALID_CREDENTIALS,
+  // ACCOUNT_INACTIVE, COMPANY_SUSPENDED) — never the raw exception message.
+  failureReason String?
+
+  // See UserSession — same hashed-device and truncated-IP treatment, and
+  // no raw User-Agent, only the parsed fields.
+  deviceIdHash String?
+  ipPreview    String?
+
+  browser         String?
+  operatingSystem String?
+  deviceType      DeviceType @default(UNKNOWN)
+
+  createdAt DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([companyId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("login_events")
+}
+
+// Single-use, short-lived password-recovery tokens. Only the SHA-256 hex digest
+// of the opaque token is ever stored (tokenHash) — the plaintext lives only in
+// the emailed link and is never persisted, logged, or returned by the API. A new
+// request invalidates the user's prior still-active tokens; consumption is
+// atomic (see PasswordResetService). requestedIpPreview reuses the same
+// truncated-IP anonymization as sessions (ip.util.ts) — never a raw address.
+model PasswordResetToken {
+  id                 String    @id @default(cuid())
+  userId             String
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  usedAt             DateTime?
+  revokedAt          DateTime?
+  requestedIpPreview String?
+  createdAt          DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }

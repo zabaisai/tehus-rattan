@@ -6,9 +6,15 @@ import { DocumentItemsEditor } from '../DocumentItemsEditor';
 import { DocumentTotalsBlock } from '../DocumentTotalsBlock';
 import { DocumentSignatureBlock } from '../DocumentSignatureBlock';
 import { DocumentFooter } from '../DocumentFooter';
-import { DocumentClient, DocumentItem, RepairMeta } from '@/types/documents';
+import {
+  DocumentClient,
+  DocumentCompanyIdentity,
+  DocumentItem,
+  RepairMeta,
+} from '@/types/documents';
 
 interface RepairTemplateProps {
+  company: DocumentCompanyIdentity;
   meta: RepairMeta;
   onMetaChange: (meta: RepairMeta) => void;
   client: DocumentClient;
@@ -25,6 +31,7 @@ interface RepairTemplateProps {
 // the reference Excel has no T&C block at all (confirmed by direct
 // inspection), unlike "Factura venta" and "Remision".
 export function RepairTemplate({
+  company,
   meta,
   onMetaChange,
   client,
@@ -42,6 +49,7 @@ export function RepairTemplate({
   return (
     <div>
       <DocumentHeader
+        company={company}
         title="Reparación"
         fields={[
           {
@@ -97,8 +105,8 @@ export function RepairTemplate({
         />
       </div>
 
-      <DocumentSignatureBlock variant="dual" />
-      <DocumentFooter />
+      <DocumentSignatureBlock variant="dual" companyName={company.name} />
+      <DocumentFooter company={company} />
     </div>
   );
 }
