@@ -80,7 +80,7 @@ log "10/12 Current service status"
 compose ps
 
 log "11/12 Running health-check.sh"
-"$SCRIPT_DIR/health-check.sh" || fail "Health check failed — inspect logs. To roll back CODE: git checkout $PREVIOUS_SHA && ./deploy/scripts/deploy.sh; to roll back the DATABASE, restore the pre-migration backup with restore-postgres.sh (see docs/DEPLOYMENT_RUNBOOK.md)."
+"$SCRIPT_DIR/health-check.sh" || fail "Health check failed — inspect logs. To roll back CODE: ./deploy/scripts/rollback-code.sh $PREVIOUS_SHA ; if the failed release ran a migration, ALSO restore the pre-migration backup with restore-postgres.sh (and restore-uploads.sh if uploads changed). See docs/DEPLOYMENT_RUNBOOK.md."
 
 log "12/12 Deployed release $GIT_SHA (rollback target: $PREVIOUS_SHA)"
 log "Deploy complete."
