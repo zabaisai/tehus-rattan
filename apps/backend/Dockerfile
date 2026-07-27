@@ -34,6 +34,15 @@ FROM node:${NODE_VERSION} AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 
+# Deployed-version identity, injected at build time (deploy.sh passes the exact
+# git SHA + timestamp). Surfaced by the app via RELEASE_INFO — logged at startup
+# and returned by GET /api/health/version. Not secrets.
+ARG GIT_SHA=unknown
+ARG BUILD_TIME=unknown
+ENV RELEASE_SHA=$GIT_SHA
+ENV BUILD_TIME=$BUILD_TIME
+LABEL org.opencontainers.image.revision=$GIT_SHA
+
 RUN addgroup -S nodeapp && adduser -S nestjs -G nodeapp
 
 # Production node_modules, then overlay the Prisma client that was actually

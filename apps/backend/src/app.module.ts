@@ -1,9 +1,12 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { HttpLoggerInterceptor } from './common/logging/http-logger.interceptor';
+import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv } from './common/config/env.validation';
@@ -73,10 +76,16 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     // `trust proxy = 1` set in main.ts, the single Caddy hop) EXCEPT
     // POST /auth/refresh, which is bucketed per device — see AppThrottlerGuard.
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
+    // Consistent error shaping + never leaking a stack trace in a 500 body.
+    { provide: APP_FILTER, useClass: AllExceptionsFilter },
+    // One safe access-log line per request (no headers/cookies/body logged).
+    { provide: APP_INTERCEPTOR, useClass: HttpLoggerInterceptor },
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer.apply(DeviceIdMiddleware).forRoutes('*');
+    // RequestIdMiddleware first so every downstream log line + the device-id
+    // middleware run with a correlation id already attached to the request.
+    consumer.apply(RequestIdMiddleware, DeviceIdMiddleware).forRoutes('*');
   }
 }

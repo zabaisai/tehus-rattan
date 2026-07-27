@@ -27,27 +27,33 @@ if [ "$current_branch" != "main" ]; then
   fail "Refusing to deploy from branch '$current_branch' — checkout main first."
 fi
 
-log "2/10 Fetching and fast-forwarding main"
+log "2/12 Fetching and fast-forwarding main"
+# Record the currently-deployed commit BEFORE moving — this is the exact SHA to
+# roll the CODE back to if the deploy fails (see docs/DEPLOYMENT_RUNBOOK.md).
+PREVIOUS_SHA="$(git rev-parse HEAD)"
+echo "Previous (rollback) commit: $(git log -1 --oneline "$PREVIOUS_SHA")"
 git fetch origin
 git pull --ff-only origin main
-echo "Deployed commit: $(git log -1 --oneline)"
+export GIT_SHA="$(git rev-parse HEAD)"
+export BUILD_TIME="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+echo "Deploying commit: $(git log -1 --oneline)"
 
-log "3/10 Validating $ENV_FILE exists"
+log "3/12 Validating $ENV_FILE exists and is not world/group-readable"
 if [ ! -f "$ENV_FILE" ]; then
   fail "$ENV_FILE not found. Copy deploy/env/staging.env.example, fill it in, chmod 600, and retry."
 fi
 perms="$(stat -c '%a' "$ENV_FILE" 2>/dev/null || stat -f '%A' "$ENV_FILE")"
 if [ "$perms" != "600" ]; then
-  echo "Warning: $ENV_FILE permissions are $perms, expected 600. Run: chmod 600 $ENV_FILE"
+  fail "$ENV_FILE permissions are $perms, expected 600. Run: chmod 600 $ENV_FILE"
 fi
 
-log "4/10 Building images"
+log "4/12 Building images (release $GIT_SHA)"
 compose build
 
-log "5/10 Starting PostgreSQL"
+log "5/12 Starting PostgreSQL"
 compose up -d postgres
 
-log "6/10 Waiting for PostgreSQL healthcheck"
+log "6/12 Waiting for PostgreSQL healthcheck"
 attempts=0
 max_attempts=30
 until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(compose ps -q postgres)" 2>/dev/null)" = "healthy" ]; do
@@ -59,16 +65,22 @@ until [ "$(docker inspect -f '{{.State.Health.Status}}' "$(compose ps -q postgre
 done
 echo "PostgreSQL is healthy."
 
-log "7/10 Running Prisma migrations (migrate deploy — never migrate dev/reset)"
+log "7/12 Pre-migration backup (DB + uploads, checksummed)"
+# A migration is the one irreversible step; snapshot BEFORE it so a bad
+# migration can be recovered by restore-postgres.sh. Never skip.
+"$SCRIPT_DIR/backup-postgres.sh" || fail "Pre-migration backup failed — aborting before touching the schema."
+
+log "8/12 Running Prisma migrations (migrate deploy — never migrate dev/reset)"
 compose run --rm backend npx prisma migrate deploy
 
-log "8/10 Starting all services"
+log "9/12 Starting all services"
 compose up -d
 
-log "9/10 Current service status"
+log "10/12 Current service status"
 compose ps
 
-log "10/10 Running health-check.sh"
-"$SCRIPT_DIR/health-check.sh" || fail "Health check failed — inspect logs before assuming the deploy succeeded."
+log "11/12 Running health-check.sh"
+"$SCRIPT_DIR/health-check.sh" || fail "Health check failed — inspect logs. To roll back CODE: ./deploy/scripts/rollback-code.sh $PREVIOUS_SHA ; if the failed release ran a migration, ALSO restore the pre-migration backup with restore-postgres.sh (and restore-uploads.sh if uploads changed). See docs/DEPLOYMENT_RUNBOOK.md."
 
+log "12/12 Deployed release $GIT_SHA (rollback target: $PREVIOUS_SHA)"
 log "Deploy complete."

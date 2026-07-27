@@ -1,0 +1,62 @@
+// Builds the Content-Security-Policy string. Pure + unit-tested; consumed by
+// next.config.ts as a static response header (same value for every request, so
+// no per-request nonce and no forced dynamic rendering).
+//
+// script-src uses 'unsafe-inline' (NOT 'unsafe-eval') in production. Why: Next
+// 16's App Router emits inline hydration scripts (self.__next_f.push(...)) and,
+// under the Turbopack production build, does NOT stamp a CSP nonce on them — so
+// a nonce/'strict-dynamic' policy blocks hydration entirely. 'unsafe-inline' is
+// the architecturally-required, documented fallback (see docs/SECURITY_HEADERS.md).
+// It is scoped to scripts only; eval stays blocked in production.
+//
+// Other deliberate relaxations:
+//  - style-src 'unsafe-inline': inline style={{}} attributes + next/font styles.
+//  - img-src https:: product images are arbitrary user-entered https URLs.
+export function buildContentSecurityPolicy(opts: {
+  apiOrigin: string;
+  isDev: boolean;
+}): string {
+  const { apiOrigin, isDev } = opts;
+
+  // Dev additionally needs 'unsafe-eval' for React Fast Refresh; prod never does.
+  const scriptSrc = isDev
+    ? `'self' 'unsafe-inline' 'unsafe-eval'`
+    : `'self' 'unsafe-inline'`;
+
+  const connectSrc = isDev
+    ? `'self' ${apiOrigin} ws: wss:`
+    : `'self' ${apiOrigin}`;
+
+  const directives = [
+    `default-src 'self'`,
+    `base-uri 'self'`,
+    `object-src 'none'`,
+    `frame-ancestors 'none'`,
+    `frame-src 'none'`,
+    `form-action 'self'`,
+    `script-src ${scriptSrc}`,
+    `style-src 'self' 'unsafe-inline'`,
+    `img-src 'self' data: blob: https:`,
+    `font-src 'self'`,
+    `connect-src ${connectSrc}`,
+  ];
+
+  // Upgrade accidental http subresources to https — but only for a real TLS
+  // deployment (https API). Skipped when the API is http (a local prod-mode run)
+  // so it does not upgrade and break that http API call.
+  if (!isDev && /^https:/i.test(apiOrigin)) {
+    directives.push('upgrade-insecure-requests');
+  }
+
+  return directives.join('; ');
+}
+
+// The API's ORIGIN (scheme://host[:port]) derived from NEXT_PUBLIC_API_URL,
+// which ends in /api. Falls back to the local backend origin.
+export function resolveApiOrigin(apiUrl: string | undefined): string {
+  try {
+    return new URL(apiUrl ?? 'http://localhost:3001/api').origin;
+  } catch {
+    return 'http://localhost:3001';
+  }
+}

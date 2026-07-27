@@ -1,40 +1,54 @@
-# Caddy automatically provisions and renews HTTPS certificates (Let's
-# Encrypt) for the domains below the moment their DNS A records resolve to
-# this VPS and ports 80/443 are reachable — no manual certbot/cron needed.
+# Caddy automatically provisions and renews HTTPS certificates (Let's Encrypt)
+# for the domains below the moment their DNS A records resolve to this VPS and
+# ports 80/443 are reachable — no manual certbot/cron needed. HTTP is
+# automatically redirected to HTTPS.
 #
-# Uncomment and set a real address before the first production deploy so
-# Let's Encrypt can reach you about certificate/account issues:
-# {
-# 	email you@tehusrattan.com
-# }
+# Header ownership (kept non-duplicating on purpose):
+#   - Caddy (this file, the TLS edge) owns Strict-Transport-Security (HSTS) —
+#     the only layer that knows the request arrived over HTTPS — plus removing
+#     the Server header and enforcing a request-body ceiling.
+#   - The apps own their own CSP and the rest of the security headers
+#     (Next.js for the frontend, Helmet for the API), so those are NOT set here.
+{
+	# CHANGE this to a monitored address before the first deploy so Let's
+	# Encrypt can send certificate/account expiry notices.
+	email admin@tehusrattan.com
+}
 
+# ---- Frontend (Next.js) ----------------------------------------------------
 crm-staging.tehusrattan.com {
 	encode zstd gzip
 
-	header {
-		X-Content-Type-Options nosniff
-		Referrer-Policy strict-origin-when-cross-origin
-		# Same effect as X-Frame-Options: SAMEORIGIN, without the deprecated
-		# header — the frontend never needs to be framed by another origin.
-		Content-Security-Policy "frame-ancestors 'self'"
-		-Server
+	# HSTS is set here (HTTPS edge) and nowhere else. No `preload` on purpose —
+	# staging should not be permanently pinned in browsers' preload lists.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+
+	# The frontend accepts no large uploads (they go cross-origin to the API).
+	request_body {
+		max_size 2MB
 	}
 
 	reverse_proxy frontend:3000
 }
 
+# ---- API (NestJS) ----------------------------------------------------------
 api.crm-staging.tehusrattan.com {
 	encode zstd gzip
 
-	header {
-		X-Content-Type-Options nosniff
-		Referrer-Policy strict-origin-when-cross-origin
-		Content-Security-Policy "frame-ancestors 'self'"
-		-Server
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+
+	# Must sit ABOVE the app's largest multipart upload (product import = 50MB,
+	# logo = 2MB) so the app's own Multer limits stay the effective control and
+	# Caddy only blocks absurdly large bodies.
+	request_body {
+		max_size 55MB
 	}
 
-	# Proxies everything, not just /api — the backend also serves uploaded
-	# files under /uploads/* (see main.ts useStaticAssets), outside the
-	# /api prefix.
+	# Proxies everything, not just /api — the backend also serves uploaded files
+	# under /uploads/* (see main.ts useStaticAssets), outside the /api prefix.
+	# Caddy forwards X-Forwarded-For/Proto/Host so the backend's `trust proxy 1`
+	# and per-IP throttler see the real client.
 	reverse_proxy backend:3001
 }

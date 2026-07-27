@@ -5,6 +5,9 @@
   "author": "(c) 2026 Isaí Zabala <isai.zaba3@gmail.com>",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
@@ -37,6 +40,7 @@
     "class-validator": "^0.15.1",
     "cookie-parser": "^1.4.7",
     "exceljs": "^4.4.0",
+    "helmet": "^8.3.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.22.0",

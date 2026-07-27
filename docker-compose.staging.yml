@@ -35,7 +35,14 @@ services:
     build:
       context: ./apps/backend
       dockerfile: Dockerfile
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+        BUILD_TIME: ${BUILD_TIME:-unknown}
     restart: unless-stopped
+    # tini as PID 1 so SIGTERM is forwarded to Node and zombies are reaped;
+    # give in-flight requests + Prisma disconnect time to finish on stop.
+    init: true
+    stop_grace_period: 30s
     env_file:
       - .env.staging
     depends_on:
@@ -66,7 +73,10 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        GIT_SHA: ${GIT_SHA:-unknown}
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
     networks:
       - proxy
     healthcheck:
