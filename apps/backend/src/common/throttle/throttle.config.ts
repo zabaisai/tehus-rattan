@@ -38,6 +38,10 @@ export const THROTTLE_LIMITS = {
   // endpoint — deliberately not device-bucketed). Per-account abuse is
   // additionally bounded by a resend cooldown in PasswordResetTokenService.
   passwordReset: positiveIntFromEnv('THROTTLE_PASSWORD_RESET_LIMIT', 5),
+  // Meta Embedded Signup start/complete/reconnect: strict, per-IP. These
+  // initiate/finish a privileged OAuth-style flow, so a modest ceiling caps
+  // abuse while comfortably allowing an admin's honest retries.
+  whatsappSignup: positiveIntFromEnv('THROTTLE_WHATSAPP_SIGNUP_LIMIT', 20),
   // Webhook POST: high enough to absorb legitimate Meta bursts.
   webhook: positiveIntFromEnv('THROTTLE_WEBHOOK_LIMIT', 600),
   // Webhook GET verify handshake: modest.
