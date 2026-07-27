@@ -5,6 +5,7 @@ import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 
 describe('WhatsAppIntegrationController', () => {
   let managementService: any;
+  let embeddedSignupService: any;
   let controller: WhatsAppIntegrationController;
 
   const safeResponse = {
@@ -30,7 +31,16 @@ describe('WhatsAppIntegrationController', () => {
       connectOrUpdateForCompany: jest.fn(),
       disconnectForCompany: jest.fn(),
     };
-    controller = new WhatsAppIntegrationController(managementService);
+    embeddedSignupService = {
+      start: jest.fn(),
+      complete: jest.fn(),
+      reconnect: jest.fn(),
+      getConnectionStatus: jest.fn(),
+    };
+    controller = new WhatsAppIntegrationController(
+      managementService,
+      embeddedSignupService,
+    );
   });
 
   describe('GET /me', () => {
@@ -39,9 +49,7 @@ describe('WhatsAppIntegrationController', () => {
 
       await controller.getMyIntegration(buildRequest('company-a'));
 
-      expect(managementService.getForCompany).toHaveBeenCalledWith(
-        'company-a',
-      );
+      expect(managementService.getForCompany).toHaveBeenCalledWith('company-a');
     });
 
     it('returns exactly the safe response from the service', async () => {
@@ -80,12 +88,13 @@ describe('WhatsAppIntegrationController', () => {
 
       await controller.connectOrUpdateMyIntegration(
         buildRequest('company-a'),
-        dto as any,
+        dto,
       );
 
-      expect(
-        managementService.connectOrUpdateForCompany,
-      ).toHaveBeenCalledWith('company-a', dto);
+      expect(managementService.connectOrUpdateForCompany).toHaveBeenCalledWith(
+        'company-a',
+        dto,
+      );
     });
 
     it('never uses a companyId from the dto, even if one is present on it', async () => {
@@ -96,7 +105,7 @@ describe('WhatsAppIntegrationController', () => {
 
       await controller.connectOrUpdateMyIntegration(
         buildRequest('company-victim'),
-        dtoWithCompanyId as any,
+        dtoWithCompanyId,
       );
 
       const [calledCompanyId] =
@@ -112,20 +121,20 @@ describe('WhatsAppIntegrationController', () => {
 
       const result = await controller.connectOrUpdateMyIntegration(
         buildRequest('company-a'),
-        dto as any,
+        dto,
       );
 
       expect(result).toBe(safeResponse);
       expect(result).not.toHaveProperty('accessTokenEncrypted');
     });
 
-    it('has @Roles(ADMIN, SUPER_ADMIN) metadata', () => {
+    it('has @Roles(SUPER_ADMIN) metadata (legacy manual connect is SUPER_ADMIN-only)', () => {
       const roles = Reflect.getMetadata(
         'roles',
         WhatsAppIntegrationController.prototype.connectOrUpdateMyIntegration,
       );
 
-      expect(roles).toEqual(['ADMIN', 'SUPER_ADMIN']);
+      expect(roles).toEqual(['SUPER_ADMIN']);
     });
   });
 
@@ -162,6 +171,72 @@ describe('WhatsAppIntegrationController', () => {
       );
 
       expect(roles).toEqual(['ADMIN', 'SUPER_ADMIN']);
+    });
+  });
+
+  describe('Embedded Signup endpoints', () => {
+    const buildReq = (companyId: string) => ({
+      user: { sub: 'user-1', role: 'ADMIN', companyId },
+      headers: { 'user-agent': 'jest' },
+    });
+
+    it('GET /me/connection-status calls the service with req.user.companyId and is ADMIN/SUPER_ADMIN only', async () => {
+      embeddedSignupService.getConnectionStatus.mockResolvedValue({
+        status: 'CONNECTED',
+      });
+      await controller.getConnectionStatus(buildReq('company-a'));
+      expect(embeddedSignupService.getConnectionStatus).toHaveBeenCalledWith(
+        'company-a',
+      );
+      expect(
+        Reflect.getMetadata(
+          'roles',
+          WhatsAppIntegrationController.prototype.getConnectionStatus,
+        ),
+      ).toEqual(['ADMIN', 'SUPER_ADMIN']);
+    });
+
+    it('POST /me/embedded-signup/start passes companyId + an actor derived only from the JWT', async () => {
+      embeddedSignupService.start.mockResolvedValue({ state: 's' });
+      await controller.startEmbeddedSignup(buildReq('company-a'));
+      const [companyId, actor] = embeddedSignupService.start.mock.calls[0];
+      expect(companyId).toBe('company-a');
+      expect(actor).toMatchObject({ userId: 'user-1', role: 'ADMIN' });
+      expect(
+        Reflect.getMetadata(
+          'roles',
+          WhatsAppIntegrationController.prototype.startEmbeddedSignup,
+        ),
+      ).toEqual(['ADMIN', 'SUPER_ADMIN']);
+    });
+
+    it('POST /me/embedded-signup/complete forwards the dto and never a body companyId', async () => {
+      embeddedSignupService.complete.mockResolvedValue({ status: 'CONNECTED' });
+      const dto = {
+        state: 'a'.repeat(64),
+        code: 'code',
+        phoneNumberId: '123',
+        wabaId: '456',
+        companyId: 'company-attacker',
+      };
+      await controller.completeEmbeddedSignup(buildReq('company-victim'), dto);
+      const [companyId] = embeddedSignupService.complete.mock.calls[0];
+      expect(companyId).toBe('company-victim');
+    });
+
+    it('POST /me/reconnect is ADMIN/SUPER_ADMIN only and passes the company from JWT', async () => {
+      embeddedSignupService.reconnect.mockResolvedValue({ state: 's' });
+      await controller.reconnect(buildReq('company-a'));
+      expect(embeddedSignupService.reconnect).toHaveBeenCalledWith(
+        'company-a',
+        expect.objectContaining({ userId: 'user-1' }),
+      );
+      expect(
+        Reflect.getMetadata(
+          'roles',
+          WhatsAppIntegrationController.prototype.reconnect,
+        ),
+      ).toEqual(['ADMIN', 'SUPER_ADMIN']);
     });
   });
 
