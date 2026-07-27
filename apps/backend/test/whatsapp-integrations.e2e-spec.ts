@@ -9,6 +9,7 @@ import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { WhatsAppIntegrationController } from '../src/modules/whatsapp-integration/whatsapp-integration.controller';
 import { WhatsAppIntegrationManagementService } from '../src/modules/whatsapp-integration/whatsapp-integration-management.service';
+import { WhatsAppEmbeddedSignupService } from '../src/modules/whatsapp-integration/whatsapp-embedded-signup.service';
 import {
   buildFakeSessionPrisma,
   encodeSid,
@@ -74,6 +75,18 @@ describe('WhatsAppIntegrationController (e2e)', () => {
         {
           provide: WhatsAppIntegrationManagementService,
           useValue: managementServiceMock,
+        },
+        {
+          // The controller now also depends on the embedded-signup service;
+          // this suite only exercises the manual/legacy endpoints, so a bare
+          // mock is enough to satisfy DI.
+          provide: WhatsAppEmbeddedSignupService,
+          useValue: {
+            start: jest.fn(),
+            complete: jest.fn(),
+            reconnect: jest.fn(),
+            getConnectionStatus: jest.fn(),
+          },
         },
       ],
     }).compile();
@@ -146,11 +159,11 @@ describe('WhatsAppIntegrationController (e2e)', () => {
       wabaId: 'waba-a',
     };
 
-    it('allows ADMIN, uses the companyId from the JWT, and never returns accessTokenEncrypted', async () => {
+    it('allows SUPER_ADMIN, uses the companyId from the JWT, and never returns accessTokenEncrypted', async () => {
       managementServiceMock.connectOrUpdateForCompany.mockResolvedValue(
         safeIntegrationResponse,
       );
-      const token = signToken('ADMIN', 'company-admin');
+      const token = signToken('SUPER_ADMIN', 'company-admin');
 
       const res = await request(app.getHttpServer())
         .put('/api/whatsapp-integrations/me')
@@ -195,8 +208,22 @@ describe('WhatsAppIntegrationController (e2e)', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('rejects a body with companyId with 400, and never forwards it to the service', async () => {
+    it('rejects ADMIN with 403 (manual connect is now SUPER_ADMIN-only)', async () => {
       const token = signToken('ADMIN', 'company-admin');
+
+      await request(app.getHttpServer())
+        .put('/api/whatsapp-integrations/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send(validBody)
+        .expect(403);
+
+      expect(
+        managementServiceMock.connectOrUpdateForCompany,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a body with companyId with 400, and never forwards it to the service', async () => {
+      const token = signToken('SUPER_ADMIN', 'company-admin');
 
       const res = await request(app.getHttpServer())
         .put('/api/whatsapp-integrations/me')
@@ -213,7 +240,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
     });
 
     it('rejects a body with status with 400', async () => {
-      const token = signToken('ADMIN', 'company-admin');
+      const token = signToken('SUPER_ADMIN', 'company-admin');
 
       const res = await request(app.getHttpServer())
         .put('/api/whatsapp-integrations/me')
@@ -228,7 +255,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
     });
 
     it('rejects a body with accessTokenEncrypted with 400', async () => {
-      const token = signToken('ADMIN', 'company-admin');
+      const token = signToken('SUPER_ADMIN', 'company-admin');
 
       const res = await request(app.getHttpServer())
         .put('/api/whatsapp-integrations/me')
@@ -245,7 +272,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
     });
 
     it('rejects a body without accessToken with 400', async () => {
-      const token = signToken('ADMIN', 'company-admin');
+      const token = signToken('SUPER_ADMIN', 'company-admin');
       const { accessToken: _accessToken, ...bodyWithoutToken } = validBody;
 
       await request(app.getHttpServer())
@@ -260,7 +287,7 @@ describe('WhatsAppIntegrationController (e2e)', () => {
     });
 
     it('rejects a body without phoneNumberId with 400', async () => {
-      const token = signToken('ADMIN', 'company-admin');
+      const token = signToken('SUPER_ADMIN', 'company-admin');
       const { phoneNumberId: _phoneNumberId, ...bodyWithoutPhoneNumberId } =
         validBody;
 
