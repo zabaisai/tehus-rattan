@@ -49,44 +49,79 @@ After deploy, run the smoke test (below).
 
 ## 4. Backups (`deploy/scripts/backup-postgres.sh`)
 
-- `pg_dump --format=plain | gzip` → `tehus-crm-staging-<ts>.sql.gz` (chmod 600) +
-  a **SHA-256** sidecar.
-- Snapshots the uploads volume → `tehus-crm-staging-uploads-<ts>.tar.gz` + sha256
-  (best-effort; warns, does not fail the DB backup, if the volume is absent).
-- Retention: deletes only this dir's exact `tehus-crm-staging-*` dumps / tarballs
-  / `.sha256` older than `RETENTION_DAYS` (default 7). Never a broad/recursive rm.
-- Never prints `POSTGRES_PASSWORD`. Cron example in VPS_DEPLOYMENT.md.
+- **Atomic + verified publish:** each artifact is written to a `*.partial` temp,
+  validated (non-empty + `gzip -t` / `tar -tzf`), checksummed, and only then
+  published under its final name via an atomic rename. A trap removes temps on any
+  failure (`rm -f`, never a broad or recursive `rm`). **A failed pg_dump/gzip/tar
+  can never leave an incomplete file that looks valid** — and restore requires the
+  checksum, so it fails closed.
+- Produces `tehus-crm-staging-<ts>.sql.gz` + `.sha256` (chmod 600), and snapshots
+  the uploads volume → `tehus-crm-staging-uploads-<ts>.tar.gz` + `.sha256`. The
+  uploads snapshot is **non-fatal**: a uploads problem never aborts the run once
+  the DB dump is published.
+- Retention deletes only this dir's exact `tehus-crm-staging-*` dumps / tarballs /
+  `.sha256` older than `RETENTION_DAYS` (default 7). Never prints `POSTGRES_PASSWORD`.
 
-Verify a backup any time (read-only): `deploy/scripts/backup-verify.sh <file>`
-(checksum + gzip integrity).
+Verify any backup read-only: `deploy/scripts/backup-verify.sh <file>` (checksum +
+gzip). **If a script fails:** it exits non-zero and publishes nothing — re-run it;
+the previous good backup is untouched.
 
-## 5. Restore (`deploy/scripts/restore-postgres.sh`)
+## 5. Restore
 
-- Requires the **exact** filename (never "latest"); **verifies the SHA-256
-  sidecar first** and aborts on mismatch; interactive confirm (type the DB name).
-- `--target-db NAME` restores into a separate/temporary DB (safe testing) without
-  touching the live one. Restoring live stops the backend for the duration and
-  restarts it.
+### Database — `deploy/scripts/restore-postgres.sh <file> [--target-db NAME] [--replace-target]`
 
-Locally demonstrated end-to-end (ephemeral marker → backup → verify →
-restore into a new temp DB → drop temp DB → corrupted backup correctly rejected
-→ QA DB untouched → uploads tar round-trip).
+- The **`.sha256` sidecar is mandatory** (missing/mismatched → abort) and gzip
+  integrity is checked — all before any DB is touched.
+- Restores into a **clean** database (terminate connections → drop → recreate) so
+  a dump never merges with existing tables. `psql` runs with **`ON_ERROR_STOP=1`**,
+  so any SQL error fails non-zero — never a false success.
+- The target DB name is validated against a strict identifier (no SQL injection).
+- **LIVE restore** (no `--target-db`): stops the backend and **always restarts it**
+  (trap), verifies the schema, reports `prisma migrate status`, and requires
+  **readiness** (`/api/health/ready`) before declaring success.
+- **`--target-db NAME`**: restores into a separate DB for safe testing; refuses to
+  overwrite an existing DB unless **`--replace-target`** is given.
+
+### Uploads — `deploy/scripts/restore-uploads.sh <file> [--volume NAME]`
+
+- Mandatory checksum + tar integrity; the archive is **rejected before extraction**
+  if any member is an absolute path, a `..` traversal, or a symlink/hardlink
+  pointing outside the volume.
+- Snapshots the current volume (checksummed) **before** replacing it, stops the
+  backend and always restarts it (trap), and extracts inside a container that
+  mounts **only** the uploads volume — never `postgres_data` / `caddy_data`.
+
+Both restores were demonstrated locally end-to-end (clean restore, `--replace-target`
+gating, and missing/wrong-checksum, corrupt-gzip, SQL-error, traversal, absolute
+path and malicious symlink all aborting with the source data untouched).
 
 ## 6. Migrations & rollback
 
-Migrations are the **one irreversible** step — that is why deploy.sh backs up
-immediately before `migrate deploy`. Chain verified: applies cleanly to an empty
-DB from zero; contains the fiscal-identity migration; does **not** contain the
-Message-Templates migration (`20260723180000`).
+Migrations are the **one irreversible** step — that is why deploy.sh takes a
+checksummed backup immediately before `migrate deploy`. Chain verified: applies
+cleanly to an empty DB from zero; contains the fiscal-identity migration; does
+**not** contain the Message-Templates migration (`20260723180000`).
 
-Rollback distinguishes four things:
+Rollback distinguishes four things — do them **in this order** when a migration was
+involved (code first only makes the old code run; the DB/uploads must match it):
 
 | Roll back | How |
 | --- | --- |
-| **Code / containers** | `git checkout <PREVIOUS_SHA>` (printed by deploy.sh) → `./deploy/scripts/deploy.sh`. Fast, always safe. |
-| **Database** | Restore the pre-migration backup: `restore-postgres.sh <pre-migration-file>`. The only way back through a schema change — Prisma has **no** universal auto-downgrade. |
-| **Uploads** | Restore the matching `…-uploads-<ts>.tar.gz` into the `backend_uploads` volume. |
+| **Code / containers** | `./deploy/scripts/rollback-code.sh <PREVIOUS_SHA>` (the SHA is printed by deploy.sh). It builds the old commit in an isolated worktree, verifies the image reports that SHA, and prints the in-place image-swap command. It does **not** touch the DB, main, or any remote. Confirm afterward with `GET /api/health/version` (== the SHA) and the smoke test (readiness). |
+| **Database** | Restore the pre-migration backup: `restore-postgres.sh <pre-migration-file>` — the only way back through a schema change (Prisma has **no** universal auto-downgrade). |
+| **Uploads** | `restore-uploads.sh <matching-uploads-tarball>` if uploads changed. |
 | **Irreversible migration** (dropped column/table) | Data is only recoverable from the backup — restore, do not "un-migrate". |
+
+**Order when a release with a migration failed:** (1) restore the pre-migration DB
+backup, (2) restore the matching uploads snapshot if needed, (3) roll the code back
+with `rollback-code.sh <PREVIOUS_SHA>`, (4) run the smoke test with
+`EXPECTED_RELEASE=<PREVIOUS_SHA>`. **To return to the current release** afterward:
+checkout the branch/main and re-run `deploy.sh`.
+
+Every script here fails **non-zero** on any problem and leaves the existing data
+untouched, so a failed recovery step never makes things worse — fix the cause and
+re-run. **Do not `git checkout <SHA> && deploy.sh`** to roll back: deploy.sh
+requires `main` and pulls it, which would redeploy the newer release.
 
 ## 7. Smoke test (`deploy/scripts/smoke-test.sh`)
 
@@ -109,11 +144,12 @@ required for the default run.
 
 ## 8. CI (`.github/workflows/ci.yml`)
 
-Runs on pushes to `develop`/`main` and on PRs — **no deploy, no secrets, no
-Meta**. Frontend: `npm ci` → test → lint → build. Backend: `npm ci` → prisma
-generate + validate → unit tests → build → `migrate deploy` + e2e against an
-isolated postgres service. Node 22, npm cache, per-job timeouts,
-cancel-in-progress. All env values are dummy/fictitious.
+Runs on pushes to `develop`/`main`/`feature/**` and on PRs — so a feature branch
+is verified remotely before it is ever merged (even with no PR yet) — with
+**no deploy, no secrets, no Meta**. Frontend: `npm ci` → test → lint → build.
+Backend: `npm ci` → prisma generate + validate → unit tests → build →
+`migrate deploy` + e2e against an isolated postgres service. Node 22, npm cache,
+per-job timeouts, cancel-in-progress. All env values are dummy/fictitious.
 
 ## 9. Environment
 

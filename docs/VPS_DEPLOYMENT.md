@@ -211,20 +211,38 @@ completo para esto.
 
 ## Rollback
 
-Si un despliegue introduce un problema:
+Si un despliegue introduce un problema, usa `rollback-code.sh` — **no** hagas
+`git checkout <commit>` sobre el checkout principal (mueve `main` a HEAD
+desacoplado y `deploy.sh` volvería a desplegar la versión nueva).
 
 ```bash
 cd /opt/tehus-crm
-git log --oneline -10          # identificar el commit bueno anterior
-git checkout <commit-bueno>
-docker compose -f docker-compose.staging.yml build
-docker compose -f docker-compose.staging.yml up -d
-git checkout main              # volver a main una vez estabilizado
+git log --oneline -10                        # identificar el commit bueno anterior
+./deploy/scripts/rollback-code.sh <SHA>      # compila ese commit en un worktree aislado
 ```
 
-Si el rollback requiere revertir una migración de base de datos, **no**
-existe downgrade automático de Prisma — restaurar desde el backup más
-reciente anterior al cambio (ver "Restauración") es el camino seguro.
+`rollback-code.sh` valida el SHA (existe y es ancestro), exige árbol limpio,
+compila las imágenes del commit anterior en un **worktree temporal** (el checkout
+principal queda intacto), verifica que la imagen reporta ese SHA, e imprime el
+comando exacto para intercambiar las imágenes en caliente (recrea solo
+`backend`/`frontend`; `postgres` y `caddy` no se tocan). Confirma con
+`GET /api/health/version` (== SHA) y `./deploy/scripts/smoke-test.sh`
+(`EXPECTED_RELEASE=<SHA>`).
+
+**Orden cuando la versión fallida corrió una migración** (el código anterior no
+puede usar el esquema nuevo):
+
+1. Restaura el backup **previo a la migración**:
+   `./deploy/scripts/restore-postgres.sh <backup-pre-migracion.sql.gz>`
+2. Si cambiaron los uploads: `./deploy/scripts/restore-uploads.sh <uploads.tar.gz>`
+3. Rollback de código: `./deploy/scripts/rollback-code.sh <SHA>`
+4. Smoke test con `EXPECTED_RELEASE=<SHA>`.
+
+Prisma **no** tiene downgrade automático de esquema; restaurar desde backup es el
+único camino seguro a través de un cambio de esquema. Cada script falla con
+código distinto de cero ante cualquier problema y deja los datos existentes
+intactos. Para **volver a la versión actual**: `git checkout main` y re-ejecuta
+`deploy.sh`.
 
 ## Backups
 
@@ -252,12 +270,15 @@ zona horaria ya configurada en el VPS) con `crontab -e` como usuario
 ./deploy/scripts/restore-postgres.sh <archivo-de-backup.sql.gz>
 ```
 
-- Requiere el **nombre exacto** del archivo — nunca elige automáticamente
-  "el más reciente".
-- Pide confirmación explícita (escribir el nombre de la base de datos
-  destino) antes de tocar cualquier dato.
-- Restaurar sobre la base viva **detiene temporalmente el backend** durante
-  la restauración y lo reinicia al finalizar.
+- Requiere el **nombre exacto** del archivo — nunca elige "el más reciente".
+- El sidecar **`.sha256` es obligatorio**: verifica checksum + integridad gzip
+  antes de tocar cualquier base. Un checksum ausente/incorrecto o un gzip dañado
+  **aborta**.
+- Restaura en una base **limpia** (drop + recreate) con `psql ON_ERROR_STOP=1`,
+  así un error de SQL falla con código distinto de cero (nunca un falso éxito).
+- Restaurar sobre la base viva **detiene el backend** y lo **reinicia siempre**
+  (incluso si la restauración falla), verifica el esquema y exige *readiness*
+  antes de declarar éxito.
 - Nunca se ejecuta automáticamente durante `deploy.sh`.
 
 Para **probar** un backup sin arriesgar la base de staging activa:
@@ -267,6 +288,22 @@ Para **probar** un backup sin arriesgar la base de staging activa:
 # validar los datos con psql/consultas según se necesite
 docker compose -f docker-compose.staging.yml exec postgres dropdb -U <POSTGRES_USER> tehus_restore_test
 ```
+
+`--target-db` **no** sobrescribe una base existente salvo que añadas
+`--replace-target`.
+
+### Restauración de uploads
+
+```bash
+./deploy/scripts/restore-uploads.sh <archivo-uploads.tar.gz>
+```
+
+- Checksum obligatorio + integridad del tar; **rechaza** el archivo antes de
+  extraer si contiene rutas absolutas, traversal `..`, o symlinks/hardlinks que
+  apunten fuera del volumen.
+- Toma un snapshot (con checksum) del volumen **actual** antes de reemplazarlo,
+  detiene el backend y lo reinicia siempre (trap), y extrae únicamente dentro del
+  volumen `backend_uploads` — nunca toca `postgres_data` ni `caddy_data`.
 
 ## Verificación de uploads
 
