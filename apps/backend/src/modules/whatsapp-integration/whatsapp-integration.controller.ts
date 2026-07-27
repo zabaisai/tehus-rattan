@@ -25,6 +25,7 @@ import {
 } from './whatsapp-embedded-signup.service';
 import { ConnectWhatsAppIntegrationDto } from './dto/connect-whatsapp-integration.dto';
 import { EmbeddedSignupCompleteDto } from './dto/embedded-signup-complete.dto';
+import { TestConnectionDto } from './dto/test-connection.dto';
 
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Controller('whatsapp-integrations')
@@ -91,10 +92,32 @@ export class WhatsAppIntegrationController {
     );
   }
 
+  // Explicit, rate-limited connection test: sends one text message to an E.164
+  // number using the company's connected integration (works only inside Meta's
+  // conversation window — no template). Never returns the raw Meta response.
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.whatsappSignup },
+  })
+  @HttpCode(200)
+  @Post('me/test')
+  testConnection(@Request() req: any, @Body() dto: TestConnectionDto) {
+    return this.embeddedSignupService.sendTest(
+      req.user.companyId,
+      this.actorFrom(req),
+      dto.to,
+    );
+  }
+
+  // Local-only disconnect (does NOT revoke on Meta / does NOT deregister the
+  // number). Audited as WHATSAPP_DISCONNECTED_LOCAL.
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Post('me/disconnect')
   disconnectMyIntegration(@Request() req: any) {
-    return this.managementService.disconnectForCompany(req.user.companyId);
+    return this.embeddedSignupService.disconnectLocal(
+      req.user.companyId,
+      this.actorFrom(req),
+    );
   }
 
   // ── Legacy manual connection (advanced, SUPER_ADMIN only) ────

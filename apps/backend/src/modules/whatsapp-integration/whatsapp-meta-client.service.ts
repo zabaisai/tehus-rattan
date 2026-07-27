@@ -16,6 +16,7 @@ export type MetaSignupErrorCode =
   | 'PHONE_NOT_IN_WABA'
   | 'SUBSCRIBE_FAILED'
   | 'REGISTER_FAILED'
+  | 'SEND_FAILED'
   | 'META_TIMEOUT';
 
 export class MetaSignupError extends Error {
@@ -144,6 +145,30 @@ export class WhatsAppMetaClientService {
       );
     } catch (error) {
       throw this.normalize(error, 'REGISTER_FAILED');
+    }
+  }
+
+  // Sends a plain text message via the Cloud API. Used by the explicit
+  // connection-test endpoint; a closed conversation window / missing template
+  // surfaces as a generic SEND_FAILED (never the raw Meta body).
+  async sendText(
+    phoneNumberId: string,
+    token: string,
+    to: string,
+    body: string,
+  ): Promise<void> {
+    const url = `${GRAPH_BASE}/${this.graphVersion()}/${phoneNumberId}/messages`;
+    try {
+      await axios.post(
+        url,
+        { messaging_product: 'whatsapp', to, type: 'text', text: { body } },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: META_TIMEOUT_MS,
+        },
+      );
+    } catch (error) {
+      throw this.normalize(error, 'SEND_FAILED');
     }
   }
 

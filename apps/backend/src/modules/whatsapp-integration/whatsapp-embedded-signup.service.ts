@@ -11,6 +11,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
 import { WhatsAppTokenCryptoService } from './whatsapp-token-crypto.service';
 import { WhatsAppEmbeddedSignupStateService } from './whatsapp-embedded-signup-state.service';
+import { WhatsAppIntegrationService } from './whatsapp-integration.service';
+import { WhatsAppIntegrationManagementService } from './whatsapp-integration-management.service';
 import {
   MetaSignupError,
   WhatsAppMetaClientService,
@@ -40,6 +42,8 @@ export class WhatsAppEmbeddedSignupService {
     private metaClient: WhatsAppMetaClientService,
     private tokenCrypto: WhatsAppTokenCryptoService,
     private auditLog: PlatformAuditLogService,
+    private integrationService: WhatsAppIntegrationService,
+    private management: WhatsAppIntegrationManagementService,
   ) {}
 
   private assertEnabled(): void {
@@ -80,7 +84,7 @@ export class WhatsAppEmbeddedSignupService {
       actorUserId: actor.userId,
       actorRole: actor.role,
       affectedCompanyId: companyId,
-      action: 'WHATSAPP_EMBEDDED_SIGNUP_STARTED',
+      action: 'WHATSAPP_SIGNUP_STARTED',
       entityType: ENTITY,
       ipAddress: actor.ipPreview,
       userAgent: actor.userAgent,
@@ -92,31 +96,85 @@ export class WhatsAppEmbeddedSignupService {
   async reconnect(companyId: string, actor: SignupActor) {
     this.assertEnabled();
     const config = this.publicConfig();
+    // Reconnect simply issues a NEW single-use state. The existing integration
+    // is deliberately left untouched (still CONNECTED) so that if the user
+    // cancels the Meta popup, the company is not left disconnected — the state
+    // is only replaced by a successful `complete`.
     const { state, expiresAt } = await this.stateService.issueForCompany(
       companyId,
       actor.userId,
       actor.ipPreview,
     );
 
-    // Reflect that the existing integration needs re-auth (best-effort).
-    await this.prisma.whatsAppIntegration
-      .updateMany({
-        where: { companyId, status: { in: ['CONNECTED', 'ERROR', 'REVOKED'] } },
-        data: { status: 'REAUTH_REQUIRED' },
-      })
-      .catch(() => undefined);
-
     await this.auditLog.record(this.prisma, {
       actorUserId: actor.userId,
       actorRole: actor.role,
       affectedCompanyId: companyId,
-      action: 'WHATSAPP_RECONNECT_STARTED',
+      action: 'WHATSAPP_RECONNECTED',
       entityType: ENTITY,
       ipAddress: actor.ipPreview,
       userAgent: actor.userAgent,
     });
 
     return { ...config, state, expiresAt };
+  }
+
+  // Local-only disconnect (does NOT revoke on Meta, does NOT deregister the
+  // number — Coexistence stays intact). Audited as a local action.
+  async disconnectLocal(companyId: string, actor: SignupActor) {
+    const result = await this.management.disconnectForCompany(companyId);
+    await this.auditLog.record(this.prisma, {
+      actorUserId: actor.userId,
+      actorRole: actor.role,
+      affectedCompanyId: companyId,
+      action: 'WHATSAPP_DISCONNECTED_LOCAL',
+      entityType: ENTITY,
+      ipAddress: actor.ipPreview,
+      userAgent: actor.userAgent,
+    });
+    return result;
+  }
+
+  // Sends a single explicit connection-test text message to an E.164 number,
+  // reusing the company's connected integration. Only works inside Meta's
+  // allowed conversation window (no template) — a closed window yields a
+  // generic error. Never returns the raw Meta response.
+  async sendTest(companyId: string, actor: SignupActor, to: string) {
+    this.assertEnabled();
+    const integration =
+      await this.integrationService.findConnectedByCompanyId(companyId);
+    if (!integration || !integration.accessTokenEncrypted) {
+      throw new BadRequestException(
+        'WhatsApp no está conectado para esta empresa.',
+      );
+    }
+    let ok = false;
+    try {
+      const token = this.tokenCrypto.decrypt(integration.accessTokenEncrypted);
+      await this.metaClient.sendText(
+        integration.phoneNumberId,
+        token,
+        to,
+        'Mensaje de prueba de conexión desde el CRM Tehus Rattan. Puedes ignorarlo.',
+      );
+      ok = true;
+      return { status: 'ok' as const };
+    } catch (error) {
+      throw this.toClientError(error);
+    } finally {
+      await this.auditLog
+        .record(this.prisma, {
+          actorUserId: actor.userId,
+          actorRole: actor.role,
+          affectedCompanyId: companyId,
+          action: 'WHATSAPP_CONNECTION_TESTED',
+          entityType: ENTITY,
+          reason: ok ? 'ok' : 'failed',
+          ipAddress: actor.ipPreview,
+          userAgent: actor.userAgent,
+        })
+        .catch(() => undefined);
+    }
   }
 
   async complete(
@@ -208,7 +266,7 @@ export class WhatsAppEmbeddedSignupService {
           actorUserId: actor.userId,
           actorRole: actor.role,
           affectedCompanyId: companyId,
-          action: 'WHATSAPP_EMBEDDED_SIGNUP_COMPLETED',
+          action: 'WHATSAPP_SIGNUP_COMPLETED',
           entityType: ENTITY,
           entityId: saved.id,
           // Non-secret metadata only.
@@ -239,10 +297,14 @@ export class WhatsAppEmbeddedSignupService {
     return {
       status: connecting ? 'CONNECTING' : 'NOT_CONNECTED',
       connectionMethod: null,
+      coexistence: false,
       maskedPhoneNumber: null,
       businessName: null,
       connectedAt: null,
       lastCheckedAt: null,
+      webhookStatus: 'UNKNOWN',
+      actionRequired: false,
+      errorCode: null,
     };
   }
 
@@ -273,7 +335,7 @@ export class WhatsAppEmbeddedSignupService {
         actorUserId: actor.userId,
         actorRole: actor.role,
         affectedCompanyId: companyId,
-        action: 'WHATSAPP_EMBEDDED_SIGNUP_FAILED',
+        action: 'WHATSAPP_SIGNUP_FAILED',
         entityType: ENTITY,
         reason: classifier,
         ipAddress: actor.ipPreview,
@@ -307,16 +369,29 @@ export class WhatsAppEmbeddedSignupService {
     businessName: string | null;
     connectedAt: Date | null;
     lastCheckedAt: Date | null;
+    lastErrorCode?: string | null;
   }) {
     const status =
       integration.status === 'PENDING' ? 'NOT_CONNECTED' : integration.status;
+    // The WABA is subscribed to the app as part of a successful `complete`, so a
+    // CONNECTED integration implies the webhook is subscribed. Anything else is
+    // reported as UNKNOWN (we never track raw webhook payloads).
+    const webhookStatus = status === 'CONNECTED' ? 'SUBSCRIBED' : 'UNKNOWN';
+    const actionRequired = ['REAUTH_REQUIRED', 'ERROR', 'REVOKED'].includes(
+      status,
+    );
     return {
       status,
       connectionMethod: integration.connectionMethod,
+      coexistence: integration.connectionMethod === 'COEXISTENCE',
       maskedPhoneNumber: this.maskPhone(integration.displayPhoneNumber),
       businessName: integration.businessName,
       connectedAt: integration.connectedAt,
       lastCheckedAt: integration.lastCheckedAt,
+      webhookStatus,
+      actionRequired,
+      // Already a redacted, non-secret classifier (or null).
+      errorCode: integration.lastErrorCode ?? null,
     };
   }
 
