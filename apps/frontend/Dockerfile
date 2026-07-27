@@ -18,6 +18,12 @@ FROM node:${NODE_VERSION} AS builder
 WORKDIR /app
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# Public Meta Embedded Signup identifiers — inlined into the client bundle and
+# used to gate the CSP relaxation for Meta's SDK (never the app secret).
+ARG NEXT_PUBLIC_WHATSAPP_APP_ID
+ENV NEXT_PUBLIC_WHATSAPP_APP_ID=${NEXT_PUBLIC_WHATSAPP_APP_ID}
+ARG NEXT_PUBLIC_WHATSAPP_CONFIG_ID
+ENV NEXT_PUBLIC_WHATSAPP_CONFIG_ID=${NEXT_PUBLIC_WHATSAPP_CONFIG_ID}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build

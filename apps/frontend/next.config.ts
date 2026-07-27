@@ -8,6 +8,9 @@ const isDev = process.env.NODE_ENV !== "production";
 const contentSecurityPolicy = buildContentSecurityPolicy({
   apiOrigin: resolveApiOrigin(process.env.NEXT_PUBLIC_API_URL),
   isDev,
+  // Only relax the CSP for Meta's SDK when the Embedded Signup app id is present
+  // at build time; otherwise the policy stays fully locked down.
+  metaSdk: Boolean(process.env.NEXT_PUBLIC_WHATSAPP_APP_ID),
 });
 
 const securityHeaders = [

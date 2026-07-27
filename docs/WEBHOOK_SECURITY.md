@@ -170,3 +170,12 @@ Decisiones conscientes de esta fase; ninguna se implementa ahora.
 - Verify token del `GET` con comparación de tiempo constante (hoy `===`).
 - Bloqueo por cuenta y protección distribuida (WAF/CDN).
 - Embedded Signup / OAuth real de Meta.
+
+## Embedded Signup + webhook subscription
+
+The Meta Embedded Signup flow (see
+[WHATSAPP_EMBEDDED_SIGNUP.md](./WHATSAPP_EMBEDDED_SIGNUP.md)) subscribes each
+customer WABA to this app server-side (`POST /{waba-id}/subscribed_apps`) so
+inbound messages are delivered to `POST /api/webhook`. The signature guard and
+fail-closed behavior described above are unchanged and still apply to every
+inbound POST regardless of how the integration was connected.

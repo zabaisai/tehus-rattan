@@ -38,22 +38,23 @@ model Company {
   address     String? // Dirección
   quoteFooter String? // Texto/condiciones opcionales para el pie de cotizaciones
 
-  users               User[]
-  contacts            Contact[]
-  conversations       Conversation[]
-  automations         Automation[]
-  pipelines           Pipeline[]
-  leads               Lead[]
-  tasks               Task[]
-  notes               Note[]
-  products            Product[]
-  quotes              Quote[]
-  whatsappIntegration WhatsAppIntegration?
-  auditLogs           AuditLog[]           @relation("AuditLogAffectedCompany")
-  supportSessions     SupportSession[]
-  invitationCodesUsed InvitationCode[]
-  userSessions        UserSession[]
-  loginEvents         LoginEvent[]
+  users                User[]
+  contacts             Contact[]
+  conversations        Conversation[]
+  automations          Automation[]
+  pipelines            Pipeline[]
+  leads                Lead[]
+  tasks                Task[]
+  notes                Note[]
+  products             Product[]
+  quotes               Quote[]
+  whatsappIntegration  WhatsAppIntegration?
+  whatsappSignupStates WhatsAppEmbeddedSignupState[]
+  auditLogs            AuditLog[]                    @relation("AuditLogAffectedCompany")
+  supportSessions      SupportSession[]
+  invitationCodesUsed  InvitationCode[]
+  userSessions         UserSession[]
+  loginEvents          LoginEvent[]
 
   @@map("companies")
 }
@@ -450,10 +451,17 @@ model WhatsAppIntegration {
   displayPhoneNumber   String?
   phoneNumberId        String                    @unique
   wabaId               String?
+  businessId           String?
+  businessName         String?
   status               WhatsAppIntegrationStatus @default(PENDING)
+  connectionMethod     WhatsAppConnectionMethod  @default(MANUAL)
   accessTokenEncrypted String?
   connectedAt          DateTime?
   disconnectedAt       DateTime?
+  lastCheckedAt        DateTime?
+  // Redacted error classifier for the last failed attempt (never a secret /
+  // never a raw Meta payload). Cleared on a successful (re)connection.
+  lastErrorCode        String?
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
 
@@ -463,11 +471,41 @@ model WhatsAppIntegration {
   @@map("whatsapp_integrations")
 }
 
+// Short-lived, single-use anti-CSRF state for the Meta Embedded Signup flow.
+// Mirrors the PasswordResetToken security model: only the SHA-256 hash of the
+// opaque state is stored; the plaintext lives only in the browser during the
+// flow and is never persisted, logged, or returned by the API.
+model WhatsAppEmbeddedSignupState {
+  id                 String    @id @default(cuid())
+  companyId          String
+  stateHash          String    @unique
+  usedAt             DateTime?
+  expiresAt          DateTime
+  createdByUserId    String?
+  requestedIpPreview String?
+  createdAt          DateTime  @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([expiresAt])
+  @@map("whatsapp_embedded_signup_states")
+}
+
 enum WhatsAppIntegrationStatus {
   PENDING
+  CONNECTING
   CONNECTED
+  REAUTH_REQUIRED
   DISCONNECTED
   REVOKED
+  ERROR
+}
+
+enum WhatsAppConnectionMethod {
+  MANUAL
+  EMBEDDED_SIGNUP
+  COEXISTENCE
 }
 
 enum Role {

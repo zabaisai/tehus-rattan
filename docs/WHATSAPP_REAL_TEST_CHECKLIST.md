@@ -165,3 +165,15 @@ npm run build
 ```
 
 No incluyas en ningún script, log compartido o documento comandos que contengan `WHATSAPP_TOKEN_ENCRYPTION_KEY`, `WHATSAPP_VERIFY_TOKEN`, `accessToken` o cualquier valor real de Meta.
+
+## Embedded Signup real test (preferred path)
+
+To validate the "Conectar con Meta" flow with a real number, follow
+[WHATSAPP_EMBEDDED_SIGNUP.md](./WHATSAPP_EMBEDDED_SIGNUP.md) → *Meta app setup*
+first (App ID, Config ID, App Secret, Graph version; enable
+`WHATSAPP_EMBEDDED_SIGNUP_ENABLED`). Then, signed in as an ADMIN of a test
+company, click **Conectar con Meta**, complete Meta's popup with the test number,
+and confirm via `GET /api/whatsapp-integrations/me/connection-status` that the
+status is `CONNECTED` with a masked number and **no token** in the response.
+Never write the real number/token into fixtures, commits, or docs — automated
+tests use fictitious ids only.
