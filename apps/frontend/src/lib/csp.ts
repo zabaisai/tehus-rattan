@@ -15,24 +15,37 @@
 export function buildContentSecurityPolicy(opts: {
   apiOrigin: string;
   isDev: boolean;
+  // When true (only when NEXT_PUBLIC_WHATSAPP_APP_ID is configured at build
+  // time), allow Meta's Facebook JS SDK to load and run the Embedded Signup
+  // flow. This is the ONLY relaxation for Meta; the app secret is never in the
+  // browser and no other third-party origin is allowed.
+  metaSdk?: boolean;
 }): string {
-  const { apiOrigin, isDev } = opts;
+  const { apiOrigin, isDev, metaSdk } = opts;
+
+  const META_SCRIPT = 'https://connect.facebook.net';
+  const META_FRAME = 'https://www.facebook.com https://web.facebook.com';
+  const META_CONNECT = 'https://graph.facebook.com https://www.facebook.com';
 
   // Dev additionally needs 'unsafe-eval' for React Fast Refresh; prod never does.
-  const scriptSrc = isDev
+  let scriptSrc = isDev
     ? `'self' 'unsafe-inline' 'unsafe-eval'`
     : `'self' 'unsafe-inline'`;
+  if (metaSdk) scriptSrc += ` ${META_SCRIPT}`;
 
-  const connectSrc = isDev
+  let connectSrc = isDev
     ? `'self' ${apiOrigin} ws: wss:`
     : `'self' ${apiOrigin}`;
+  if (metaSdk) connectSrc += ` ${META_CONNECT}`;
+
+  const frameSrc = metaSdk ? META_FRAME : `'none'`;
 
   const directives = [
     `default-src 'self'`,
     `base-uri 'self'`,
     `object-src 'none'`,
     `frame-ancestors 'none'`,
-    `frame-src 'none'`,
+    `frame-src ${frameSrc}`,
     `form-action 'self'`,
     `script-src ${scriptSrc}`,
     `style-src 'self' 'unsafe-inline'`,

@@ -153,3 +153,15 @@ npm run build             # OK
 - El verify token (`WHATSAPP_VERIFY_TOKEN`) sigue siendo global, no por integración.
 - `POST /me/disconnect` actualmente solo marca `status: DISCONNECTED` localmente — no revoca ni desconecta nada del lado de Meta.
 - La migración de `WhatsAppIntegration` fue aditiva: no borra ni modifica `Company.phone`, que queda intacto y sin uso en este flujo.
+
+## Embedded Signup (primary connection path)
+
+The primary way to connect is now the official Meta **Embedded Signup** flow —
+see [WHATSAPP_EMBEDDED_SIGNUP.md](./WHATSAPP_EMBEDDED_SIGNUP.md). The manual
+`PUT /me` form is retained as a **SUPER_ADMIN-only** advanced fallback.
+`WhatsAppIntegration` gained `businessId`, `businessName`, `connectionMethod`
+(`MANUAL`/`EMBEDDED_SIGNUP`/`COEXISTENCE`), `lastCheckedAt` and a redacted
+`lastErrorCode`; `WhatsAppIntegrationStatus` gained `CONNECTING`,
+`REAUTH_REQUIRED` and `ERROR`. The multi-tenant guarantees are unchanged:
+`companyId` from the JWT, `phoneNumberId` globally unique (cross-company → 409),
+tokens encrypted and never returned.

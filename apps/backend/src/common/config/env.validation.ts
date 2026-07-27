@@ -41,19 +41,61 @@ export function validateEnv(config: Env): Env {
     );
   }
 
+  // Opt-in flag for Meta Embedded Signup. When enabled, the server-side code
+  // exchange + Graph calls need the app id, the Embedded Signup configuration
+  // id, the app secret, and a valid Graph API version. The app secret is
+  // shared with the webhook signature guard. When disabled (default in
+  // dev/tests), the embedded-signup endpoints return a controlled 503.
+  const embeddedSignupEnabled =
+    config.WHATSAPP_EMBEDDED_SIGNUP_ENABLED?.trim() === 'true';
+  if (embeddedSignupEnabled) {
+    for (const key of [
+      'WHATSAPP_APP_ID',
+      'WHATSAPP_CONFIG_ID',
+      'WHATSAPP_APP_SECRET',
+    ]) {
+      if (!config[key]?.trim()) {
+        errors.push(
+          `${key} is required when WHATSAPP_EMBEDDED_SIGNUP_ENABLED=true`,
+        );
+      }
+    }
+    if (!graphVersion) {
+      errors.push(
+        'WHATSAPP_GRAPH_API_VERSION is required when WHATSAPP_EMBEDDED_SIGNUP_ENABLED=true',
+      );
+    }
+  }
+
+  const signupTtl = config.WHATSAPP_EMBEDDED_SIGNUP_STATE_TTL_MINUTES?.trim();
+  if (
+    signupTtl &&
+    !(Number.isInteger(Number(signupTtl)) && Number(signupTtl) > 0)
+  ) {
+    errors.push(
+      'WHATSAPP_EMBEDDED_SIGNUP_STATE_TTL_MINUTES must be a positive integer',
+    );
+  }
+
   // Opt-in flag for transactional email (password recovery). When enabled, the
   // SMTP settings the MailService needs are required; when disabled (default in
   // dev/tests), the recovery endpoints still work — email is a controlled no-op.
-  const passwordResetEnabled =
-    config.PASSWORD_RESET_ENABLED?.trim() === 'true';
+  const passwordResetEnabled = config.PASSWORD_RESET_ENABLED?.trim() === 'true';
   if (passwordResetEnabled) {
-    for (const key of ['SMTP_HOST', 'SMTP_USER', 'SMTP_PASSWORD', 'SMTP_FROM_EMAIL']) {
+    for (const key of [
+      'SMTP_HOST',
+      'SMTP_USER',
+      'SMTP_PASSWORD',
+      'SMTP_FROM_EMAIL',
+    ]) {
       if (!config[key]?.trim()) {
         errors.push(`${key} is required when PASSWORD_RESET_ENABLED=true`);
       }
     }
     if (!config.PASSWORD_RESET_URL?.trim()) {
-      errors.push('PASSWORD_RESET_URL is required when PASSWORD_RESET_ENABLED=true');
+      errors.push(
+        'PASSWORD_RESET_URL is required when PASSWORD_RESET_ENABLED=true',
+      );
     }
   }
 
@@ -70,7 +112,9 @@ export function validateEnv(config: Env): Env {
   }
 
   if (errors.length > 0) {
-    throw new Error(`Invalid environment configuration:\n- ${errors.join('\n- ')}`);
+    throw new Error(
+      `Invalid environment configuration:\n- ${errors.join('\n- ')}`,
+    );
   }
 
   return config;
