@@ -1,8 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { MessageCircle, ShieldCheck, Check, Loader2 } from 'lucide-react';
+import {
+  MessageCircle,
+  ShieldCheck,
+  Check,
+  Loader2,
+  AlertTriangle,
+} from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import {
   completeEmbeddedSignup,
@@ -10,6 +17,7 @@ import {
   getWhatsAppConnectionStatus,
   reconnectWhatsApp,
   startEmbeddedSignup,
+  testWhatsAppConnection,
   type WhatsAppConnectionStatus,
 } from '@/lib/whatsapp';
 import {
@@ -133,6 +141,18 @@ export function WhatsAppConnect() {
     }
   };
 
+  const handleTest = async (to: string): Promise<string> => {
+    try {
+      await testWhatsAppConnection(to);
+      return 'Mensaje de prueba enviado. Revisa el teléfono de destino.';
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 400)
+        return 'No se pudo enviar. El número debe tener formato E.164 y existir una conversación abierta (24 h) con Meta.';
+      return mapError(err);
+    }
+  };
+
   if (isLoading) {
     return <p className="text-sm text-stone-400">Cargando estado de WhatsApp…</p>;
   }
@@ -154,6 +174,7 @@ export function WhatsAppConnect() {
           status={status}
           onReconnect={() => runFlow(reconnectWhatsApp)}
           onDisconnect={handleDisconnect}
+          onTest={handleTest}
           busy={busy}
           disconnecting={disconnecting}
           actionMsg={actionMsg}
@@ -279,6 +300,7 @@ function ConnectedView({
   status,
   onReconnect,
   onDisconnect,
+  onTest,
   busy,
   disconnecting,
   actionMsg,
@@ -286,12 +308,24 @@ function ConnectedView({
   status: WhatsAppConnectionStatus;
   onReconnect: () => void;
   onDisconnect: () => void;
+  onTest: (to: string) => Promise<string>;
   busy: boolean;
   disconnecting: boolean;
   actionMsg: string | null;
 }) {
   const fmt = (d: string | null) =>
     d ? new Date(d).toLocaleString('es-CO') : '—';
+  const [testTo, setTestTo] = useState('');
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<string | null>(null);
+
+  const runTest = async () => {
+    setTesting(true);
+    setTestMsg(null);
+    setTestMsg(await onTest(testTo.trim()));
+    setTesting(false);
+  };
+
   return (
     <div className="rounded-lg border border-stone-200 bg-white p-6">
       <div className="flex items-center gap-3">
@@ -301,21 +335,69 @@ function ConnectedView({
         <StatusPill status={status.status} />
       </div>
 
+      {status.actionRequired && (
+        <div className="mt-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            La conexión necesita atención. Usa “Reconectar” para volver a
+            autorizar con Meta.
+          </span>
+        </div>
+      )}
+
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Número" value={status.maskedPhoneNumber ?? '—'} />
         <Field label="Nombre comercial" value={status.businessName ?? '—'} />
         <Field
           label="Método"
           value={
-            status.connectionMethod === 'COEXISTENCE'
+            status.coexistence
               ? 'Coexistencia (App + API)'
               : status.connectionMethod === 'EMBEDDED_SIGNUP'
                 ? 'Meta Embedded Signup'
                 : 'Manual'
           }
         />
+        <Field
+          label="Webhook"
+          value={
+            status.webhookStatus === 'SUBSCRIBED' ? 'Suscrito' : 'Desconocido'
+          }
+        />
         <Field label="Conectado desde" value={fmt(status.connectedAt)} />
         <Field label="Última comprobación" value={fmt(status.lastCheckedAt)} />
+      </div>
+
+      {/* Explicit connection test (only inside Meta's 24h conversation window). */}
+      <div className="mt-6 border-t border-stone-100 pt-4">
+        <p className="mb-2 text-sm font-medium text-stone-700">Probar conexión</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <label htmlFor="wa-test-to" className="sr-only">
+            Número de destino (E.164)
+          </label>
+          <input
+            id="wa-test-to"
+            type="tel"
+            inputMode="tel"
+            placeholder="+573001234567"
+            value={testTo}
+            onChange={(e) => setTestTo(e.target.value)}
+            className="w-56 rounded-md border border-stone-300 px-3 py-1.5 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          />
+          <button
+            type="button"
+            onClick={runTest}
+            disabled={testing || !testTo.trim()}
+            className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+          >
+            {testing ? 'Enviando…' : 'Enviar prueba'}
+          </button>
+        </div>
+        <p className="mt-1.5 text-xs text-stone-400">
+          Envía un mensaje de texto de prueba. Solo funciona si hay una
+          conversación abierta con ese número (ventana de 24 h de Meta).
+        </p>
+        {testMsg && <p className="mt-2 text-xs text-stone-600">{testMsg}</p>}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -335,11 +417,18 @@ function ConnectedView({
         >
           {disconnecting ? 'Desconectando…' : 'Desconectar'}
         </button>
+        <Link
+          href="/dashboard/conversations"
+          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+        >
+          Ir a conversaciones
+        </Link>
       </div>
 
       <p className="mt-3 text-xs text-stone-400">
         La desconexión solo cambia el estado local en el CRM; no revoca el acceso
-        en Meta. Los tokens nunca se muestran en esta pantalla.
+        en Meta ni afecta WhatsApp Business App. Los tokens nunca se muestran en
+        esta pantalla.
       </p>
       {actionMsg && <p className="mt-2 text-xs text-emerald-600">{actionMsg}</p>}
     </div>

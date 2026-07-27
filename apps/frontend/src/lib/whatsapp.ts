@@ -24,10 +24,14 @@ export type ConnectionStatusValue =
 export interface WhatsAppConnectionStatus {
   status: ConnectionStatusValue;
   connectionMethod: 'MANUAL' | 'EMBEDDED_SIGNUP' | 'COEXISTENCE' | null;
+  coexistence: boolean;
   maskedPhoneNumber: string | null;
   businessName: string | null;
   connectedAt: string | null;
   lastCheckedAt: string | null;
+  webhookStatus: 'SUBSCRIBED' | 'UNKNOWN';
+  actionRequired: boolean;
+  errorCode: string | null;
 }
 
 // What the browser posts to finish the flow. The code is the 30s exchangeable
@@ -92,6 +96,18 @@ export async function completeEmbeddedSignup(
 export async function reconnectWhatsApp(): Promise<EmbeddedSignupStart> {
   const { data } = await api.post<EmbeddedSignupStart>(
     '/whatsapp-integrations/me/reconnect',
+  );
+  return data;
+}
+
+// Explicit connection test — sends one text to an E.164 number using the
+// company's connected integration. Works only inside Meta's conversation window.
+export async function testWhatsAppConnection(
+  to: string,
+): Promise<{ status: 'ok' }> {
+  const { data } = await api.post<{ status: 'ok' }>(
+    '/whatsapp-integrations/me/test',
+    { to },
   );
   return data;
 }

@@ -12,6 +12,7 @@ const wa = vi.hoisted(() => ({
   reconnectWhatsApp: vi.fn(),
   disconnectWhatsAppIntegration: vi.fn(),
   getWhatsAppIntegration: vi.fn(),
+  testWhatsAppConnection: vi.fn(),
 }));
 const sdk = vi.hoisted(() => ({
   loadFacebookSdk: vi.fn(),
@@ -42,18 +43,26 @@ function renderConnect() {
 const DISCONNECTED = {
   status: 'NOT_CONNECTED',
   connectionMethod: null,
+  coexistence: false,
   maskedPhoneNumber: null,
   businessName: null,
   connectedAt: null,
   lastCheckedAt: null,
+  webhookStatus: 'UNKNOWN',
+  actionRequired: false,
+  errorCode: null,
 };
 const CONNECTED = {
   status: 'CONNECTED',
-  connectionMethod: 'EMBEDDED_SIGNUP',
+  connectionMethod: 'COEXISTENCE',
+  coexistence: true,
   maskedPhoneNumber: '••• 4521',
   businessName: 'Tehus QA',
   connectedAt: '2026-07-27T00:00:00Z',
   lastCheckedAt: '2026-07-27T00:00:00Z',
+  webhookStatus: 'SUBSCRIBED',
+  actionRequired: false,
+  errorCode: null,
 };
 
 describe('WhatsAppConnect', () => {
@@ -107,14 +116,33 @@ describe('WhatsAppConnect', () => {
     expect(wa.completeEmbeddedSignup).not.toHaveBeenCalled();
   });
 
-  it('renders the connected view (masked number, reconnect/disconnect) and never a token', async () => {
+  it('renders the connected view (masked number, coexistence, webhook, reconnect/disconnect) and never a token', async () => {
     wa.getWhatsAppConnectionStatus.mockResolvedValue(CONNECTED);
     renderConnect();
     expect(await screen.findByText('WhatsApp Business conectado')).toBeInTheDocument();
     expect(screen.getByText('••• 4521')).toBeInTheDocument();
+    expect(screen.getByText('Coexistencia (App + API)')).toBeInTheDocument();
+    expect(screen.getByText('Suscrito')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Reconectar/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Desconectar/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Ir a conversaciones/i })).toHaveAttribute(
+      'href',
+      '/dashboard/conversations',
+    );
     expect(document.body.textContent).not.toMatch(/accessToken/i);
+  });
+
+  it('sends a test message from the connected view', async () => {
+    wa.getWhatsAppConnectionStatus.mockResolvedValue(CONNECTED);
+    wa.testWhatsAppConnection.mockResolvedValue({ status: 'ok' });
+    renderConnect();
+    await screen.findByText('WhatsApp Business conectado');
+    await userEvent.type(screen.getByPlaceholderText('+573001234567'), '+573001234567');
+    await userEvent.click(screen.getByRole('button', { name: /Enviar prueba/i }));
+    await waitFor(() =>
+      expect(wa.testWhatsAppConnection).toHaveBeenCalledWith('+573001234567'),
+    );
+    expect(await screen.findByText(/Mensaje de prueba enviado/i)).toBeInTheDocument();
   });
 
   it('hides the advanced manual section from ADMIN', async () => {
