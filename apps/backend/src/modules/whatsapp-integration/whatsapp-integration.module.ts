@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PlatformModule } from '../platform/platform.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { WhatsAppIntegrationService } from './whatsapp-integration.service';
 import { WhatsAppTokenCryptoService } from './whatsapp-token-crypto.service';
 import { WhatsAppIntegrationManagementService } from './whatsapp-integration-management.service';
@@ -9,7 +10,7 @@ import { WhatsAppEmbeddedSignupService } from './whatsapp-embedded-signup.servic
 import { WhatsAppIntegrationController } from './whatsapp-integration.controller';
 
 @Module({
-  imports: [PlatformModule],
+  imports: [PlatformModule, NotificationsModule],
   controllers: [WhatsAppIntegrationController],
   providers: [
     WhatsAppIntegrationService,

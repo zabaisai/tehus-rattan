@@ -32,6 +32,7 @@ import { QuotesModule } from './modules/quotes/quotes.module';
 import { InvitationCodesModule } from './modules/invitation-codes/invitation-codes.module';
 import { SessionsModule } from './modules/sessions/sessions.module';
 import { PasswordRecoveryModule } from './modules/auth/password-recovery/password-recovery.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
 
 @Module({
@@ -50,6 +51,7 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     ScheduleModule.forRoot(),
     PrismaModule,
     SessionsModule,
+    NotificationsModule,
     AuthModule,
     CompaniesModule,
     UsersModule,

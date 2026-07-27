@@ -7,6 +7,7 @@ describe('WebhookService', () => {
   let contactsService: any;
   let automationsService: any;
   let whatsappIntegrationService: any;
+  let notifications: any;
   let service: WebhookService;
 
   const connectedIntegration = {
@@ -48,6 +49,7 @@ describe('WebhookService', () => {
     contactsService = { create: jest.fn() };
     automationsService = { processMessage: jest.fn() };
     whatsappIntegrationService = { findConnectedByPhoneNumberId: jest.fn() };
+    notifications = { emit: jest.fn().mockResolvedValue(undefined) };
 
     service = new WebhookService(
       prisma,
@@ -56,6 +58,7 @@ describe('WebhookService', () => {
       contactsService,
       automationsService,
       whatsappIntegrationService,
+      notifications,
     );
   });
 
