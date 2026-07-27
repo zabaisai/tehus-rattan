@@ -73,6 +73,11 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        # Public Meta Embedded Signup identifiers, inlined into the client
+        # bundle at build time (never the app secret). Empty => the "Conectar
+        # con Meta" button is present but the flow reports "no disponible".
+        NEXT_PUBLIC_WHATSAPP_APP_ID: ${NEXT_PUBLIC_WHATSAPP_APP_ID:-}
+        NEXT_PUBLIC_WHATSAPP_CONFIG_ID: ${NEXT_PUBLIC_WHATSAPP_CONFIG_ID:-}
         GIT_SHA: ${GIT_SHA:-unknown}
     restart: unless-stopped
     init: true
