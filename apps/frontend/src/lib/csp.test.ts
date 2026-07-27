@@ -13,6 +13,29 @@ describe("resolveApiOrigin", () => {
   });
 });
 
+describe("buildContentSecurityPolicy (Meta Embedded Signup)", () => {
+  const base = buildContentSecurityPolicy({ apiOrigin: api, isDev: false });
+  const withMeta = buildContentSecurityPolicy({
+    apiOrigin: api,
+    isDev: false,
+    metaSdk: true,
+  });
+
+  it("keeps frame-src 'none' and no facebook origins when the feature is off", () => {
+    expect(base).toContain("frame-src 'none'");
+    expect(base).not.toContain("facebook");
+  });
+
+  it("allows the Facebook SDK script/frame/connect only when metaSdk is enabled", () => {
+    expect(withMeta).toContain("https://connect.facebook.net");
+    expect(withMeta).toContain("frame-src https://www.facebook.com");
+    expect(withMeta).toContain("https://graph.facebook.com");
+    // Still no eval, still self-based.
+    expect(withMeta).not.toContain("'unsafe-eval'");
+    expect(withMeta).toContain("script-src 'self' 'unsafe-inline'");
+  });
+});
+
 describe("buildContentSecurityPolicy (production)", () => {
   const csp = buildContentSecurityPolicy({ apiOrigin: api, isDev: false });
 
