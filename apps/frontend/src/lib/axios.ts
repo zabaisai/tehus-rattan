@@ -24,7 +24,14 @@ api.interceptors.request.use((config) => {
 // Requests to these never trigger a silent refresh on 401 — a failed login is
 // a real credentials error (not an expired access token), a failed refresh must
 // not try to refresh itself, and onboarding is a public pre-auth flow.
-const NO_REFRESH_PATHS = ["/auth/login", "/auth/refresh", "/auth/logout", "/onboarding"];
+const NO_REFRESH_PATHS = [
+  "/auth/login",
+  "/auth/refresh",
+  "/auth/logout",
+  "/onboarding",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+];
 
 function shouldSkipRefresh(url: string | undefined): boolean {
   if (!url) return true;
