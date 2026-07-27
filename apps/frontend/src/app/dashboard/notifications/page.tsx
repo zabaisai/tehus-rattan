@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   useInfiniteQuery,
@@ -64,13 +65,21 @@ export default function NotificationsPage() {
             Tus alertas de conversaciones, tareas, WhatsApp y más.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={markAll}
-          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
-        >
-          Marcar todas como leídas
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/settings/notifications"
+            className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+          >
+            Preferencias
+          </Link>
+          <button
+            type="button"
+            onClick={markAll}
+            className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+          >
+            Marcar todas como leídas
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
