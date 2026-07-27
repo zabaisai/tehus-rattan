@@ -47,8 +47,10 @@ state); the rest are persisted on `WhatsAppIntegration.status`.
 | --- | --- | --- |
 | `POST /api/whatsapp-integrations/me/embedded-signup/start` | ADMIN/SUPER_ADMIN | Mint state + return public SDK config. Per-IP throttled. |
 | `POST /api/whatsapp-integrations/me/embedded-signup/complete` | ADMIN/SUPER_ADMIN | Finish: exchange code, validate, subscribe, persist. |
-| `GET /api/whatsapp-integrations/me/connection-status` | ADMIN/SUPER_ADMIN | Safe snapshot (masked phone, no token, no WABA). |
-| `POST /api/whatsapp-integrations/me/reconnect` | ADMIN/SUPER_ADMIN | Mint a new state to re-run signup (REAUTH_REQUIRED). |
+| `GET /api/whatsapp-integrations/me/connection-status` | ADMIN/SUPER_ADMIN | Safe snapshot: `status`, `connectionMethod`, `coexistence`, masked phone, `businessName`, `connectedAt`, `lastCheckedAt`, `webhookStatus`, `actionRequired`, sanitized `errorCode`. No token, no WABA. |
+| `POST /api/whatsapp-integrations/me/reconnect` | ADMIN/SUPER_ADMIN | Mint a new state to re-run signup. **Cancel-safe**: the current integration is left CONNECTED until a new `complete` succeeds. |
+| `POST /api/whatsapp-integrations/me/test` | ADMIN/SUPER_ADMIN | Send one E.164-validated test text via the connected integration (rate-limited, audited). Works only inside Meta's 24h window. |
+| `POST /api/whatsapp-integrations/me/disconnect` | ADMIN/SUPER_ADMIN | **Local-only** disconnect (does NOT revoke on Meta / deregister the number). |
 | `PUT /api/whatsapp-integrations/me` | **SUPER_ADMIN only** | Legacy manual connect (advanced fallback). |
 
 No endpoint ever returns the access token (plaintext or encrypted).
@@ -114,9 +116,9 @@ fully locked down. No app secret is ever exposed to the browser.
 - **Timeouts** on every Meta call; **redacted logs** (never the code, token, or
   Meta payload — only a non-secret error classifier); **generic** user-facing
   errors.
-- **Audit** (no secrets): `WHATSAPP_EMBEDDED_SIGNUP_STARTED`,
-  `WHATSAPP_EMBEDDED_SIGNUP_COMPLETED`, `WHATSAPP_EMBEDDED_SIGNUP_FAILED`,
-  `WHATSAPP_RECONNECT_STARTED`.
+- **Audit** (no secrets): `WHATSAPP_SIGNUP_STARTED`, `WHATSAPP_SIGNUP_COMPLETED`,
+  `WHATSAPP_SIGNUP_FAILED`, `WHATSAPP_RECONNECTED`,
+  `WHATSAPP_DISCONNECTED_LOCAL`, `WHATSAPP_CONNECTION_TESTED`.
 
 ## New vs migrated vs Coexistence numbers
 
