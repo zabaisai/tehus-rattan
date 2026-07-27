@@ -1,4 +1,5 @@
-import { IsEmail, IsString, IsNotEmpty, IsOptional, MinLength } from 'class-validator';
+import { IsEmail, IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsStrongPassword } from '../../../common/password/password-policy';
 
 export class RegisterDto {
   @IsString()
@@ -13,7 +14,7 @@ export class RegisterDto {
   email!: string;
 
   @IsString()
-  @MinLength(6, { message: 'La contraseña debe tener al menos 6 caracteres' })
+  @IsStrongPassword()
   password!: string;
 
   // Read directly off the raw request by OnboardingInviteGuard, not off this

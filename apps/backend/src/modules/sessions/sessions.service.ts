@@ -218,4 +218,27 @@ export class SessionsService {
       data: { lastActivityAt: new Date() },
     });
   }
+
+  // Revokes ALL of a user's ACTIVE sessions (and thus their refresh tokens) in a
+  // single write — used after a password reset so every previously-issued access
+  // token is rejected on its next request (JwtStrategy checks the session's
+  // status per request) and no old refresh token can rotate. Accepts an optional
+  // transaction client so it can enroll in the caller's atomic password change,
+  // and returns how many sessions were revoked. `revokedByUserId` is the user
+  // themselves for a self-service reset.
+  async revokeAllActiveForUser(
+    userId: string,
+    revokedByUserId: string | null,
+    tx: SessionWriter = this.prisma,
+  ): Promise<number> {
+    const result = await tx.userSession.updateMany({
+      where: { userId, status: 'ACTIVE' },
+      data: {
+        status: 'REVOKED',
+        revokedAt: new Date(),
+        revokedByUserId: revokedByUserId ?? undefined,
+      },
+    });
+    return result.count;
+  }
 }
