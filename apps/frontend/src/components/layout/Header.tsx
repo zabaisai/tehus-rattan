@@ -1,10 +1,12 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { LogOut, Menu } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { logout } from '@/lib/auth';
 import { broadcastAuthEvent } from '@/lib/auth-events';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -12,6 +14,7 @@ interface HeaderProps {
 
 export function Header({ onMenuClick }: HeaderProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
   const clearSession = useAuthStore((s) => s.clearSession);
 
@@ -25,6 +28,9 @@ export function Header({ onMenuClick }: HeaderProps) {
       // ignored — see comment above
     }
     clearSession();
+    // Drop all cached queries (notifications, etc.) so nothing leaks into the
+    // next session in this tab.
+    queryClient.clear();
     // Tell other tabs of this browser to drop the (now closed) session too.
     broadcastAuthEvent('logout');
     router.push('/login');
@@ -42,6 +48,7 @@ export function Header({ onMenuClick }: HeaderProps) {
       </button>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        <NotificationBell />
         <span className="hidden text-sm text-stone-700 sm:inline">{user?.name ?? '...'}</span>
         <button
           onClick={handleLogout}

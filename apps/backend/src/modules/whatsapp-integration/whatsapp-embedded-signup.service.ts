@@ -13,6 +13,7 @@ import { WhatsAppTokenCryptoService } from './whatsapp-token-crypto.service';
 import { WhatsAppEmbeddedSignupStateService } from './whatsapp-embedded-signup-state.service';
 import { WhatsAppIntegrationService } from './whatsapp-integration.service';
 import { WhatsAppIntegrationManagementService } from './whatsapp-integration-management.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   MetaSignupError,
   WhatsAppMetaClientService,
@@ -44,7 +45,29 @@ export class WhatsAppEmbeddedSignupService {
     private auditLog: PlatformAuditLogService,
     private integrationService: WhatsAppIntegrationService,
     private management: WhatsAppIntegrationManagementService,
+    private notifications: NotificationsService,
   ) {}
+
+  // Notifies the company's admins about a WhatsApp connection event.
+  private notifyAdmins(
+    companyId: string,
+    type:
+      | 'WHATSAPP_CONNECTED'
+      | 'WHATSAPP_CONNECTION_FAILED'
+      | 'WHATSAPP_DISCONNECTED',
+    title: string,
+  ): void {
+    void this.notifications.emitToCompanyRoles(
+      companyId,
+      ['ADMIN', 'SUPER_ADMIN'],
+      {
+        type,
+        title,
+        entityType: 'WhatsAppIntegration',
+        actionUrl: '/dashboard/settings/whatsapp',
+      },
+    );
+  }
 
   private assertEnabled(): void {
     const enabled =
@@ -132,6 +155,11 @@ export class WhatsAppEmbeddedSignupService {
       ipAddress: actor.ipPreview,
       userAgent: actor.userAgent,
     });
+    this.notifyAdmins(
+      companyId,
+      'WHATSAPP_DISCONNECTED',
+      'WhatsApp se desconectó en el CRM (no se revocó en Meta).',
+    );
     return result;
   }
 
@@ -278,9 +306,19 @@ export class WhatsAppEmbeddedSignupService {
         return saved;
       });
 
+      this.notifyAdmins(
+        companyId,
+        'WHATSAPP_CONNECTED',
+        'WhatsApp Business quedó conectado correctamente.',
+      );
       return this.toSafeStatus(integration);
     } catch (error) {
       await this.recordFailure(companyId, actor, error);
+      this.notifyAdmins(
+        companyId,
+        'WHATSAPP_CONNECTION_FAILED',
+        'No se pudo completar la conexión de WhatsApp con Meta.',
+      );
       throw this.toClientError(error);
     }
   }

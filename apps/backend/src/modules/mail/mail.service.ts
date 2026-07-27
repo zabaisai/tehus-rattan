@@ -59,6 +59,60 @@ export class MailService {
     this.logger.log('Password reset email dispatched');
   }
 
+  // Notification emails gate only on SMTP being configured (independent of the
+  // password-reset flag). When SMTP is not configured it is a controlled no-op
+  // — never throws, so a notification email can never break the main operation.
+  // The caller must pass an already-sanitized preview (no secrets, no full
+  // message bodies, no other company's data).
+  isSmtpConfigured(): boolean {
+    return (
+      !!this.config.get<string>('SMTP_HOST')?.trim() &&
+      !!this.config.get<string>('SMTP_USER')?.trim() &&
+      !!this.config.get<string>('SMTP_PASSWORD')?.trim() &&
+      !!this.config.get<string>('SMTP_FROM_EMAIL')?.trim()
+    );
+  }
+
+  async sendNotificationEmail(input: {
+    to: string;
+    name: string;
+    title: string;
+    preview: string;
+    actionUrl: string | null;
+    category: string;
+  }): Promise<void> {
+    if (!this.isSmtpConfigured()) {
+      this.logger.log('Notification email suppressed (SMTP not configured)');
+      return;
+    }
+    const fromName =
+      this.config.get<string>('SMTP_FROM_NAME')?.trim() || 'Tehus Rattan';
+    const fromEmail = this.config.getOrThrow<string>('SMTP_FROM_EMAIL');
+    const safe = (s: string) => s.replace(/[<>]/g, '').slice(0, 300);
+    const title = safe(input.title);
+    const preview = safe(input.preview);
+    // Only an absolute http(s) URL is ever linked (no open redirect / arbitrary
+    // scheme); otherwise the button is omitted.
+    const link =
+      input.actionUrl && /^https?:\/\//i.test(input.actionUrl)
+        ? input.actionUrl
+        : null;
+    const button = link
+      ? `<p><a href="${link}" style="display:inline-block;padding:10px 16px;background:#1c1917;color:#fff;border-radius:6px;text-decoration:none">Abrir en el CRM</a></p>`
+      : '';
+    const html = `<div style="font-family:sans-serif;color:#1c1917"><p>Hola ${safe(input.name)},</p><p><strong>${title}</strong></p>${preview ? `<p>${preview}</p>` : ''}${button}<p style="color:#78716c;font-size:12px">Recibiste este correo por tus preferencias de notificaciones en el CRM Tehus Rattan.</p></div>`;
+    const text = `Hola ${safe(input.name)}\n\n${title}\n${preview}${link ? `\n\n${link}` : ''}`;
+
+    await this.getTransporter().sendMail({
+      from: `${fromName} <${fromEmail}>`,
+      to: input.to,
+      subject: title,
+      html,
+      text,
+    });
+    this.logger.log('Notification email dispatched');
+  }
+
   private getTransporter(): Transporter {
     if (!this.transporter) {
       this.transporter = createTransport({

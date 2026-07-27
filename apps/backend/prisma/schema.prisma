@@ -50,6 +50,8 @@ model Company {
   quotes               Quote[]
   whatsappIntegration  WhatsAppIntegration?
   whatsappSignupStates WhatsAppEmbeddedSignupState[]
+  notifications        Notification[]
+  notificationPrefs    NotificationPreference[]
   auditLogs            AuditLog[]                    @relation("AuditLogAffectedCompany")
   supportSessions      SupportSession[]
   invitationCodesUsed  InvitationCode[]
@@ -88,6 +90,10 @@ model User {
   sessionsRevoked     UserSession[]        @relation("UserSessionRevokedBy")
   loginEvents         LoginEvent[]
   passwordResetTokens PasswordResetToken[]
+
+  notifications           Notification[]           @relation("NotificationRecipient")
+  notificationsAuthored   Notification[]           @relation("NotificationActor")
+  notificationPreferences NotificationPreference[]
 
   @@map("users")
 }
@@ -506,6 +512,83 @@ enum WhatsAppConnectionMethod {
   MANUAL
   EMBEDDED_SIGNUP
   COEXISTENCE
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+// Per-user, per-company in-app notification. Never stores secrets, full
+// WhatsApp message bodies, tokens, passwords, full IPs or sessions — only a
+// short sanitized preview and minimal metadata. `dedupeKey` (unique) collapses
+// bursts of the same event into one row.
+model Notification {
+  id              String               @id @default(cuid())
+  companyId       String
+  recipientUserId String
+  actorUserId     String?
+  type            String
+  category        NotificationCategory
+  priority        NotificationPriority @default(NORMAL)
+  title           String
+  bodyPreview     String?
+  entityType      String?
+  entityId        String?
+  actionUrl       String?
+  metadata        Json?
+  dedupeKey       String?              @unique
+  readAt          DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime             @default(now())
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  recipient User    @relation("NotificationRecipient", fields: [recipientUserId], references: [id], onDelete: Cascade)
+  actor     User?   @relation("NotificationActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([recipientUserId, readAt])
+  @@index([recipientUserId, createdAt])
+  @@index([companyId])
+  @@index([expiresAt])
+  @@map("notifications")
+}
+
+// One row per (user, category) — controls in-app + email delivery. Defaults are
+// applied in code when a row is absent, so a new user needs no seeding.
+model NotificationPreference {
+  id           String               @id @default(cuid())
+  companyId    String
+  userId       String
+  category     NotificationCategory
+  inAppEnabled Boolean              @default(true)
+  emailEnabled Boolean              @default(false)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, category])
+  @@index([companyId])
+  @@map("notification_preferences")
+}
+
+enum NotificationCategory {
+  CONVERSATION
+  MESSAGE
+  CONTACT
+  LEAD
+  TASK
+  QUOTE
+  WHATSAPP
+  SECURITY
+  PLATFORM
+  SYSTEM
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
 }
 
 enum Role {

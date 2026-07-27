@@ -5,6 +5,7 @@ import { MessagesService } from '../messages/messages.service';
 import { ContactsService } from '../contacts/contacts.service';
 import { AutomationsService } from '../automations/automations.service';
 import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-integration.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { maskPhone } from '../../common/logging/redact';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class WebhookService {
     private contactsService: ContactsService,
     private automationsService: AutomationsService,
     private whatsappIntegrationService: WhatsAppIntegrationService,
+    private notifications: NotificationsService,
   ) {}
 
   // Walks the whole Meta payload — every entry, every change, every message —
@@ -136,6 +138,28 @@ export class WebhookService {
       text,
       message.from,
     );
+
+    // Notify the assigned agent of a new inbound message. Best-effort (never
+    // breaks webhook processing), a short sanitized preview only (never the full
+    // body / full phone), and deduped per conversation in 5-minute buckets so a
+    // burst of messages collapses to one notification.
+    const assignedTo = (conversation as { assignedTo?: string | null })
+      .assignedTo;
+    if (assignedTo) {
+      const preview = text.replace(/\s+/g, ' ').trim().slice(0, 60);
+      const bucket = Math.floor(Date.now() / 300_000);
+      void this.notifications.emit({
+        companyId,
+        recipientUserId: assignedTo,
+        type: 'NEW_INBOUND_MESSAGE',
+        title: 'Nuevo mensaje de WhatsApp',
+        bodyPreview: preview || undefined,
+        entityType: 'Conversation',
+        entityId: conversation.id,
+        actionUrl: `/dashboard/conversations`,
+        dedupeKey: `NEW_INBOUND_MESSAGE:${conversation.id}:${bucket}`,
+      });
+    }
 
     this.logger.log(`Mensaje procesado de ${maskPhone(message.from)}`);
   }
