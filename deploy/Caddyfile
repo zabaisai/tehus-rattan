@@ -52,3 +52,35 @@ api.crm-staging.tehusrattan.com {
 	# and per-IP throttler see the real client.
 	reverse_proxy backend:3001
 }
+
+# ---- TAKTO · sitio comercial ------------------------------------------------
+# Proyecto y contenedor SEPARADOS: repositorio takto-web, imagen takto-web,
+# desplegado en /opt/takto-web. No comparte codigo, dependencias, variables,
+# volumenes ni base de datos con el CRM. Caddy solo lo enruta.
+#
+# El destino es `takto-web:3000` y no `127.0.0.1:3100` porque Caddy corre
+# dentro de un contenedor: alli 127.0.0.1 es su propio loopback, no el host.
+# Se comprobo en el servidor que el contenedor NO alcanza el loopback del
+# host. El contenedor de la web se une a la red `tehus-crm-staging_proxy`
+# (la red de borde: caddy, frontend, backend) declarandola como externa.
+# NO se une a `tehus-crm-staging_internal`, que es donde vive PostgreSQL.
+takto.online {
+	encode zstd gzip
+
+	# HSTS se emite aqui, en el borde TLS, igual que en los bloques de arriba.
+	# Sin `preload`: el dominio es nuevo y no debe fijarse en los navegadores.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+
+	# La web comercial no recibe subidas: solo el formulario, que es JSON breve.
+	request_body {
+		max_size 1MB
+	}
+
+	reverse_proxy takto-web:3000
+}
+
+# El www redirige de forma permanente a la raiz, conservando ruta y query.
+www.takto.online {
+	redir https://takto.online{uri} permanent
+}
