@@ -129,11 +129,13 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [ ] Índices de tráfico (medidos antes)
 
 ### Bloque 3 — E.164
-- [ ] Utilitario único de normalización
-- [ ] Detección de colisiones previa
-- [ ] Backfill auditable de los 4 contactos
-- [ ] Compatibilidad temporal de búsqueda con y sin `+`
-- [ ] Pruebas de regresión
+- [x] **Utilitario único** — `src/common/phone/e164.util.ts` (33 pruebas)
+- [x] **Normalización al crear** + reutilización del contacto existente en
+      lugar de duplicar (`contacts.service.ts`)
+- [x] **Compatibilidad de búsqueda** con y sin `+` (3 pruebas dedicadas)
+- [x] Pruebas de regresión — spec de contactos: 27 → 36 casos
+- [ ] **Backfill de las filas existentes** — pendiente, va en migración aparte
+      con detección de colisiones previa
 
 ### Bloque 4 — WhatsApp multi-número (mayor riesgo)
 - [ ] Segundo backup verificado
@@ -305,7 +307,9 @@ revisaron y no se duplicaron.
 | 2026-07-30 | **CI remoto** `312ced6` | frontend y backend **success** |
 | 2026-07-30 | **CI remoto** `0837c28` (pipelines) | frontend y backend **success**, `head_sha` verificado |
 | 2026-07-30 | **CI remoto** `93b6b81` (relaciones) | frontend y backend **success**, `head_sha` verificado |
-| 2026-07-30 | tras bloque 2.4 | **851 unit / 214 e2e verdes** |
+| 2026-07-30 | tras bloque 2.4 | 851 unit / 214 e2e verdes |
+| 2026-07-30 | CI `e59d22a` | **cancelled** (lo canceló el push siguiente) |
+| 2026-07-30 | tras bloque 3 (E.164) | **893 unit / 214 e2e verdes** |
 
 ## Despliegues
 
@@ -314,6 +318,19 @@ _(ninguno en esta rama — staging sigue en `58dfb76`)_
 ## Bloqueadores
 
 _(ninguno)_
+
+## Aprendizaje operativo importante
+
+**El CI cancela runs anteriores del mismo ref.** El workflow tiene
+`concurrency: cancel-in-progress: true`, así que hacer push de un commit
+mientras corre el del anterior deja al primero en `cancelled`, no en verde.
+
+Ocurrió con `e59d22a` (bloque 2.4): su run fue **cancelado** por el push de
+`a1de25b`. No debe darse por cubierto.
+
+**Regla para quien reanude:** verificar el CI del **último SHA publicado** del
+lote, y comprobar siempre que `head_sha` del run coincide exactamente. Un run
+verde de un SHA anterior no cubre el código nuevo.
 
 ## Deuda operativa detectada (no corregida aún)
 
