@@ -16,7 +16,7 @@ describe('WhatsAppIntegrationService', () => {
 
   beforeEach(() => {
     prisma = {
-      whatsAppIntegration: { findFirst: jest.fn() },
+      whatsAppIntegration: { findFirst: jest.fn(), findMany: jest.fn() },
     };
     service = new WhatsAppIntegrationService(prisma);
   });
@@ -72,8 +72,7 @@ describe('WhatsAppIntegrationService', () => {
         // non-connected integration never matches and Prisma returns null.
         prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
 
-        const result =
-          await service.findConnectedByPhoneNumberId('1234567890');
+        const result = await service.findConnectedByPhoneNumberId('1234567890');
 
         expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -125,9 +124,11 @@ describe('WhatsAppIntegrationService', () => {
 
       const result = await service.findConnectedByCompanyId('company-a');
 
-      expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith({
-        where: { companyId: 'company-a', status: 'CONNECTED' },
-      });
+      expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { companyId: 'company-a', status: 'CONNECTED' },
+        }),
+      );
       expect(result).toEqual(connectedIntegrationWithToken);
       expect(result?.accessTokenEncrypted).toBe('encrypted-token-value');
     });
@@ -139,9 +140,11 @@ describe('WhatsAppIntegrationService', () => {
 
       await service.findConnectedByCompanyId('  company-a  ');
 
-      expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith({
-        where: { companyId: 'company-a', status: 'CONNECTED' },
-      });
+      expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { companyId: 'company-a', status: 'CONNECTED' },
+        }),
+      );
     });
 
     it('returns null when no integration matches that company', async () => {
@@ -157,9 +160,11 @@ describe('WhatsAppIntegrationService', () => {
 
       const result = await service.findConnectedByCompanyId('company-a');
 
-      expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith({
-        where: { companyId: 'company-a', status: 'CONNECTED' },
-      });
+      expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { companyId: 'company-a', status: 'CONNECTED' },
+        }),
+      );
       expect(result).toBeNull();
     });
 
@@ -197,20 +202,76 @@ describe('WhatsAppIntegrationService', () => {
       expect(where.phoneNumberId).toBe('1234567890');
     });
 
-    it('el saliente usa findFirst SIN criterio de desempate (ambiguo al haber varios números)', async () => {
+    // HUECO CERRADO (add_whatsapp_multi_number_fields): el saliente ya no
+    // depende de qué fila devuelva la base. Se fija ANTES de retirar el
+    // UNIQUE, para que cuando se retire el criterio ya esté probado.
+    it('el saliente desempata por principal, luego orden, luego antigüedad', async () => {
       prisma.whatsAppIntegration.findFirst.mockResolvedValue(
         connectedIntegration,
       );
 
       await service.findConnectedByCompanyId('company-a');
 
-      // Mientras `companyId` sea único no hay ambigüedad posible. Al retirar
-      // ese constraint, esta ausencia de criterio se convierte en un bug:
-      // `findFirst` devolvería una fila arbitraria. La reforma debe resolver
-      // la PRINCIPAL (`isPrimary`) o exigir el número de forma explícita.
-      const args = prisma.whatsAppIntegration.findFirst.mock.calls[0][0];
-      expect(args.orderBy).toBeUndefined();
-      expect(args.where.isPrimary).toBeUndefined();
+      expect(
+        prisma.whatsAppIntegration.findFirst.mock.calls[0][0].orderBy,
+      ).toEqual([
+        { isPrimary: 'desc' },
+        { order: 'asc' },
+        { createdAt: 'asc' },
+      ]);
+    });
+
+    it('findAllConnectedByCompanyId lista los números sin exponer el token', async () => {
+      prisma.whatsAppIntegration.findMany.mockResolvedValue([]);
+
+      await service.findAllConnectedByCompanyId('company-a');
+
+      const args = prisma.whatsAppIntegration.findMany.mock.calls[0][0];
+      expect(args.where).toEqual({
+        companyId: 'company-a',
+        status: 'CONNECTED',
+      });
+      expect(args.select.accessTokenEncrypted).toBeUndefined();
+      expect(Object.keys(args.select)).not.toContain('accessTokenEncrypted');
+    });
+
+    it('findAllConnectedByCompanyId devuelve [] sin consultar si falta la empresa', async () => {
+      await expect(service.findAllConnectedByCompanyId('  ')).resolves.toEqual(
+        [],
+      );
+
+      expect(prisma.whatsAppIntegration.findMany).not.toHaveBeenCalled();
+    });
+
+    it('resolver un número concreto queda acotado a la empresa', async () => {
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(
+        connectedIntegration,
+      );
+
+      await service.findConnectedByCompanyAndPhoneNumberId(
+        'company-a',
+        '1234567890',
+      );
+
+      // Sin el companyId, un phoneNumberId de otro tenant resolvería.
+      expect(
+        prisma.whatsAppIntegration.findFirst.mock.calls[0][0].where,
+      ).toEqual({
+        companyId: 'company-a',
+        phoneNumberId: '1234567890',
+        status: 'CONNECTED',
+      });
+    });
+
+    it('resolver un número concreto exige ambos parámetros', async () => {
+      await expect(
+        service.findConnectedByCompanyAndPhoneNumberId('company-a', '  '),
+      ).resolves.toBeNull();
+      await expect(
+        service.findConnectedByCompanyAndPhoneNumberId('  ', '123'),
+      ).resolves.toBeNull();
+
+      expect(prisma.whatsAppIntegration.findFirst).not.toHaveBeenCalled();
     });
   });
 

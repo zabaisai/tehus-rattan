@@ -35,8 +35,7 @@ export class WhatsAppTokenCryptoService {
       throw new Error('accessTokenEncrypted no puede estar vacio');
     }
 
-    const [ivHex, authTagHex, cipherTextHex] =
-      accessTokenEncrypted.split(':');
+    const [ivHex, authTagHex, cipherTextHex] = accessTokenEncrypted.split(':');
 
     if (!ivHex || !authTagHex || !cipherTextHex) {
       throw new Error('Formato de accessTokenEncrypted inválido');

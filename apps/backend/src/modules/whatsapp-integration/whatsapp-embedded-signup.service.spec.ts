@@ -88,12 +88,15 @@ function build(overrides: any = {}) {
     ...overrides.integrationService,
   } as any;
   const management = {
-    disconnectForCompany: jest.fn().mockResolvedValue({ status: 'DISCONNECTED' }),
+    disconnectForCompany: jest
+      .fn()
+      .mockResolvedValue({ status: 'DISCONNECTED' }),
   } as any;
   const notifications = {
     emitToCompanyRoles: jest.fn().mockResolvedValue(undefined),
   } as any;
-  metaClient.sendText = metaClient.sendText ?? jest.fn().mockResolvedValue(undefined);
+  metaClient.sendText =
+    metaClient.sendText ?? jest.fn().mockResolvedValue(undefined);
 
   const service = new WhatsAppEmbeddedSignupService(
     prisma,
@@ -332,7 +335,9 @@ describe('WhatsAppEmbeddedSignupService', () => {
 
     it('rejects when the company is not connected', async () => {
       const { service } = build({
-        integrationService: { findConnectedByCompanyId: jest.fn().mockResolvedValue(null) },
+        integrationService: {
+          findConnectedByCompanyId: jest.fn().mockResolvedValue(null),
+        },
       });
       await expect(
         service.sendTest('company-a', actor, '+573001234567'),
@@ -341,14 +346,21 @@ describe('WhatsAppEmbeddedSignupService', () => {
 
     it('maps a Meta send failure to a generic error and still audits', async () => {
       const { service, auditLog } = build({
-        metaClient: { sendText: jest.fn().mockRejectedValue(new MetaSignupError('SEND_FAILED')) },
+        metaClient: {
+          sendText: jest
+            .fn()
+            .mockRejectedValue(new MetaSignupError('SEND_FAILED')),
+        },
       });
       await expect(
         service.sendTest('company-a', actor, '+573001234567'),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(auditLog.record).toHaveBeenCalledWith(
         expect.anything(),
-        expect.objectContaining({ action: 'WHATSAPP_CONNECTION_TESTED', reason: 'failed' }),
+        expect.objectContaining({
+          action: 'WHATSAPP_CONNECTION_TESTED',
+          reason: 'failed',
+        }),
       );
     });
   });
