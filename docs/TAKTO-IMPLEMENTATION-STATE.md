@@ -134,8 +134,10 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       lugar de duplicar (`contacts.service.ts`)
 - [x] **Compatibilidad de búsqueda** con y sin `+` (3 pruebas dedicadas)
 - [x] Pruebas de regresión — spec de contactos: 27 → 36 casos
-- [ ] **Backfill de las filas existentes** — pendiente, va en migración aparte
-      con detección de colisiones previa
+- [x] **Backfill de las filas existentes** —
+      `20260730233500_backfill_contact_phones_to_e164` · alcance estrecho
+      (solo antepone `+` a dígitos ya E.164) · **nunca sobrescribe una
+      colisión** · idempotente, verificado · aplicada **solo en local**
 
 ### Bloque 4 — WhatsApp multi-número (mayor riesgo)
 - [ ] Segundo backup verificado
@@ -281,6 +283,7 @@ revisaron y no se duplicaron.
 | `20260730230534_add_pipeline_ordering_and_stage_type` | ✅ | ✅ | ❌ **no aplicada** | aditiva + backfill + índice parcial | `DROP COLUMN` / `DROP INDEX` |
 | `20260730231440_link_conversation_lead_and_task_conversation` | ✅ | ✅ | ❌ **no aplicada** | aditiva pura (2 FK nullable + 9 índices) | `DROP COLUMN` |
 | `20260730232007_add_message_media_and_delivery_status` | ✅ | ✅ | ❌ **no aplicada** | aditiva + `ALTER TYPE ADD VALUE` | columnas: `DROP`; enum: **no reversible en caliente** |
+| `20260730233500_backfill_contact_phones_to_e164` | ✅ | ✅ | ❌ **no aplicada** | solo datos (UPDATE) | restaurar desde backup si hiciera falta |
 
 > **Importante para quien reanude:** staging sigue con **21** migraciones y en
 > el release `58dfb76`. La 22ª existe solo en la rama y en la base local. No
@@ -309,7 +312,9 @@ revisaron y no se duplicaron.
 | 2026-07-30 | **CI remoto** `93b6b81` (relaciones) | frontend y backend **success**, `head_sha` verificado |
 | 2026-07-30 | tras bloque 2.4 | 851 unit / 214 e2e verdes |
 | 2026-07-30 | CI `e59d22a` | **cancelled** (lo canceló el push siguiente) |
-| 2026-07-30 | tras bloque 3 (E.164) | **893 unit / 214 e2e verdes** |
+| 2026-07-30 | tras bloque 3 (E.164) | 893 unit / 214 e2e verdes |
+| 2026-07-30 | **CI remoto** `d92d4d1` (E.164) | frontend y backend **success**, `head_sha` verificado |
+| 2026-07-30 | tras backfill E.164 | **893 unit / 214 e2e verdes** |
 
 ## Despliegues
 
