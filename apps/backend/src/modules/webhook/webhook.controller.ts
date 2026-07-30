@@ -20,6 +20,12 @@ export class WebhookController {
 
   constructor(private webhookService: WebhookService) {}
 
+  // Writes the response through @Res() and returns NOTHING. Returning the
+  // Express Response object here is not cosmetic: the global
+  // ClassSerializerInterceptor (main.ts) would try to serialize it, walk its
+  // socket and throw, and the global filter would then write after the headers
+  // were already sent — which takes the whole process down on socket detach.
+  // Covered by test/webhook-verify.e2e-spec.ts.
   @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.webhookVerify } })
   @Get()
   verify(
@@ -27,12 +33,13 @@ export class WebhookController {
     @Query('hub.verify_token') token: string,
     @Query('hub.challenge') challenge: string,
     @Res() res: Response,
-  ) {
+  ): void {
     if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
       this.logger.log('Webhook verificado correctamente');
-      return res.status(200).send(challenge);
+      res.status(200).send(challenge);
+      return;
     }
-    return res.status(403).send('Forbidden');
+    res.status(403).send('Forbidden');
   }
 
   // WhatsAppSignatureGuard verifies the X-Hub-Signature-256 HMAC against the
