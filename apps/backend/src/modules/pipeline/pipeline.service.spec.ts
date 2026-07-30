@@ -40,6 +40,7 @@ describe('PipelineService (caracterización pre-reforma)', () => {
         update: jest.fn((args: any) =>
           Promise.resolve({ id: args.where.id, ...args.data }),
         ),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         delete: jest.fn().mockResolvedValue(pipelineRow),
       },
       pipelineStage: {
@@ -55,7 +56,12 @@ describe('PipelineService (caracterización pre-reforma)', () => {
         count: jest.fn().mockResolvedValue(0),
       },
       lead: { count: jest.fn().mockResolvedValue(0) },
-      $transaction: jest.fn((ops: any[]) => Promise.all(ops)),
+      // Soporta las dos formas de $transaction que usa el servicio: el lote
+      // de operaciones (reorderStages) y el callback interactivo (create /
+      // update, que necesitan leer y escribir dentro de la misma transacción).
+      $transaction: jest.fn((arg: any) =>
+        typeof arg === 'function' ? arg(prisma) : Promise.all(arg),
+      ),
     };
     service = new PipelineService(prisma);
   });
@@ -64,8 +70,8 @@ describe('PipelineService (caracterización pre-reforma)', () => {
     it('findAll filtra siempre por companyId', async () => {
       await service.findAll(COMPANY_A);
 
-      expect(prisma.pipeline.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { companyId: COMPANY_A } }),
+      expect(prisma.pipeline.findMany.mock.calls[0][0].where.companyId).toBe(
+        COMPANY_A,
       );
     });
 
@@ -139,6 +145,10 @@ describe('PipelineService (caracterización pre-reforma)', () => {
     });
 
     it('remove rechaza borrar un pipeline que todavía tiene etapas', async () => {
+      prisma.pipeline.findFirst.mockResolvedValue({
+        ...pipelineRow,
+        isDefault: false,
+      });
       prisma.pipelineStage.count.mockResolvedValue(3);
 
       await expect(
@@ -148,7 +158,11 @@ describe('PipelineService (caracterización pre-reforma)', () => {
       expect(prisma.pipeline.delete).not.toHaveBeenCalled();
     });
 
-    it('remove borra cuando no quedan etapas', async () => {
+    it('remove borra un pipeline NO predeterminado sin etapas', async () => {
+      prisma.pipeline.findFirst.mockResolvedValue({
+        ...pipelineRow,
+        isDefault: false,
+      });
       prisma.pipelineStage.count.mockResolvedValue(0);
 
       await service.remove(PIPELINE_A, COMPANY_A);
@@ -158,14 +172,94 @@ describe('PipelineService (caracterización pre-reforma)', () => {
       });
     });
 
-    // Hoy NO existe garantía de un único predeterminado: el servicio acepta
-    // marcar isDefault sin desmarcar el anterior. La reforma debe cerrar este
-    // hueco; se deja documentado para que el cambio sea deliberado.
-    it('HOY no desmarca el predeterminado anterior al marcar otro (hueco conocido)', async () => {
+    // HUECO CERRADO (migración add_pipeline_ordering_and_stage_type):
+    // marcar un predeterminado ahora desmarca el anterior en la MISMA
+    // transacción, y el índice parcial lo garantiza en base.
+    it('al marcar isDefault desmarca el anterior en la misma transacción', async () => {
+      prisma.pipeline.findFirst.mockResolvedValue({
+        ...pipelineRow,
+        isDefault: false,
+      });
+
       await service.update(PIPELINE_A, COMPANY_A, { isDefault: true });
 
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.pipeline.updateMany).toHaveBeenCalledWith({
+        where: {
+          companyId: COMPANY_A,
+          isDefault: true,
+          id: { not: PIPELINE_A },
+        },
+        data: { isDefault: false },
+      });
       expect(prisma.pipeline.update).toHaveBeenCalledTimes(1);
-      expect(prisma.pipeline.updateMany).toBeUndefined();
+    });
+
+    it('create con isDefault desmarca el anterior antes de insertar', async () => {
+      await service.create(COMPANY_A, { name: 'Nuevo', isDefault: true });
+
+      expect(prisma.pipeline.updateMany).toHaveBeenCalledWith({
+        where: { companyId: COMPANY_A, isDefault: true },
+        data: { isDefault: false },
+      });
+    });
+
+    it('create sin isDefault no toca los demás pipelines', async () => {
+      await service.create(COMPANY_A, { name: 'Secundario' });
+
+      expect(prisma.pipeline.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('una empresa nunca se queda sin predeterminado: no se puede desmarcar', async () => {
+      await expect(
+        service.update(PIPELINE_A, COMPANY_A, { isDefault: false }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.pipeline.update).not.toHaveBeenCalled();
+    });
+
+    it('tampoco se puede archivar el predeterminado', async () => {
+      await expect(
+        service.update(PIPELINE_A, COMPANY_A, { isArchived: true }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.pipeline.update).not.toHaveBeenCalled();
+    });
+
+    it('tampoco se puede eliminar el predeterminado', async () => {
+      await expect(
+        service.remove(PIPELINE_A, COMPANY_A),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.pipeline.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('orden y archivado', () => {
+    it('findAll oculta los archivados por defecto', async () => {
+      await service.findAll(COMPANY_A);
+
+      expect(prisma.pipeline.findMany.mock.calls[0][0].where).toEqual({
+        companyId: COMPANY_A,
+        isArchived: false,
+      });
+    });
+
+    it('findAll(includeArchived) los incluye', async () => {
+      await service.findAll(COMPANY_A, true);
+
+      expect(prisma.pipeline.findMany.mock.calls[0][0].where).toEqual({
+        companyId: COMPANY_A,
+      });
+    });
+
+    it('ordena por `order` y desempata por fecha de creación', async () => {
+      await service.findAll(COMPANY_A);
+
+      expect(prisma.pipeline.findMany.mock.calls[0][0].orderBy).toEqual([
+        { order: 'asc' },
+        { createdAt: 'asc' },
+      ]);
     });
   });
 

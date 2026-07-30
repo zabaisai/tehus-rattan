@@ -199,11 +199,25 @@ model Pipeline {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Orden de presentación en el selector. Separado de `createdAt` para que
+  // reordenar no dependa de cuándo se creó cada pipeline.
+  order Int @default(0)
+
+  // Archivar en lugar de borrar: un pipeline con leads no se puede eliminar
+  // (RESTRICT en la FK), así que archivar es la única forma de retirarlo de
+  // la vista sin perder su historial comercial.
+  isArchived Boolean @default(false)
+
   companyId String
   company   Company         @relation(fields: [companyId], references: [id])
   stages    PipelineStage[]
   leads     Lead[]
 
+  // La unicidad del predeterminado por empresa NO se puede expresar aquí:
+  // Prisma no soporta índices parciales. Se crea como SQL en la migración
+  // (`pipelines_one_default_per_company`) y se refuerza en el servicio dentro
+  // de una transacción. Ver la nota en el propio migration.sql.
+  @@index([companyId, isArchived, order])
   @@map("pipelines")
 }
 
@@ -215,11 +229,30 @@ model PipelineStage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Probabilidad de cierre en porcentaje (0-100). Nullable a propósito: "sin
+  // definir" no es lo mismo que 0%, y el pronóstico ponderado debe poder
+  // ignorar las etapas que aún no la tienen en vez de contarlas como perdidas.
+  probability Int?
+
+  // Semántica comercial de la etapa. Hoy el cierre vive en `Lead.status`;
+  // este campo permite que el pipeline declare qué etapa SIGNIFICA ganado o
+  // perdido, que es lo que necesitan las automatizaciones por cambio de etapa
+  // y las métricas de conversión. Se introduce como aditivo: `Lead.status`
+  // sigue siendo la fuente de verdad hasta que la transición se complete.
+  type StageType @default(OPEN)
+
   pipelineId String
   pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
   leads      Lead[]
 
+  @@index([pipelineId, order])
   @@map("pipeline_stages")
+}
+
+enum StageType {
+  OPEN
+  WON
+  LOST
 }
 
 model Lead {

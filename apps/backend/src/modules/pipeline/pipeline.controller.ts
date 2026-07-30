@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   Request,
   UseGuards,
 } from '@nestjs/common';
@@ -26,8 +27,14 @@ export class PipelineController {
   constructor(private pipelineService: PipelineService) {}
 
   @Get()
-  findAll(@Request() req: any) {
-    return this.pipelineService.findAll(req.user.companyId);
+  findAll(
+    @Request() req: any,
+    @Query('includeArchived') includeArchived?: string,
+  ) {
+    return this.pipelineService.findAll(
+      req.user.companyId,
+      includeArchived === 'true',
+    );
   }
 
   @Get(':id')
