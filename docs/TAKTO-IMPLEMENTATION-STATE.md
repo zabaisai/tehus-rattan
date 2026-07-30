@@ -114,8 +114,10 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [ ] Productos y cotizaciones: aislamiento explícito — pendiente
 
 ### Bloque 2 — Migraciones aditivas
-- [ ] Empresa: timezone (`America/Bogota`), currency (`COP`), locale
-      (`es-CO`), businessHours, preferencias, branding de empresa
+- [x] **Empresa: regional** — `20260730225506_add_company_regional_settings`
+      · `timezone` / `currency` / `locale` con default, `businessHours` JSONB
+      nullable · aplicada **solo en local** · staging intacto
+- [ ] Empresa: preferencias de automatización/retención, branding de empresa
 - [ ] Pipelines/etapas: orden, archivado, probabilidad, tipo, color semántico,
       predeterminado garantizado + backfill
 - [ ] `Conversation.leadId` (nullable) y `Task.conversationId` (nullable)
@@ -271,7 +273,13 @@ revisaron y no se duplicaron.
 
 ## Migraciones creadas / aplicadas
 
-_(ninguna — no se ha tocado el esquema)_
+| Migración | Creada | Local | **Staging** | Tipo | Rollback |
+|---|:--:|:--:|:--:|---|---|
+| `20260730225506_add_company_regional_settings` | ✅ | ✅ | ❌ **no aplicada** | aditiva pura (4 columnas) | `DROP COLUMN` |
+
+> **Importante para quien reanude:** staging sigue con **21** migraciones y en
+> el release `58dfb76`. La 22ª existe solo en la rama y en la base local. No
+> se despliega hasta cerrar un lote coherente del bloque 2.
 
 ## Commits
 
@@ -290,6 +298,8 @@ _(ninguna — no se ha tocado el esquema)_
 | 2026-07-30 | backend unit tras contacts+tasks+automations | **831 verdes / 69 suites** |
 | 2026-07-30 | `whatsapp-integration.service.spec` ampliado | 18 verdes |
 | 2026-07-30 | lint de los specs nuevos | 0 hallazgos nuevos |
+| 2026-07-30 | tras migración regional: build + unit + e2e | **833 unit / 214 e2e verdes** |
+| 2026-07-30 | **CI remoto de la rama** (`312ced6`) | **frontend y backend success** |
 
 ## Despliegues
 
@@ -310,26 +320,36 @@ El bloque 1 ya cubre las cuatro puertas críticas, así que **el bloque 2 puede
 empezar**. Orden recomendado (de menor a mayor riesgo, cada uno con su
 caracterización ya en verde):
 
+La migración regional (2.1) ya está hecha. **Siguiente: 2.2, pipelines.**
+
 ```
-# BLOQUE 2 — primera migración aditiva, la de menor riesgo de todas:
-#   Company: timezone (America/Bogota), currency (COP), locale (es-CO),
-#   businessHours. Todo nullable o con default; 2 filas afectadas; sin
-#   backfill complejo; rollback = DROP COLUMN.
+# BLOQUE 2.2 — pipelines y etapas. Mismo procedimiento que la 2.1:
 #
-# 1) Editar apps/backend/prisma/schema.prisma (solo el modelo Company)
-# 2) Generar la migración SIN aplicarla a staging:
+#   Pipeline:      order Int @default(0), isArchived Boolean @default(false)
+#   PipelineStage: probability Int?, type (enum OPEN|WON|LOST @default(OPEN))
+#
+#   Ojo con el hueco fijado en pipeline.service.spec.ts: marcar isDefault NO
+#   desmarca el anterior. El constraint parcial
+#     CREATE UNIQUE INDEX ... ON pipelines("companyId") WHERE "isDefault"
+#   hay que anadirlo DESPUES de garantizar que no hay duplicados, y el
+#   servicio debe pasar a desmarcar en la misma transaccion.
+#
+#   Backfill obligatorio: la Empresa 2 no tiene NINGUN pipeline. Crear el
+#   predeterminado con sus etapas antes de que exista cualquier regla de
+#   creacion automatica de oportunidades, o esa regla fallara para ella.
+#
 cd apps/backend
-npx prisma migrate dev --name add_company_regional_settings --create-only
-# 3) Revisar el SQL generado a mano antes de nada
-# 4) Aplicar en LOCAL para probar, nunca en staging desde aquí
-# 5) Tests + commit
+# 1) editar schema.prisma
+npx prisma migrate dev --name add_pipeline_ordering_and_stage_type --create-only
+# 2) revisar el SQL a mano; anadir el backfill al propio migration.sql
+# 3) npx prisma migrate deploy   (LOCAL)
+# 4) actualizar pipeline.service.spec.ts: el caso del hueco pasa a exigir el
+#    comportamiento nuevo
+# 5) npx jest && npm run build && commit
 #
-# Después, en este orden:
-#   2.2 pipelines/etapas (orden, archivado, probabilidad, tipo) + backfill
-#       del pipeline predeterminado para la empresa que no tiene ninguno
-#   2.3 Conversation.leadId y Task.conversationId (ambos nullable)
-#   2.4 Message: media, estados de entrega, tipos ampliados
-#   2.5 índices de tráfico (medir antes)
+# Después: 2.3 Conversation.leadId + Task.conversationId (nullable)
+#          2.4 Message media/estados/tipos
+#          2.5 índices de tráfico (medir antes)
 ```
 
 **Recordatorio de seguridad para quien reanude:** el backup verificado del
