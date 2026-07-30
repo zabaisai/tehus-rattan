@@ -23,7 +23,7 @@ const COMPANY_A = 'company-a';
 const COMPANY_B = 'company-b';
 const CONTACT_A = 'contact-a';
 
-describe('ContactsService (caracterización pre-E.164)', () => {
+describe('ContactsService (normalización E.164 y aislamiento)', () => {
   let prisma: any;
   let service: ContactsService;
 
@@ -41,7 +41,8 @@ describe('ContactsService (caracterización pre-E.164)', () => {
     prisma = {
       contact: {
         findMany: jest.fn().mockResolvedValue([contactRow]),
-        findFirst: jest.fn().mockResolvedValue(contactRow),
+        // Por defecto NO hay contacto previo: create inserta.
+        findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn((args: any) =>
           Promise.resolve({ id: 'new', ...args.data }),
         ),
@@ -64,6 +65,8 @@ describe('ContactsService (caracterización pre-E.164)', () => {
     });
 
     it('findById exige coincidencia de id y empresa', async () => {
+      prisma.contact.findFirst.mockResolvedValue(contactRow);
+
       await service.findById(CONTACT_A, COMPANY_A);
 
       expect(prisma.contact.findFirst).toHaveBeenCalledWith({
@@ -89,40 +92,112 @@ describe('ContactsService (caracterización pre-E.164)', () => {
     );
   });
 
-  describe('creación — comportamiento que la migración E.164 va a cambiar', () => {
+  // HUECO CERRADO (bloque 3): el teléfono se normaliza a E.164 antes de
+  // escribir y el mismo número en otra forma reutiliza el contacto existente.
+  describe('normalización E.164 al crear', () => {
     it('fuerza el companyId del contexto, nunca uno del cliente', async () => {
       await service.create(COMPANY_A, { phone: '573001112233' });
 
-      expect(prisma.contact.create).toHaveBeenCalledWith({
-        data: { phone: '573001112233', companyId: COMPANY_A },
-      });
-    });
-
-    it('HOY guarda el teléfono tal cual, sin normalizar ni añadir "+"', async () => {
-      await service.create(COMPANY_A, { phone: '573001112233' });
-
-      const guardado = prisma.contact.create.mock.calls[0][0].data.phone;
-      expect(guardado).toBe('573001112233');
-      expect(guardado.startsWith('+')).toBe(false);
-    });
-
-    it('HOY no normaliza formatos con espacios, guiones o paréntesis', async () => {
-      await service.create(COMPANY_A, { phone: '+57 (300) 111-2233' });
-
-      expect(prisma.contact.create.mock.calls[0][0].data.phone).toBe(
-        '+57 (300) 111-2233',
+      expect(prisma.contact.create.mock.calls[0][0].data.companyId).toBe(
+        COMPANY_A,
       );
     });
 
-    it('HOY no deduplica: dos formatos del mismo número son dos llamadas distintas', async () => {
+    it('normaliza el wa_id de Meta (sin "+") a forma canónica', async () => {
       await service.create(COMPANY_A, { phone: '573001112233' });
+
+      expect(prisma.contact.create.mock.calls[0][0].data.phone).toBe(
+        '+573001112233',
+      );
+    });
+
+    it('normaliza formatos con espacios, guiones y paréntesis', async () => {
+      await service.create(COMPANY_A, { phone: '+57 (300) 111-2233' });
+
+      expect(prisma.contact.create.mock.calls[0][0].data.phone).toBe(
+        '+573001112233',
+      );
+    });
+
+    it('completa el indicativo a un número nacional', async () => {
+      await service.create(COMPANY_A, { phone: '3001112233' });
+
+      expect(prisma.contact.create.mock.calls[0][0].data.phone).toBe(
+        '+573001112233',
+      );
+    });
+
+    it('NO reinterpreta un número internacional como nacional', async () => {
+      await service.create(COMPANY_A, { phone: '+13055551234' });
+
+      expect(prisma.contact.create.mock.calls[0][0].data.phone).toBe(
+        '+13055551234',
+      );
+    });
+
+    it('reutiliza el contacto existente si el número ya está en otra forma', async () => {
+      prisma.contact.findFirst.mockResolvedValue({
+        ...contactRow,
+        phone: '573001112233',
+      });
+
       await service.create(COMPANY_A, { phone: '+573001112233' });
 
-      // La única defensa actual es el índice único (phone, companyId), que no
-      // ve estos dos valores como iguales. Tras E.164 deben colapsar en uno.
-      expect(prisma.contact.create).toHaveBeenCalledTimes(2);
-      expect(prisma.contact.create.mock.calls[0][0].data.phone).not.toBe(
-        prisma.contact.create.mock.calls[1][0].data.phone,
+      // No inserta un duplicado: migra la fila existente a la forma canónica.
+      expect(prisma.contact.create).not.toHaveBeenCalled();
+      expect(prisma.contact.update).toHaveBeenCalledWith({
+        where: { id: CONTACT_A },
+        data: { phone: '+573001112233' },
+      });
+    });
+
+    it('completa el nombre si el contacto se creó sin él (caso del webhook)', async () => {
+      prisma.contact.findFirst.mockResolvedValue({
+        ...contactRow,
+        phone: '+573001112233',
+        name: null,
+      });
+
+      await service.create(COMPANY_A, {
+        phone: '+573001112233',
+        name: 'QA Sintetico',
+      });
+
+      expect(prisma.contact.update.mock.calls[0][0].data.name).toBe(
+        'QA Sintetico',
+      );
+    });
+
+    it('no toca la fila si ya está canónica y con nombre', async () => {
+      prisma.contact.findFirst.mockResolvedValue({
+        ...contactRow,
+        phone: '+573001112233',
+        name: 'Ya tiene',
+      });
+
+      const resultado = await service.create(COMPANY_A, {
+        phone: '+573001112233',
+        name: 'Otro',
+      });
+
+      expect(prisma.contact.update).not.toHaveBeenCalled();
+      expect(prisma.contact.create).not.toHaveBeenCalled();
+      expect(resultado.phone).toBe('+573001112233');
+    });
+
+    it('guarda tal cual un número no normalizable en vez de perder el contacto', async () => {
+      await service.create(COMPANY_A, { phone: 'extension-401' });
+
+      expect(prisma.contact.create.mock.calls[0][0].data.phone).toBe(
+        'extension-401',
+      );
+    });
+
+    it('busca duplicados acotado a la empresa, nunca globalmente', async () => {
+      await service.create(COMPANY_A, { phone: '573001112233' });
+
+      expect(prisma.contact.findFirst.mock.calls[0][0].where.companyId).toBe(
+        COMPANY_A,
       );
     });
   });
@@ -132,11 +207,48 @@ describe('ContactsService (caracterización pre-E.164)', () => {
       await service.findAll(COMPANY_A, { search: 'qa' });
 
       const or = prisma.contact.findMany.mock.calls[0][0].where.OR;
-      expect(or).toEqual([
-        { name: { contains: 'qa', mode: 'insensitive' } },
-        { phone: { contains: 'qa', mode: 'insensitive' } },
-        { email: { contains: 'qa', mode: 'insensitive' } },
-      ]);
+      expect(or).toEqual(
+        expect.arrayContaining([
+          { name: { contains: 'qa', mode: 'insensitive' } },
+          { phone: { contains: 'qa', mode: 'insensitive' } },
+          { email: { contains: 'qa', mode: 'insensitive' } },
+        ]),
+      );
+    });
+
+    it('buscar SIN "+" encuentra al contacto ya normalizado CON "+"', async () => {
+      await service.findAll(COMPANY_A, { search: '573001112233' });
+
+      const or = prisma.contact.findMany.mock.calls[0][0].where.OR;
+      const buscados = or
+        .filter((c: any) => c.phone)
+        .map((c: any) => c.phone.contains);
+
+      // Requisito de la migración: la búsqueda no puede romperse mientras
+      // convivan las dos formas.
+      expect(buscados).toContain('573001112233');
+      expect(buscados).toContain('+573001112233');
+    });
+
+    it('buscar CON "+" encuentra al contacto histórico guardado sin él', async () => {
+      await service.findAll(COMPANY_A, { search: '+573001112233' });
+
+      const buscados = prisma.contact.findMany.mock.calls[0][0].where.OR.filter(
+        (c: any) => c.phone,
+      ).map((c: any) => c.phone.contains);
+
+      expect(buscados).toContain('573001112233');
+      expect(buscados).toContain('+573001112233');
+    });
+
+    it('buscar por el nacional encuentra al contacto con indicativo', async () => {
+      await service.findAll(COMPANY_A, { search: '3001112233' });
+
+      const buscados = prisma.contact.findMany.mock.calls[0][0].where.OR.filter(
+        (c: any) => c.phone,
+      ).map((c: any) => c.phone.contains);
+
+      expect(buscados).toContain('+573001112233');
     });
 
     it('sin término de búsqueda no añade cláusula OR', async () => {
@@ -195,6 +307,11 @@ describe('ContactsService (caracterización pre-E.164)', () => {
   });
 
   describe('actualización y bloqueo', () => {
+    beforeEach(() => {
+      // Estos casos operan sobre un contacto que SÍ existe.
+      prisma.contact.findFirst.mockResolvedValue(contactRow);
+    });
+
     it('update no permite cambiar el teléfono (no está en el contrato)', async () => {
       await service.update(CONTACT_A, COMPANY_A, { name: 'Nuevo' });
 

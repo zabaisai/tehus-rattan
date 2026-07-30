@@ -4,6 +4,10 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  normalizePhone,
+  phoneLookupVariants,
+} from '../../common/phone/e164.util';
 
 @Injectable()
 export class ContactsService {
@@ -23,6 +27,11 @@ export class ContactsService {
             { name: { contains: filters.search, mode: 'insensitive' } },
             { phone: { contains: filters.search, mode: 'insensitive' } },
             { email: { contains: filters.search, mode: 'insensitive' } },
+            // Compatibilidad: buscar sin "+" debe encontrar al contacto ya
+            // normalizado, y al revés, mientras convivan ambas formas.
+            ...phoneLookupVariants(filters.search).map((v) => ({
+              phone: { contains: v, mode: 'insensitive' as const },
+            })),
           ],
         }),
       },
@@ -39,6 +48,14 @@ export class ContactsService {
     return contact;
   }
 
+  // Normaliza a E.164 antes de escribir y reutiliza el contacto existente si
+  // el mismo número ya está guardado en otra forma. Sin esto, "573001112233"
+  // (lo que entrega Meta) y "+573001112233" (lo que teclea un asesor) son dos
+  // contactos distintos para el índice único (phone, companyId).
+  //
+  // Un número no normalizable se guarda tal cual en vez de rechazarse: perder
+  // el contacto sería peor que guardarlo en un formato imperfecto, y el
+  // backfill puede revisarlo después.
   async create(
     companyId: string,
     data: {
@@ -48,8 +65,33 @@ export class ContactsService {
       tags?: string[];
     },
   ) {
+    const { e164 } = normalizePhone(data.phone);
+    const phone = e164 ?? data.phone;
+
+    const existente = await this.prisma.contact.findFirst({
+      where: {
+        companyId,
+        phone: { in: phoneLookupVariants(data.phone) },
+      },
+    });
+
+    if (existente) {
+      // Aprovecha para migrar la fila a la forma canónica y completar el
+      // nombre si el contacto se creó sin él (caso típico del webhook).
+      const cambios: { phone?: string; name?: string } = {};
+      if (e164 && existente.phone !== e164) cambios.phone = e164;
+      if (!existente.name && data.name) cambios.name = data.name;
+
+      if (Object.keys(cambios).length === 0) return existente;
+
+      return this.prisma.contact.update({
+        where: { id: existente.id },
+        data: cambios,
+      });
+    }
+
     return this.prisma.contact.create({
-      data: { ...data, companyId },
+      data: { ...data, phone, companyId },
     });
   }
 
@@ -96,7 +138,9 @@ export class ContactsService {
     if (offset !== undefined) {
       const skip = Number(offset);
       if (!Number.isInteger(skip) || skip < 0) {
-        throw new BadRequestException('offset debe ser un entero mayor o igual a 0');
+        throw new BadRequestException(
+          'offset debe ser un entero mayor o igual a 0',
+        );
       }
       pagination.skip = skip;
     }
