@@ -173,6 +173,47 @@ describe('WhatsAppIntegrationService', () => {
     });
   });
 
+  // ─────────────────────────────────────────────────────────────
+  // CARACTERIZACIÓN — puerta del multi-número.
+  //
+  // Esta es la capa que decide QUÉ integración atiende un webhook y QUÉ
+  // integración se usa para enviar. Es el punto exacto donde está incrustado
+  // el modelo "una integración por empresa", así que conviene fijarlo antes
+  // de retirar `WhatsAppIntegration.companyId @unique`.
+  // ─────────────────────────────────────────────────────────────
+  describe('resolución multiempresa (pre-multi-número)', () => {
+    it('el entrante NO filtra por empresa: la empresa es el RESULTADO del número', async () => {
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(
+        connectedIntegration,
+      );
+
+      await service.findConnectedByPhoneNumberId('1234567890');
+
+      // Invariante del enrutamiento: el webhook no sabe de qué empresa es el
+      // mensaje hasta resolver el número. Debe seguir siendo así con varios
+      // números por empresa.
+      const where = prisma.whatsAppIntegration.findFirst.mock.calls[0][0].where;
+      expect(where.companyId).toBeUndefined();
+      expect(where.phoneNumberId).toBe('1234567890');
+    });
+
+    it('el saliente usa findFirst SIN criterio de desempate (ambiguo al haber varios números)', async () => {
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(
+        connectedIntegration,
+      );
+
+      await service.findConnectedByCompanyId('company-a');
+
+      // Mientras `companyId` sea único no hay ambigüedad posible. Al retirar
+      // ese constraint, esta ausencia de criterio se convierte en un bug:
+      // `findFirst` devolvería una fila arbitraria. La reforma debe resolver
+      // la PRINCIPAL (`isPrimary`) o exigir el número de forma explícita.
+      const args = prisma.whatsAppIntegration.findFirst.mock.calls[0][0];
+      expect(args.orderBy).toBeUndefined();
+      expect(args.where.isPrimary).toBeUndefined();
+    });
+  });
+
   describe('assertConnectedByCompanyId', () => {
     it('returns the integration when it exists and is connected', async () => {
       prisma.whatsAppIntegration.findFirst.mockResolvedValue(

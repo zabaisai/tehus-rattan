@@ -94,17 +94,24 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 
 ### Bloque 1 — Pruebas de caracterización (antes de tocar arquitectura)
 - [x] **Pipelines y etapas** — `pipeline.service.spec.ts`, 27 casos
-- [ ] Aislamiento multiempresa: contactos, conversaciones, tareas,
-      productos, cotizaciones, automatizaciones, WhatsApp
-- [ ] Webhook firmado + idempotencia por `wamid`
-- [ ] Integración manual y Embedded Signup
-- [ ] Creación de contacto y conversación desde webhook
-- [ ] CRUD actual de pipeline y etapas
-- [ ] Tareas, contactos, automatizaciones existentes
-- [ ] Permisos ADMIN / AGENT / SUPER_ADMIN
-- [ ] Sesión de soporte
-- [ ] Origin / cookies / refresh rotation
-- [ ] Normalización telefónica y deduplicación
+- [x] **Contactos** — `contacts.service.spec.ts`, 27 casos (puerta E.164)
+- [x] **Tareas** — `tasks.service.spec.ts`, 29 casos (puerta `conversationId`)
+- [x] **Automatizaciones** — `automations.service.spec.ts`, 31 casos
+- [x] **Resolución WhatsApp** — 2 casos añadidos al spec existente
+      (puerta del multi-número)
+- [x] Webhook firmado + idempotencia por `wamid` — **ya cubierto** por
+      `webhook.service.spec.ts` (14 casos) y `webhook-signature.e2e-spec.ts`.
+      Verificado, no duplicado.
+- [x] Integración manual y Embedded Signup — **ya cubierto**
+      (`whatsapp-integration-management.service.spec.ts`,
+      `whatsapp-embedded-signup.service.spec.ts`, 2 e2e)
+- [x] Permisos ADMIN / AGENT / SUPER_ADMIN — **ya cubierto**
+      (`roles-guard.e2e-spec.ts`, `business-tenant-guard.e2e-spec.ts`)
+- [x] Sesión de soporte — **ya cubierto** (`support-sessions.e2e-spec.ts`)
+- [x] Origin / cookies / refresh rotation — **ya cubierto**
+      (`cookie-origin`, `refresh-rotation-concurrency`, `session-revocation`)
+- [ ] Conversaciones (servicio) — pendiente
+- [ ] Productos y cotizaciones: aislamiento explícito — pendiente
 
 ### Bloque 2 — Migraciones aditivas
 - [ ] Empresa: timezone (`America/Bogota`), currency (`COP`), locale
@@ -224,10 +231,43 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
   - **hueco documentado**: hoy marcar `isDefault` NO desmarca el anterior.
     La reforma debe cerrarlo de forma deliberada.
 
+### Bloque 1 — Caracterización (esencialmente completo)
+
+Cobertura añadida en esta sesión, **114 casos nuevos** en 4 módulos que
+estaban a cero, más 2 casos en el resolutor de WhatsApp:
+
+| Módulo | Antes | Ahora | Puerta que protege |
+|---|---:|---:|---|
+| `pipeline` | 0 | 27 | orden, archivado, probabilidad, tipo de etapa |
+| `contacts` | 0 | 27 | normalización E.164 + deduplicación |
+| `tasks` | 0 | 29 | `Task.conversationId` + round-robin |
+| `automations` | 0 | 31 | motor durable v2 |
+| `whatsapp-integration` | 13 | 18 | retirada de `companyId @unique` |
+
+**Huecos fijados como prueba explícita** (para que cerrarlos sea deliberado
+y visible en el diff, no un efecto colateral):
+
+1. `pipeline`: marcar `isDefault` **no** desmarca el anterior → una empresa
+   puede acabar con varios predeterminados.
+2. `contacts`: el teléfono se guarda **tal cual**; dos formatos del mismo
+   número son dos contactos distintos.
+3. `tasks`: no existe ninguna noción de conversación, ni en el contrato ni
+   en los filtros.
+4. `automations`: solo 3 disparadores y 4 acciones; `change_stage` escribe
+   `Conversation.stage` (texto libre) en vez de mover el lead; los errores se
+   tragan sin reintento, sin `AutomationRun` y sin idempotencia.
+5. `whatsapp-integration`: el saliente usa `findFirst` **sin criterio de
+   desempate** → al retirar el UNIQUE devolvería una fila arbitraria. Debe
+   pasar a resolver `isPrimary` o exigir el número explícito.
+
+Verificado además que webhook/firma/idempotencia, Embedded Signup, permisos,
+sesión de soporte y origin/refresh **ya tenían cobertura suficiente**; se
+revisaron y no se duplicaron.
+
 ## Cambios en curso
 
-- Bloque 1: faltan las caracterizaciones de contactos, tareas,
-  conversaciones, automatizaciones, webhook/idempotencia y permisos.
+- Bloque 1: quedan `conversations` (servicio) y el aislamiento explícito de
+  productos/cotizaciones. No bloquean el bloque 2.
 
 ## Migraciones creadas / aplicadas
 
@@ -246,8 +286,10 @@ _(ninguna — no se ha tocado el esquema)_
 | 2026-07-30 | baseline heredada (backend unit) | 717 verdes |
 | 2026-07-30 | baseline heredada (backend e2e) | 214 verdes |
 | 2026-07-30 | baseline heredada (frontend) | 120 verdes |
-| 2026-07-30 | backend unit tras bloque 1 parcial | **744 verdes / 66 suites** |
-| 2026-07-30 | lint del spec nuevo | 0 hallazgos |
+| 2026-07-30 | backend unit tras `pipeline` | 744 verdes / 66 suites |
+| 2026-07-30 | backend unit tras contacts+tasks+automations | **831 verdes / 69 suites** |
+| 2026-07-30 | `whatsapp-integration.service.spec` ampliado | 18 verdes |
+| 2026-07-30 | lint de los specs nuevos | 0 hallazgos nuevos |
 
 ## Despliegues
 
@@ -264,11 +306,33 @@ _(ninguno)_
 
 ## Próximo comando seguro
 
+El bloque 1 ya cubre las cuatro puertas críticas, así que **el bloque 2 puede
+empezar**. Orden recomendado (de menor a mayor riesgo, cada uno con su
+caracterización ya en verde):
+
 ```
-# Continuar bloque 1 — caracterización pendiente, en este orden:
-#   1. contacts.service.spec.ts      (puerta de la normalización E.164)
-#   2. tasks.service.spec.ts         (puerta de Task.conversationId)
-#   3. webhook idempotencia/firma    (puerta del multi-número)
-#   4. automations.service.spec.ts   (puerta del motor durable)
-cd apps/backend && npx jest src/modules/contacts/
+# BLOQUE 2 — primera migración aditiva, la de menor riesgo de todas:
+#   Company: timezone (America/Bogota), currency (COP), locale (es-CO),
+#   businessHours. Todo nullable o con default; 2 filas afectadas; sin
+#   backfill complejo; rollback = DROP COLUMN.
+#
+# 1) Editar apps/backend/prisma/schema.prisma (solo el modelo Company)
+# 2) Generar la migración SIN aplicarla a staging:
+cd apps/backend
+npx prisma migrate dev --name add_company_regional_settings --create-only
+# 3) Revisar el SQL generado a mano antes de nada
+# 4) Aplicar en LOCAL para probar, nunca en staging desde aquí
+# 5) Tests + commit
+#
+# Después, en este orden:
+#   2.2 pipelines/etapas (orden, archivado, probabilidad, tipo) + backfill
+#       del pipeline predeterminado para la empresa que no tiene ninguno
+#   2.3 Conversation.leadId y Task.conversationId (ambos nullable)
+#   2.4 Message: media, estados de entrega, tipos ampliados
+#   2.5 índices de tráfico (medir antes)
 ```
+
+**Recordatorio de seguridad para quien reanude:** el backup verificado del
+2026-07-30 17:35 contiene los 7 mensajes, 4 contactos, 4 conversaciones y la
+integración reales. Antes de retirar `WhatsAppIntegration.companyId @unique`
+hay que crear un **segundo** backup verificado.
