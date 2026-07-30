@@ -140,10 +140,16 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       colisión** · idempotente, verificado · aplicada **solo en local**
 
 ### Bloque 4 — WhatsApp multi-número (mayor riesgo)
-- [ ] Segundo backup verificado
-- [ ] Columnas `isPrimary`, nombre interno, orden, estado + backfill
-- [ ] Código adaptado a colecciones de integraciones
-- [ ] Webhook y envío por `phoneNumberId`
+- [x] **Segundo backup verificado** (2026-07-30 18:40) — checksums OK, gzip
+      íntegro, y confirmado que contiene la integración, 7 mensajes, 4
+      contactos y 4 conversaciones reales
+- [x] **Columnas `isPrimary`, `label`, `order` + backfill** —
+      `20260730234117` · la integración viva quedó como principal · solo local
+- [x] **Resolución con desempate** — `findConnectedByCompanyId` ordena por
+      principal → orden → antigüedad; `findAllConnectedByCompanyId` (sin
+      token) y `findConnectedByCompanyAndPhoneNumberId` (acotado por empresa)
+- [ ] Código adaptado a colecciones en el resto de servicios (envío, UI)
+- [ ] Webhook y envío por `phoneNumberId` elegido explícitamente
 - [ ] Pruebas: dos números / una empresa y dos empresas
 - [ ] Retirar `UNIQUE(companyId)` + constraints finales
 - [ ] Desconexión local vs desconexión real en Meta
@@ -284,6 +290,7 @@ revisaron y no se duplicaron.
 | `20260730231440_link_conversation_lead_and_task_conversation` | ✅ | ✅ | ❌ **no aplicada** | aditiva pura (2 FK nullable + 9 índices) | `DROP COLUMN` |
 | `20260730232007_add_message_media_and_delivery_status` | ✅ | ✅ | ❌ **no aplicada** | aditiva + `ALTER TYPE ADD VALUE` | columnas: `DROP`; enum: **no reversible en caliente** |
 | `20260730233500_backfill_contact_phones_to_e164` | ✅ | ✅ | ❌ **no aplicada** | solo datos (UPDATE) | restaurar desde backup si hiciera falta |
+| `20260730234117_add_whatsapp_multi_number_fields` | ✅ | ✅ | ❌ **no aplicada** | aditiva + backfill de principal | `DROP COLUMN` |
 
 > **Importante para quien reanude:** staging sigue con **21** migraciones y en
 > el release `58dfb76`. La 22ª existe solo en la rama y en la base local. No
@@ -314,7 +321,9 @@ revisaron y no se duplicaron.
 | 2026-07-30 | CI `e59d22a` | **cancelled** (lo canceló el push siguiente) |
 | 2026-07-30 | tras bloque 3 (E.164) | 893 unit / 214 e2e verdes |
 | 2026-07-30 | **CI remoto** `d92d4d1` (E.164) | frontend y backend **success**, `head_sha` verificado |
-| 2026-07-30 | tras backfill E.164 | **893 unit / 214 e2e verdes** |
+| 2026-07-30 | tras backfill E.164 | 893 unit / 214 e2e verdes |
+| 2026-07-30 | **CI remoto** `4f4a007` (backfill) | frontend y backend **success**, `head_sha` verificado |
+| 2026-07-30 | tras bloque 4 fase aditiva | **897 unit / 214 e2e verdes** |
 
 ## Despliegues
 
@@ -344,42 +353,40 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-Bloques 2.1 a 2.4 hechos. **Siguiente: bloque 3, normalización E.164.**
-
-Va antes del multi-número a propósito: el multi-número es el cambio
-destructivo y conviene llegar a él con los datos ya limpios.
+Bloques 0 a 3 completos. Bloque 4 en su **fase aditiva**, que es la segura.
 
 ```
-# BLOQUE 3 — E.164
+# BLOQUE 4, FASE DESTRUCTIVA — retirar WhatsAppIntegration.companyId @unique
 #
-# Hecho critico ya fijado por contacts.service.spec.ts: hoy el telefono se
-# guarda TAL CUAL. Los 4 contactos reales de staging estan sin "+", porque
-# Meta entrega wa_id sin prefijo.
+# PRERREQUISITOS YA CUMPLIDOS:
+#   - segundo backup verificado (2026-07-30 18:40)
+#   - isPrimary backfilleado: la integracion viva es la principal
+#   - findConnectedByCompanyId ya desempata por principal, probado
 #
-# 1) src/common/phone/e164.util.ts  — utilitario UNICO de normalizacion.
-#    Colombia por defecto, pero sin asumir pais cuando el numero ya trae
-#    indicativo. Debe ser puro y testeable aparte.
-# 2) Deteccion de colisiones ANTES de escribir: si al normalizar dos
-#    contactos de la misma empresa colapsan, NO sobrescribir en silencio.
-#    Registrar el conflicto y dejarlo para resolucion manual auditada.
-# 3) Migracion con backfill en dos fases:
-#      a. anadir columna phoneNormalized (nullable)
-#      b. backfill + verificacion
-#      c. (migracion posterior) hacerla la columna de busqueda
-# 4) Compatibilidad temporal: buscar con y sin "+" debe seguir funcionando.
-# 5) Actualizar contacts.service.spec.ts: los casos que hoy afirman "guarda
-#    tal cual" pasan a exigir normalizacion.
-cd apps/backend && npx jest src/modules/contacts/
+# LO QUE FALTA ANTES DE RETIRAR EL UNIQUE:
+#   1. Adaptar el resto del codigo a colecciones: WhatsappService.sendMessage
+#      debe aceptar un phoneNumberId opcional y resolver la principal cuando
+#      no se indique.
+#   2. Anadir el constraint que sustituye al UNIQUE:
+#        CREATE UNIQUE INDEX whatsapp_one_primary_per_company
+#          ON whatsapp_integrations("companyId") WHERE "isPrimary";
+#      (mismo patron y misma advertencia de Prisma que
+#       pipelines_one_default_per_company)
+#   3. Pruebas con DOS numeros en una empresa y DOS empresas distintas,
+#      verificando que ningun mensaje se enruta a la empresa equivocada.
+#   4. SOLO ENTONCES: DROP el indice unico de companyId, en migracion propia.
+#
+# Despues del bloque 4: bloque 5 (retiro de Conversation.stage con
+# dual-read/write) y bloque 6 (Redis + worker + WebSockets).
 ```
 
 **Recordatorios de seguridad vigentes**
 
-- El backup verificado del 2026-07-30 17:35 contiene los 7 mensajes, 4
-  contactos, 4 conversaciones y la integración reales.
-- Antes de retirar `WhatsAppIntegration.companyId @unique` (bloque 4) hace
-  falta un **segundo backup verificado**.
-- **Staging sigue en 21 migraciones y en el release `58dfb76`.** Las 4
-  migraciones nuevas existen solo en la rama y en la base local. No se
-  despliega hasta cerrar un lote coherente y con CI verde del SHA exacto.
-- El índice parcial `pipelines_one_default_per_company` vive solo en el
-  `migration.sql`. Si `prisma migrate dev` propone eliminarlo, **rechazar**.
+- **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 27.
+  No se ha desplegado nada.
+- Dos backups verificados disponibles: 17:35 y 18:40.
+- Índices parciales (`pipelines_one_default_per_company`, y el futuro de
+  WhatsApp) viven solo en el `migration.sql`. Si `prisma migrate dev` propone
+  eliminarlos, **rechazar**.
+- El CI cancela runs anteriores del mismo ref: verificar siempre el **último**
+  SHA publicado y que `head_sha` coincida.
