@@ -276,6 +276,9 @@ revisaron y no se duplicaron.
 | Migración | Creada | Local | **Staging** | Tipo | Rollback |
 |---|:--:|:--:|:--:|---|---|
 | `20260730225506_add_company_regional_settings` | ✅ | ✅ | ❌ **no aplicada** | aditiva pura (4 columnas) | `DROP COLUMN` |
+| `20260730230534_add_pipeline_ordering_and_stage_type` | ✅ | ✅ | ❌ **no aplicada** | aditiva + backfill + índice parcial | `DROP COLUMN` / `DROP INDEX` |
+| `20260730231440_link_conversation_lead_and_task_conversation` | ✅ | ✅ | ❌ **no aplicada** | aditiva pura (2 FK nullable + 9 índices) | `DROP COLUMN` |
+| `20260730232007_add_message_media_and_delivery_status` | ✅ | ✅ | ❌ **no aplicada** | aditiva + `ALTER TYPE ADD VALUE` | columnas: `DROP`; enum: **no reversible en caliente** |
 
 > **Importante para quien reanude:** staging sigue con **21** migraciones y en
 > el release `58dfb76`. La 22ª existe solo en la rama y en la base local. No
@@ -299,7 +302,10 @@ revisaron y no se duplicaron.
 | 2026-07-30 | `whatsapp-integration.service.spec` ampliado | 18 verdes |
 | 2026-07-30 | lint de los specs nuevos | 0 hallazgos nuevos |
 | 2026-07-30 | tras migración regional: build + unit + e2e | **833 unit / 214 e2e verdes** |
-| 2026-07-30 | **CI remoto de la rama** (`312ced6`) | **frontend y backend success** |
+| 2026-07-30 | **CI remoto** `312ced6` | frontend y backend **success** |
+| 2026-07-30 | **CI remoto** `0837c28` (pipelines) | frontend y backend **success**, `head_sha` verificado |
+| 2026-07-30 | **CI remoto** `93b6b81` (relaciones) | frontend y backend **success**, `head_sha` verificado |
+| 2026-07-30 | tras bloque 2.4 | **851 unit / 214 e2e verdes** |
 
 ## Despliegues
 
@@ -316,43 +322,42 @@ _(ninguno)_
 
 ## Próximo comando seguro
 
-El bloque 1 ya cubre las cuatro puertas críticas, así que **el bloque 2 puede
-empezar**. Orden recomendado (de menor a mayor riesgo, cada uno con su
-caracterización ya en verde):
+Bloques 2.1 a 2.4 hechos. **Siguiente: bloque 3, normalización E.164.**
 
-La migración regional (2.1) ya está hecha. **Siguiente: 2.2, pipelines.**
+Va antes del multi-número a propósito: el multi-número es el cambio
+destructivo y conviene llegar a él con los datos ya limpios.
 
 ```
-# BLOQUE 2.2 — pipelines y etapas. Mismo procedimiento que la 2.1:
+# BLOQUE 3 — E.164
 #
-#   Pipeline:      order Int @default(0), isArchived Boolean @default(false)
-#   PipelineStage: probability Int?, type (enum OPEN|WON|LOST @default(OPEN))
+# Hecho critico ya fijado por contacts.service.spec.ts: hoy el telefono se
+# guarda TAL CUAL. Los 4 contactos reales de staging estan sin "+", porque
+# Meta entrega wa_id sin prefijo.
 #
-#   Ojo con el hueco fijado en pipeline.service.spec.ts: marcar isDefault NO
-#   desmarca el anterior. El constraint parcial
-#     CREATE UNIQUE INDEX ... ON pipelines("companyId") WHERE "isDefault"
-#   hay que anadirlo DESPUES de garantizar que no hay duplicados, y el
-#   servicio debe pasar a desmarcar en la misma transaccion.
-#
-#   Backfill obligatorio: la Empresa 2 no tiene NINGUN pipeline. Crear el
-#   predeterminado con sus etapas antes de que exista cualquier regla de
-#   creacion automatica de oportunidades, o esa regla fallara para ella.
-#
-cd apps/backend
-# 1) editar schema.prisma
-npx prisma migrate dev --name add_pipeline_ordering_and_stage_type --create-only
-# 2) revisar el SQL a mano; anadir el backfill al propio migration.sql
-# 3) npx prisma migrate deploy   (LOCAL)
-# 4) actualizar pipeline.service.spec.ts: el caso del hueco pasa a exigir el
-#    comportamiento nuevo
-# 5) npx jest && npm run build && commit
-#
-# Después: 2.3 Conversation.leadId + Task.conversationId (nullable)
-#          2.4 Message media/estados/tipos
-#          2.5 índices de tráfico (medir antes)
+# 1) src/common/phone/e164.util.ts  — utilitario UNICO de normalizacion.
+#    Colombia por defecto, pero sin asumir pais cuando el numero ya trae
+#    indicativo. Debe ser puro y testeable aparte.
+# 2) Deteccion de colisiones ANTES de escribir: si al normalizar dos
+#    contactos de la misma empresa colapsan, NO sobrescribir en silencio.
+#    Registrar el conflicto y dejarlo para resolucion manual auditada.
+# 3) Migracion con backfill en dos fases:
+#      a. anadir columna phoneNormalized (nullable)
+#      b. backfill + verificacion
+#      c. (migracion posterior) hacerla la columna de busqueda
+# 4) Compatibilidad temporal: buscar con y sin "+" debe seguir funcionando.
+# 5) Actualizar contacts.service.spec.ts: los casos que hoy afirman "guarda
+#    tal cual" pasan a exigir normalizacion.
+cd apps/backend && npx jest src/modules/contacts/
 ```
 
-**Recordatorio de seguridad para quien reanude:** el backup verificado del
-2026-07-30 17:35 contiene los 7 mensajes, 4 contactos, 4 conversaciones y la
-integración reales. Antes de retirar `WhatsAppIntegration.companyId @unique`
-hay que crear un **segundo** backup verificado.
+**Recordatorios de seguridad vigentes**
+
+- El backup verificado del 2026-07-30 17:35 contiene los 7 mensajes, 4
+  contactos, 4 conversaciones y la integración reales.
+- Antes de retirar `WhatsAppIntegration.companyId @unique` (bloque 4) hace
+  falta un **segundo backup verificado**.
+- **Staging sigue en 21 migraciones y en el release `58dfb76`.** Las 4
+  migraciones nuevas existen solo en la rama y en la base local. No se
+  despliega hasta cerrar un lote coherente y con CI verde del SHA exacto.
+- El índice parcial `pipelines_one_default_per_company` vive solo en el
+  `migration.sql`. Si `prisma migrate dev` propone eliminarlo, **rechazar**.
