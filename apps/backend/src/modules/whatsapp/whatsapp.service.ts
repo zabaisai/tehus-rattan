@@ -22,15 +22,27 @@ export class WhatsappService {
     private config: ConfigService,
   ) {}
 
+  // `fromPhoneNumberId` permite al asesor elegir desde que numero responde
+  // cuando la empresa tiene varios. Omitirlo usa la integracion PRINCIPAL, no
+  // una cualquiera: el desempate vive en findConnectedByCompanyId.
+  //
+  // El numero indicado se resuelve SIEMPRE acotado a la empresa del contexto,
+  // de modo que un phoneNumberId de otro tenant nunca pueda usarse para
+  // enviar en su nombre.
   async sendMessage(
     companyId: string,
     to: string,
     message: string,
+    fromPhoneNumberId?: string,
   ): Promise<string | undefined> {
-    const integration =
-      await this.whatsappIntegrationService.findConnectedByCompanyId(
-        companyId,
-      );
+    const integration = fromPhoneNumberId
+      ? await this.whatsappIntegrationService.findConnectedByCompanyAndPhoneNumberId(
+          companyId,
+          fromPhoneNumberId,
+        )
+      : await this.whatsappIntegrationService.findConnectedByCompanyId(
+          companyId,
+        );
 
     if (!integration) {
       throw new NotFoundException('WhatsApp no conectado para esta empresa');
@@ -79,10 +91,20 @@ export class WhatsappService {
       const details = axios.isAxiosError(error)
         ? error.response?.data
         : (error as Error)?.message;
+      // Diagnostico util SIN PII: el telefono va enmascarado y de la respuesta
+      // de Meta se extrae solo el mensaje de error, no el cuerpo entero. El
+      // payload completo puede incluir datos del destinatario, y serializarlo
+      // era el hallazgo de privacidad de la auditoria.
+      const metaMessage =
+        typeof details === 'string'
+          ? details
+          : ((details as { error?: { message?: string } })?.error?.message ??
+            'sin detalle');
+
       this.logger.error(
-        `Error enviando mensaje de WhatsApp a ${to} (status: ${
+        `Error enviando mensaje de WhatsApp a ${maskPhone(to)} (status: ${
           status ?? 'desconocido'
-        }): ${JSON.stringify(details)}`,
+        }): ${String(metaMessage).slice(0, 200)}`,
       );
       throw new BadRequestException('No se pudo enviar el mensaje de WhatsApp');
     }

@@ -38,7 +38,10 @@ describe('WhatsappService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
 
-    whatsappIntegrationService = { findConnectedByCompanyId: jest.fn() };
+    whatsappIntegrationService = {
+      findConnectedByCompanyId: jest.fn(),
+      findConnectedByCompanyAndPhoneNumberId: jest.fn(),
+    };
     const configService = buildConfig(TEST_GRAPH_VERSION);
     tokenCryptoService = new WhatsAppTokenCryptoService(configService as any);
 
@@ -46,7 +49,9 @@ describe('WhatsappService', () => {
       id: 'integration-a',
       companyId: 'company-a',
       phoneNumberId: '1234567890',
-      accessTokenEncrypted: tokenCryptoService.encrypt('fake-meta-access-token'),
+      accessTokenEncrypted: tokenCryptoService.encrypt(
+        'fake-meta-access-token',
+      ),
     };
 
     service = new WhatsappService(
@@ -86,9 +91,7 @@ describe('WhatsappService', () => {
   });
 
   it('throws NotFoundException and never calls axios when there is no connected integration', async () => {
-    whatsappIntegrationService.findConnectedByCompanyId.mockResolvedValue(
-      null,
-    );
+    whatsappIntegrationService.findConnectedByCompanyId.mockResolvedValue(null);
 
     await expect(
       service.sendMessage('company-b', '50255551111', 'Hola'),
@@ -249,9 +252,72 @@ describe('WhatsappService', () => {
     });
 
     it('has no hardcoded Graph API version literal in the service source', () => {
-      const source = readFileSync(join(__dirname, 'whatsapp.service.ts'), 'utf8');
+      const source = readFileSync(
+        join(__dirname, 'whatsapp.service.ts'),
+        'utf8',
+      );
       expect(source).not.toContain('v19.0');
       expect(source).not.toMatch(/graph\.facebook\.com\/v\d/);
+    });
+  });
+
+  // Bloque 4: la empresa puede tener varios numeros.
+  describe('seleccion del numero remitente', () => {
+    beforeEach(() => {
+      mockedAxios.post.mockResolvedValue({ data: {} });
+    });
+
+    it('sin numero indicado usa la integracion PRINCIPAL', async () => {
+      whatsappIntegrationService.findConnectedByCompanyId.mockResolvedValue(
+        connectedIntegration,
+      );
+
+      await service.sendMessage('company-a', '50255551111', 'hola');
+
+      expect(
+        whatsappIntegrationService.findConnectedByCompanyId,
+      ).toHaveBeenCalledWith('company-a');
+      expect(
+        whatsappIntegrationService.findConnectedByCompanyAndPhoneNumberId,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('con numero indicado lo resuelve acotado a la empresa', async () => {
+      whatsappIntegrationService.findConnectedByCompanyAndPhoneNumberId.mockResolvedValue(
+        { ...connectedIntegration, phoneNumberId: '9999999999' },
+      );
+
+      await service.sendMessage(
+        'company-a',
+        '50255551111',
+        'hola',
+        '9999999999',
+      );
+
+      // Acotado por empresa: un phoneNumberId de otro tenant no debe resolver.
+      expect(
+        whatsappIntegrationService.findConnectedByCompanyAndPhoneNumberId,
+      ).toHaveBeenCalledWith('company-a', '9999999999');
+      expect(
+        whatsappIntegrationService.findConnectedByCompanyId,
+      ).not.toHaveBeenCalled();
+
+      // Y el envio sale por ESE numero, no por el principal.
+      expect(mockedAxios.post.mock.calls[0][0]).toContain(
+        '/9999999999/messages',
+      );
+    });
+
+    it('un numero que no pertenece a la empresa falla sin enviar', async () => {
+      whatsappIntegrationService.findConnectedByCompanyAndPhoneNumberId.mockResolvedValue(
+        null,
+      );
+
+      await expect(
+        service.sendMessage('company-a', '50255551111', 'hola', 'ajeno'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(mockedAxios.post).not.toHaveBeenCalled();
     });
   });
 });
