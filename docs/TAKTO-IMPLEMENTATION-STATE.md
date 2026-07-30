@@ -1,0 +1,274 @@
+# TAKTO — Estado de implementación
+
+> Archivo de continuidad. Se actualiza después de cada bloque coherente de
+> trabajo y antes de cualquier acción larga. **Nunca contiene secretos.**
+>
+> Para reanudar: leer este archivo + `git log --oneline origin/main..HEAD`.
+> No empezar de cero. No repetir migraciones ni envíos ya registrados aquí.
+
+## Objetivo
+
+Transformar el CRM en una plataforma comercial multiempresa TAKTO: WhatsApp
+multi-número, conversación→oportunidad automática, múltiples pipelines,
+asignación round-robin, automatizaciones durables con constructor visual,
+chatbot visual, tiempo real, campos personalizados, PDF real, retención y la
+identidad oficial TAKTO — con aislamiento multiempresa, auditoría y rollback
+intactos.
+
+## Rama y base
+
+| | |
+|---|---|
+| Rama | `feature/takto-crm-platform-overhaul` |
+| Base (`origin/main` al empezar) | `58dfb760ec6b09b6514238787cfb6dc4e3e6e129` |
+| Fecha de inicio | 2026-07-30 |
+| Producción | **fuera de alcance — no se toca** |
+
+## Decisiones aprobadas (cerradas, no re-preguntar)
+
+1. Varios números WhatsApp por empresa; uno principal; `phoneNumberId` único
+   global; enrutamiento por `phone_number_id`. La integración viva se migra
+   como principal. El número terminado en 9970 es el **número de prueba de
+   Meta** y no debe presentarse como número real de la empresa.
+2. Primer mensaje entrante crea oportunidad **solo si** no hay una `OPEN`/
+   `PAUSED` para ese contacto en el pipeline aplicable. Reutiliza la abierta.
+   Si todas están cerradas, un contacto posterior puede crear una nueva.
+   Idempotente frente a webhooks duplicados/concurrentes.
+3. Múltiples pipelines; predeterminado obligatorio; etapas configurables;
+   `Lead.stageId` como fuente única del estado comercial; `Conversation.stage`
+   se retira por transición compatible (dual-read/write), nunca de golpe.
+4. Asignación round-robin entre asesores activos y elegibles; configurable;
+   reasignación manual siempre posible y auditada; sin elegible → bandeja sin
+   asignar + notificación a administradores.
+5. Tareas relacionables con conversación, contacto, oportunidad, empresa y
+   asesor; creables desde el chat sin salir de la conversación.
+6. Automatizaciones: constructor visual + motor durable (Redis + BullMQ),
+   versiones, reintentos con backoff, idempotencia, historial, DLQ.
+7. Chatbot v1 visual con transferencia humana, borrador/publicado y sesiones.
+8. Tiempo real por WebSockets autenticados y aislados por empresa; polling
+   como respaldo.
+9. Campos personalizados híbridos: definiciones normalizadas + valores JSONB
+   validados, con índices GIN donde aporten.
+10. Historial previo de WhatsApp: **no se promete importación automática**.
+    Se documenta y se prepara importación controlada CSV/API.
+11. PDF servidor con librería ligera (PDFKit/pdf-lib). Sin Chromium salvo
+    necesidad demostrada.
+12. Identidad visible → TAKTO. **Sin reemplazo masivo** de identificadores
+    internos `tehus-*` que invaliden sesiones o infraestructura.
+13. Retención configurable por empresa; sin purga automática por defecto;
+    exportación, solicitud de eliminación, auditoría, soft delete y purga
+    programable.
+
+## Inventario inicial (staging, 2026-07-30)
+
+| Elemento | Valor |
+|---|---|
+| Release desplegado | `58dfb760…` (`builtAt 2026-07-30T18:16:27Z`) |
+| Migraciones | 21/21 aplicadas, 0 fallidas, **drift 0** (26/26 tablas) |
+| Companies | 2 (una sin pipeline) |
+| Users | 4 (1 ADMIN, 2 AGENT, 1 SUPER_ADMIN plataforma), todos activos |
+| Contacts / Conversations / Messages | 4 / 4 / **7** |
+| Mensajes | 5 INBOUND + 2 OUTBOUND, todos TEXT, RECEIVED/SENT |
+| Leads / Tasks / Automations / Notifications | **0 / 0 / 0 / 0** |
+| Pipelines / Stages | 1 / 5 |
+| WhatsAppIntegration | 1 · `CONNECTED` · método `MANUAL` |
+| Conversaciones sin asesor / sin tarea / sin oportunidad | 4 / 4 / 4 |
+| Contactos sin `+` (E.164 pendiente) | 4 de 4 |
+| Tests | backend 717 unit + 214 e2e · frontend 120 |
+| CI de la base | verde (frontend y backend) |
+
+**Datos reales a preservar sin excepción:** la integración `CONNECTED`, los
+4 contactos, 4 conversaciones y **7 mensajes**.
+
+## Checklist maestro
+
+Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
+
+### Bloque 0 — Preflight
+- [x] Revalidar git, `origin/main`, working tree, `index.lock`, `autocrlf`
+- [x] Verificar checksums del brand pack (205/205 OK)
+- [x] Capturar baseline (release, contenedores, migraciones, conteos, tests)
+- [x] Crear rama `feature/takto-crm-platform-overhaul`
+- [x] Crear este archivo de estado
+- [x] Backup fresco de PostgreSQL + uploads, con SHA-256 verificado
+
+### Bloque 1 — Pruebas de caracterización (antes de tocar arquitectura)
+- [x] **Pipelines y etapas** — `pipeline.service.spec.ts`, 27 casos
+- [ ] Aislamiento multiempresa: contactos, conversaciones, tareas,
+      productos, cotizaciones, automatizaciones, WhatsApp
+- [ ] Webhook firmado + idempotencia por `wamid`
+- [ ] Integración manual y Embedded Signup
+- [ ] Creación de contacto y conversación desde webhook
+- [ ] CRUD actual de pipeline y etapas
+- [ ] Tareas, contactos, automatizaciones existentes
+- [ ] Permisos ADMIN / AGENT / SUPER_ADMIN
+- [ ] Sesión de soporte
+- [ ] Origin / cookies / refresh rotation
+- [ ] Normalización telefónica y deduplicación
+
+### Bloque 2 — Migraciones aditivas
+- [ ] Empresa: timezone (`America/Bogota`), currency (`COP`), locale
+      (`es-CO`), businessHours, preferencias, branding de empresa
+- [ ] Pipelines/etapas: orden, archivado, probabilidad, tipo, color semántico,
+      predeterminado garantizado + backfill
+- [ ] `Conversation.leadId` (nullable) y `Task.conversationId` (nullable)
+- [ ] Mensajes: tipos ampliados, media, reply/context, estados de entrega
+- [ ] Campos personalizados (definiciones + valores JSONB)
+- [ ] Reglas de asignación
+- [ ] `AutomationVersion` + `AutomationRun`
+- [ ] Chatbot: flujos, versiones, nodos, sesiones
+- [ ] Índices de tráfico (medidos antes)
+
+### Bloque 3 — E.164
+- [ ] Utilitario único de normalización
+- [ ] Detección de colisiones previa
+- [ ] Backfill auditable de los 4 contactos
+- [ ] Compatibilidad temporal de búsqueda con y sin `+`
+- [ ] Pruebas de regresión
+
+### Bloque 4 — WhatsApp multi-número (mayor riesgo)
+- [ ] Segundo backup verificado
+- [ ] Columnas `isPrimary`, nombre interno, orden, estado + backfill
+- [ ] Código adaptado a colecciones de integraciones
+- [ ] Webhook y envío por `phoneNumberId`
+- [ ] Pruebas: dos números / una empresa y dos empresas
+- [ ] Retirar `UNIQUE(companyId)` + constraints finales
+- [ ] Desconexión local vs desconexión real en Meta
+
+### Bloque 5 — Retiro de `Conversation.stage`
+- [ ] Dual-read/dual-write
+- [ ] Migrar datos a la oportunidad
+- [ ] Frontend/filtros/automatizaciones → `Lead.stageId`
+- [ ] Retirar columna en migración separada
+
+### Bloque 6 — Infraestructura
+- [ ] Redis con healthcheck
+- [ ] Worker aislado (BullMQ)
+- [ ] Outbox/eventos durables
+- [ ] WebSockets autenticados y aislados por empresa
+- [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
+
+### Bloque 7 — Capacidades funcionales
+- [ ] Conversación → oportunidad → asignación → tarea (flujo completo)
+- [ ] Bandeja omnicanal
+- [ ] UI de pipelines y etapas
+- [ ] Oportunidades (vista detallada)
+- [ ] Tareas y SLA
+- [ ] Asignación automática
+- [ ] Automatizaciones (motor + constructor visual)
+- [ ] Chatbot (motor + constructor visual)
+- [ ] Notificaciones (productores completos)
+- [ ] WhatsApp: salud, medios, plantillas, estados
+- [ ] Cotizaciones + PDF real
+- [ ] Configuración y personalización por empresa
+- [ ] Plataforma y soporte
+
+### Bloque 8 — Branding TAKTO
+- [ ] Design system con tokens semánticos + documentación
+- [ ] Favicon, manifest/PWA, Open Graph, metadatos
+- [ ] Fuentes Archivo / IBM Plex Sans / IBM Plex Mono
+- [ ] Todas las superficies del §4 del encargo
+- [ ] Separación identidad plataforma vs empresa cliente
+- [ ] `prefers-reduced-motion`
+
+### Bloque 9 — Seguridad y cumplimiento
+- [ ] Corregir PII en logs de WhatsApp
+- [ ] Observabilidad de 4xx
+- [ ] Desconexión completa de WhatsApp
+- [ ] Rotación de clave de cifrado
+- [ ] Retención / exportación / eliminación
+- [ ] Sesiones de soporte vencidas marcadas ACTIVE
+- [ ] Fijar throttling y límites de body en `.env.staging`
+
+### Bloque 10 — QA y entrega
+- [ ] Suites unitarias/E2E/frontend nuevas y existentes verdes
+- [ ] QA visual en 6 viewports
+- [ ] QA E2E de extremo a extremo en staging
+- [ ] CI verde de rama y de `main`
+- [ ] Despliegue con etiquetas por SHA + release anterior recuperable
+- [ ] Runbooks de despliegue y rollback actualizados
+- [ ] `docs/TAKTO-IMPLEMENTATION-REPORT.md`
+
+## Cambios terminados
+
+### Bloque 0 — Preflight ✅
+- Git revalidado: `origin/main` sin cambios desde la auditoría; árbol limpio;
+  sin `index.lock`; `core.autocrlf=true` preservado.
+- Brand pack íntegro: **205/205 checksums OK**, sin discrepancias ni faltantes.
+  No se ejecutó ningún HTML/JS del paquete.
+- Rama creada desde `origin/main`.
+- **Backup fresco verificado** (2026-07-30 17:35 hora VPS):
+  - Dump SQL: 15.148 bytes · checksum **OK** · `gzip -t` íntegro.
+  - Uploads: 294 bytes · checksum **OK** · `tar` íntegro (4 entradas).
+  - **Contenido confirmado dentro del dump**: 7 `messages`, 4 `contacts`,
+    4 `conversations`, 1 `whatsapp_integrations`. Los datos reales están
+    respaldados antes de cualquier migración.
+  - Observación menor: el `.tar.gz` de uploads queda como `root:root` 644
+    (lo crea el contenedor); el `chmod` del script falla con "Operation not
+    permitted". No afecta a la integridad ni a la restauración. **Anotado
+    como deuda operativa**, no corregido en este bloque.
+
+### Bloque 1 — Caracterización (parcial)
+- `apps/backend/src/modules/pipeline/pipeline.service.spec.ts` — **27 casos**,
+  el módulo pasa de **0 a 27** pruebas. Fija:
+  - aislamiento multiempresa en los 8 métodos que resuelven pipeline
+    (tabla `it.each`): 404 y **ninguna escritura** si el pipeline es de otra
+    empresa;
+  - `create` fuerza el `companyId` del contexto;
+  - orden automático de etapas (último+1, o 0 en pipeline vacío);
+  - `remove`/`removeStage` bloqueados por etapas o leads existentes;
+  - reordenamiento rechazado si alguna etapa es ajena, y aplicado en **una**
+    transacción;
+  - kanban: filtro `companyId` + `status OPEN`, totales por etapa, `value`
+    nulo tratado como 0;
+  - **hueco documentado**: hoy marcar `isDefault` NO desmarca el anterior.
+    La reforma debe cerrarlo de forma deliberada.
+
+## Cambios en curso
+
+- Bloque 1: faltan las caracterizaciones de contactos, tareas,
+  conversaciones, automatizaciones, webhook/idempotencia y permisos.
+
+## Migraciones creadas / aplicadas
+
+_(ninguna — no se ha tocado el esquema)_
+
+## Commits
+
+| SHA | Descripción |
+|---|---|
+| _(ver `git log origin/main..HEAD`)_ | test(pipeline): caracterización pre-reforma |
+
+## Pruebas ejecutadas
+
+| Fecha | Suite | Resultado |
+|---|---|---|
+| 2026-07-30 | baseline heredada (backend unit) | 717 verdes |
+| 2026-07-30 | baseline heredada (backend e2e) | 214 verdes |
+| 2026-07-30 | baseline heredada (frontend) | 120 verdes |
+| 2026-07-30 | backend unit tras bloque 1 parcial | **744 verdes / 66 suites** |
+| 2026-07-30 | lint del spec nuevo | 0 hallazgos |
+
+## Despliegues
+
+_(ninguno en esta rama — staging sigue en `58dfb76`)_
+
+## Bloqueadores
+
+_(ninguno)_
+
+## Deuda operativa detectada (no corregida aún)
+
+- El `.tar.gz` de uploads queda `root:root`; el `chmod` del script de backup
+  falla. Revisar `backup-postgres.sh` cuando se toque el runbook.
+
+## Próximo comando seguro
+
+```
+# Continuar bloque 1 — caracterización pendiente, en este orden:
+#   1. contacts.service.spec.ts      (puerta de la normalización E.164)
+#   2. tasks.service.spec.ts         (puerta de Task.conversationId)
+#   3. webhook idempotencia/firma    (puerta del multi-número)
+#   4. automations.service.spec.ts   (puerta del motor durable)
+cd apps/backend && npx jest src/modules/contacts/
+```
