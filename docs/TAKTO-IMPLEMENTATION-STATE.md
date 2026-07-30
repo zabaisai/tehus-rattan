@@ -148,8 +148,13 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [x] **Resolución con desempate** — `findConnectedByCompanyId` ordena por
       principal → orden → antigüedad; `findAllConnectedByCompanyId` (sin
       token) y `findConnectedByCompanyAndPhoneNumberId` (acotado por empresa)
-- [ ] Código adaptado a colecciones en el resto de servicios (envío, UI)
-- [ ] Webhook y envío por `phoneNumberId` elegido explícitamente
+- [x] **Envío por número explícito** — `sendMessage(..., fromPhoneNumberId?)`
+      resuelve acotado a la empresa; omitirlo usa la principal
+- [x] **PII en logs corregida** — teléfono enmascarado y solo
+      `error.message` de Meta, nunca el cuerpo crudo
+- [ ] UI: selector de número remitente en la bandeja
+- [ ] **Retirar `UNIQUE(companyId)`** + índice parcial
+      `whatsapp_one_primary_per_company` (migración destructiva, aparte)
 - [ ] Pruebas: dos números / una empresa y dos empresas
 - [ ] Retirar `UNIQUE(companyId)` + constraints finales
 - [ ] Desconexión local vs desconexión real en Meta
@@ -323,7 +328,9 @@ revisaron y no se duplicaron.
 | 2026-07-30 | **CI remoto** `d92d4d1` (E.164) | frontend y backend **success**, `head_sha` verificado |
 | 2026-07-30 | tras backfill E.164 | 893 unit / 214 e2e verdes |
 | 2026-07-30 | **CI remoto** `4f4a007` (backfill) | frontend y backend **success**, `head_sha` verificado |
-| 2026-07-30 | tras bloque 4 fase aditiva | **897 unit / 214 e2e verdes** |
+| 2026-07-30 | tras bloque 4 fase aditiva | 897 unit / 214 e2e verdes |
+| 2026-07-30 | **CI remoto** `7a74fee` | frontend y backend **success**, `head_sha` verificado |
+| 2026-07-30 | tras número remitente + PII | **900 unit / 214 e2e verdes** |
 
 ## Despliegues
 
