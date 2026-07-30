@@ -36,10 +36,16 @@ export class WebhookService {
       for (const change of changes) {
         const value = change?.value;
         const messages = Array.isArray(value?.messages) ? value.messages : [];
+        const statuses = Array.isArray(value?.statuses) ? value.statuses : [];
 
-        // No inbound messages here (status updates, template events, etc.) —
-        // nothing to persist yet. Delivery/read statuses are a documented
-        // pending item; skipping them is intentional, not an error.
+        // Avances de entrega (sent/delivered/read/failed). Se procesan aunque
+        // el payload no traiga mensajes: Meta los envía por separado. No
+        // requieren resolver la empresa, porque el `wamid` ya identifica de
+        // forma única el mensaje y su conversación.
+        if (statuses.length > 0) {
+          await this.processStatuses(statuses);
+        }
+
         if (messages.length === 0) continue;
 
         const phoneNumberId = value?.metadata?.phone_number_id;
@@ -74,6 +80,79 @@ export class WebhookService {
     }
   }
 
+  // Traduce los `statuses` de Meta al ciclo de entrega del CRM. Cada uno se
+  // aísla: un wamid desconocido (por ejemplo, un mensaje enviado antes de
+  // conectar el CRM) no debe impedir que se apliquen los demás.
+  private async processStatuses(statuses: any[]): Promise<void> {
+    const mapa: Record<string, 'SENT' | 'DELIVERED' | 'READ' | 'FAILED'> = {
+      sent: 'SENT',
+      delivered: 'DELIVERED',
+      read: 'READ',
+      failed: 'FAILED',
+    };
+
+    for (const status of statuses) {
+      try {
+        const nuevo = mapa[String(status?.status ?? '').toLowerCase()];
+        if (!nuevo || !status?.id) continue;
+
+        // `timestamp` de Meta viene en segundos como texto.
+        const segundos = Number(status.timestamp);
+        const occurredAt = Number.isFinite(segundos)
+          ? new Date(segundos * 1000)
+          : undefined;
+
+        // Del error solo se conserva el clasificador y el título, nunca el
+        // payload crudo: puede incluir datos del destinatario.
+        const primerError = Array.isArray(status.errors)
+          ? status.errors[0]
+          : undefined;
+
+        const resultado = await this.messagesService.applyDeliveryStatus({
+          wamid: String(status.id),
+          status: nuevo,
+          occurredAt,
+          errorCode:
+            primerError?.code !== undefined ? String(primerError.code) : null,
+          errorMessage: primerError?.title
+            ? String(primerError.title).slice(0, 200)
+            : null,
+        });
+
+        if (resultado === 'unknown') {
+          this.logger.log(
+            `Estado ${nuevo} recibido para un mensaje que el CRM no tiene almacenado`,
+          );
+        }
+      } catch (error) {
+        this.logger.error('Error aplicando estado de entrega', error as Error);
+      }
+    }
+  }
+
+  // Tipos que Meta entrega y que el CRM sabe representar. `reaction` y
+  // `system` se omiten a propósito: no son mensajes de la conversación.
+  private readonly TIPOS_SOPORTADOS: Record<string, string> = {
+    text: 'TEXT',
+    image: 'IMAGE',
+    audio: 'AUDIO',
+    video: 'VIDEO',
+    document: 'DOCUMENT',
+    sticker: 'STICKER',
+    location: 'LOCATION',
+    contacts: 'CONTACTS',
+    interactive: 'INTERACTIVE',
+  };
+
+  // Un interactivo lleva la respuesta del usuario en el título del botón o de
+  // la fila elegida. Se extrae ese texto para que el hilo sea legible sin
+  // tener que interpretar el JSON.
+  private textoDeInteractivo(interactive: any): string {
+    return String(
+      interactive?.button_reply?.title ?? interactive?.list_reply?.title ?? '',
+    );
+  }
+
   private async processSingleMessage(
     companyId: string,
     message: any,
@@ -81,15 +160,8 @@ export class WebhookService {
   ): Promise<void> {
     if (!message?.id || !message?.from) return;
 
-    // Only text is persisted today. Other types (image/audio/video/document/
-    // sticker/location/interactive/...) are acknowledged and skipped — a
-    // documented pending item, not a failure.
-    if (message.type && message.type !== 'text') {
-      this.logger.log(
-        `Tipo de mensaje no soportado aún, ignorado: ${message.type}`,
-      );
-      return;
-    }
+    const tipoMeta = String(message.type ?? 'text').toLowerCase();
+    const tipo = this.TIPOS_SOPORTADOS[tipoMeta] ?? 'UNSUPPORTED';
 
     const duplicate = await this.messagesService.findByWamid(message.id);
     if (duplicate) {
@@ -120,7 +192,19 @@ export class WebhookService {
       contactRecord.id,
     );
 
-    const text = message.text?.body || '';
+    // El adjunto real vive bajo la clave del propio tipo (image, audio, …).
+    const adjunto = message[tipoMeta] ?? {};
+    const caption: string | undefined = adjunto?.caption || undefined;
+
+    // `body` es lo que se muestra en el hilo. Para un medio, el pie de foto;
+    // si no lo hay, queda vacío y la interfaz decide cómo representarlo. NO se
+    // inventa un texto tipo "[imagen]": eso es decisión de presentación.
+    const text =
+      tipoMeta === 'text'
+        ? message.text?.body || ''
+        : tipoMeta === 'interactive'
+          ? this.textoDeInteractivo(message.interactive)
+          : caption || '';
 
     await this.messagesService.create({
       companyId,
@@ -128,8 +212,29 @@ export class WebhookService {
       wamid: message.id,
       body: text,
       direction: 'INBOUND',
-      type: 'TEXT',
+      type: tipo as never,
       status: 'RECEIVED',
+      // El binario NO se descarga aquí: el webhook debe responder rápido y
+      // `mediaId` caduca en Meta. Se guarda la referencia y la descarga la
+      // hará un job aparte, que rellenará `mediaUrl`.
+      ...(adjunto?.id ? { mediaId: String(adjunto.id) } : {}),
+      ...(adjunto?.mime_type
+        ? { mediaMimeType: String(adjunto.mime_type) }
+        : {}),
+      ...(adjunto?.filename ? { mediaFileName: String(adjunto.filename) } : {}),
+      ...(caption ? { caption } : {}),
+      ...(tipoMeta === 'location' && message.location
+        ? { location: message.location }
+        : {}),
+      ...(tipoMeta === 'contacts' && message.contacts
+        ? { contacts: message.contacts }
+        : {}),
+      ...(tipoMeta === 'interactive' && message.interactive
+        ? { interactive: message.interactive }
+        : {}),
+      ...(message.context?.id
+        ? { replyToWamid: String(message.context.id) }
+        : {}),
     });
 
     await this.automationsService.processMessage(

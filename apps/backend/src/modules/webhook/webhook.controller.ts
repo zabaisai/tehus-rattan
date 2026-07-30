@@ -12,7 +12,10 @@ import { Throttle } from '@nestjs/throttler';
 import type { Response } from 'express';
 import { WebhookService } from './webhook.service';
 import { WhatsAppSignatureGuard } from './whatsapp-signature.guard';
-import { THROTTLE_TTL_MS, THROTTLE_LIMITS } from '../../common/throttle/throttle.config';
+import {
+  THROTTLE_TTL_MS,
+  THROTTLE_LIMITS,
+} from '../../common/throttle/throttle.config';
 
 @Controller('webhook')
 export class WebhookController {
@@ -26,7 +29,9 @@ export class WebhookController {
   // socket and throw, and the global filter would then write after the headers
   // were already sent — which takes the whole process down on socket detach.
   // Covered by test/webhook-verify.e2e-spec.ts.
-  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.webhookVerify } })
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.webhookVerify },
+  })
   @Get()
   verify(
     @Query('hub.mode') mode: string,
@@ -46,7 +51,9 @@ export class WebhookController {
   // raw body BEFORE this handler runs, so processWebhook is never reached for
   // an unsigned/forged payload. On a valid signature we ack Meta with 200
   // immediately and process asynchronously (Meta retries on slow acks).
-  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.webhook } })
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.webhook },
+  })
   @UseGuards(WhatsAppSignatureGuard)
   @Post()
   receive(@Body() body: any, @Res() res: Response) {

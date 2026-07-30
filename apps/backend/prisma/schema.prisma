@@ -175,10 +175,52 @@ model Message {
   status    MessageStatus @default(QUEUED)
   createdAt DateTime      @default(now())
 
+  // ── Medios ──────────────────────────────────────────────────
+  // El binario NO se guarda aquí. `mediaId` es el identificador de Meta, que
+  // caduca; `mediaUrl` apunta al archivo ya descargado y servido por el CRM
+  // tras autenticar. Separarlos permite reintentar la descarga sin perder la
+  // referencia original y detectar los medios que aún no se han traído.
+  mediaId       String?
+  mediaUrl      String?
+  mediaMimeType String?
+  mediaFileName String?
+  mediaSize     Int?
+  mediaDuration Int? // segundos, para audio y video
+  caption       String?
+
+  // Ubicación y contacto compartido. JSON porque su forma la define Meta y
+  // normalizarla en columnas obligaría a migrar cada vez que cambie.
+  location Json?
+  contacts Json?
+
+  // Mensaje al que responde este, tal como lo entrega Meta (context.id). Se
+  // guarda el wamid y no una FK: la respuesta puede referirse a un mensaje
+  // anterior a la conexión, que el CRM nunca llegó a almacenar.
+  replyToWamid String?
+
+  // Payload de interactivos (botones y listas) ya sanitizado.
+  interactive Json?
+
+  // ── Estados de entrega ──────────────────────────────────────
+  // Hoy el estado nunca pasa de SENT porque los payloads `statuses` de Meta
+  // se descartan. Estas marcas permiten reflejar el ciclo real y detectar
+  // envíos fallidos sin releer el log.
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+
+  // Clasificador de error ya redactado; NUNCA la respuesta cruda de Meta,
+  // que puede incluir el token o datos del destinatario.
+  errorCode    String?
+  errorMessage String?
+
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
   @@index([conversationId, createdAt])
+  @@index([conversationId, status])
+  @@index([status, createdAt])
   @@map("messages")
 }
 
@@ -746,6 +788,13 @@ enum MessageType {
   VIDEO
   DOCUMENT
   TEMPLATE
+  // Tipos que Meta entrega y que hoy se descartaban en el webhook.
+  STICKER
+  LOCATION
+  CONTACTS
+  INTERACTIVE
+  REACTION
+  UNSUPPORTED
 }
 
 enum Direction {

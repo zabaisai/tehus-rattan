@@ -45,7 +45,11 @@ describe('WebhookService', () => {
   beforeEach(() => {
     prisma = { contact: { findFirst: jest.fn() } };
     conversationsService = { findOrCreate: jest.fn() };
-    messagesService = { findByWamid: jest.fn(), create: jest.fn() };
+    messagesService = {
+      findByWamid: jest.fn(),
+      create: jest.fn(),
+      applyDeliveryStatus: jest.fn().mockResolvedValue('updated'),
+    };
     contactsService = { create: jest.fn() };
     automationsService = { processMessage: jest.fn() };
     whatsappIntegrationService = { findConnectedByPhoneNumberId: jest.fn() };
@@ -174,7 +178,9 @@ describe('WebhookService', () => {
       );
       messagesService.findByWamid.mockResolvedValue(null);
       prisma.contact.findFirst.mockResolvedValue({ id: 'contact-a' });
-      conversationsService.findOrCreate.mockResolvedValue({ id: 'conversation-a' });
+      conversationsService.findOrCreate.mockResolvedValue({
+        id: 'conversation-a',
+      });
       messagesService.create.mockResolvedValue({ id: 'message-a' });
       automationsService.processMessage.mockResolvedValue(undefined);
     });
@@ -200,7 +206,9 @@ describe('WebhookService', () => {
         ],
       });
 
-      const created = messagesService.create.mock.calls.map((c: any) => c[0].wamid);
+      const created = messagesService.create.mock.calls.map(
+        (c: any) => c[0].wamid,
+      );
       expect(created).toEqual(['wamid.1', 'wamid.2']);
     });
 
@@ -223,23 +231,39 @@ describe('WebhookService', () => {
         entry: [
           {
             changes: [
-              { value: value([textMessage('wamid.1'), textMessage('wamid.2')]) },
+              {
+                value: value([textMessage('wamid.1'), textMessage('wamid.2')]),
+              },
             ],
           },
         ],
       });
-      const created = messagesService.create.mock.calls.map((c: any) => c[0].wamid);
+      const created = messagesService.create.mock.calls.map(
+        (c: any) => c[0].wamid,
+      );
       expect(created).toEqual(['wamid.1', 'wamid.2']);
     });
 
-    it('skips unsupported message types but still processes text in the same batch', async () => {
+    // CAMBIO DELIBERADO (add_message_media_and_delivery_status): los medios
+    // ya NO se descartan. Se persisten con su tipo y la referencia mediaId,
+    // sin descargar el binario dentro del webhook.
+    it('persists media messages alongside text in the same batch', async () => {
       await service.processWebhook({
         entry: [
           {
             changes: [
               {
                 value: value([
-                  { id: 'wamid.img', from: '50255551111', type: 'image', image: { id: 'x' } },
+                  {
+                    id: 'wamid.img',
+                    from: '50255551111',
+                    type: 'image',
+                    image: {
+                      id: 'media-x',
+                      mime_type: 'image/jpeg',
+                      caption: 'foto',
+                    },
+                  },
                   textMessage('wamid.txt'),
                 ]),
               },
@@ -247,8 +271,42 @@ describe('WebhookService', () => {
           },
         ],
       });
-      const created = messagesService.create.mock.calls.map((c: any) => c[0].wamid);
-      expect(created).toEqual(['wamid.txt']); // the image was ignored
+
+      const created = messagesService.create.mock.calls.map((c: any) => c[0]);
+      expect(created.map((m: any) => m.wamid)).toEqual([
+        'wamid.img',
+        'wamid.txt',
+      ]);
+
+      const imagen = created[0];
+      expect(imagen.type).toBe('IMAGE');
+      expect(imagen.mediaId).toBe('media-x');
+      expect(imagen.mediaMimeType).toBe('image/jpeg');
+      expect(imagen.caption).toBe('foto');
+      // El pie de foto es lo que se muestra en el hilo; no se inventa un
+      // texto tipo "[imagen]".
+      expect(imagen.body).toBe('foto');
+      // El binario NO se descarga en el webhook: mediaUrl lo rellena un job.
+      expect(imagen.mediaUrl).toBeUndefined();
+    });
+
+    it('marks a genuinely unknown type as UNSUPPORTED instead of dropping it', async () => {
+      await service.processWebhook({
+        entry: [
+          {
+            changes: [
+              {
+                value: value([
+                  { id: 'wamid.raro', from: '50255551111', type: 'ephemeral' },
+                ]),
+              },
+            ],
+          },
+        ],
+      });
+
+      expect(messagesService.create).toHaveBeenCalledTimes(1);
+      expect(messagesService.create.mock.calls[0][0].type).toBe('UNSUPPORTED');
     });
 
     it('isolates a per-message failure and continues the batch', async () => {
@@ -261,7 +319,12 @@ describe('WebhookService', () => {
           entry: [
             {
               changes: [
-                { value: value([textMessage('wamid.1'), textMessage('wamid.2')]) },
+                {
+                  value: value([
+                    textMessage('wamid.1'),
+                    textMessage('wamid.2'),
+                  ]),
+                },
               ],
             },
           ],
@@ -297,8 +360,119 @@ describe('WebhookService', () => {
 
     it('does not throw on an empty or missing entry array', async () => {
       await expect(service.processWebhook({})).resolves.toBeUndefined();
-      await expect(service.processWebhook({ entry: [] })).resolves.toBeUndefined();
+      await expect(
+        service.processWebhook({ entry: [] }),
+      ).resolves.toBeUndefined();
       expect(messagesService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // CAPACIDAD NUEVA (add_message_media_and_delivery_status): los payloads
+  // `statuses` ya no se descartan. Antes el estado nunca pasaba de SENT.
+  // ─────────────────────────────────────────────────────────────
+  describe('estados de entrega', () => {
+    const statusPayload = (statuses: any[]) => ({
+      entry: [{ changes: [{ value: { statuses } }] }],
+    });
+
+    it('aplica sent, delivered, read y failed', async () => {
+      await service.processWebhook(
+        statusPayload([
+          { id: 'wamid.a', status: 'sent', timestamp: '1790000000' },
+          { id: 'wamid.b', status: 'delivered', timestamp: '1790000001' },
+          { id: 'wamid.c', status: 'read', timestamp: '1790000002' },
+        ]),
+      );
+
+      expect(messagesService.applyDeliveryStatus).toHaveBeenCalledTimes(3);
+      const estados = messagesService.applyDeliveryStatus.mock.calls.map(
+        (c: any) => c[0].status,
+      );
+      expect(estados).toEqual(['SENT', 'DELIVERED', 'READ']);
+    });
+
+    it('convierte el timestamp de Meta (segundos) a Date', async () => {
+      await service.processWebhook(
+        statusPayload([
+          { id: 'wamid.a', status: 'sent', timestamp: '1790000000' },
+        ]),
+      );
+
+      const arg = messagesService.applyDeliveryStatus.mock.calls[0][0];
+      expect(arg.occurredAt).toBeInstanceOf(Date);
+      expect(arg.occurredAt.getTime()).toBe(1790000000 * 1000);
+    });
+
+    it('en failed conserva solo el clasificador y el titulo del error', async () => {
+      await service.processWebhook(
+        statusPayload([
+          {
+            id: 'wamid.f',
+            status: 'failed',
+            timestamp: '1790000003',
+            errors: [
+              {
+                code: 131047,
+                title: 'Re-engagement message',
+                error_data: { details: 'no debe propagarse' },
+              },
+            ],
+          },
+        ]),
+      );
+
+      const arg = messagesService.applyDeliveryStatus.mock.calls[0][0];
+      expect(arg.status).toBe('FAILED');
+      expect(arg.errorCode).toBe('131047');
+      expect(arg.errorMessage).toBe('Re-engagement message');
+      // El payload crudo de Meta nunca se propaga.
+      expect(JSON.stringify(arg)).not.toContain('no debe propagarse');
+    });
+
+    it('ignora un estado desconocido sin romper el lote', async () => {
+      await service.processWebhook(
+        statusPayload([
+          { id: 'wamid.x', status: 'inventado' },
+          { id: 'wamid.y', status: 'read', timestamp: '1790000004' },
+        ]),
+      );
+
+      expect(messagesService.applyDeliveryStatus).toHaveBeenCalledTimes(1);
+      expect(messagesService.applyDeliveryStatus.mock.calls[0][0].wamid).toBe(
+        'wamid.y',
+      );
+    });
+
+    it('un fallo al aplicar un estado no impide aplicar los demas', async () => {
+      messagesService.applyDeliveryStatus
+        .mockRejectedValueOnce(new Error('db blip'))
+        .mockResolvedValueOnce('updated');
+
+      await expect(
+        service.processWebhook(
+          statusPayload([
+            { id: 'wamid.a', status: 'sent', timestamp: '1790000000' },
+            { id: 'wamid.b', status: 'read', timestamp: '1790000001' },
+          ]),
+        ),
+      ).resolves.toBeUndefined();
+
+      expect(messagesService.applyDeliveryStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('un payload de solo estados no crea contactos ni mensajes', async () => {
+      await service.processWebhook(
+        statusPayload([
+          { id: 'wamid.a', status: 'delivered', timestamp: '1790000000' },
+        ]),
+      );
+
+      expect(messagesService.create).not.toHaveBeenCalled();
+      expect(contactsService.create).not.toHaveBeenCalled();
+      expect(
+        whatsappIntegrationService.findConnectedByPhoneNumberId,
+      ).not.toHaveBeenCalled();
     });
   });
 });

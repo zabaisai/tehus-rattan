@@ -21,8 +21,7 @@ function buildContext(req: any): ExecutionContext {
 
 function makeGuard(secret: string | undefined): WhatsAppSignatureGuard {
   const config = {
-    get: (key: string) =>
-      key === 'WHATSAPP_APP_SECRET' ? secret : undefined,
+    get: (key: string) => (key === 'WHATSAPP_APP_SECRET' ? secret : undefined),
   };
   return new WhatsAppSignatureGuard(config as any);
 }
@@ -52,42 +51,54 @@ describe('WhatsAppSignatureGuard', () => {
 
   it('rejects an empty signature header', () => {
     expect(() =>
-      guard.canActivate(buildContext(req({ headers: { 'x-hub-signature-256': '' } }))),
+      guard.canActivate(
+        buildContext(req({ headers: { 'x-hub-signature-256': '' } })),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
   it('rejects a different algorithm prefix (sha1=)', () => {
     const sha1 = 'sha1=' + '0'.repeat(40);
     expect(() =>
-      guard.canActivate(buildContext(req({ headers: { 'x-hub-signature-256': sha1 } }))),
+      guard.canActivate(
+        buildContext(req({ headers: { 'x-hub-signature-256': sha1 } })),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
   it('rejects invalid hex characters', () => {
     const bad = 'sha256=' + 'z'.repeat(64);
     expect(() =>
-      guard.canActivate(buildContext(req({ headers: { 'x-hub-signature-256': bad } }))),
+      guard.canActivate(
+        buildContext(req({ headers: { 'x-hub-signature-256': bad } })),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
   it('rejects a too-short signature', () => {
     const short = 'sha256=' + 'a'.repeat(63);
     expect(() =>
-      guard.canActivate(buildContext(req({ headers: { 'x-hub-signature-256': short } }))),
+      guard.canActivate(
+        buildContext(req({ headers: { 'x-hub-signature-256': short } })),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
   it('rejects a too-long signature', () => {
     const long = 'sha256=' + 'a'.repeat(65);
     expect(() =>
-      guard.canActivate(buildContext(req({ headers: { 'x-hub-signature-256': long } }))),
+      guard.canActivate(
+        buildContext(req({ headers: { 'x-hub-signature-256': long } })),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
   it('rejects a well-formed signature computed with the wrong secret', () => {
     const forged = sign('some-other-secret', rawBody);
     expect(() =>
-      guard.canActivate(buildContext(req({ headers: { 'x-hub-signature-256': forged } }))),
+      guard.canActivate(
+        buildContext(req({ headers: { 'x-hub-signature-256': forged } })),
+      ),
     ).toThrow(UnauthorizedException);
   });
 
@@ -96,7 +107,10 @@ describe('WhatsAppSignatureGuard', () => {
     const tampered = Buffer.from(rawBody.toString('utf8') + ' ', 'utf8');
     expect(() =>
       guard.canActivate(
-        buildContext({ rawBody: tampered, headers: { 'x-hub-signature-256': signature } }),
+        buildContext({
+          rawBody: tampered,
+          headers: { 'x-hub-signature-256': signature },
+        }),
       ),
     ).toThrow(UnauthorizedException);
   });
@@ -109,7 +123,10 @@ describe('WhatsAppSignatureGuard', () => {
     const sig = sign(APP_SECRET, unicodeBody);
     expect(
       guard.canActivate(
-        buildContext({ rawBody: unicodeBody, headers: { 'x-hub-signature-256': sig } }),
+        buildContext({
+          rawBody: unicodeBody,
+          headers: { 'x-hub-signature-256': sig },
+        }),
       ),
     ).toBe(true);
   });
@@ -120,7 +137,10 @@ describe('WhatsAppSignatureGuard', () => {
     const sigForA = sign(APP_SECRET, a);
     expect(() =>
       guard.canActivate(
-        buildContext({ rawBody: b, headers: { 'x-hub-signature-256': sigForA } }),
+        buildContext({
+          rawBody: b,
+          headers: { 'x-hub-signature-256': sigForA },
+        }),
       ),
     ).toThrow(UnauthorizedException);
   });
@@ -128,7 +148,10 @@ describe('WhatsAppSignatureGuard', () => {
   it('rejects when the raw body is missing (cannot verify)', () => {
     expect(() =>
       guard.canActivate(
-        buildContext({ rawBody: undefined, headers: { 'x-hub-signature-256': sign(APP_SECRET, rawBody) } }),
+        buildContext({
+          rawBody: undefined,
+          headers: { 'x-hub-signature-256': sign(APP_SECRET, rawBody) },
+        }),
       ),
     ).toThrow(UnauthorizedException);
   });
@@ -143,12 +166,17 @@ describe('WhatsAppSignatureGuard', () => {
   it('accepts an uppercase-hex signature (case-insensitive match)', () => {
     const upper =
       'sha256=' +
-      createHmac('sha256', APP_SECRET).update(rawBody).digest('hex').toUpperCase();
+      createHmac('sha256', APP_SECRET)
+        .update(rawBody)
+        .digest('hex')
+        .toUpperCase();
     // Meta sends lowercase; uppercase hex is still a valid representation.
     // Our regex is lowercase-only by spec, so this MUST be rejected — asserting
     // the strict contract rather than silently accepting.
     expect(() =>
-      guard.canActivate(buildContext(req({ headers: { 'x-hub-signature-256': upper } }))),
+      guard.canActivate(
+        buildContext(req({ headers: { 'x-hub-signature-256': upper } })),
+      ),
     ).toThrow(UnauthorizedException);
   });
 });
