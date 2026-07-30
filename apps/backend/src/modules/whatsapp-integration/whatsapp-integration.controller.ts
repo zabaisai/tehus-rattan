@@ -132,6 +132,7 @@ export class WhatsAppIntegrationController {
     return this.managementService.connectOrUpdateForCompany(
       req.user.companyId,
       dto,
+      this.actorFrom(req),
     );
   }
 

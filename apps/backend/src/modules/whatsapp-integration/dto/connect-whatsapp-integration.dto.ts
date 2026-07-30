@@ -13,7 +13,10 @@ export class ConnectWhatsAppIntegrationDto {
   @IsString()
   displayPhoneNumber?: string;
 
-  @IsOptional()
+  // Required (it used to be optional): the manual flow now validates that the
+  // phoneNumberId really belongs to this WABA and subscribes the app to it, and
+  // neither is possible without it.
   @IsString()
-  wabaId?: string;
+  @IsNotEmpty({ message: 'wabaId es requerido' })
+  wabaId!: string;
 }

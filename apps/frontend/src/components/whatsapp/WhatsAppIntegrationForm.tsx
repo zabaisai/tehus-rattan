@@ -122,11 +122,16 @@ export function WhatsAppIntegrationForm({
         </label>
         <input
           type="text"
+          required
           value={wabaId}
           onChange={(e) => setWabaId(e.target.value)}
           placeholder="WhatsApp Business Account ID"
           className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
         />
+        <p className="mt-1 text-xs text-stone-400">
+          Obligatorio. El servidor comprueba con Meta que el Phone Number ID
+          pertenece a esta WABA y suscribe la app para recibir mensajes.
+        </p>
       </div>
 
       {error && <p className="text-xs text-red-600">{error}</p>}
