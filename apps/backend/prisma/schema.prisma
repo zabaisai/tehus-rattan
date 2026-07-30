@@ -38,6 +38,18 @@ model Company {
   address     String? // Dirección
   quoteFooter String? // Texto/condiciones opcionales para el pie de cotizaciones
 
+  // Configuración regional. Con default para que toda empresa existente y
+  // futura tenga un valor válido sin backfill manual: hasta ahora las fechas
+  // se renderizaban en la zona del navegador y los montos sin moneda
+  // explícita, lo que es ambiguo en cuanto entra una segunda empresa.
+  // `businessHours` queda nullable a propósito: "sin horario definido" es un
+  // estado distinto de "horario vacío", y las reglas de asignación deben
+  // poder distinguirlos.
+  timezone      String  @default("America/Bogota")
+  currency      String  @default("COP")
+  locale        String  @default("es-CO")
+  businessHours Json?
+
   users                User[]
   contacts             Contact[]
   conversations        Conversation[]
