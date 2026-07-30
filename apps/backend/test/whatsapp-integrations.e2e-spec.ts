@@ -175,7 +175,11 @@ describe('WhatsAppIntegrationController (e2e)', () => {
 
       expect(
         managementServiceMock.connectOrUpdateForCompany,
-      ).toHaveBeenCalledWith('company-admin', validBody);
+      ).toHaveBeenCalledWith(
+        'company-admin',
+        validBody,
+        expect.objectContaining({ userId: 'user-1' }),
+      );
       expect(res.body).not.toHaveProperty('accessTokenEncrypted');
     });
 
@@ -193,7 +197,11 @@ describe('WhatsAppIntegrationController (e2e)', () => {
 
       expect(
         managementServiceMock.connectOrUpdateForCompany,
-      ).toHaveBeenCalledWith('company-super-admin', validBody);
+      ).toHaveBeenCalledWith(
+        'company-super-admin',
+        validBody,
+        expect.objectContaining({ userId: 'user-1' }),
+      );
     });
 
     it('rejects AGENT with 403', async () => {
@@ -302,6 +310,45 @@ describe('WhatsAppIntegrationController (e2e)', () => {
       expect(
         managementServiceMock.connectOrUpdateForCompany,
       ).not.toHaveBeenCalled();
+    });
+
+    it('rejects a body without wabaId with 400 (required: it gates the WABA check and the subscription)', async () => {
+      const token = signToken('SUPER_ADMIN', 'company-admin');
+      const bodyWithoutWabaId = {
+        phoneNumberId: validBody.phoneNumberId,
+        accessToken: validBody.accessToken,
+        displayPhoneNumber: validBody.displayPhoneNumber,
+      };
+
+      await request(app.getHttpServer())
+        .put('/api/whatsapp-integrations/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send(bodyWithoutWabaId)
+        .expect(400);
+
+      expect(
+        managementServiceMock.connectOrUpdateForCompany,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('forwards a redacted actor for the audit trail and never the token', async () => {
+      const token = signToken('SUPER_ADMIN', 'company-admin');
+      managementServiceMock.connectOrUpdateForCompany.mockResolvedValue(
+        safeIntegrationResponse,
+      );
+
+      await request(app.getHttpServer())
+        .put('/api/whatsapp-integrations/me')
+        .set('Authorization', `Bearer ${token}`)
+        .send(validBody)
+        .expect(200);
+
+      const actorArg =
+        managementServiceMock.connectOrUpdateForCompany.mock.calls[0][2];
+      expect(actorArg).toEqual(
+        expect.objectContaining({ userId: 'user-1', role: 'SUPER_ADMIN' }),
+      );
+      expect(JSON.stringify(actorArg)).not.toContain(validBody.accessToken);
     });
   });
 

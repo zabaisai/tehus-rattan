@@ -83,7 +83,7 @@ describe('WhatsAppIntegrationController', () => {
       wabaId: 'waba-a',
     };
 
-    it('calls connectOrUpdateForCompany with req.user.companyId and the dto', async () => {
+    it('calls connectOrUpdateForCompany with req.user.companyId, the dto and the actor', async () => {
       managementService.connectOrUpdateForCompany.mockResolvedValue(
         safeResponse,
       );
@@ -96,7 +96,13 @@ describe('WhatsAppIntegrationController', () => {
       expect(managementService.connectOrUpdateForCompany).toHaveBeenCalledWith(
         'company-a',
         dto,
+        // Actor for the audit entry: identity + redacted request metadata,
+        // never a token.
+        expect.objectContaining({ userId: expect.any(String) }),
       );
+      const actorArg =
+        managementService.connectOrUpdateForCompany.mock.calls[0][2];
+      expect(JSON.stringify(actorArg)).not.toContain('fake-meta-token');
     });
 
     it('never uses a companyId from the dto, even if one is present on it', async () => {
