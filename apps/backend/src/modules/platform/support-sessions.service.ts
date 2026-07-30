@@ -245,6 +245,9 @@ export class SupportSessionsService {
         id: true,
         actorUserId: true,
         companyId: true,
+        // The stated support reason travels with the session so a gated
+        // action can record WHY support touched the company.
+        reason: true,
         status: true,
         expiresAt: true,
         company: { select: { id: true, name: true } },

@@ -21,6 +21,9 @@ import { PlatformActivityService } from './platform-activity.service';
     SupportSessionsService,
     PlatformActivityService,
   ],
-  exports: [PlatformAuditLogService],
+  // SupportSessionsService is exported so support-gated endpoints living in
+  // other modules can re-validate the session server-side. It does NOT widen
+  // what support mode can read — only who may re-check that a session is live.
+  exports: [PlatformAuditLogService, SupportSessionsService],
 })
 export class PlatformModule {}

@@ -2,16 +2,28 @@
 
 import { useState } from 'react';
 import { connectOrUpdateWhatsAppIntegration } from '@/lib/whatsapp';
-import { WhatsAppIntegration } from '@/types';
+import {
+  ConnectWhatsAppIntegrationPayload,
+  WhatsAppIntegration,
+} from '@/types';
 
 interface WhatsAppIntegrationFormProps {
   integration: WhatsAppIntegration | null;
   onSuccess: () => void;
+  // Lets the same form serve a different endpoint without duplicating it —
+  // used by the platform panel's support-gated connection. Defaults to the
+  // in-company endpoint. The token is handed over here and never stored.
+  onSubmit?: (
+    payload: ConnectWhatsAppIntegrationPayload,
+  ) => Promise<unknown>;
+  submitLabel?: string;
 }
 
 export function WhatsAppIntegrationForm({
   integration,
   onSuccess,
+  onSubmit,
+  submitLabel,
 }: WhatsAppIntegrationFormProps) {
   const [phoneNumberId, setPhoneNumberId] = useState(
     integration?.phoneNumberId ?? '',
@@ -31,12 +43,13 @@ export function WhatsAppIntegrationForm({
     setSuccess('');
     setIsSubmitting(true);
     try {
-      await connectOrUpdateWhatsAppIntegration({
+      const payload: ConnectWhatsAppIntegrationPayload = {
         phoneNumberId: phoneNumberId.trim(),
         accessToken: accessToken.trim(),
         displayPhoneNumber: displayPhoneNumber.trim() || undefined,
-        wabaId: wabaId.trim() || undefined,
-      });
+        wabaId: wabaId.trim(),
+      };
+      await (onSubmit ?? connectOrUpdateWhatsAppIntegration)(payload);
       setAccessToken('');
       setSuccess(
         integration
@@ -145,9 +158,8 @@ export function WhatsAppIntegrationForm({
         >
           {isSubmitting
             ? 'Guardando...'
-            : integration
-              ? 'Actualizar integración'
-              : 'Conectar WhatsApp'}
+            : (submitLabel ??
+              (integration ? 'Actualizar integración' : 'Conectar WhatsApp'))}
         </button>
       </div>
     </form>
