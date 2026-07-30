@@ -35,6 +35,12 @@ export class CreateTaskDto {
   @IsString()
   contactId?: string;
 
+  // Conversación de origen: permite crear la tarea desde el chat. El servicio
+  // valida que pertenezca a la misma empresa.
+  @IsOptional()
+  @IsString()
+  conversationId?: string;
+
   @IsOptional()
   @IsString()
   assignedTo?: string;

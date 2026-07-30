@@ -26,6 +26,7 @@ export class TasksController {
     @Request() req: any,
     @Query('leadId') leadId?: string,
     @Query('contactId') contactId?: string,
+    @Query('conversationId') conversationId?: string,
     @Query('status') status?: string,
     @Query('assignedTo') assignedTo?: string,
     @Query('overdue') overdue?: string,
@@ -36,6 +37,7 @@ export class TasksController {
     return this.tasksService.findAll(req.user.companyId, {
       leadId,
       contactId,
+      conversationId,
       status,
       assignedTo,
       overdue: overdue === 'true',

@@ -147,9 +147,22 @@ model Conversation {
   assignedTo String?
   agent      User?   @relation(fields: [assignedTo], references: [id])
 
+  // Oportunidad comercial que originó esta conversación. Nullable a
+  // propósito y para siempre: no toda conversación es una venta (soporte,
+  // consultas, spam), y forzarla obligaría a inventar oportunidades vacías.
+  // Es el vínculo que hoy falta y que deja 4 de 4 conversaciones fuera del
+  // pipeline. `SetNull` al borrar el lead: la conversación y sus mensajes son
+  // el registro de lo que ocurrió y no deben desaparecer con la oportunidad.
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
   messages Message[]
   notes    Note[]
+  tasks    Task[]
 
+  @@index([companyId, status, lastMessageAt])
+  @@index([companyId, assignedTo])
+  @@index([leadId])
   @@map("conversations")
 }
 
@@ -280,12 +293,16 @@ model Lead {
   assignedTo String?
   agent      User?   @relation(fields: [assignedTo], references: [id])
 
-  stageHistory LeadStageHistory[]
-  tasks        Task[]
+  stageHistory  LeadStageHistory[]
+  tasks         Task[]
+  conversations Conversation[]
   notes        Note[]
   leadProducts LeadProduct[]
   quotes       Quote[]
 
+  @@index([companyId, status])
+  @@index([pipelineId, stageId])
+  @@index([contactId])
   @@map("leads")
 }
 
@@ -354,9 +371,18 @@ model Task {
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id])
 
+  // Conversación de origen. Permite crear una tarea desde el chat sin salir
+  // de él y mostrar en la conversación las tareas que genera. `SetNull` para
+  // que archivar o borrar una conversación no borre el seguimiento.
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
   assignedTo String?
   agent      User?   @relation(fields: [assignedTo], references: [id])
 
+  @@index([companyId, status, dueDate])
+  @@index([companyId, assignedTo])
+  @@index([conversationId])
   @@map("tasks")
 }
 

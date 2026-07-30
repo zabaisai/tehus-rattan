@@ -23,7 +23,7 @@ const COMPANY_A = 'company-a';
 const COMPANY_B = 'company-b';
 const TASK_A = 'task-a';
 
-describe('TasksService (caracterización pre-conversationId)', () => {
+describe('TasksService (vínculos y aislamiento)', () => {
   let prisma: any;
   let service: TasksService;
 
@@ -45,6 +45,9 @@ describe('TasksService (caracterización pre-conversationId)', () => {
       user: { findFirst: jest.fn().mockResolvedValue({ id: 'user-1' }) },
       lead: { findFirst: jest.fn().mockResolvedValue({ id: 'lead-1' }) },
       contact: { findFirst: jest.fn().mockResolvedValue({ id: 'contact-1' }) },
+      conversation: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'conv-1' }),
+      },
     };
     service = new TasksService(prisma);
   });
@@ -178,25 +181,62 @@ describe('TasksService (caracterización pre-conversationId)', () => {
     });
   });
 
-  describe('hueco conocido: la tarea NO conoce la conversación', () => {
-    it('el contrato de creación no acepta conversationId', async () => {
+  // HUECO CERRADO (migración link_conversation_lead_and_task_conversation):
+  // la tarea ya conoce su conversación de origen, con la misma validación de
+  // pertenencia que lead y contacto.
+  describe('vínculo con la conversación', () => {
+    it('valida que la conversación sea de la MISMA empresa antes de crear', async () => {
       await service.create(COMPANY_A, {
-        title: 'T',
+        title: 'Llamar tras el chat',
         conversationId: 'conv-1',
-      } as never);
+      });
 
-      // Hoy el valor viajaría hasta Prisma y reventaría en base, porque la
-      // columna no existe. Tras la migración esto debe validarse igual que
-      // leadId/contactId: pertenencia a la misma empresa antes de escribir.
-      expect(prisma.task.create).toHaveBeenCalledTimes(1);
+      expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'conv-1', companyId: COMPANY_A },
+        }),
+      );
+      expect(prisma.task.create.mock.calls[0][0].data.conversationId).toBe(
+        'conv-1',
+      );
     });
 
-    it('findAll no ofrece filtro por conversación', async () => {
-      await service.findAll(COMPANY_A, { conversationId: 'conv-1' } as never);
+    it('rechaza una conversación de otra empresa sin crear la tarea', async () => {
+      prisma.conversation.findFirst.mockResolvedValue(null);
 
-      expect(
-        prisma.task.findMany.mock.calls[0][0].where.conversationId,
-      ).toBeUndefined();
+      await expect(
+        service.create(COMPANY_A, { title: 'T', conversationId: 'ajena' }),
+      ).rejects.toBeInstanceOf(NotFoundException);
+
+      expect(prisma.task.create).not.toHaveBeenCalled();
+    });
+
+    it('rechaza conversationId en blanco', async () => {
+      await expect(
+        service.create(COMPANY_A, { title: 'T', conversationId: '   ' }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(prisma.task.create).not.toHaveBeenCalled();
+    });
+
+    it('permite filtrar tareas por conversación', async () => {
+      await service.findAll(COMPANY_A, { conversationId: 'conv-1' });
+
+      expect(prisma.task.findMany.mock.calls[0][0].where.conversationId).toBe(
+        'conv-1',
+      );
+    });
+
+    it('incluye la conversación en las lecturas, sin exponer sus mensajes', async () => {
+      await service.findAll(COMPANY_A, {});
+
+      const include = prisma.task.findMany.mock.calls[0][0].include;
+      expect(include.conversation.select).toEqual({
+        id: true,
+        status: true,
+        channel: true,
+      });
+      expect(include.conversation.include).toBeUndefined();
     });
   });
 
