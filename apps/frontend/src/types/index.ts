@@ -381,7 +381,16 @@ export interface ConnectWhatsAppIntegrationPayload {
   phoneNumberId: string;
   accessToken: string;
   displayPhoneNumber?: string;
-  wabaId?: string;
+  // Required by the API: it gates the WABA/number check and the app
+  // subscription, so a payload without it is rejected with 400.
+  wabaId: string;
+}
+
+// Same payload plus the support session the platform SUPER_ADMIN is acting
+// under. The server re-validates that session and the target company.
+export interface PlatformConnectWhatsAppIntegrationPayload
+  extends ConnectWhatsAppIntegrationPayload {
+  supportSessionId: string;
 }
 
 export type CompanyStatus = "ACTIVE" | "SUSPENDED" | "DELETED";

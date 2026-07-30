@@ -33,6 +33,15 @@ export interface ManualConnectActor {
   userAgent?: string | null;
 }
 
+// Lets a caller that reached this service through a different, already-
+// authorized path (e.g. a support-gated platform endpoint) stamp its own
+// context onto the SAME audit row, inside the SAME transaction. Callers must
+// pass non-secret values only — never a token, never a full phone number.
+export interface ManualConnectAuditOverride {
+  action?: string;
+  metadata?: Record<string, string | number | boolean | null>;
+}
+
 @Injectable()
 export class WhatsAppIntegrationManagementService {
   constructor(
@@ -66,6 +75,7 @@ export class WhatsAppIntegrationManagementService {
     companyId: string,
     input: ConnectWhatsAppIntegrationInput,
     actor: ManualConnectActor,
+    audit: ManualConnectAuditOverride = {},
   ) {
     const trimmedCompanyId = this.requireNonBlank(
       companyId,
@@ -155,11 +165,11 @@ export class WhatsAppIntegrationManagementService {
           actorUserId: actor.userId,
           actorRole: actor.role,
           affectedCompanyId: trimmedCompanyId,
-          action: 'WHATSAPP_MANUAL_CONNECTED',
+          action: audit.action ?? 'WHATSAPP_MANUAL_CONNECTED',
           entityType: ENTITY,
           entityId: saved.id,
           // Non-secret metadata only — never the token, never the raw number.
-          metadata: { connectionMethod: 'MANUAL' },
+          metadata: { connectionMethod: 'MANUAL', ...(audit.metadata ?? {}) },
           ipAddress: actor.ipPreview,
           userAgent: actor.userAgent,
         });

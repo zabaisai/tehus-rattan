@@ -2,10 +2,17 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getPlatformCompanySupportOverview, getSupportSessions } from '@/lib/platform';
+import { AlertTriangle } from 'lucide-react';
+import {
+  connectPlatformCompanyWhatsApp,
+  getPlatformCompanySupportOverview,
+  getSupportSessions,
+} from '@/lib/platform';
 import { CompanyStatus, PlatformSupportSession } from '@/types';
+import { useAuthStore } from '@/store/auth.store';
 import { StartSupportSessionModal } from './StartSupportSessionModal';
 import { SupportSessionPanel } from './SupportSessionPanel';
+import { WhatsAppIntegrationForm } from '@/components/whatsapp/WhatsAppIntegrationForm';
 import { Modal } from '@/components/ui/Modal';
 
 const statusLabels: Record<CompanyStatus, string> = {
@@ -48,6 +55,12 @@ export function CompanySupportOverviewModal({
     null,
   );
   const [startModalOpen, setStartModalOpen] = useState(false);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+
+  // The whole platform panel is already SUPER_ADMIN-only, but the manual
+  // WhatsApp action is re-gated explicitly here: it writes credentials, so it
+  // should never render off the back of a stale or partial session state.
+  const isSuperAdmin = useAuthStore((s) => s.user?.role) === 'SUPER_ADMIN';
 
   const { data: activeSessions, isLoading: loadingActiveSession } = useQuery({
     queryKey: ['platform-support-sessions-active', companyId],
@@ -159,9 +172,18 @@ export function CompanySupportOverviewModal({
             </div>
 
             <div className="border-t border-stone-100 pt-4">
-              <p className="mb-2 text-xs font-semibold text-stone-500">
-                WhatsApp
-              </p>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-stone-500">WhatsApp</p>
+                {isSuperAdmin && hasActiveSession && session && (
+                  <button
+                    type="button"
+                    onClick={() => setWhatsappModalOpen(true)}
+                    className="whitespace-nowrap rounded-md border border-stone-300 px-2.5 py-1 text-xs text-stone-700 hover:bg-stone-50"
+                  >
+                    Configurar WhatsApp manualmente
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <p className="text-xs text-stone-500">Conectado</p>
@@ -349,6 +371,43 @@ export function CompanySupportOverviewModal({
             });
           }}
         />
+      )}
+
+      {whatsappModalOpen && overview && session && (
+        <Modal
+          title="Configurar WhatsApp manualmente"
+          onClose={() => setWhatsappModalOpen(false)}
+        >
+          <div className="mb-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>
+              Vas a conectar WhatsApp para <strong>{overview.company.name}</strong>{' '}
+              bajo la sesión de soporte activa. La acción queda auditada con tu
+              usuario, la empresa y el motivo de soporte. El token nunca se
+              muestra ni se guarda en el navegador.
+            </span>
+          </div>
+          <WhatsAppIntegrationForm
+            integration={null}
+            submitLabel="Conectar WhatsApp para la empresa"
+            // The companyId travels in the path and the session id in the
+            // body; the server re-validates both before writing anything.
+            onSubmit={(payload) =>
+              connectPlatformCompanyWhatsApp(companyId, {
+                ...payload,
+                supportSessionId: session.id,
+              })
+            }
+            onSuccess={() => {
+              setWhatsappModalOpen(false);
+              queryClient.invalidateQueries({
+                queryKey: ['platform-company-support-overview', companyId],
+              });
+              // Audited as WHATSAPP_MANUAL_CONNECTED_VIA_SUPPORT.
+              queryClient.invalidateQueries({ queryKey: ['platform-audit-logs'] });
+            }}
+          />
+        </Modal>
       )}
     </>
   );

@@ -10,8 +10,10 @@ import {
   PlatformCompanySupportOverview,
   PlatformSupportConversation,
   PlatformSupportConversationDetail,
+  PlatformConnectWhatsAppIntegrationPayload,
   PlatformSupportSession,
   SupportSessionStatus,
+  WhatsAppIntegration,
 } from '@/types';
 
 export async function getPlatformCompanies(params?: {
@@ -61,6 +63,20 @@ export async function getPlatformCompanySupportOverview(
 ): Promise<PlatformCompanySupportOverview> {
   const { data } = await api.get<PlatformCompanySupportOverview>(
     `/platform/companies/${id}/support-overview`,
+  );
+  return data;
+}
+
+// Support-gated manual WhatsApp connection performed by a platform
+// SUPER_ADMIN. The companyId travels in the path (never in the body) and the
+// server re-validates the support session against it before writing anything.
+export async function connectPlatformCompanyWhatsApp(
+  companyId: string,
+  payload: PlatformConnectWhatsAppIntegrationPayload,
+): Promise<WhatsAppIntegration> {
+  const { data } = await api.put<WhatsAppIntegration>(
+    `/platform/companies/${companyId}/whatsapp-integration`,
+    payload,
   );
   return data;
 }

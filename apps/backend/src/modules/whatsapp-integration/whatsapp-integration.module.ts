@@ -8,11 +8,20 @@ import { WhatsAppEmbeddedSignupStateService } from './whatsapp-embedded-signup-s
 import { WhatsAppMetaClientService } from './whatsapp-meta-client.service';
 import { WhatsAppEmbeddedSignupService } from './whatsapp-embedded-signup.service';
 import { WhatsAppIntegrationController } from './whatsapp-integration.controller';
+import { PlatformWhatsAppIntegrationController } from './platform-whatsapp-integration.controller';
+import { PlatformWhatsAppIntegrationService } from './platform-whatsapp-integration.service';
 
 @Module({
+  // The support-gated platform controller lives HERE, not in PlatformModule,
+  // so the dependency stays one-way (whatsapp -> platform) and no circular
+  // import is introduced.
   imports: [PlatformModule, NotificationsModule],
-  controllers: [WhatsAppIntegrationController],
+  controllers: [
+    WhatsAppIntegrationController,
+    PlatformWhatsAppIntegrationController,
+  ],
   providers: [
+    PlatformWhatsAppIntegrationService,
     WhatsAppIntegrationService,
     WhatsAppTokenCryptoService,
     WhatsAppIntegrationManagementService,
