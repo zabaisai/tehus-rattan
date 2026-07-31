@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   X,
   Zap,
+  Bot,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
@@ -102,7 +103,14 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         // solo quien administra la empresa deberia poder tocarlas, igual que
         // la conexion de WhatsApp.
         ...(canManageCompany
-          ? [{ href: '/dashboard/automations', label: 'Automatizaciones', icon: Zap }]
+          ? [
+              {
+                href: '/dashboard/automations',
+                label: 'Automatizaciones',
+                icon: Zap,
+              },
+              { href: '/dashboard/chatbot', label: 'Chatbot', icon: Bot },
+            ]
           : []),
         ...(canManageWhatsApp
           ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]

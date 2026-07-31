@@ -296,7 +296,14 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       recibe DOS mensajes por cada uno que envía. También se salta el aviso de
       «nuevo mensaje» mientras el bot conversa; al entregar, el asesor recibe
       el suyo · 5 pruebas
-- [ ] Chatbot: constructor visual
+- [x] **Chatbot: constructor visual** — cada paso declara a cuál va después
+      **eligiéndolo de una lista**, no escribiéndolo: es lo que hace imposible
+      el error más común, enlazar a un paso inexistente. No es un lienzo de
+      nodos porque sobre un flujo de WhatsApp —lineal con bifurcaciones en los
+      menús— añade la carga de colocar cajas sin añadir capacidad, e invita a
+      dibujar ramificaciones que el motor no ejecuta. Borrar un paso limpia
+      los enlaces que apuntaban a él y reasigna el inicio si hacía falta ·
+      15 pruebas
 - [ ] Notificaciones (productores completos)
 - [ ] WhatsApp: salud, medios, plantillas, estados
 - [ ] Cotizaciones + PDF real
