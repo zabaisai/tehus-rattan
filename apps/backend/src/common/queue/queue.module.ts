@@ -1,6 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { QueueHealthService } from './queue.health';
 import { QueuePingService } from './queue.ping';
+import { InboundQueueService } from './inbound-queue.service';
 
 /**
  * Módulo de la cola durable.
@@ -16,7 +17,7 @@ import { QueuePingService } from './queue.ping';
  */
 @Global()
 @Module({
-  providers: [QueueHealthService, QueuePingService],
-  exports: [QueueHealthService, QueuePingService],
+  providers: [QueueHealthService, QueuePingService, InboundQueueService],
+  exports: [QueueHealthService, QueuePingService, InboundQueueService],
 })
 export class QueueModule {}

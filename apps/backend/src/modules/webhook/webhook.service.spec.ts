@@ -4,6 +4,7 @@ describe('WebhookService', () => {
   let prisma: any;
   let conversationsService: any;
   let messagesService: any;
+  let inboundQueue: any;
   let contactsService: any;
   let automationsService: any;
   let whatsappIntegrationService: any;
@@ -55,6 +56,12 @@ describe('WebhookService', () => {
     whatsappIntegrationService = { findConnectedByPhoneNumberId: jest.fn() };
     notifications = { emit: jest.fn().mockResolvedValue(undefined) };
 
+    inboundQueue = {
+      // Por defecto NO encola: las pruebas existentes verifican la ejecución
+      // en línea, que es la marcha atrás cuando no hay Redis.
+      enqueueInboundMessage: jest.fn().mockResolvedValue(false),
+      isEnabled: jest.fn().mockReturnValue(false),
+    };
     service = new WebhookService(
       prisma,
       conversationsService,
@@ -63,6 +70,7 @@ describe('WebhookService', () => {
       automationsService,
       whatsappIntegrationService,
       notifications,
+      inboundQueue,
     );
   });
 
@@ -473,6 +481,67 @@ describe('WebhookService', () => {
       expect(
         whatsappIntegrationService.findConnectedByPhoneNumberId,
       ).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────
+  // COLA DURABLE: el webhook debe hacer solo persistir + encolar. Meta exige
+  // un ack rapido y reintenta si el handler tarda, asi que ejecutar los
+  // efectos aqui dentro es lo que provoca reintentos y duplicados.
+  // ─────────────────────────────────────────────────────────────
+  describe('encolado de efectos', () => {
+    beforeEach(() => {
+      whatsappIntegrationService.findConnectedByPhoneNumberId.mockResolvedValue(
+        connectedIntegration,
+      );
+      messagesService.findByWamid.mockResolvedValue(null);
+      prisma.contact.findFirst.mockResolvedValue(null);
+      contactsService.create.mockResolvedValue({ id: 'contact-a' });
+      conversationsService.findOrCreate.mockResolvedValue({
+        id: 'conversation-a',
+      });
+      messagesService.create.mockResolvedValue({ id: 'message-a' });
+      automationsService.processMessage.mockResolvedValue(undefined);
+    });
+
+    it('encola los efectos con los datos del mensaje persistido', async () => {
+      inboundQueue.enqueueInboundMessage.mockResolvedValue(true);
+      messagesService.create.mockResolvedValue({ id: 'message-persistido' });
+
+      await service.processWebhook(buildPayload());
+
+      expect(inboundQueue.enqueueInboundMessage).toHaveBeenCalledTimes(1);
+      const enviado = inboundQueue.enqueueInboundMessage.mock.calls[0][0];
+      expect(enviado.messageId).toBe('message-persistido');
+      expect(enviado.companyId).toBe('company-a');
+    });
+
+    it('cuando ENCOLA no ejecuta los efectos en linea', async () => {
+      inboundQueue.enqueueInboundMessage.mockResolvedValue(true);
+
+      await service.processWebhook(buildPayload());
+
+      // Si ademas se ejecutaran aqui, cada mensaje dispararia sus efectos dos
+      // veces: una en linea y otra en el worker.
+      expect(automationsService.processMessage).not.toHaveBeenCalled();
+    });
+
+    it('cuando NO puede encolar ejecuta en linea: ningun mensaje se pierde', async () => {
+      inboundQueue.enqueueInboundMessage.mockResolvedValue(false);
+
+      await service.processWebhook(buildPayload());
+
+      expect(automationsService.processMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('un fallo de la cola no impide persistir el mensaje', async () => {
+      // El orden importa: primero se persiste, despues se encola. Si se
+      // invirtiera, un fallo de Redis perderia el mensaje.
+      inboundQueue.enqueueInboundMessage.mockResolvedValue(false);
+
+      await service.processWebhook(buildPayload());
+
+      expect(messagesService.create).toHaveBeenCalledTimes(1);
     });
   });
 });

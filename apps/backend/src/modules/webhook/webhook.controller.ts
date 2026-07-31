@@ -58,6 +58,10 @@ export class WebhookController {
   @Post()
   receive(@Body() body: any, @Res() res: Response) {
     res.status(200).send('OK');
-    this.webhookService.processWebhook(body);
+    // `void` deliberado: el ack a Meta ya salió y el procesamiento continúa
+    // en segundo plano. Esperarlo aquí retrasaría la respuesta y provocaría
+    // reintentos de Meta, que es justo lo que la cola viene a evitar.
+    // processWebhook nunca rechaza: aísla los fallos por mensaje.
+    void this.webhookService.processWebhook(body);
   }
 }

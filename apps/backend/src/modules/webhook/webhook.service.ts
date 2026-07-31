@@ -7,6 +7,7 @@ import { AutomationsService } from '../automations/automations.service';
 import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-integration.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { maskPhone } from '../../common/logging/redact';
+import { InboundQueueService } from '../../common/queue/inbound-queue.service';
 
 @Injectable()
 export class WebhookService {
@@ -20,6 +21,7 @@ export class WebhookService {
     private automationsService: AutomationsService,
     private whatsappIntegrationService: WhatsAppIntegrationService,
     private notifications: NotificationsService,
+    private inboundQueue: InboundQueueService,
   ) {}
 
   // Walks the whole Meta payload — every entry, every change, every message —
@@ -206,7 +208,7 @@ export class WebhookService {
           ? this.textoDeInteractivo(message.interactive)
           : caption || '';
 
-    await this.messagesService.create({
+    const persistido = await this.messagesService.create({
       companyId,
       conversationId: conversation.id,
       wamid: message.id,
@@ -237,19 +239,59 @@ export class WebhookService {
         : {}),
     });
 
+    // Los efectos van a la cola: Meta exige un ack rapido y reintenta si el
+    // webhook tarda, asi que ejecutar automatizaciones y notificaciones aqui
+    // dentro es justamente lo que provoca reintentos y mensajes duplicados
+    // cuando una de esas acciones se ralentiza.
+    //
+    // Si la cola no esta disponible se ejecuta en linea, igual que antes: un
+    // fallo de Redis degrada la latencia, nunca deja un mensaje sin procesar.
+    const encolado = await this.inboundQueue.enqueueInboundMessage({
+      companyId,
+      conversationId: conversation.id,
+      messageId: persistido.id,
+      contactPhone: message.from,
+      body: text,
+    });
+
+    if (!encolado) {
+      await this.runInboundEffects(
+        companyId,
+        conversation.id,
+        text,
+        message.from,
+        (conversation as { assignedTo?: string | null }).assignedTo ?? null,
+      );
+    }
+
+    this.logger.log(`Mensaje procesado de ${maskPhone(message.from)}`);
+  }
+
+  /**
+   * Efectos de un mensaje entrante: automatizaciones y aviso al asesor.
+   *
+   * Publico para que el procesador de la cola lo reutilice: encolado y en
+   * linea deben ejecutar EXACTAMENTE lo mismo, o el comportamiento cambiaria
+   * segun si Redis esta levantado.
+   */
+  async runInboundEffects(
+    companyId: string,
+    conversationId: string,
+    text: string,
+    contactPhone: string,
+    assignedTo: string | null,
+  ): Promise<void> {
     await this.automationsService.processMessage(
       companyId,
-      conversation.id,
+      conversationId,
       text,
-      message.from,
+      contactPhone,
     );
 
-    // Notify the assigned agent of a new inbound message. Best-effort (never
-    // breaks webhook processing), a short sanitized preview only (never the full
-    // body / full phone), and deduped per conversation in 5-minute buckets so a
-    // burst of messages collapses to one notification.
-    const assignedTo = (conversation as { assignedTo?: string | null })
-      .assignedTo;
+    // Aviso al asesor asignado. Best-effort (nunca rompe el procesamiento),
+    // con una vista previa corta y saneada —nunca el cuerpo completo ni el
+    // telefono entero— y deduplicado por conversacion en cubos de 5 minutos
+    // para que una rafaga colapse en un solo aviso.
     if (assignedTo) {
       const preview = text.replace(/\s+/g, ' ').trim().slice(0, 60);
       const bucket = Math.floor(Date.now() / 300_000);
@@ -260,12 +302,10 @@ export class WebhookService {
         title: 'Nuevo mensaje de WhatsApp',
         bodyPreview: preview || undefined,
         entityType: 'Conversation',
-        entityId: conversation.id,
+        entityId: conversationId,
         actionUrl: `/dashboard/conversations`,
-        dedupeKey: `NEW_INBOUND_MESSAGE:${conversation.id}:${bucket}`,
+        dedupeKey: `NEW_INBOUND_MESSAGE:${conversationId}:${bucket}`,
       });
     }
-
-    this.logger.log(`Mensaje procesado de ${maskPhone(message.from)}`);
   }
 }
