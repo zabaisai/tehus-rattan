@@ -236,7 +236,13 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       de `lastReadAt` —sin contador que desincronizar— resueltos en SQL porque
       la correlación entre mensaje y marca no se puede expresar en Prisma ·
       `20260731…_add_conversation_reads` · 29 e2e contra base real
-- [ ] Bandeja omnicanal (interfaz)
+- [x] **Bandeja omnicanal (interfaz)** — pestañas con contador (Todas, Mías,
+      Sin asignar, Sin leer), búsqueda, filtro de estado, selección múltiple y
+      barra de acciones masivas. Abrir un hilo lo marca leído. Cada pestaña
+      **reemplaza** el filtro anterior en vez de acumularlo, y cambiar de
+      filtro limpia la selección: mantenerla dejaría marcadas conversaciones
+      que ya no se ven. Sin borrado masivo — cerrar y archivar son
+      reversibles, borrar no · 33 pruebas
 - [ ] UI de pipelines y etapas
 - [ ] Oportunidades (vista detallada)
 - [ ] Tareas y SLA
@@ -470,6 +476,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras salud agregada | **1101 unit / 264 e2e verdes** |
 | 2026-07-31 | **CI** `4dbc8d4` (salud agregada) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras bandeja omnicanal (backend) | **1101 unit / 293 e2e verdes** |
+| 2026-07-31 | **CI** `7748c73` (bandeja backend) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras bandeja omnicanal (interfaz) | **183 frontend verdes / 32 suites** |
 
 ## Despliegues
 
