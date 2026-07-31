@@ -165,9 +165,7 @@ export class AutomationsService {
             break;
           }
           case 'change_stage': {
-            await this.conversationsService.update(conversationId, companyId, {
-              stage: action.stage,
-            });
+            await this.moveLeadStage(companyId, conversationId, action.stage);
             break;
           }
           case 'close_conversation': {
@@ -181,5 +179,81 @@ export class AutomationsService {
         this.logger.error(`Error ejecutando acción ${action.type}`, error);
       }
     }
+  }
+
+  /**
+   * TRANSICION `Conversation.stage` -> `Lead.stageId` (dual-write).
+   *
+   * `Conversation.stage` era un String suelto SIN relacion con PipelineStage:
+   * escribirlo no movia nada en el pipeline, que es el hueco que la
+   * caracterizacion dejo fijado. Ahora la accion mueve la OPORTUNIDAD, que es
+   * lo que el usuario espera al configurar "cambiar de etapa".
+   *
+   * Durante la transicion se sigue escribiendo `Conversation.stage` para no
+   * romper ningun consumidor que aun lo lea. La columna se retira en una
+   * migracion posterior y separada, cuando el dual-write lleve tiempo en
+   * produccion.
+   *
+   * La etapa se resuelve POR NOMBRE dentro del pipeline del propio lead, y
+   * acotada a la empresa: una etapa de otro tenant nunca puede aplicarse.
+   */
+  private async moveLeadStage(
+    companyId: string,
+    conversationId: string,
+    stageName: string,
+  ): Promise<void> {
+    // Dual-write: se conserva el valor antiguo mientras exista la columna.
+    await this.conversationsService.update(conversationId, companyId, {
+      stage: stageName,
+    });
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { id: conversationId, companyId },
+      select: { leadId: true },
+    });
+
+    if (!conversation?.leadId) {
+      // Sin oportunidad asociada no hay nada que mover. No es un error: una
+      // conversacion de soporte o una consulta suelta puede no tener lead.
+      this.logger.log(
+        'change_stage sin oportunidad asociada: solo se registro el estado en la conversacion',
+      );
+      return;
+    }
+
+    const lead = await this.prisma.lead.findFirst({
+      where: { id: conversation.leadId, companyId },
+      select: { id: true, pipelineId: true, stageId: true },
+    });
+    if (!lead) return;
+
+    const destino = await this.prisma.pipelineStage.findFirst({
+      where: { pipelineId: lead.pipelineId, name: stageName },
+      select: { id: true },
+    });
+
+    if (!destino) {
+      this.logger.warn(
+        'change_stage: la etapa indicada no existe en el pipeline de la oportunidad',
+      );
+      return;
+    }
+
+    if (destino.id === lead.stageId) return; // ya esta ahi: nada que hacer
+
+    // Mover y dejar rastro, igual que hace el cambio manual de etapa.
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lead.update({
+        where: { id: lead.id },
+        data: { stageId: destino.id },
+      });
+      await tx.leadStageHistory.create({
+        data: {
+          leadId: lead.id,
+          fromStageId: lead.stageId,
+          toStageId: destino.id,
+        },
+      });
+    });
   }
 }

@@ -30,7 +30,7 @@ const COMPANY_B = 'company-b';
 const CONV = 'conversation-1';
 const PHONE = '573001112233';
 
-describe('AutomationsService (caracterización pre-motor-durable)', () => {
+describe('AutomationsService (disparadores, acciones y etapa real)', () => {
   let prisma: any;
   let messages: any;
   let conversations: any;
@@ -63,8 +63,19 @@ describe('AutomationsService (caracterización pre-motor-durable)', () => {
       },
       conversation: {
         findUnique: jest.fn().mockResolvedValue({ id: CONV, isPaused: false }),
+        // Por defecto la conversación NO tiene oportunidad asociada.
+        findFirst: jest.fn().mockResolvedValue({ leadId: null }),
       },
       message: { count: jest.fn().mockResolvedValue(1) },
+      lead: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        update: jest.fn(),
+      },
+      pipelineStage: { findFirst: jest.fn().mockResolvedValue(null) },
+      leadStageHistory: { create: jest.fn() },
+      $transaction: jest.fn((cb: any) =>
+        typeof cb === 'function' ? cb(prisma) : Promise.all(cb),
+      ),
     };
     messages = { create: jest.fn().mockResolvedValue({ id: 'm1' }) };
     conversations = { update: jest.fn().mockResolvedValue({ id: CONV }) };
@@ -225,7 +236,7 @@ describe('AutomationsService (caracterización pre-motor-durable)', () => {
     });
   });
 
-  describe('acciones disponibles HOY (solo 4)', () => {
+  describe('acciones disponibles', () => {
     const conActions = (actions: any[]) =>
       prisma.automation.findMany.mockResolvedValue([automation({ actions })]);
 
@@ -259,16 +270,104 @@ describe('AutomationsService (caracterización pre-motor-durable)', () => {
       });
     });
 
-    it('change_stage escribe Conversation.stage (texto libre), NO mueve el lead', async () => {
-      conActions([{ type: 'change_stage', stage: 'negociacion' }]);
+    // HUECO CERRADO (bloque 5): change_stage mueve la OPORTUNIDAD. Se
+    // mantiene el dual-write sobre Conversation.stage hasta que la columna se
+    // retire en una migración posterior.
+    it('change_stage mueve el lead a la etapa y deja rastro en el historial', async () => {
+      prisma.conversation.findFirst.mockResolvedValue({ leadId: 'lead-1' });
+      prisma.lead.findFirst.mockResolvedValue({
+        id: 'lead-1',
+        pipelineId: 'pipe-1',
+        stageId: 'stage-viejo',
+      });
+      prisma.pipelineStage.findFirst.mockResolvedValue({ id: 'stage-nuevo' });
+      conActions([{ type: 'change_stage', stage: 'Negociacion' }]);
 
       await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
 
-      // Este es el hueco estructural: `stage` es un String suelto sin relación
-      // con PipelineStage. La reforma debe mover el Lead, no escribir texto.
-      expect(conversations.update).toHaveBeenCalledWith(CONV, COMPANY_A, {
-        stage: 'negociacion',
+      expect(prisma.lead.update).toHaveBeenCalledWith({
+        where: { id: 'lead-1' },
+        data: { stageId: 'stage-nuevo' },
       });
+      expect(prisma.leadStageHistory.create).toHaveBeenCalledWith({
+        data: {
+          leadId: 'lead-1',
+          fromStageId: 'stage-viejo',
+          toStageId: 'stage-nuevo',
+        },
+      });
+    });
+
+    it('dual-write: sigue escribiendo Conversation.stage durante la transición', async () => {
+      conActions([{ type: 'change_stage', stage: 'Negociacion' }]);
+
+      await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
+
+      expect(conversations.update).toHaveBeenCalledWith(CONV, COMPANY_A, {
+        stage: 'Negociacion',
+      });
+    });
+
+    it('resuelve la etapa DENTRO del pipeline del propio lead', async () => {
+      prisma.conversation.findFirst.mockResolvedValue({ leadId: 'lead-1' });
+      prisma.lead.findFirst.mockResolvedValue({
+        id: 'lead-1',
+        pipelineId: 'pipe-1',
+        stageId: 'stage-viejo',
+      });
+      prisma.pipelineStage.findFirst.mockResolvedValue({ id: 'stage-nuevo' });
+      conActions([{ type: 'change_stage', stage: 'Negociacion' }]);
+
+      await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
+
+      // Acotada al pipeline del lead: una etapa homónima de otro pipeline (o
+      // de otra empresa) nunca se aplica.
+      expect(prisma.pipelineStage.findFirst).toHaveBeenCalledWith({
+        where: { pipelineId: 'pipe-1', name: 'Negociacion' },
+        select: { id: true },
+      });
+    });
+
+    it('sin oportunidad asociada no mueve nada y no falla', async () => {
+      prisma.conversation.findFirst.mockResolvedValue({ leadId: null });
+      conActions([{ type: 'change_stage', stage: 'Negociacion' }]);
+
+      await expect(
+        service.processMessage(COMPANY_A, CONV, 'hola', PHONE),
+      ).resolves.toBeUndefined();
+
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+    });
+
+    it('una etapa inexistente no mueve el lead', async () => {
+      prisma.conversation.findFirst.mockResolvedValue({ leadId: 'lead-1' });
+      prisma.lead.findFirst.mockResolvedValue({
+        id: 'lead-1',
+        pipelineId: 'pipe-1',
+        stageId: 'stage-viejo',
+      });
+      prisma.pipelineStage.findFirst.mockResolvedValue(null);
+      conActions([{ type: 'change_stage', stage: 'Inventada' }]);
+
+      await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
+
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+    });
+
+    it('si el lead ya está en esa etapa no reescribe ni duplica historial', async () => {
+      prisma.conversation.findFirst.mockResolvedValue({ leadId: 'lead-1' });
+      prisma.lead.findFirst.mockResolvedValue({
+        id: 'lead-1',
+        pipelineId: 'pipe-1',
+        stageId: 'stage-igual',
+      });
+      prisma.pipelineStage.findFirst.mockResolvedValue({ id: 'stage-igual' });
+      conActions([{ type: 'change_stage', stage: 'Negociacion' }]);
+
+      await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
+
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+      expect(prisma.leadStageHistory.create).not.toHaveBeenCalled();
     });
 
     it('close_conversation cierra la conversación', async () => {
