@@ -13,6 +13,7 @@ import {
 import { ConversationList } from "@/components/conversations/ConversationList";
 import { MessageThread } from "@/components/conversations/MessageThread";
 import { MessageInput } from "@/components/conversations/MessageInput";
+import { ConversationOpportunity } from "@/components/conversations/ConversationOpportunity";
 import { intervaloDeRefresco, useRealtime } from "@/lib/use-realtime";
 
 export default function ConversationsPage() {
@@ -133,6 +134,13 @@ export default function ConversationsPage() {
                 )}
               </button>
             </div>
+
+            <ConversationOpportunity
+              conversation={selectedConversation}
+              onTaskCreated={() =>
+                queryClient.invalidateQueries({ queryKey: ["tasks"] })
+              }
+            />
 
             {sendNotice && (
               <p className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700">

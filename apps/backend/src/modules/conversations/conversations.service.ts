@@ -33,6 +33,18 @@ export class ConversationsService {
         contact: { select: { id: true, name: true, phone: true } },
         agent: { select: { id: true, name: true } },
         messages: { orderBy: { createdAt: 'desc' }, take: 1 },
+        // La oportunidad ligada. Se incluye en la lista y en el detalle para
+        // que el asesor vea desde el chat en que punto del embudo esta ese
+        // cliente, sin tener que buscarlo en el tablero. Nullable siempre: no
+        // toda conversacion es una venta.
+        lead: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            stage: { select: { id: true, name: true, color: true } },
+          },
+        },
       },
       orderBy: { updatedAt: 'desc' },
       ...pagination,
@@ -45,6 +57,18 @@ export class ConversationsService {
       include: {
         contact: true,
         agent: { select: { id: true, name: true } },
+        // La oportunidad ligada. Se incluye en la lista y en el detalle para
+        // que el asesor vea desde el chat en que punto del embudo esta ese
+        // cliente, sin tener que buscarlo en el tablero. Nullable siempre: no
+        // toda conversacion es una venta.
+        lead: {
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            stage: { select: { id: true, name: true, color: true } },
+          },
+        },
       },
     });
     if (!conv) throw new NotFoundException('Conversacion no encontrada');

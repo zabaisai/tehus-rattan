@@ -68,6 +68,10 @@ export function useRealtime(conversationId?: string | null): {
     socket.on(EVENTS.MESSAGE_STATUS_CHANGED, enMensaje);
     socket.on(EVENTS.CONVERSATION_UPDATED, () => invalidar(["conversations"]));
     socket.on(EVENTS.LEAD_UPDATED, () => {
+      // `kanban` sin el id del pipeline invalida todos sus tableros: la clave
+      // es un prefijo. Es lo que hace que una oportunidad entrante aparezca
+      // sin recargar aunque el asesor tenga abierto otro pipeline.
+      invalidar(["kanban"]);
       invalidar(["leads"]);
       invalidar(["pipeline"]);
     });

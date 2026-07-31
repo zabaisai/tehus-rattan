@@ -16,6 +16,7 @@ import {
   type NotificationCategory,
 } from '@/lib/notifications';
 import { CategoryIcon, relativeTime } from '@/components/notifications/notification-ui';
+import { useRealtime } from '@/lib/use-realtime';
 
 type Filter = 'all' | 'unread';
 
@@ -23,6 +24,8 @@ export default function NotificationsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
+  // La campana se actualiza sola en cuanto entra un aviso.
+  useRealtime();
   const [category, setCategory] = useState<NotificationCategory | ''>('');
 
   const query = useInfiniteQuery({

@@ -7,9 +7,12 @@ import { getPipelines } from '@/lib/pipeline';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
+import { useRealtime } from '@/lib/use-realtime';
 
 export default function PipelinePage() {
   const queryClient = useQueryClient();
+  // Una oportunidad que entra por WhatsApp aparece sola en el tablero.
+  useRealtime();
   const { data: pipelines, isLoading } = useQuery({
     queryKey: ['pipelines'],
     queryFn: getPipelines,

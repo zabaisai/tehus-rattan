@@ -207,7 +207,13 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       procesos) · oportunidad y conversación al MISMO asesor · sin elegibles
       entra sin asignar y avisa a administradores ·
       `20260731161636_add_auto_assignment_fields` · 12 unit + 17 e2e reales
-- [ ] Tarea desde la conversación (flujo completo)
+- [x] **Tarea desde la conversación** — panel comercial en el chat: muestra
+      la oportunidad y su etapa, y crea la tarea atada a conversación +
+      oportunidad + contacto sin salir del hilo. El asesor decide el siguiente
+      paso mientras lee el mensaje; obligarle a ir al tablero y volver es el
+      momento exacto en que se pierde el seguimiento · 7 pruebas
+- [x] **Tiempo real en tablero, tareas y avisos** — la oportunidad entrante
+      aparece sola; polling relajado a 30 s, nunca eliminado
 - [ ] Bandeja omnicanal
 - [ ] UI de pipelines y etapas
 - [ ] Oportunidades (vista detallada)
@@ -344,6 +350,7 @@ revisaron y no se duplicaron.
 | _(ver `git log origin/main..HEAD`)_ | test(pipeline): caracterización pre-reforma |
 | `1598def` | feat(realtime): canal WebSocket aislado por empresa |
 | `32bbc7c` | style(backend): formato prettier que eslint ya exigía |
+| `337e33e` | feat(leads): oportunidad automática desde WhatsApp + round-robin |
 
 ## Pruebas ejecutadas
 
@@ -385,6 +392,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | frontend tras WebSockets | **130 verdes / 26 suites**, lint y build limpios |
 | 2026-07-31 | **CI** `32bbc7c` (WebSockets) | **success** en ambos jobs, `head_sha` verificado |
 | 2026-07-31 | tras entrada de oportunidades + reparto | **1064 unit / 264 e2e verdes** |
+| 2026-07-31 | **CI** `337e33e` (oportunidades + reparto) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras tarea desde conversación | **1064 unit / 264 e2e / 137 frontend verdes** |
 
 ## Despliegues
 

@@ -7,6 +7,7 @@ import { getTasks, createTask, updateTask, completeTask, deleteTask } from '@/li
 import { Task } from '@/types';
 import { TaskModal, TaskFormData } from '@/components/tasks/TaskModal';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { intervaloDeRefresco, useRealtime } from '@/lib/use-realtime';
 
 const priorityColors: Record<string, string> = {
   LOW: 'bg-stone-100 text-stone-600',
@@ -163,9 +164,12 @@ function TaskGroup({
 
 export default function TasksPage() {
   const queryClient = useQueryClient();
+  // Una tarea asignada por otro asesor aparece sola.
+  const { enVivo } = useRealtime();
   const { data: tasks, isLoading } = useQuery({
     queryKey: ['tasks'],
     queryFn: getTasks,
+    refetchInterval: intervaloDeRefresco(enVivo),
   });
 
   const [modalOpen, setModalOpen] = useState(false);
