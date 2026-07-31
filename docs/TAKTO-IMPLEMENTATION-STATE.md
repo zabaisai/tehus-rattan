@@ -177,7 +177,10 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       `removeOnFail: false` como DLQ · 15 pruebas
 - [x] **Worker como proceso separado** (`src/worker.ts`) · misma imagen y
       AppModule, sin servidor HTTP, `stop_grace_period` 60 s
+- [x] **QueueModule registrado** + `/health/queue` aislado de `/health/ready`
+      · `QueuePingService` con conexión propia y perezosa · 11 pruebas
 - [ ] Procesadores reales enganchados a las colas
+- [ ] El webhook debe ENCOLAR en vez de ejecutar en línea
 - [ ] Outbox/eventos durables
 - [ ] WebSockets autenticados y aislados por empresa
 - [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
@@ -343,7 +346,9 @@ revisaron y no se duplicaron.
 | 2026-07-30 | tras número remitente + PII | 900 unit / 214 e2e verdes |
 | 2026-07-31 | **CI** `56e5a63` (multi-número) | **success**, `head_sha` verificado |
 | 2026-07-31 | **CI** `531b12b` (dual-write etapa) | **success**, `head_sha` verificado |
-| 2026-07-31 | tras bloque 6 infra | **920 unit / 233 e2e verdes** |
+| 2026-07-31 | tras bloque 6 infra | 920 unit / 233 e2e verdes |
+| 2026-07-31 | **CI** `eebaa91` (Redis + worker) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras QueueModule | **931 unit / 233 e2e verdes** |
 
 ## Despliegues
 
@@ -373,36 +378,40 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-Bloques 0–4 completos. Bloque 5 en dual-write. Bloque 6 con infraestructura
-lista pero **sin procesadores enganchados**.
+Bloques 0–4 completos. Bloque 5 en dual-write. Bloque 6 con Redis, worker,
+config de cola y salud **ya enganchados**; faltan los procesadores.
 
 ```
-# BLOQUE 6, FASE 2 — enganchar los procesadores a las colas
+# BLOQUE 6, FASE 3 — procesadores reales
 #
-# Lo que existe: Redis, la config de cola (3 colas, backoff, DLQ) y el worker
-# como proceso separado que arranca el AppModule sin HTTP.
-# Lo que falta: un QueueModule de Nest que registre las colas y los
-# procesadores, y que el webhook ENCOLE en vez de ejecutar en linea.
+# Lo que YA existe y esta probado:
+#   - Redis en ambos compose, con healthcheck y sin puertos publicados
+#   - queue.config.ts: 3 colas, backoff exponencial, removeOnFail:false (DLQ)
+#   - src/worker.ts: proceso separado, AppModule sin HTTP, drena en SIGTERM
+#   - QueueModule + /health/queue (informa, no decide)
 #
-# 1. src/common/queue/queue.module.ts: registrar las 3 colas con
+# Lo que falta:
+# 1. Registrar las Queue de BullMQ como providers, usando
 #    buildRedisConnection() y DEFAULT_JOB_OPTIONS.
-# 2. Un procesador para takto.inbound que reciba { messageId } y ejecute los
-#    efectos que hoy corren dentro del webhook (automatizaciones, avisos).
-# 3. El webhook pasa a: persistir + encolar. Nada mas. Es lo que permite el
-#    ack rapido que Meta exige.
-# 4. Health/readiness: comprobar Redis sin tumbar el backend si falla (la API
-#    debe seguir sirviendo aunque la cola este caida).
-# 5. Pruebas: job idempotente por messageId, reintento con backoff, y que un
-#    job fallido QUEDE en la cola.
+# 2. Procesador de takto.inbound: recibe { messageId } y ejecuta los efectos
+#    que hoy corren DENTRO del webhook (automatizaciones, notificaciones).
+# 3. El webhook pasa a: persistir + encolar. Nada mas. Es lo que da el ack
+#    rapido que Meta exige y lo que hace que un fallo de automatizacion deje
+#    de poder afectar a la recepcion del mensaje.
+# 4. Idempotencia por jobId = messageId: un reintento de Meta no debe duplicar
+#    efectos. Es el mismo principio que ya protege wamid.
+# 5. Pruebas: job idempotente, reintento con backoff, y que un job fallido
+#    QUEDE en la cola para poder reejecutarlo.
 #
-# Despues: WebSockets con aislamiento por empresa (bloque 6, fase 3).
+# Solo el worker debe registrar procesadores; el backend solo produce. Si
+# ambos procesaran, un job correria dos veces.
 ```
 
 **Recordatorios de seguridad vigentes**
 
 - **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 29
   migraciones. **Nada desplegado.** El despliegue exigirá levantar Redis y el
-  worker, no solo backend y frontend.
+  worker, no solo backend y frontend, y el runbook debe actualizarse antes.
 - Dos backups verificados: 2026-07-30 17:35 y 18:40.
 - Índices parciales (`pipelines_one_default_per_company`,
   `whatsapp_one_primary_per_company`) viven solo en el `migration.sql`. Si
