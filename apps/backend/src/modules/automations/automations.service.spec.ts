@@ -1,5 +1,6 @@
 import { NotFoundException } from '@nestjs/common';
 import { AutomationsService } from './automations.service';
+import { AutomationRunsService } from './automation-runs.service';
 
 /**
  * CARACTERIZACIÓN — puerta del motor durable (Automation v2).
@@ -29,6 +30,8 @@ const COMPANY_A = 'company-a';
 const COMPANY_B = 'company-b';
 const CONV = 'conversation-1';
 const PHONE = '573001112233';
+
+let runs: AutomationRunsService;
 
 describe('AutomationsService (disparadores, acciones y etapa real)', () => {
   let prisma: any;
@@ -73,6 +76,13 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
       },
       pipelineStage: { findFirst: jest.fn().mockResolvedValue(null) },
       leadStageHistory: { create: jest.fn() },
+      // Cada cambio de comportamiento publica una version: es lo que permite
+      // explicar despues por que una ejecucion hizo lo que hizo.
+      automationVersion: { create: jest.fn().mockResolvedValue({}) },
+      automationRun: {
+        create: jest.fn().mockResolvedValue({ id: 'run-1' }),
+        update: jest.fn().mockResolvedValue({ attempts: 1 }),
+      },
       $transaction: jest.fn((cb: any) =>
         typeof cb === 'function' ? cb(prisma) : Promise.all(cb),
       ),
@@ -81,7 +91,14 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
     conversations = { update: jest.fn().mockResolvedValue({ id: CONV }) };
     whatsapp = { sendMessage: jest.fn().mockResolvedValue('wamid-1') };
 
-    service = new AutomationsService(prisma, messages, conversations, whatsapp);
+    runs = new AutomationRunsService();
+    service = new AutomationsService(
+      prisma,
+      messages,
+      conversations,
+      whatsapp,
+      runs,
+    );
   });
 
   describe('CRUD acotado por empresa', () => {

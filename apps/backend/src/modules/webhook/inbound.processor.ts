@@ -71,7 +71,8 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
   }
 
   private async procesar(job: Job<InboundMessageJob>): Promise<void> {
-    const { companyId, conversationId, body, contactPhone } = job.data;
+    const { companyId, conversationId, body, contactPhone, messageId } =
+      job.data;
 
     // `assignedTo` se resuelve AQUÍ, no se toma del job: entre el encolado y
     // el procesado un asesor pudo tomar la conversación, y notificar al
@@ -99,6 +100,7 @@ export class InboundProcessor implements OnModuleInit, OnApplicationShutdown {
       body,
       contactPhone,
       conversacion.assignedTo ?? null,
+      messageId,
     );
   }
 

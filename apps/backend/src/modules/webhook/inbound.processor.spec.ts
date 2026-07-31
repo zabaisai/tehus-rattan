@@ -115,6 +115,10 @@ describe('InboundProcessor', () => {
         'hola',
         '+573001112233',
         'user-1',
+        // El id del mensaje viaja como llave de idempotencia: sin el, un
+        // reintento del job volveria a ejecutar las automatizaciones y el
+        // cliente recibiria el mismo WhatsApp dos veces.
+        'wamid.abc',
       );
     });
 

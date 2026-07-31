@@ -320,6 +320,12 @@ export class WebhookService {
     text: string,
     contactPhone: string,
     assignedTo: string | null,
+    /**
+     * Llave de idempotencia de las automatizaciones. Opcional para no romper
+     * a los llamadores antiguos, pero sin ella una reejecucion del job vuelve
+     * a lanzar las acciones — que aqui significa mandar otra vez el mensaje.
+     */
+    messageId?: string,
   ): Promise<void> {
     // Entrada al tablero. Acotada por companyId aunque el trabajo venga de
     // nuestra propia cola: no se confia en su contenido para saltarse el
@@ -355,11 +361,15 @@ export class WebhookService {
       }
     }
 
+    // El id del mensaje viaja como llave de idempotencia: si el job se
+    // reintenta, las automatizaciones NO se vuelven a ejecutar y el cliente no
+    // recibe el mismo WhatsApp dos veces.
     await this.automationsService.processMessage(
       companyId,
       conversationId,
       text,
       contactPhone,
+      messageId,
     );
 
     // Aviso al asesor asignado. Best-effort (nunca rompe el procesamiento),

@@ -257,8 +257,20 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       mismos `@Cron` y todo lo programado corría por duplicado. Hoy no se veía
       porque las notificaciones se deduplican y los borrados son idempotentes,
       pero eso era una coincidencia afortunada, no un diseño · 5 pruebas
-- [ ] Asignación automática
-- [ ] Automatizaciones (motor + constructor visual)
+- [x] **Asignación automática** — round-robin por `User.lastAssignedAt`
+      (cerrado con el bloque de oportunidades)
+- [x] **Automatizaciones: motor durable** — `AutomationRun` +
+      `AutomationVersion`. Antes ejecutaba en línea y se tragaba los errores
+      en un `logger.error`: si una automatización dejaba de funcionar, nadie
+      se enteraba, y ante "¿por qué no se mandó ese mensaje?" no había nada
+      que mirar. Ahora cada ejecución registra **qué versión** corrió y el
+      resultado de **cada acción**; una acción fallida no detiene las
+      siguientes, pero la ejecución no se marca completada. Idempotencia por
+      `messageId:automationId` — un reintento del job no vuelve a mandarle un
+      WhatsApp al cliente. `DEAD` tras 3 intentos, en la base y no en Redis
+      para que sobreviva a un reinicio ·
+      `20260731…_add_automation_versions_and_runs` · 14 e2e reales
+- [ ] Automatizaciones: constructor visual
 - [ ] Chatbot (motor + constructor visual)
 - [ ] Notificaciones (productores completos)
 - [ ] WhatsApp: salud, medios, plantillas, estados
@@ -491,6 +503,10 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras bandeja omnicanal (interfaz) | **183 frontend verdes / 32 suites** |
 | 2026-07-31 | **CI** `b11da62` (bandeja interfaz) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras SLA de respuesta | **1106 unit / 310 e2e verdes** |
+| 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras motor durable de automatizaciones | **1106 unit / 324 e2e verdes** |
+| 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras historial de automatizaciones | **1106 unit / 324 e2e verdes** |
 
 ## Despliegues
 

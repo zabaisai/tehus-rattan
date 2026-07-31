@@ -79,6 +79,7 @@ model Company {
   notificationPrefs    NotificationPreference[]
   auditLogs            AuditLog[]                    @relation("AuditLogAffectedCompany")
   supportSessions      SupportSession[]
+  automationRuns       AutomationRun[]
   invitationCodesUsed  InvitationCode[]
   userSessions         UserSession[]
   loginEvents          LoginEvent[]
@@ -272,10 +273,105 @@ model Automation {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  /// Version actual de la definicion. Sube en cada cambio de disparador,
+  /// condiciones o acciones. Permite responder a "esto se ejecuto asi porque
+  /// la automatizacion decia otra cosa entonces", que sin versionar es
+  /// imposible de reconstruir.
+  version Int @default(1)
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
+  versions AutomationVersion[]
+  runs     AutomationRun[]
+
   @@map("automations")
+}
+
+/// Foto de la definicion en el momento de publicarse.
+///
+/// Sin esto, el historial de ejecuciones seria enganoso: se veria QUE paso
+/// pero no la regla que lo provoco, porque la automatizacion pudo cambiar
+/// despues. Es tambien lo que permite revertir a una version anterior sin
+/// reconstruirla de memoria.
+model AutomationVersion {
+  id      String @id @default(cuid())
+  version Int
+
+  trigger    String
+  conditions Json?
+  actions    Json
+
+  /// Quien la publico. Nullable porque una automatizacion puede nacer de una
+  /// plantilla o de una migracion, sin autor humano.
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, version])
+  @@map("automation_versions")
+}
+
+enum AutomationRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  /// Agotados los reintentos. Queda para inspeccion y reejecucion manual: es
+  /// el equivalente a una dead-letter queue, en la base y no en Redis, para
+  /// que sobreviva a un reinicio de Redis.
+  DEAD
+}
+
+/// Una ejecucion de una automatizacion.
+///
+/// EXISTE PORQUE HOY NO HAY NINGUN RASTRO. El motor actual ejecuta en linea y
+/// se traga los errores en un `logger.error`: si una automatizacion deja de
+/// funcionar, nadie se entera, y cuando alguien pregunta "¿por que no se
+/// mando ese mensaje?" no hay nada que mirar.
+model AutomationRun {
+  id String @id @default(cuid())
+
+  /// Version de la definicion que se ejecuto. Con la automatizacion ya
+  /// modificada, es lo unico que explica el resultado.
+  automationVersion Int
+
+  status   AutomationRunStatus @default(PENDING)
+  attempts Int                 @default(0)
+
+  /// Que disparo la ejecucion y sobre que. Sin PII: ids, nunca el texto del
+  /// mensaje ni el telefono.
+  triggerType String
+
+  /// Resultado de cada accion, en orden. Permite ver donde se rompio una
+  /// ejecucion a medias, que es justo lo que un log plano no deja reconstruir.
+  steps Json?
+
+  /// Clasificador del error, nunca el mensaje crudo del proveedor.
+  lastError String?
+
+  /// Misma llave que el outbox: garantiza que un reintento del mensaje no
+  /// vuelva a ejecutar las acciones.
+  idempotencyKey String @unique
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+
+  @@index([companyId, createdAt])
+  @@index([automationId, createdAt])
+  @@index([status, createdAt])
+  @@map("automation_runs")
 }
 
 // ─────────────────────────────────────────────
