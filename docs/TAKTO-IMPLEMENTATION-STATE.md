@@ -152,22 +152,32 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       resuelve acotado a la empresa; omitirlo usa la principal
 - [x] **PII en logs corregida** — teléfono enmascarado y solo
       `error.message` de Meta, nunca el cuerpo crudo
+- [x] **Índice parcial `whatsapp_one_primary_per_company`** — `20260730235500`
+- [x] **`UNIQUE(companyId)` retirado** — `20260730235606`
+- [x] **19 pruebas contra la base REAL** (`whatsapp-multi-number.e2e-spec.ts`):
+      dos números por empresa, dos empresas, enrutamiento por
+      `phone_number_id`, envío explícito, fallback a principal, prohibición de
+      dos principales, reconexión vs alta, y **cero fuga multiempresa**
 - [ ] UI: selector de número remitente en la bandeja
-- [ ] **Retirar `UNIQUE(companyId)`** + índice parcial
-      `whatsapp_one_primary_per_company` (migración destructiva, aparte)
 - [ ] Pruebas: dos números / una empresa y dos empresas
 - [ ] Retirar `UNIQUE(companyId)` + constraints finales
 - [ ] Desconexión local vs desconexión real en Meta
 
 ### Bloque 5 — Retiro de `Conversation.stage`
-- [ ] Dual-read/dual-write
-- [ ] Migrar datos a la oportunidad
-- [ ] Frontend/filtros/automatizaciones → `Lead.stageId`
-- [ ] Retirar columna en migración separada
+- [x] **Dual-write implementado** — `change_stage` mueve la OPORTUNIDAD
+      (`Lead.stageId` + `LeadStageHistory`) y sigue escribiendo
+      `Conversation.stage` durante la transición · 6 pruebas
+- [x] Auditoría de alcance: **1 solo escritor**, **0 filas** lo usan
+- [ ] Retirar la columna en migración separada (tras rodaje del dual-write)
 
 ### Bloque 6 — Infraestructura
-- [ ] Redis con healthcheck
-- [ ] Worker aislado (BullMQ)
+- [x] **Redis con healthcheck** en staging y desarrollo · `appendonly`,
+      `noeviction`, sin puertos publicados
+- [x] **Configuración de cola** (BullMQ) · 3 colas, backoff exponencial,
+      `removeOnFail: false` como DLQ · 15 pruebas
+- [x] **Worker como proceso separado** (`src/worker.ts`) · misma imagen y
+      AppModule, sin servidor HTTP, `stop_grace_period` 60 s
+- [ ] Procesadores reales enganchados a las colas
 - [ ] Outbox/eventos durables
 - [ ] WebSockets autenticados y aislados por empresa
 - [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
@@ -281,64 +291,6 @@ Verificado además que webhook/firma/idempotencia, Embedded Signup, permisos,
 sesión de soporte y origin/refresh **ya tenían cobertura suficiente**; se
 revisaron y no se duplicaron.
 
-## ⚠️ TRABAJO EN CURSO SIN COMITEAR — leer antes que nada
-
-**Hay cambios en el working tree que NO están comiteados a propósito: dejan
-11 pruebas en rojo.** No se comitearon para no meter un commit rojo en la
-historia ni romper el CI de la rama. El último commit (`96bb0fa`) sí está
-verde y publicado.
-
-### Qué hay en el working tree
-
-Dos migraciones nuevas, **ya aplicadas en la base local**:
-
-| Migración | Qué hace |
-|---|---|
-| `20260730235500_enforce_one_primary_whatsapp_per_company` | Normaliza principales + índice parcial `whatsapp_one_primary_per_company`. **Verificado**: índice creado, 0 empresas con >1 principal, 0 sin principal |
-| `20260730*_drop_whatsapp_company_unique_for_multi_number` | `DROP INDEX whatsapp_integrations_companyId_key` — **el cambio destructivo** |
-
-Y la adaptación de código que exige quitar ese UNIQUE:
-
-- `schema.prisma`: `Company.whatsappIntegration` (1:1) → `whatsappIntegrations`
-  (1:N); `WhatsAppIntegration.companyId` deja de ser `@unique`.
-- `whatsapp-integration-management.service.ts` y
-  `whatsapp-embedded-signup.service.ts`: los `upsert`/`findUnique` que
-  usaban `where: { companyId }` pasan a **`phoneNumberId`** (único global) o a
-  `findFirst` con desempate por principal. Esa es la semántica correcta:
-  reconectar el mismo número lo actualiza, conectar otro añade una segunda
-  integración.
-- `platform-companies.service.ts`: lee la lista y toma la principal.
-
-**Compila sin errores.** Lo que falta son los **mocks de 3 specs**, que aún
-devuelven la forma antigua.
-
-### Las 11 pruebas en rojo y por qué
-
-Todas son mocks desactualizados, **ningún fallo de lógica**:
-
-- `WhatsAppIntegrationManagementService` (7): el mock define
-  `whatsAppIntegration.findUnique`; el servicio ahora llama `findFirst`.
-  → añadir `findFirst: jest.fn()` al mock y ajustar las aserciones que
-  esperaban `where: { companyId }` en el `upsert` (ahora es `phoneNumberId`).
-- `WhatsAppEmbeddedSignupService › getConnectionStatus` (4): mismo motivo.
-- `platform-companies.service.spec.ts`: una suite no arranca — revisar que
-  todos los fixtures usen `whatsappIntegrations: [...]` en plural.
-
-### Cómo continuar (primer comando)
-
-```
-cd apps/backend
-npx jest src/modules/whatsapp-integration/whatsapp-integration-management.service.spec.ts
-# arreglar mocks -> repetir con embedded-signup -> platform-companies
-# luego: npx jest --runInBand && npm run build && npx jest --config ./test/jest-e2e.json
-# SOLO con todo verde: commit + push + verificar CI del SHA exacto
-```
-
-**Falta además, antes de dar el bloque 4 por cerrado:** una prueba con DOS
-números en una empresa y DOS empresas distintas que verifique que ningún
-mensaje se enruta a la empresa equivocada. Ahora ya es posible crearla,
-porque el UNIQUE ya no lo impide.
-
 ## Cambios en curso
 
 - Bloque 1: quedan `conversations` (servicio) y el aislamiento explícito de
@@ -388,7 +340,10 @@ porque el UNIQUE ya no lo impide.
 | 2026-07-30 | **CI remoto** `4f4a007` (backfill) | frontend y backend **success**, `head_sha` verificado |
 | 2026-07-30 | tras bloque 4 fase aditiva | 897 unit / 214 e2e verdes |
 | 2026-07-30 | **CI remoto** `7a74fee` | frontend y backend **success**, `head_sha` verificado |
-| 2026-07-30 | tras número remitente + PII | **900 unit / 214 e2e verdes** |
+| 2026-07-30 | tras número remitente + PII | 900 unit / 214 e2e verdes |
+| 2026-07-31 | **CI** `56e5a63` (multi-número) | **success**, `head_sha` verificado |
+| 2026-07-31 | **CI** `531b12b` (dual-write etapa) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras bloque 6 infra | **920 unit / 233 e2e verdes** |
 
 ## Despliegues
 
@@ -418,40 +373,39 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-Bloques 0 a 3 completos. Bloque 4 en su **fase aditiva**, que es la segura.
+Bloques 0–4 completos. Bloque 5 en dual-write. Bloque 6 con infraestructura
+lista pero **sin procesadores enganchados**.
 
 ```
-# BLOQUE 4, FASE DESTRUCTIVA — retirar WhatsAppIntegration.companyId @unique
+# BLOQUE 6, FASE 2 — enganchar los procesadores a las colas
 #
-# PRERREQUISITOS YA CUMPLIDOS:
-#   - segundo backup verificado (2026-07-30 18:40)
-#   - isPrimary backfilleado: la integracion viva es la principal
-#   - findConnectedByCompanyId ya desempata por principal, probado
+# Lo que existe: Redis, la config de cola (3 colas, backoff, DLQ) y el worker
+# como proceso separado que arranca el AppModule sin HTTP.
+# Lo que falta: un QueueModule de Nest que registre las colas y los
+# procesadores, y que el webhook ENCOLE en vez de ejecutar en linea.
 #
-# LO QUE FALTA ANTES DE RETIRAR EL UNIQUE:
-#   1. Adaptar el resto del codigo a colecciones: WhatsappService.sendMessage
-#      debe aceptar un phoneNumberId opcional y resolver la principal cuando
-#      no se indique.
-#   2. Anadir el constraint que sustituye al UNIQUE:
-#        CREATE UNIQUE INDEX whatsapp_one_primary_per_company
-#          ON whatsapp_integrations("companyId") WHERE "isPrimary";
-#      (mismo patron y misma advertencia de Prisma que
-#       pipelines_one_default_per_company)
-#   3. Pruebas con DOS numeros en una empresa y DOS empresas distintas,
-#      verificando que ningun mensaje se enruta a la empresa equivocada.
-#   4. SOLO ENTONCES: DROP el indice unico de companyId, en migracion propia.
+# 1. src/common/queue/queue.module.ts: registrar las 3 colas con
+#    buildRedisConnection() y DEFAULT_JOB_OPTIONS.
+# 2. Un procesador para takto.inbound que reciba { messageId } y ejecute los
+#    efectos que hoy corren dentro del webhook (automatizaciones, avisos).
+# 3. El webhook pasa a: persistir + encolar. Nada mas. Es lo que permite el
+#    ack rapido que Meta exige.
+# 4. Health/readiness: comprobar Redis sin tumbar el backend si falla (la API
+#    debe seguir sirviendo aunque la cola este caida).
+# 5. Pruebas: job idempotente por messageId, reintento con backoff, y que un
+#    job fallido QUEDE en la cola.
 #
-# Despues del bloque 4: bloque 5 (retiro de Conversation.stage con
-# dual-read/write) y bloque 6 (Redis + worker + WebSockets).
+# Despues: WebSockets con aislamiento por empresa (bloque 6, fase 3).
 ```
 
 **Recordatorios de seguridad vigentes**
 
-- **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 27.
-  No se ha desplegado nada.
-- Dos backups verificados disponibles: 17:35 y 18:40.
-- Índices parciales (`pipelines_one_default_per_company`, y el futuro de
-  WhatsApp) viven solo en el `migration.sql`. Si `prisma migrate dev` propone
-  eliminarlos, **rechazar**.
+- **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 29
+  migraciones. **Nada desplegado.** El despliegue exigirá levantar Redis y el
+  worker, no solo backend y frontend.
+- Dos backups verificados: 2026-07-30 17:35 y 18:40.
+- Índices parciales (`pipelines_one_default_per_company`,
+  `whatsapp_one_primary_per_company`) viven solo en el `migration.sql`. Si
+  `prisma migrate dev` propone eliminarlos, **rechazar**.
 - El CI cancela runs anteriores del mismo ref: verificar siempre el **último**
   SHA publicado y que `head_sha` coincida.
