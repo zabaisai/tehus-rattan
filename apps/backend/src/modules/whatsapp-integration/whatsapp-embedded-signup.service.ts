@@ -183,7 +183,7 @@ export class WhatsAppEmbeddedSignupService {
         integration.phoneNumberId,
         token,
         to,
-        'Mensaje de prueba de conexión desde el CRM Tehus Rattan. Puedes ignorarlo.',
+        'Mensaje de prueba de conexión desde TAKTO. Puedes ignorarlo.',
       );
       ok = true;
       return { status: 'ok' as const };

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 import { ConnectionUnavailable } from '@/components/auth/ConnectionUnavailable';
+import { TaktoLogo } from '@/components/ui/TaktoLogo';
 
 type ApiError = {
   response?: {
@@ -99,11 +100,15 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
-            Tehus Rattan
-          </h1>
-          <p className="mt-1 text-sm text-stone-500">CRM interno</p>
+        <div className="mb-8 flex flex-col items-center text-center">
+          {/* Puerta de entrada del producto: aquí la marca es TAKTO. La
+              identidad de cada empresa cliente aparece despues, dentro de su
+              propio espacio, y las dos nunca se mezclan. */}
+          <h1 className="sr-only">TAKTO</h1>
+          <TaktoLogo height={34} />
+          <p className="mt-2 text-sm text-neutral-500">
+            CRM conversacional para vender por WhatsApp
+          </p>
         </div>
 
         {resetNotice && (

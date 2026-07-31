@@ -17,7 +17,7 @@ export interface RenderedEmail {
 export function renderPasswordResetEmail(
   data: PasswordResetEmailData,
 ): RenderedEmail {
-  const subject = 'Restablece tu contraseña de Tehus Rattan CRM';
+  const subject = 'Restablece tu contraseña de TAKTO';
   const greeting = data.name ? `Hola ${escapeHtml(data.name)},` : 'Hola,';
   const greetingText = data.name ? `Hola ${data.name},` : 'Hola,';
 
@@ -26,7 +26,7 @@ export function renderPasswordResetEmail(
   <body style="margin:0;background:#f5f5f4;font-family:Arial,Helvetica,sans-serif;color:#1c1917;">
     <div style="max-width:520px;margin:0 auto;padding:32px 20px;">
       <div style="background:#ffffff;border:1px solid #e7e5e4;border-radius:10px;padding:28px;">
-        <h1 style="margin:0 0 4px;font-size:18px;color:#1c1917;">Tehus Rattan CRM</h1>
+        <h1 style="margin:0 0 4px;font-size:18px;color:#1c1917;">TAKTO</h1>
         <p style="margin:0 0 20px;font-size:13px;color:#78716c;">Recuperación de contraseña</p>
         <p style="font-size:14px;line-height:1.6;">${greeting}</p>
         <p style="font-size:14px;line-height:1.6;">
@@ -48,7 +48,7 @@ export function renderPasswordResetEmail(
         </p>
       </div>
       <p style="text-align:center;font-size:11px;color:#a8a29e;margin-top:16px;">
-        Este es un mensaje automático de Tehus Rattan CRM. No respondas a este correo.
+        Este es un mensaje automático de TAKTO. No respondas a este correo.
       </p>
     </div>
   </body>
@@ -56,7 +56,7 @@ export function renderPasswordResetEmail(
 
   const text = `${greetingText}
 
-Recibimos una solicitud para restablecer la contraseña de tu cuenta de Tehus Rattan CRM.
+Recibimos una solicitud para restablecer la contraseña de tu cuenta de TAKTO.
 
 Abre este enlace para elegir una nueva contraseña:
 ${data.resetUrl}

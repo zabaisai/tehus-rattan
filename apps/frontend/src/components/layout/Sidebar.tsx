@@ -106,7 +106,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       ];
 
   const logoUrl = company?.logoUrl ? resolveCompanyAssetUrl(company.logoUrl) : null;
-  const brandName = company?.name || 'Tehus Rattan';
+  // Dentro del espacio de trabajo manda la identidad de LA EMPRESA: es su
+  // casa. TAKTO solo aparece como respaldo mientras carga o si no hay
+  // nombre; mezclar ambas marcas en la misma barra es justo lo que el manual
+  // prohibe.
+  const brandName = company?.name || 'TAKTO';
   const activeColor = company?.primaryColor || undefined;
 
   function renderNav(onNavigate?: () => void) {

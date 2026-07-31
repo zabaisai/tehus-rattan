@@ -44,7 +44,7 @@ export class MailService {
     }
 
     const fromName =
-      this.config.get<string>('SMTP_FROM_NAME')?.trim() || 'Tehus Rattan';
+      this.config.get<string>('SMTP_FROM_NAME')?.trim() || 'TAKTO';
     const fromEmail = this.config.getOrThrow<string>('SMTP_FROM_EMAIL');
     const { subject, html, text } = renderPasswordResetEmail(input);
 
@@ -86,7 +86,7 @@ export class MailService {
       return;
     }
     const fromName =
-      this.config.get<string>('SMTP_FROM_NAME')?.trim() || 'Tehus Rattan';
+      this.config.get<string>('SMTP_FROM_NAME')?.trim() || 'TAKTO';
     const fromEmail = this.config.getOrThrow<string>('SMTP_FROM_EMAIL');
     const safe = (s: string) => s.replace(/[<>]/g, '').slice(0, 300);
     const title = safe(input.title);
@@ -100,7 +100,7 @@ export class MailService {
     const button = link
       ? `<p><a href="${link}" style="display:inline-block;padding:10px 16px;background:#1c1917;color:#fff;border-radius:6px;text-decoration:none">Abrir en el CRM</a></p>`
       : '';
-    const html = `<div style="font-family:sans-serif;color:#1c1917"><p>Hola ${safe(input.name)},</p><p><strong>${title}</strong></p>${preview ? `<p>${preview}</p>` : ''}${button}<p style="color:#78716c;font-size:12px">Recibiste este correo por tus preferencias de notificaciones en el CRM Tehus Rattan.</p></div>`;
+    const html = `<div style="font-family:sans-serif;color:#1c1917"><p>Hola ${safe(input.name)},</p><p><strong>${title}</strong></p>${preview ? `<p>${preview}</p>` : ''}${button}<p style="color:#78716c;font-size:12px">Recibiste este correo por tus preferencias de notificaciones en TAKTO.</p></div>`;
     const text = `Hola ${safe(input.name)}\n\n${title}\n${preview}${link ? `\n\n${link}` : ''}`;
 
     await this.getTransporter().sendMail({

@@ -228,6 +228,28 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [ ] Plataforma y soporte
 
 ### Bloque 8 — Branding TAKTO
+- [x] **Fundamento visual** — tokens del paquete de marca traducidos a
+      `@theme` de Tailwind 4 (Tailwind 4 se configura en CSS, no con preset
+      JS): paleta navy/naranja, neutrales de marca, semánticos, colores de
+      etapa, radios, sombras teñidas de navy y curvas de movimiento
+- [x] **Tipografía autoalojada** — Archivo (titulares, wordmark en 800) +
+      IBM Plex Sans (interfaz) + IBM Plex Mono (cifras), vía
+      `next/font/local`. Ninguna petición sale a Google Fonts, que además es
+      lo que exige `font-src 'self'` de la CSP. Licencias OFL incluidas
+- [x] **Identidad del navegador** — favicon (ico/svg/16/32/48), apple-touch,
+      PWA 192/512, maskable, `site.webmanifest`, OG 1200×630, `themeColor`
+      navy, título TAKTO con plantilla `%s · TAKTO`, `robots: noindex`
+      (herramienta interna)
+- [x] **Logotipo** — `TaktoLogo` como SVG inline (no `<img>`: en `<img>` el
+      navegador no ve la fuente autoalojada y el wordmark caería a Arial).
+      Fija la división TAK navy / TO naranja y la geometría del isotipo ·
+      8 pruebas
+- [x] **Marca visible en producto** — login con lockup TAKTO; correos de
+      notificación y de recuperación; mensaje de prueba de WhatsApp. Dentro
+      del espacio de trabajo sigue mandando la identidad de la empresa: es su
+      casa, y mezclarlas es justo lo que prohíbe el manual
+- [ ] Recolorear pantalla a pantalla la escala `stone` heredada a los
+      neutrales de marca (los tokens ya están; falta el barrido)
 - [ ] Design system con tokens semánticos + documentación
 - [ ] Favicon, manifest/PWA, Open Graph, metadatos
 - [ ] Fuentes Archivo / IBM Plex Sans / IBM Plex Mono
@@ -351,6 +373,8 @@ revisaron y no se duplicaron.
 | `1598def` | feat(realtime): canal WebSocket aislado por empresa |
 | `32bbc7c` | style(backend): formato prettier que eslint ya exigía |
 | `337e33e` | feat(leads): oportunidad automática desde WhatsApp + round-robin |
+| `cef26f7` | feat(conversations): oportunidad y tarea desde el chat |
+| `f8efb71` | feat(pipeline): selector de pipelines en el tablero |
 
 ## Pruebas ejecutadas
 
@@ -394,6 +418,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras entrada de oportunidades + reparto | **1064 unit / 264 e2e verdes** |
 | 2026-07-31 | **CI** `337e33e` (oportunidades + reparto) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras tarea desde conversación | **1064 unit / 264 e2e / 137 frontend verdes** |
+| 2026-07-31 | **CI** `cef26f7` (chat → tarea) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras fundamento de marca TAKTO | **1064 unit / 264 e2e / 150 frontend verdes** |
 
 ## Despliegues
 
