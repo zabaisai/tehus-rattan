@@ -90,6 +90,12 @@ jobs:
       # de las notificaciones y las pruebas pasando igualmente.
       - name: Typecheck (incluye specs)
         run: npm run typecheck
+      # El backend no pasaba lint en CI y habia acumulado 31 errores, dos de
+      # ellos de comportamiento: `String(unknown)` mandando "[object Object]"
+      # a un cliente por WhatsApp y al nombre de un producto importado.
+      # `--no-fix` a proposito: en CI se comprueba, no se reescribe.
+      - name: Lint
+        run: npx eslint "{src,apps,libs,test}/**/*.ts" --no-fix
       - name: Unit tests
         run: npm test -- --runInBand
       - name: Build

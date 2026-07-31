@@ -427,7 +427,7 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [ ] Fijar throttling y límites de body en `.env.staging`
 
 ### Bloque 10 — QA y entrega
-- [x] **Suites verdes** — 1238 unit / 388 e2e / 229 frontend, typecheck sin
+- [x] **Suites verdes** — 1268 unit / 457 e2e / 304 frontend, typecheck sin
       errores en ambos proyectos, lint y build limpios
 - [x] **QA visual en 6 viewports** (320/390/430/768/1280/1920) con sesión
       iniciada real vía CDP · 36 capturas, 0 desbordes · **más accesibilidad**:
@@ -436,7 +436,7 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [x] **Ruta de actualización de la base verificada** —
       `scripts/verificar-ruta-de-migracion.sh`: base llevada al estado exacto
       de staging (21 migraciones), datos insertados, y **solo entonces** las
-      18 restantes. No es lo mismo que el CI, que aplica desde cero sobre
+      20 restantes. No es lo mismo que el CI, que aplica desde cero sobre
       tablas vacías: una columna `NOT NULL` sin default pasaría allí y
       fallaría en el despliegue
 - [x] **Pruebas de carga** — 20 concurrentes: p95 entre 25 y 50 ms. La primera
@@ -448,6 +448,36 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       instancia sana. `/health/ready` y el negocio siguen sirviendo
 - [x] **`docs/TAKTO-IMPLEMENTATION-REPORT.md`** — informe de preparación con
       riesgos, lo que NO incluye y la secuencia de despliegue
+
+#### Cierre de todo lo que el informe marcaba como no incluido
+
+- [x] **Eliminación de datos completa** — solicitar, aprobar y ejecutar como
+      tres papeles separados; recuento previo, nombre exacto de la empresa
+      tecleado, auditoría y pruebas de aislamiento. La empresa no se borra:
+      sin su ficha, la auditoría de su propio borrado no apunta a nada
+- [x] **Rotación de `WHATSAPP_TOKEN_ENCRYPTION_KEY`** — clave anterior y nueva
+      conviviendo, recifrado verificado fila a fila **antes** de escribir, y
+      luz verde para retirar la vieja solo con cero filas antiguas y cero
+      ilegibles. Runbook sin secretos en `docs/ROTACION-CLAVE-WHATSAPP.md`
+- [x] **Historial de WhatsApp hasta el límite real de Meta** — la Cloud API no
+      expone mensajes pasados; solo llega el historial de coexistencia, una
+      vez. Lo demás, CSV con análisis previo. Nada importado dispara efectos.
+      El límite se dice en la propia pantalla (`docs/HISTORIAL-WHATSAPP.md`)
+- [x] **Barrido de `stone`** — 1407 usos → `neutral-*` en 85 ficheros, puente
+      retirado, mismo conjunto de colores en el CSS compilado antes y después.
+      Sin tocar `primaryColor` / `logoUrl` de cada empresa
+- [x] **Interfaz para lo que solo existía en el backend** — Ajustes › Datos
+      (retención, exportación, solicitud), Plataforma › Eliminaciones,
+      importación de historial y administración de números
+- [x] **Auditoría de las pantallas existentes** — chatbot, automatizaciones,
+      pipelines, tareas y cotizaciones: estados vacíos, de error y de permiso,
+      con pruebas de página para cada uno
+- [x] **Varios números de punta a punta** — se listan, se nombran, se elige el
+      principal, y **cada conversación se responde por el número que la
+      recibió**. Antes se contestaba siempre desde el principal
+- [x] **Lint del backend en CI** — estaba fuera y había acumulado 31 errores,
+      dos de comportamiento
+
 - [ ] QA E2E de extremo a extremo **en staging** — requiere desplegar
 - [ ] CI verde de `main` — requiere fusionar
 - [ ] Despliegue con etiquetas por SHA + release anterior recuperable
@@ -714,22 +744,32 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-**Bloques 0–6 CERRADOS.** Redis, worker, cola, procesador, outbox durable y
-WebSockets.
+**Bloques 0–10 CERRADOS en código.** Lo único que queda del plan es lo que
+por definición no se puede hacer sin desplegar: fusionar a `main`, backup,
+migración, despliegue y QA sobre staging.
 
-**Bloque 7 EN CURSO.** Hecho: entrada automática de oportunidades desde
-WhatsApp (el agujero de fondo del producto), reparto round-robin, tarea desde
-la conversación, selector de pipelines y tiempo real en las pantallas.
-Pendiente: bandeja omnicanal, SLA de tareas, motor de automatizaciones durable
-con constructor visual, chatbot v1, salud de WhatsApp/medios/plantillas,
-cotizaciones con PDF en servidor y configuración de empresa.
+Todo lo que el informe marcaba como no incluido está cerrado: eliminación de
+datos completa, rotación de la clave de cifrado, historial de WhatsApp hasta
+el límite real de Meta, barrido de `stone`, e interfaz —con estados vacíos,
+de error y de permiso— para lo que solo existía en el backend.
 
-**Bloque 8 PARCIAL.** Fundamento visual completo y aplicado. Pendiente:
-aplicar el naranja de acento a superficies concretas y QA visual con sesión
-iniciada.
+**Lo que queda pendiente, y por qué:**
 
-**Bloques 9 y 10 SIN EMPEZAR.** Retención/exportación/eliminación, rotación de
-clave de cifrado, sesiones de soporte caducadas; y la campaña de QA final.
+| Pendiente | Motivo |
+|---|---|
+| QA E2E sobre staging | Requiere desplegar |
+| CI verde de `main` | Requiere fusionar |
+| Despliegue con etiquetas por SHA | Es el paso final |
+
+**Antes de fusionar, en este orden:**
+
+1. Verificar CI verde del **último SHA publicado**, comprobando `head_sha`.
+2. Backup verificado de staging (dump + uploads, con checksum y conteos).
+3. `prisma migrate deploy` — 20 migraciones sobre el estado de staging; la
+   ruta está ensayada con datos dentro, no solo desde cero.
+4. Levantar **Redis y worker antes que el backend**: al revés, el primer
+   arranque reporta `degraded` y confunde la verificación.
+5. `/api/health/status` debe decir `ok`, no solo responder 200.
 
 ### Estrategia de ejecución, ya unificada
 
@@ -783,9 +823,9 @@ antes de fallar la respuesta.
 **Recordatorios de seguridad vigentes**
 
 - **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por
-  **31** migraciones. **Nada desplegado, nada fusionado a main.**
-- No desplegar ni fusionar mientras las capacidades funcionales (bloques 7–10)
-  y el branding sigan incompletos.
+  **41** migraciones. **Nada desplegado, nada fusionado a main.**
+- Las capacidades funcionales ya no bloquean: lo que queda es el
+  procedimiento de despliegue, que es una decisión, no una tarea de código.
 - **No retirar `Conversation.stage` todavía**: el dual-write sigue vigente
   hasta que frontend, automatizaciones, backfill y pruebas usen `Lead.stageId`
   de forma estable.
