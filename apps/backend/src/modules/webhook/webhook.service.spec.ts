@@ -8,6 +8,7 @@ describe('WebhookService', () => {
   let outbox: any;
   let leadIntake: any;
   let chatbot: any;
+  let historySync: any;
   let contactsService: any;
   let automationsService: any;
   let whatsappIntegrationService: any;
@@ -92,6 +93,14 @@ describe('WebhookService', () => {
         .fn()
         .mockResolvedValue({ atendido: false, motivo: 'sin-flujo' }),
     };
+    historySync = {
+      procesarHistorial: jest.fn().mockResolvedValue({
+        recibidos: 0,
+        importados: 0,
+        duplicados: 0,
+        descartados: 0,
+      }),
+    };
     service = new WebhookService(
       prisma,
       conversationsService,
@@ -104,6 +113,7 @@ describe('WebhookService', () => {
       outbox,
       leadIntake,
       chatbot,
+      historySync,
     );
   });
 
@@ -812,6 +822,56 @@ describe('WebhookService', () => {
         service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null),
       ).resolves.toBeUndefined();
       expect(automationsService.processMessage).toHaveBeenCalled();
+    });
+  });
+
+  describe('historial de coexistencia', () => {
+    const conHistorial = {
+      entry: [
+        {
+          changes: [
+            {
+              value: {
+                metadata: { phone_number_id: 'phone-a' },
+                history: [{ contact: { wa_id: '573001112233' }, messages: [] }],
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      whatsappIntegrationService.findConnectedByPhoneNumberId.mockResolvedValue(
+        connectedIntegration,
+      );
+    });
+
+    it('lo procesa por su propio camino', async () => {
+      await service.processWebhook(conHistorial);
+
+      expect(historySync.procesarHistorial).toHaveBeenCalledWith(
+        'company-a',
+        expect.objectContaining({ history: expect.anything() }),
+      );
+    });
+
+    it('NO pasa por el camino de los mensajes en vivo', async () => {
+      // Es la garantia entera: un mensaje de hace seis meses que dispare una
+      // automatizacion manda un WhatsApp real a un cliente por una
+      // conversacion que termino hace medio ano.
+      await service.processWebhook(conHistorial);
+
+      expect(messagesService.create).not.toHaveBeenCalled();
+      expect(outbox.record).not.toHaveBeenCalled();
+      expect(inboundQueue.enqueueInboundMessage).not.toHaveBeenCalled();
+    });
+
+    it('un fallo importando historial no tumba el webhook', async () => {
+      // Por el mismo webhook llegan los mensajes en vivo.
+      historySync.procesarHistorial.mockRejectedValue(new Error('formato raro'));
+
+      await expect(service.processWebhook(conHistorial)).resolves.toBeUndefined();
     });
   });
 });

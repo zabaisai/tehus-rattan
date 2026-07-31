@@ -10,6 +10,7 @@ import { maskPhone } from '../../common/logging/redact';
 import { InboundQueueService } from '../../common/queue/inbound-queue.service';
 import { LeadIntakeService } from '../leads/lead-intake.service';
 import { ChatbotService } from '../chatbot/chatbot.service';
+import { HistorySyncService } from '../whatsapp-history/history-sync.service';
 import {
   OutboxService,
   OUTBOX_TYPES,
@@ -31,7 +32,17 @@ export class WebhookService {
     private outbox: OutboxService,
     private leadIntake: LeadIntakeService,
     private chatbot: ChatbotService,
+    private historySync: HistorySyncService,
   ) {}
+
+  /** ¿Este cambio trae historial de coexistencia? */
+  private tieneHistorial(value: any): boolean {
+    return (
+      Array.isArray(value?.history) ||
+      Array.isArray(value?.history?.threads) ||
+      Array.isArray(value?.threads)
+    );
+  }
 
   // Walks the whole Meta payload — every entry, every change, every message —
   // instead of only entry[0]/changes[0]/messages[0]. Payloads that carry no
@@ -55,6 +66,34 @@ export class WebhookService {
         // forma única el mensaje y su conversación.
         if (statuses.length > 0) {
           await this.processStatuses(statuses);
+        }
+
+        // Sincronizacion de historial de COEXISTENCIA. Meta la envia una sola
+        // vez al conectar un numero que venia usandose en la app de WhatsApp
+        // Business. Va por un camino aparte del de los mensajes en vivo, y
+        // ESO ES LO IMPORTANTE: lo importado no dispara automatizaciones, ni
+        // chatbot, ni crea oportunidades. Un mensaje de hace seis meses que
+        // dispare una automatizacion manda un WhatsApp real a un cliente por
+        // una conversacion que termino hace medio ano.
+        if (this.tieneHistorial(value)) {
+          const integracionHistorial =
+            await this.whatsappIntegrationService.findConnectedByPhoneNumberId(
+              value?.metadata?.phone_number_id,
+            );
+          if (integracionHistorial) {
+            await this.historySync
+              .procesarHistorial(integracionHistorial.companyId, value)
+              .catch((error: unknown) => {
+                // Un fallo importando historial no puede tumbar el webhook:
+                // por el mismo camino llegan los mensajes en vivo.
+                this.logger.warn(
+                  `Fallo la sincronizacion de historial [${
+                    error instanceof Error ? error.name : 'Error'
+                  }]`,
+                );
+              });
+          }
+          continue;
         }
 
         if (messages.length === 0) continue;

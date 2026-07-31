@@ -200,6 +200,17 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
           .mockResolvedValue({ atendido: false, motivo: 'sin-flujo' }),
       } as never;
 
+      // El historial de coexistencia no participa aqui: llega por otro campo
+      // del webhook y no dispara efectos.
+      const historySyncMock = {
+        procesarHistorial: jest.fn().mockResolvedValue({
+          recibidos: 0,
+          importados: 0,
+          duplicados: 0,
+          descartados: 0,
+        }),
+      } as never;
+
       webhookService = new WebhookService(
         prisma,
         conversationsService,
@@ -212,6 +223,7 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         outboxMock,
         leadIntakeMock,
         chatbotMock,
+        historySyncMock,
       );
     });
 

@@ -223,6 +223,15 @@ model Message {
   body      String?
   type      MessageType   @default(TEXT)
   direction Direction
+
+  /// De donde salio este mensaje.
+  ///
+  /// EXISTE PARA QUE EL HISTORIAL IMPORTADO NO DISPARE NADA. Un mensaje de
+  /// hace seis meses no debe crear una oportunidad, ni ejecutar
+  /// automatizaciones, ni despertar al chatbot: eso mandaria cientos de
+  /// WhatsApp a clientes por conversaciones que ya terminaron. Sin este campo
+  /// no hay forma de distinguirlo de un mensaje que acaba de llegar.
+  source MessageSource @default(LIVE)
   status    MessageStatus @default(QUEUED)
   createdAt DateTime      @default(now())
 
@@ -1452,4 +1461,14 @@ model DataRequest {
   @@index([companyId, status])
   @@index([status, requestedAt])
   @@map("data_requests")
+}
+
+enum MessageSource {
+  /// Llegado por webhook en tiempo real. Dispara efectos.
+  LIVE
+  /// Sincronizacion de historial que envia Meta al conectar en coexistencia.
+  /// Llega una sola vez y NO dispara efectos.
+  HISTORY_SYNC
+  /// Importacion controlada desde CSV. Tampoco dispara efectos.
+  CSV_IMPORT
 }

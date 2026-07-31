@@ -11,6 +11,7 @@ import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-inte
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LeadsModule } from '../leads/leads.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
+import { WhatsAppHistoryModule } from '../whatsapp-history/whatsapp-history.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ChatbotModule } from '../chatbot/chatbot.module';
     NotificationsModule,
     LeadsModule,
     ChatbotModule,
+    WhatsAppHistoryModule,
   ],
   controllers: [WebhookController],
   // InboundProcessor vive aqui y no en QueueModule porque necesita
