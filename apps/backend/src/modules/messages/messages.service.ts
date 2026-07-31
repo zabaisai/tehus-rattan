@@ -15,35 +15,50 @@ export class MessagesService {
     });
   }
 
-  async create(data: {
-    companyId: string;
-    conversationId: string;
-    body: string;
-    direction: any;
-    type?: any;
-    wamid?: string;
-    // Medios y metadatos entregados por Meta. Todos opcionales: un mensaje de
-    // texto no los lleva y no deben escribirse como null explicito.
-    mediaId?: string;
-    mediaUrl?: string;
-    mediaMimeType?: string;
-    mediaFileName?: string;
-    mediaSize?: number;
-    mediaDuration?: number;
-    caption?: string;
-    location?: any;
-    contacts?: any;
-    interactive?: any;
-    replyToWamid?: string;
-    status?:
-      | 'QUEUED'
-      | 'SENDING'
-      | 'SENT'
-      | 'DELIVERED'
-      | 'READ'
-      | 'FAILED'
-      | 'RECEIVED';
-  }) {
+  async create(
+    data: {
+      companyId: string;
+      conversationId: string;
+      body: string;
+      direction: any;
+      type?: any;
+      wamid?: string;
+      // Medios y metadatos entregados por Meta. Todos opcionales: un mensaje de
+      // texto no los lleva y no deben escribirse como null explicito.
+      mediaId?: string;
+      mediaUrl?: string;
+      mediaMimeType?: string;
+      mediaFileName?: string;
+      mediaSize?: number;
+      mediaDuration?: number;
+      caption?: string;
+      location?: any;
+      contacts?: any;
+      interactive?: any;
+      replyToWamid?: string;
+      status?:
+        | 'QUEUED'
+        | 'SENDING'
+        | 'SENT'
+        | 'DELIVERED'
+        | 'READ'
+        | 'FAILED'
+        | 'RECEIVED';
+    },
+    /**
+     * Callback que se ejecuta DENTRO de la misma transacción que la creación
+     * del mensaje. Es lo que permite escribir el evento de outbox de forma
+     * atómica: o se guardan mensaje y evento, o no se guarda ninguno.
+     *
+     * Si lanza, la transacción entera se revierte y el mensaje no se
+     * persiste — que es exactamente lo que queremos: preferimos que Meta
+     * reintente a guardar un mensaje cuyos efectos nunca ocurrirán.
+     */
+    dentroDeLaTransaccion?: (
+      tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
+      mensaje: { id: string },
+    ) => Promise<void>,
+  ) {
     return this.prisma.$transaction(async (tx) => {
       const { companyId, ...messageData } = data;
       const conversation = await tx.conversation.findFirst({
@@ -59,6 +74,11 @@ export class MessagesService {
         where: { id: messageData.conversationId },
         data: { lastMessageAt: new Date() },
       });
+
+      if (dentroDeLaTransaccion) {
+        await dentroDeLaTransaccion(tx, message);
+      }
+
       return message;
     });
   }

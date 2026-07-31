@@ -8,6 +8,10 @@ import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-int
 import { NotificationsService } from '../notifications/notifications.service';
 import { maskPhone } from '../../common/logging/redact';
 import { InboundQueueService } from '../../common/queue/inbound-queue.service';
+import {
+  OutboxService,
+  OUTBOX_TYPES,
+} from '../../common/outbox/outbox.service';
 
 @Injectable()
 export class WebhookService {
@@ -22,6 +26,7 @@ export class WebhookService {
     private whatsappIntegrationService: WhatsAppIntegrationService,
     private notifications: NotificationsService,
     private inboundQueue: InboundQueueService,
+    private outbox: OutboxService,
   ) {}
 
   // Walks the whole Meta payload — every entry, every change, every message —
@@ -208,36 +213,58 @@ export class WebhookService {
           ? this.textoDeInteractivo(message.interactive)
           : caption || '';
 
-    const persistido = await this.messagesService.create({
-      companyId,
-      conversationId: conversation.id,
-      wamid: message.id,
-      body: text,
-      direction: 'INBOUND',
-      type: tipo as never,
-      status: 'RECEIVED',
-      // El binario NO se descarga aquí: el webhook debe responder rápido y
-      // `mediaId` caduca en Meta. Se guarda la referencia y la descarga la
-      // hará un job aparte, que rellenará `mediaUrl`.
-      ...(adjunto?.id ? { mediaId: String(adjunto.id) } : {}),
-      ...(adjunto?.mime_type
-        ? { mediaMimeType: String(adjunto.mime_type) }
-        : {}),
-      ...(adjunto?.filename ? { mediaFileName: String(adjunto.filename) } : {}),
-      ...(caption ? { caption } : {}),
-      ...(tipoMeta === 'location' && message.location
-        ? { location: message.location }
-        : {}),
-      ...(tipoMeta === 'contacts' && message.contacts
-        ? { contacts: message.contacts }
-        : {}),
-      ...(tipoMeta === 'interactive' && message.interactive
-        ? { interactive: message.interactive }
-        : {}),
-      ...(message.context?.id
-        ? { replyToWamid: String(message.context.id) }
-        : {}),
-    });
+    const persistido = await this.messagesService.create(
+      {
+        companyId,
+        conversationId: conversation.id,
+        wamid: message.id,
+        body: text,
+        direction: 'INBOUND',
+        type: tipo as never,
+        status: 'RECEIVED',
+        // El binario NO se descarga aquí: el webhook debe responder rápido y
+        // `mediaId` caduca en Meta. Se guarda la referencia y la descarga la
+        // hará un job aparte, que rellenará `mediaUrl`.
+        ...(adjunto?.id ? { mediaId: String(adjunto.id) } : {}),
+        ...(adjunto?.mime_type
+          ? { mediaMimeType: String(adjunto.mime_type) }
+          : {}),
+        ...(adjunto?.filename
+          ? { mediaFileName: String(adjunto.filename) }
+          : {}),
+        ...(caption ? { caption } : {}),
+        ...(tipoMeta === 'location' && message.location
+          ? { location: message.location }
+          : {}),
+        ...(tipoMeta === 'contacts' && message.contacts
+          ? { contacts: message.contacts }
+          : {}),
+        ...(tipoMeta === 'interactive' && message.interactive
+          ? { interactive: message.interactive }
+          : {}),
+        ...(message.context?.id
+          ? { replyToWamid: String(message.context.id) }
+          : {}),
+      },
+      // Outbox EN LA MISMA TRANSACCION: o se guardan mensaje y evento, o no
+      // se guarda ninguno. Sin esto, morir entre el commit y el enqueue
+      // dejaria un mensaje cuyos efectos no ocurririan nunca, y nadie se
+      // enteraria porque el webhook ya respondio 200 y Meta no reintenta.
+      async (tx, mensaje) => {
+        await this.outbox.record(tx, {
+          type: OUTBOX_TYPES.INBOUND_MESSAGE,
+          companyId,
+          idempotencyKey: mensaje.id,
+          payload: {
+            companyId,
+            conversationId: conversation.id,
+            messageId: mensaje.id,
+            contactPhone: message.from,
+            body: text,
+          },
+        });
+      },
+    );
 
     // Los efectos van a la cola: Meta exige un ack rapido y reintenta si el
     // webhook tarda, asi que ejecutar automatizaciones y notificaciones aqui
@@ -246,6 +273,13 @@ export class WebhookService {
     //
     // Si la cola no esta disponible se ejecuta en linea, igual que antes: un
     // fallo de Redis degrada la latencia, nunca deja un mensaje sin procesar.
+    // El evento de outbox ya quedó escrito en la MISMA transacción que el
+    // mensaje (ver la llamada a messagesService.create de arriba), así que a
+    // partir de aquí los efectos están garantizados aunque este proceso muera
+    // ahora mismo: el dispatcher los recogerá.
+    //
+    // Se intenta encolar de inmediato solo para no esperar al siguiente pase
+    // del dispatcher. Si falla, no se hace nada: el evento sigue PENDING.
     const encolado = await this.inboundQueue.enqueueInboundMessage({
       companyId,
       conversationId: conversation.id,
@@ -254,14 +288,13 @@ export class WebhookService {
       body: text,
     });
 
-    if (!encolado) {
-      await this.runInboundEffects(
-        companyId,
-        conversation.id,
-        text,
-        message.from,
-        (conversation as { assignedTo?: string | null }).assignedTo ?? null,
-      );
+    if (encolado) {
+      // Ya está en la cola: se marca completado para que el dispatcher no lo
+      // vuelva a empujar. La idempotencia del jobId lo protegería igualmente,
+      // pero marcarlo evita trabajo inútil.
+      await this.outbox
+        .markCompletedByKey(persistido.id)
+        .catch(() => undefined);
     }
 
     this.logger.log(`Mensaje procesado de ${maskPhone(message.from)}`);

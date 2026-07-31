@@ -160,7 +160,9 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       contactsService = {
         create: jest.fn().mockResolvedValue({ id: 'contact-x' }),
       };
-      automationsService = { processMessage: jest.fn().mockResolvedValue(undefined) };
+      automationsService = {
+        processMessage: jest.fn().mockResolvedValue(undefined),
+      };
 
       webhookService = new WebhookService(
         prisma,
@@ -169,6 +171,16 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         contactsService,
         automationsService,
         whatsappIntegrationService,
+        // La cola y el outbox no participan en el aislamiento: se simulan para
+        // que el webhook persista y registre el evento sin efectos reales.
+        {
+          enqueueInboundMessage: jest.fn().mockResolvedValue(false),
+          isEnabled: jest.fn().mockReturnValue(false),
+        } as never,
+        {
+          record: jest.fn().mockResolvedValue(true),
+          markCompletedByKey: jest.fn().mockResolvedValue(undefined),
+        } as never,
       );
     });
 
@@ -185,6 +197,8 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       );
       expect(messagesService.create).toHaveBeenCalledWith(
         expect.objectContaining({ companyId: 'company-a' }),
+        // Segundo argumento: el callback del outbox.
+        expect.any(Function),
       );
 
       expect(contactsService.create).not.toHaveBeenCalledWith(
@@ -213,6 +227,8 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       );
       expect(messagesService.create).toHaveBeenCalledWith(
         expect.objectContaining({ companyId: 'company-b' }),
+        // Segundo argumento: el callback del outbox.
+        expect.any(Function),
       );
 
       expect(contactsService.create).not.toHaveBeenCalledWith(
@@ -243,7 +259,10 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         tokenCryptoService,
         // Fixture Graph API version (a test value, not a production default);
         // the service has no hardcoded fallback.
-        { get: (key: string) => (key === 'WHATSAPP_GRAPH_API_VERSION' ? 'v20.0' : undefined) } as any,
+        {
+          get: (key: string) =>
+            key === 'WHATSAPP_GRAPH_API_VERSION' ? 'v20.0' : undefined,
+        } as any,
       );
 
       mockedAxios.post.mockResolvedValue({ data: {} });

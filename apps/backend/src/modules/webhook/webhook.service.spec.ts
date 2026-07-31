@@ -5,6 +5,7 @@ describe('WebhookService', () => {
   let conversationsService: any;
   let messagesService: any;
   let inboundQueue: any;
+  let outbox: any;
   let contactsService: any;
   let automationsService: any;
   let whatsappIntegrationService: any;
@@ -48,7 +49,13 @@ describe('WebhookService', () => {
     conversationsService = { findOrCreate: jest.fn() };
     messagesService = {
       findByWamid: jest.fn(),
-      create: jest.fn(),
+      // Simula la transacción real: ejecuta el callback del outbox con el
+      // mensaje ya creado, que es lo que garantiza la atomicidad.
+      create: jest.fn(async (_data: any, dentro?: any) => {
+        const mensaje = { id: 'message-a' };
+        if (dentro) await dentro({}, mensaje);
+        return mensaje;
+      }),
       applyDeliveryStatus: jest.fn().mockResolvedValue('updated'),
     };
     contactsService = { create: jest.fn() };
@@ -56,6 +63,10 @@ describe('WebhookService', () => {
     whatsappIntegrationService = { findConnectedByPhoneNumberId: jest.fn() };
     notifications = { emit: jest.fn().mockResolvedValue(undefined) };
 
+    outbox = {
+      record: jest.fn().mockResolvedValue(true),
+      markCompletedByKey: jest.fn().mockResolvedValue(undefined),
+    };
     inboundQueue = {
       // Por defecto NO encola: las pruebas existentes verifican la ejecución
       // en línea, que es la marcha atrás cuando no hay Redis.
@@ -71,6 +82,7 @@ describe('WebhookService', () => {
       whatsappIntegrationService,
       notifications,
       inboundQueue,
+      outbox,
     );
   });
 
@@ -84,7 +96,11 @@ describe('WebhookService', () => {
     conversationsService.findOrCreate.mockResolvedValue({
       id: 'conversation-a',
     });
-    messagesService.create.mockResolvedValue({ id: 'message-a' });
+    messagesService.create.mockImplementation(async (_d: any, dentro?: any) => {
+      const mensaje = { id: 'message-a' };
+      if (dentro) await dentro({}, mensaje);
+      return mensaje;
+    });
     automationsService.processMessage.mockResolvedValue(undefined);
 
     await service.processWebhook(buildPayload());
@@ -110,13 +126,14 @@ describe('WebhookService', () => {
         conversationId: 'conversation-a',
         wamid: 'wamid.1',
       }),
+      // Segundo argumento: el callback del outbox, que se ejecuta dentro
+      // de la misma transacción.
+      expect.any(Function),
     );
-    expect(automationsService.processMessage).toHaveBeenCalledWith(
-      'company-a',
-      'conversation-a',
-      'Hola',
-      '50255551111',
-    );
+    // Los efectos YA NO corren en linea: el evento de outbox quedo escrito en
+    // la misma transaccion y los ejecuta el worker. Aqui solo se verifica el
+    // aislamiento por empresa de lo que si ocurre en el webhook.
+    expect(automationsService.processMessage).not.toHaveBeenCalled();
 
     // prisma.company is never referenced anymore for tenant resolution.
     expect(prisma.company).toBeUndefined();
@@ -189,7 +206,13 @@ describe('WebhookService', () => {
       conversationsService.findOrCreate.mockResolvedValue({
         id: 'conversation-a',
       });
-      messagesService.create.mockResolvedValue({ id: 'message-a' });
+      messagesService.create.mockImplementation(
+        async (_d: any, dentro?: any) => {
+          const mensaje = { id: 'message-a' };
+          if (dentro) await dentro({}, mensaje);
+          return mensaje;
+        },
+      );
       automationsService.processMessage.mockResolvedValue(undefined);
     });
 
@@ -500,13 +523,25 @@ describe('WebhookService', () => {
       conversationsService.findOrCreate.mockResolvedValue({
         id: 'conversation-a',
       });
-      messagesService.create.mockResolvedValue({ id: 'message-a' });
+      messagesService.create.mockImplementation(
+        async (_d: any, dentro?: any) => {
+          const mensaje = { id: 'message-a' };
+          if (dentro) await dentro({}, mensaje);
+          return mensaje;
+        },
+      );
       automationsService.processMessage.mockResolvedValue(undefined);
     });
 
     it('encola los efectos con los datos del mensaje persistido', async () => {
       inboundQueue.enqueueInboundMessage.mockResolvedValue(true);
-      messagesService.create.mockResolvedValue({ id: 'message-persistido' });
+      messagesService.create.mockImplementation(
+        async (_d: any, dentro?: any) => {
+          const mensaje = { id: 'message-persistido' };
+          if (dentro) await dentro({}, mensaje);
+          return mensaje;
+        },
+      );
 
       await service.processWebhook(buildPayload());
 
@@ -526,12 +561,36 @@ describe('WebhookService', () => {
       expect(automationsService.processMessage).not.toHaveBeenCalled();
     });
 
-    it('cuando NO puede encolar ejecuta en linea: ningun mensaje se pierde', async () => {
+    it('cuando NO puede encolar NO ejecuta en linea: lo hara el dispatcher', async () => {
       inboundQueue.enqueueInboundMessage.mockResolvedValue(false);
 
       await service.processWebhook(buildPayload());
 
-      expect(automationsService.processMessage).toHaveBeenCalledTimes(1);
+      // Un solo camino de ejecucion. El evento quedo en el outbox dentro de
+      // la misma transaccion que el mensaje, asi que los efectos estan
+      // garantizados; ejecutarlos tambien aqui los duplicaria si el enqueue
+      // si habia llegado a Redis antes de fallar la respuesta.
+      expect(automationsService.processMessage).not.toHaveBeenCalled();
+      expect(outbox.markCompletedByKey).not.toHaveBeenCalled();
+    });
+
+    it('registra el evento de outbox DENTRO de la transaccion del mensaje', async () => {
+      await service.processWebhook(buildPayload());
+
+      // El callback se ejecuta dentro de messagesService.create: o se guardan
+      // mensaje y evento, o no se guarda ninguno.
+      expect(outbox.record).toHaveBeenCalledTimes(1);
+      const registrado = outbox.record.mock.calls[0][1];
+      expect(registrado.idempotencyKey).toBe('message-a');
+      expect(registrado.companyId).toBe('company-a');
+    });
+
+    it('marca el evento completado cuando SI consiguio encolar', async () => {
+      inboundQueue.enqueueInboundMessage.mockResolvedValue(true);
+
+      await service.processWebhook(buildPayload());
+
+      expect(outbox.markCompletedByKey).toHaveBeenCalledWith('message-a');
     });
 
     it('un fallo de la cola no impide persistir el mensaje', async () => {

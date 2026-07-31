@@ -69,6 +69,7 @@ model Company {
   invitationCodesUsed  InvitationCode[]
   userSessions         UserSession[]
   loginEvents          LoginEvent[]
+  outboxEvents         OutboxEvent[]
 
   @@map("companies")
 }
@@ -1018,4 +1019,64 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ─────────────────────────────────────────────
+// OUTBOX DURABLE
+// ─────────────────────────────────────────────
+// Resuelve la ventana entre "el dato ya está persistido" y "sus efectos se
+// encolaron". Sin esto, si el proceso muere justo después del commit y antes
+// del enqueue, el mensaje queda guardado y sus efectos no ocurren nunca: ni
+// asignación, ni tarea, ni aviso al asesor. Nada lo detecta, porque no hay
+// error en ningún log.
+//
+// El evento se escribe en LA MISMA TRANSACCIÓN que el cambio esencial, así
+// que o existen ambos o no existe ninguno. Un dispatcher posterior lo empuja
+// a la cola y lo marca completado.
+model OutboxEvent {
+  id   String @id @default(cuid())
+  type String
+
+  // Acotado por empresa como todo lo demás: un evento nunca es global.
+  companyId String
+
+  payload Json
+
+  // Clave de deduplicación. UNIQUE: si el mismo hecho se registra dos veces
+  // (reintento de Meta, reproceso), la segunda inserción falla y no se
+  // duplican efectos. Suele ser el id del mensaje.
+  idempotencyKey String @unique
+
+  status   OutboxStatus @default(PENDING)
+  attempts Int          @default(0)
+
+  // Cuándo puede volver a intentarse. El backoff se materializa aquí, de modo
+  // que sobrevive a un reinicio: un retraso en memoria se perdería.
+  availableAt DateTime @default(now())
+
+  // Clasificador ya redactado; NUNCA el payload crudo del error, que puede
+  // arrastrar PII o secretos.
+  lastError String?
+
+  // Marca de cuándo se reclamó, para poder recuperar los que quedaron
+  // colgados si el proceso murió a mitad.
+  claimedAt   DateTime?
+  processedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // El índice que usa el dispatcher para reclamar lotes.
+  @@index([status, availableAt])
+  @@index([companyId, status])
+  @@map("outbox_events")
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
