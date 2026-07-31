@@ -5,6 +5,7 @@ import {
   CLOSED_SESSION_RETENTION_DAYS,
   LOGIN_EVENT_RETENTION_DAYS,
 } from './sessions.constants';
+import { shouldRunScheduledJobs } from '../../common/scheduling/scheduling.role';
 
 // Retention policy — must be reflected in the privacy policy before this
 // ships to production:
@@ -26,6 +27,8 @@ export class SessionCleanupService {
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async handleScheduledCleanup(): Promise<void> {
+    // Un solo proceso: ver common/scheduling/scheduling.role.ts.
+    if (!shouldRunScheduledJobs()) return;
     await this.cleanupExpiredLoginEvents();
     await this.cleanupClosedSessions();
   }

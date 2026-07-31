@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { TaskStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NotificationsService } from './notifications.service';
+import { shouldRunScheduledJobs } from '../../common/scheduling/scheduling.role';
 
 // How far ahead counts as "due soon" (hours). A task crossing this window
 // produces one TASK_DUE_SOON; once its dueDate passes, one TASK_OVERDUE. Both
@@ -22,17 +23,20 @@ export class NotificationSchedulerService {
     private notifications: NotificationsService,
   ) {}
 
-  // Runs hourly (single instance on staging). Idempotent: dedupeKeys make
-  // re-runs no-ops. Documented scaling note: for multi-instance, move to a
-  // leader-elected job or a durable queue (see docs).
+  // Cada hora, en UN SOLO proceso. Backend y worker comparten AppModule, asi
+  // que sin el guardia ambos registrarian este @Cron y todo correria dos
+  // veces. Los dedupeKey lo hacen inofensivo hoy, pero eso es una
+  // coincidencia afortunada y no un diseno.
   @Cron(CronExpression.EVERY_HOUR)
   async handleScheduledTaskNotifications(): Promise<void> {
+    if (!shouldRunScheduledJobs()) return;
     await this.notifyDueSoonTasks();
     await this.notifyOverdueTasks();
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async handleRetentionCleanup(): Promise<number> {
+    if (!shouldRunScheduledJobs()) return 0;
     const now = new Date();
     const cutoff = new Date(now.getTime() - READ_RETENTION_DAYS * 86_400_000);
     const result = await this.prisma.notification.deleteMany({

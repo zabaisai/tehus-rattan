@@ -57,6 +57,12 @@ model Company {
   // entonces todo entra sin asesor, a la bandeja común.
   autoAssignEnabled Boolean @default(true)
 
+  /// Minutos que puede pasar un mensaje entrante sin respuesta antes de
+  /// considerarse incumplido. `null` = sin compromiso definido, que es lo
+  /// contrario de "cero minutos": una empresa sin SLA no debe recibir alarmas
+  /// por cada conversacion.
+  responseSlaMinutes Int?
+
   users                User[]
   contacts             Contact[]
   conversations        Conversation[]

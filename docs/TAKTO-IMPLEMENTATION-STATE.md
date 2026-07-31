@@ -245,7 +245,18 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       reversibles, borrar no · 33 pruebas
 - [ ] UI de pipelines y etapas
 - [ ] Oportunidades (vista detallada)
-- [ ] Tareas y SLA
+- [x] **SLA de primera respuesta** — `ResponseSlaService`: detecta
+      conversaciones cuyo **último** mensaje es entrante y lleva más del
+      umbral de su empresa (`Company.responseSlaMinutes`, `null` = sin
+      compromiso, que no es cero). Avisa al responsable, o a los
+      administradores si no hay nadie — esa es la que más urge. Excluye
+      resueltas, cerradas, archivadas y **pausadas** (están en manos del
+      chatbot a propósito) · 17 e2e reales
+- [x] **Trabajos programados en UN SOLO proceso** — `shouldRunScheduledJobs()`.
+      Backend y worker comparten `AppModule`, así que ambos registraban los
+      mismos `@Cron` y todo lo programado corría por duplicado. Hoy no se veía
+      porque las notificaciones se deduplican y los borrados son idempotentes,
+      pero eso era una coincidencia afortunada, no un diseño · 5 pruebas
 - [ ] Asignación automática
 - [ ] Automatizaciones (motor + constructor visual)
 - [ ] Chatbot (motor + constructor visual)
@@ -478,6 +489,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras bandeja omnicanal (backend) | **1101 unit / 293 e2e verdes** |
 | 2026-07-31 | **CI** `7748c73` (bandeja backend) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras bandeja omnicanal (interfaz) | **183 frontend verdes / 32 suites** |
+| 2026-07-31 | **CI** `b11da62` (bandeja interfaz) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras SLA de respuesta | **1106 unit / 310 e2e verdes** |
 
 ## Despliegues
 
