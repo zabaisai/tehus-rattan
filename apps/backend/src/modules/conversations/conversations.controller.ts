@@ -164,6 +164,12 @@ export class ConversationsController {
         req.user.companyId,
         conversation.contact.phone,
         body.message,
+        // Se responde POR DONDE ENTRO. Con varios numeros, usar siempre el
+        // principal hace que quien escribio a Soporte reciba la respuesta
+        // desde Ventas: un numero que no reconoce. Si la conversacion no lo
+        // sabe -es anterior a este campo, o vino de un CSV- se cae al
+        // principal, que es el comportamiento de siempre.
+        conversation.whatsappIntegration?.phoneNumberId,
       );
 
       return await this.messagesService.create({

@@ -23,7 +23,10 @@ describe('Automatizaciones: historial y versiones (e2e, base real)', () => {
   const dobles = {
     messages: { create: jest.fn().mockResolvedValue({ id: 'm1' }) },
     conversations: { update: jest.fn().mockResolvedValue({}) },
-    whatsapp: { sendMessage: jest.fn().mockResolvedValue('wamid-1') },
+    whatsapp: {
+      sendMessage: jest.fn().mockResolvedValue('wamid-1'),
+      sendFromConversation: jest.fn().mockResolvedValue('wamid-1'),
+    },
   };
 
   beforeAll(async () => {

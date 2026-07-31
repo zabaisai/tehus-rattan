@@ -75,6 +75,17 @@ export class ConversationsService {
             stage: { select: { id: true, name: true, color: true } },
           },
         },
+        // El numero por el que entro, para poder responder desde el mismo y
+        // para que la interfaz pueda decir cual es. Nunca el token.
+        whatsappIntegration: {
+          select: {
+            id: true,
+            phoneNumberId: true,
+            displayPhoneNumber: true,
+            label: true,
+            status: true,
+          },
+        },
       },
     });
     if (!conv) throw new NotFoundException('Conversacion no encontrada');
@@ -143,13 +154,35 @@ export class ConversationsService {
     });
   }
 
-  async findOrCreate(companyId: string, contactId: string) {
+  /**
+   * `whatsappIntegrationId` es el número por el que ENTRÓ el mensaje.
+   *
+   * En una conversación que ya existe se rellena solo si estaba vacío: si el
+   * cliente escribió antes a otro número de la misma empresa, el hilo sigue
+   * perteneciendo a aquel, y cambiarlo a mitad haría que las respuestas
+   * empezaran a salir desde un número distinto del que el cliente conoce.
+   */
+  async findOrCreate(
+    companyId: string,
+    contactId: string,
+    whatsappIntegrationId?: string,
+  ) {
     const existing = await this.prisma.conversation.findFirst({
       where: { companyId, contactId, status: 'OPEN' },
     });
-    if (existing) return existing;
+
+    if (existing) {
+      if (whatsappIntegrationId && !existing.whatsappIntegrationId) {
+        return this.prisma.conversation.update({
+          where: { id: existing.id },
+          data: { whatsappIntegrationId },
+        });
+      }
+      return existing;
+    }
+
     return this.prisma.conversation.create({
-      data: { companyId, contactId },
+      data: { companyId, contactId, whatsappIntegrationId },
     });
   }
 

@@ -205,6 +205,18 @@ model Conversation {
   leadId String?
   lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
+  // Numero de la empresa por el que ENTRO esta conversacion.
+  //
+  // Sin esto, una empresa con dos numeros contesta siempre desde el
+  // principal: quien escribio a "Soporte" recibe la respuesta desde
+  // "Ventas", un numero que no reconoce y al que no habia escrito.
+  //
+  // Nullable porque las conversaciones anteriores a este campo no pueden
+  // saberlo, y porque un CSV importado no tiene numero de entrada. En ambos
+  // casos el envio cae en el principal, que es el comportamiento de siempre.
+  whatsappIntegrationId String?
+  whatsappIntegration   WhatsAppIntegration? @relation(fields: [whatsappIntegrationId], references: [id], onDelete: SetNull)
+
   messages Message[]
   notes    Note[]
   tasks    Task[]
@@ -759,6 +771,8 @@ model WhatsAppIntegration {
   //     migracion): una sola integracion principal por empresa.
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
+
+  conversations Conversation[]
 
   @@index([companyId, isPrimary])
   @@map("whatsapp_integrations")

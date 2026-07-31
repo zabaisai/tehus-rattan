@@ -45,10 +45,14 @@ describe('ConversationsController', () => {
         message: 'Hola, ya tenemos tu pedido listo',
       });
 
+      // El cuarto argumento es el numero desde el que se envia. Aqui es
+      // undefined porque la conversacion de prueba no tiene numero asociado
+      // -como las anteriores a este campo-, y entonces se cae al principal.
       expect(whatsappService.sendMessage).toHaveBeenCalledWith(
         'company-a',
         '50255551111',
         'Hola, ya tenemos tu pedido listo',
+        undefined,
       );
       expect(messagesService.create).toHaveBeenCalledWith({
         companyId: 'company-a',

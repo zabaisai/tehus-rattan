@@ -153,9 +153,7 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       // El doble solo implementa lo que este servicio consulta. La asercion
       // dice exactamente eso: es un Prisma parcial a proposito, no un
       // descuido.
-      whatsappIntegrationService = new WhatsAppIntegrationService(
-        prisma as unknown as PrismaService,
-      );
+      whatsappIntegrationService = new WhatsAppIntegrationService(prisma);
       conversationsService = {
         findOrCreate: jest.fn().mockResolvedValue({ id: 'conversation-x' }),
       };
@@ -234,9 +232,13 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         'company-a',
         expect.anything(),
       );
+      // Tercer argumento: la integracion POR LA QUE ENTRO. Es lo que hace
+      // que la respuesta salga por el mismo numero, y ademas ata el hilo a
+      // una integracion de ESTA empresa.
       expect(conversationsService.findOrCreate).toHaveBeenCalledWith(
         'company-a',
         'contact-x',
+        'integration-a',
       );
       expect(messagesService.create).toHaveBeenCalledWith(
         expect.objectContaining({ companyId: 'company-a' }),
@@ -267,6 +269,7 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       expect(conversationsService.findOrCreate).toHaveBeenCalledWith(
         'company-b',
         'contact-x',
+        'integration-b',
       );
       expect(messagesService.create).toHaveBeenCalledWith(
         expect.objectContaining({ companyId: 'company-b' }),

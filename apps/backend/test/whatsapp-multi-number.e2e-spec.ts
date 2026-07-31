@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { WhatsAppIntegrationService } from '../src/modules/whatsapp-integration/whatsapp-integration.service';
+import { WhatsAppNumbersService } from '../src/modules/whatsapp-integration/whatsapp-numbers.service';
 
 /**
  * MULTI-NÚMERO — contra la base REAL, no mocks.
@@ -287,6 +288,76 @@ describe('WhatsApp multi-número (e2e, base real)', () => {
           },
         }),
       ).rejects.toThrow();
+    });
+  });
+
+  describe('j) administrar los numeros desde la empresa', () => {
+    let numeros: WhatsAppNumbersService;
+    const actor = { userId: 'e2e-actor', role: 'ADMIN' };
+
+    beforeAll(() => {
+      // La auditoria se aisla: aqui se prueba el efecto sobre las filas de
+      // integraciones, no el registro -que tiene sus propias pruebas y exige
+      // un usuario real por la clave ajena.
+      numeros = new WhatsAppNumbersService(
+        prisma as never,
+        {
+          record: async () => undefined,
+        } as never,
+      );
+    });
+
+    it('lista solo los numeros de la empresa que pregunta', async () => {
+      const deA = await numeros.listar(empresaA);
+
+      expect(deA.length).toBeGreaterThanOrEqual(2);
+      expect(deA.map((n) => n.phoneNumberId)).not.toContain(PNID_B1);
+    });
+
+    it('el listado no trae el token ni por descuido', async () => {
+      const deA = await numeros.listar(empresaA);
+
+      expect(JSON.stringify(deA)).not.toContain('enc-');
+    });
+
+    it('renombrar un numero de OTRA empresa no encuentra nada', async () => {
+      const deB = await numeros.listar(empresaB);
+
+      await expect(
+        numeros.renombrar(empresaA, deB[0].id, 'Robado'),
+      ).rejects.toThrow();
+    });
+
+    it('marcar principal deja EXACTAMENTE uno, con el indice parcial activo', async () => {
+      const deA = await numeros.listar(empresaA);
+      const noPrincipal = deA.find(
+        (n) => !n.isPrimary && n.status === 'CONNECTED',
+      );
+      expect(noPrincipal).toBeDefined();
+
+      await numeros.marcarPrincipal(empresaA, noPrincipal!.id, actor);
+
+      const principales = await prisma.whatsAppIntegration.count({
+        where: { companyId: empresaA, isPrimary: true },
+      });
+      // Si el cambio no fuera transaccional, el indice parcial habria
+      // rechazado el segundo paso y aqui habria CERO.
+      expect(principales).toBe(1);
+
+      const despues = await numeros.listar(empresaA);
+      expect(despues[0].id).toBe(noPrincipal!.id);
+    });
+
+    it('cambiar el principal de A no toca el de B', async () => {
+      const principalesB = await prisma.whatsAppIntegration.count({
+        where: { companyId: empresaB, isPrimary: true },
+      });
+
+      expect(principalesB).toBeLessThanOrEqual(1);
+      const deB = await numeros.listar(empresaB);
+      expect(deB.every((n) => n.phoneNumberId.startsWith('e2e-pnid-b'))).toBe(
+        true,
+      );
     });
   });
 

@@ -232,8 +232,9 @@ export class AutomationsService {
       try {
         switch (action.type) {
           case 'send_message': {
-            await this.whatsappService.sendMessage(
+            await this.whatsappService.sendFromConversation(
               companyId,
+              conversationId,
               contactPhone,
               action.message,
             );

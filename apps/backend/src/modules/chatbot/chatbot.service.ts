@@ -379,7 +379,10 @@ export class ChatbotService {
     return definicion?.nodes?.find((n) => n.id === id);
   }
 
-  private textoDe(nodo: NodoChatbot, contexto: Record<string, unknown>): string {
+  private textoDe(
+    nodo: NodoChatbot,
+    contexto: Record<string, unknown>,
+  ): string {
     const base = interpolar(nodo.text ?? '', contexto);
     if (nodo.type !== 'menu') return base;
 
@@ -398,8 +401,9 @@ export class ChatbotService {
   ): Promise<void> {
     if (!texto.trim()) return;
 
-    const wamid = await this.whatsapp.sendMessage(
+    const wamid = await this.whatsapp.sendFromConversation(
       input.companyId,
+      input.conversationId,
       input.contactPhone,
       texto,
     );

@@ -116,7 +116,12 @@ export class WebhookService {
 
         for (const message of messages) {
           try {
-            await this.processSingleMessage(companyId, message, contacts);
+            await this.processSingleMessage(
+              companyId,
+              message,
+              contacts,
+              integration.id,
+            );
           } catch (error) {
             // Isolate per-message failures. The message was not persisted (so
             // it is not deduped), leaving Meta's retry free to reprocess it.
@@ -207,6 +212,7 @@ export class WebhookService {
     companyId: string,
     message: any,
     contacts: any[],
+    whatsappIntegrationId?: string,
   ): Promise<void> {
     if (!message?.id || !message?.from) return;
 
@@ -240,6 +246,7 @@ export class WebhookService {
     const conversation = await this.conversationsService.findOrCreate(
       companyId,
       contactRecord.id,
+      whatsappIntegrationId,
     );
 
     // El adjunto real vive bajo la clave del propio tipo (image, audio, …).

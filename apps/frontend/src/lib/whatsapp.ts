@@ -111,3 +111,45 @@ export async function testWhatsAppConnection(
   );
   return data;
 }
+
+// ── Varios numeros ─────────────────────────────────────────────
+
+/** Un numero conectado de la empresa. Nunca incluye el token. */
+export interface NumeroWhatsApp {
+  id: string;
+  phoneNumberId: string;
+  displayPhoneNumber: string | null;
+  label: string | null;
+  isPrimary: boolean;
+  order: number;
+  status: ConnectionStatusValue | 'PENDING';
+  connectedAt: string | null;
+  lastErrorCode: string | null;
+}
+
+export async function getWhatsAppNumbers(): Promise<NumeroWhatsApp[]> {
+  const { data } = await api.get<NumeroWhatsApp[]>(
+    '/whatsapp-integrations/me/numbers',
+  );
+  return data;
+}
+
+export async function renameWhatsAppNumber(
+  id: string,
+  label: string | null,
+): Promise<NumeroWhatsApp> {
+  const { data } = await api.patch<NumeroWhatsApp>(
+    `/whatsapp-integrations/me/numbers/${id}`,
+    { label },
+  );
+  return data;
+}
+
+export async function setPrimaryWhatsAppNumber(
+  id: string,
+): Promise<NumeroWhatsApp> {
+  const { data } = await api.post<NumeroWhatsApp>(
+    `/whatsapp-integrations/me/numbers/${id}/primary`,
+  );
+  return data;
+}

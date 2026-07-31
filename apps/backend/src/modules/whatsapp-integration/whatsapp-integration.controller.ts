@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   HttpCode,
+  Param,
+  Patch,
   Post,
   Put,
   Request,
@@ -26,6 +28,8 @@ import {
 import { ConnectWhatsAppIntegrationDto } from './dto/connect-whatsapp-integration.dto';
 import { EmbeddedSignupCompleteDto } from './dto/embedded-signup-complete.dto';
 import { TestConnectionDto } from './dto/test-connection.dto';
+import { RenameNumberDto } from './dto/rename-number.dto';
+import { WhatsAppNumbersService } from './whatsapp-numbers.service';
 
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Controller('whatsapp-integrations')
@@ -33,6 +37,7 @@ export class WhatsAppIntegrationController {
   constructor(
     private managementService: WhatsAppIntegrationManagementService,
     private embeddedSignupService: WhatsAppEmbeddedSignupService,
+    private numbersService: WhatsAppNumbersService,
   ) {}
 
   @Get('me')
@@ -118,6 +123,41 @@ export class WhatsAppIntegrationController {
       req.user.companyId,
       this.actorFrom(req),
     );
+  }
+
+  // ── Varios numeros ──────────────────────────────────────────
+  // Una empresa puede tener conectados varios (Ventas, Soporte, un numero de
+  // prueba). Se recibe por todos y se responde por donde entro la
+  // conversacion; el PRINCIPAL solo decide desde cual se envia cuando no hay
+  // conversacion que lo diga.
+
+  @Get('me/numbers')
+  listMyNumbers(@Request() req: any) {
+    return this.numbersService.listar(req.user.companyId);
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Patch('me/numbers/:id')
+  renameMyNumber(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() dto: RenameNumberDto,
+  ) {
+    return this.numbersService.renombrar(
+      req.user.companyId,
+      id,
+      dto.label ?? null,
+    );
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @HttpCode(200)
+  @Post('me/numbers/:id/primary')
+  setMyPrimaryNumber(@Param('id') id: string, @Request() req: any) {
+    return this.numbersService.marcarPrincipal(req.user.companyId, id, {
+      userId: req.user.sub,
+      role: req.user.role,
+    });
   }
 
   // ── Legacy manual connection (advanced, SUPER_ADMIN only) ────

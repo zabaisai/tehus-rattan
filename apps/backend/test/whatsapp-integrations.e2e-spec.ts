@@ -10,6 +10,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { WhatsAppIntegrationController } from '../src/modules/whatsapp-integration/whatsapp-integration.controller';
 import { WhatsAppIntegrationManagementService } from '../src/modules/whatsapp-integration/whatsapp-integration-management.service';
 import { WhatsAppEmbeddedSignupService } from '../src/modules/whatsapp-integration/whatsapp-embedded-signup.service';
+import { WhatsAppNumbersService } from '../src/modules/whatsapp-integration/whatsapp-numbers.service';
 import {
   buildFakeSessionPrisma,
   encodeSid,
@@ -75,6 +76,17 @@ describe('WhatsAppIntegrationController (e2e)', () => {
         {
           provide: WhatsAppIntegrationManagementService,
           useValue: managementServiceMock,
+        },
+        {
+          // El controlador tambien depende del servicio de numeros. Esta
+          // suite no ejercita esos endpoints, pero sin el proveedor la
+          // inyeccion falla y NO ARRANCA NINGUNA prueba del fichero.
+          provide: WhatsAppNumbersService,
+          useValue: {
+            listar: jest.fn(),
+            renombrar: jest.fn(),
+            marcarPrincipal: jest.fn(),
+          },
         },
         {
           // The controller now also depends on the embedded-signup service;

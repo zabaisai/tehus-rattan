@@ -15,7 +15,11 @@ describe('Chatbot v1 (e2e, base real)', () => {
   let chatbot: ChatbotService;
   let flows: ChatbotFlowsService;
 
-  const whatsapp = { sendMessage: jest.fn().mockResolvedValue('wamid-1') };
+  const whatsapp = {
+    sendMessage: jest.fn().mockResolvedValue('wamid-1'),
+    // El chatbot responde por donde entro la conversacion.
+    sendFromConversation: jest.fn().mockResolvedValue('wamid-1'),
+  };
   const messages = { create: jest.fn().mockResolvedValue({ id: 'm1' }) };
   const notifications = {
     emit: jest.fn().mockResolvedValue(undefined),
@@ -88,7 +92,10 @@ describe('Chatbot v1 (e2e, base real)', () => {
 
   /** Textos que el bot mando en esta interaccion. */
   const enviados = () =>
-    whatsapp.sendMessage.mock.calls.map((c) => String(c[2]));
+    // `sendFromConversation(companyId, conversationId, to, texto)`: el texto
+    // es el CUARTO argumento. El bot responde por el numero de la
+    // conversacion, no siempre desde el principal.
+    whatsapp.sendFromConversation.mock.calls.map((c) => String(c[3]));
 
   beforeAll(async () => {
     prisma = new PrismaService();
@@ -144,7 +151,7 @@ describe('Chatbot v1 (e2e, base real)', () => {
   });
 
   beforeEach(() => {
-    whatsapp.sendMessage.mockClear();
+    whatsapp.sendFromConversation.mockClear();
     messages.create.mockClear();
     notifications.emit.mockClear();
     notifications.emitToCompanyRoles.mockClear();
@@ -192,7 +199,7 @@ describe('Chatbot v1 (e2e, base real)', () => {
       const r = await entra(conv, 'hola');
 
       expect(r.atendido).toBe(false);
-      expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+      expect(whatsapp.sendFromConversation).not.toHaveBeenCalled();
     });
 
     it('sin flujo activo no atiende y deja pasar el resto del procesamiento', async () => {
@@ -211,7 +218,7 @@ describe('Chatbot v1 (e2e, base real)', () => {
     it('una opción del menú lleva al nodo correcto', async () => {
       const conv = await nuevaConversacion();
       await entra(conv, 'hola');
-      whatsapp.sendMessage.mockClear();
+      whatsapp.sendFromConversation.mockClear();
 
       await entra(conv, '1');
 
@@ -221,7 +228,7 @@ describe('Chatbot v1 (e2e, base real)', () => {
     it('una respuesta que no se entiende REPITE el menú en vez de adivinar', async () => {
       const conv = await nuevaConversacion();
       await entra(conv, 'hola');
-      whatsapp.sendMessage.mockClear();
+      whatsapp.sendFromConversation.mockClear();
 
       await entra(conv, 'no sé qué escribir');
 
@@ -233,7 +240,7 @@ describe('Chatbot v1 (e2e, base real)', () => {
       const conv = await nuevaConversacion();
       await entra(conv, 'hola');
       await entra(conv, '1');
-      whatsapp.sendMessage.mockClear();
+      whatsapp.sendFromConversation.mockClear();
 
       await entra(conv, 'Ana');
 
@@ -244,12 +251,12 @@ describe('Chatbot v1 (e2e, base real)', () => {
       const conv = await nuevaConversacion();
       await entra(conv, 'hola');
       await entra(conv, '1');
-      whatsapp.sendMessage.mockClear();
+      whatsapp.sendFromConversation.mockClear();
 
       await entra(conv, 'Ana');
 
       // "Gracias Ana..." y "Cuesta 100." salen en la misma interacción.
-      expect(whatsapp.sendMessage).toHaveBeenCalledTimes(2);
+      expect(whatsapp.sendFromConversation).toHaveBeenCalledTimes(2);
     });
 
     it('al llegar al final la sesión queda COMPLETED', async () => {
@@ -322,12 +329,12 @@ describe('Chatbot v1 (e2e, base real)', () => {
       const conv = await nuevaConversacion();
       await entra(conv, 'hola');
       await entra(conv, '2');
-      whatsapp.sendMessage.mockClear();
+      whatsapp.sendFromConversation.mockClear();
 
       const r = await entra(conv, 'sigo aquí');
 
       expect(r.atendido).toBe(false);
-      expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+      expect(whatsapp.sendFromConversation).not.toHaveBeenCalled();
     });
   });
 

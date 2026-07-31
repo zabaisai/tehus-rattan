@@ -3,6 +3,7 @@
 import { useAuthStore } from '@/store/auth.store';
 import { WhatsAppConnect } from '@/components/whatsapp/WhatsAppConnect';
 import { HistoryImport } from '@/components/whatsapp/HistoryImport';
+import { WhatsAppNumbers } from '@/components/whatsapp/WhatsAppNumbers';
 
 export default function WhatsAppSettingsPage() {
   const user = useAuthStore((s) => s.user);
@@ -24,6 +25,8 @@ export default function WhatsAppSettingsPage() {
       ) : (
         <div className="mt-6 space-y-6">
           <WhatsAppConnect />
+          {/* Solo se dibuja con dos o más: con uno, la lista no informa. */}
+          <WhatsAppNumbers />
           {/* El historial vive aquí y no en una pantalla propia: se importa
               justo después de conectar un número, y es la primera pregunta que
               aparece al ver la bandeja vacía. */}

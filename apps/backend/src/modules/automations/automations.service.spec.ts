@@ -89,7 +89,11 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
     };
     messages = { create: jest.fn().mockResolvedValue({ id: 'm1' }) };
     conversations = { update: jest.fn().mockResolvedValue({ id: CONV }) };
-    whatsapp = { sendMessage: jest.fn().mockResolvedValue('wamid-1') };
+    whatsapp = {
+      sendMessage: jest.fn().mockResolvedValue('wamid-1'),
+      // Las automatizaciones responden POR DONDE ENTRO la conversacion.
+      sendFromConversation: jest.fn().mockResolvedValue('wamid-1'),
+    };
 
     runs = new AutomationRunsService();
     service = new AutomationsService(
@@ -149,7 +153,7 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
       await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
 
       expect(prisma.automation.findMany).not.toHaveBeenCalled();
-      expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+      expect(whatsapp.sendFromConversation).not.toHaveBeenCalled();
     });
   });
 
@@ -262,8 +266,9 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
 
       await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
 
-      expect(whatsapp.sendMessage).toHaveBeenCalledWith(
+      expect(whatsapp.sendFromConversation).toHaveBeenCalledWith(
         COMPANY_A,
+        CONV,
         PHONE,
         'Hola',
       );
@@ -410,7 +415,7 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
 
       await service.processMessage(COMPANY_A, CONV, 'hola', PHONE);
 
-      expect(whatsapp.sendMessage).not.toHaveBeenCalled();
+      expect(whatsapp.sendFromConversation).not.toHaveBeenCalled();
       expect(conversations.update).not.toHaveBeenCalled();
       expect(messages.create).not.toHaveBeenCalled();
     });
@@ -434,7 +439,7 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
 
   describe('manejo de errores HOY: se tragan (la reforma debe darles visibilidad)', () => {
     it('un fallo de envío no aborta las acciones siguientes', async () => {
-      whatsapp.sendMessage.mockRejectedValue(new Error('Meta caido'));
+      whatsapp.sendFromConversation.mockRejectedValue(new Error('Meta caido'));
       prisma.automation.findMany.mockResolvedValue([
         automation({
           actions: [
@@ -454,7 +459,7 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
     });
 
     it('un fallo no se reintenta ni deja rastro persistido', async () => {
-      whatsapp.sendMessage.mockRejectedValue(new Error('Meta caido'));
+      whatsapp.sendFromConversation.mockRejectedValue(new Error('Meta caido'));
       prisma.automation.findMany.mockResolvedValue([
         automation({ actions: [{ type: 'send_message', message: 'Hola' }] }),
       ]);
@@ -463,7 +468,7 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
 
       // Sin reintento, sin AutomationRun, sin DLQ: exactamente un intento y
       // ninguna escritura de estado. Esto es lo que la reforma sustituye.
-      expect(whatsapp.sendMessage).toHaveBeenCalledTimes(1);
+      expect(whatsapp.sendFromConversation).toHaveBeenCalledTimes(1);
       expect(messages.create).not.toHaveBeenCalled();
     });
 

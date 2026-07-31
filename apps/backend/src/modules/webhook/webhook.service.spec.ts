@@ -147,9 +147,13 @@ describe('WebhookService', () => {
       phone: '50255551111',
       name: 'Jane Doe',
     });
+    // El tercer argumento es el numero POR EL QUE ENTRO. Sin el, una empresa
+    // con varios numeros responderia siempre desde el principal y el cliente
+    // recibiria la respuesta desde un numero al que no escribio.
     expect(conversationsService.findOrCreate).toHaveBeenCalledWith(
       'company-a',
       'contact-a',
+      'integration-a',
     );
     expect(messagesService.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -797,7 +801,13 @@ describe('WebhookService', () => {
         motivo: 'respondido',
       });
 
-      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        null,
+      );
 
       expect(leadIntake.ensureLeadForConversation).toHaveBeenCalled();
     });
@@ -808,7 +818,13 @@ describe('WebhookService', () => {
         motivo: 'sin-flujo',
       });
 
-      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        null,
+      );
 
       expect(automationsService.processMessage).toHaveBeenCalled();
     });
@@ -819,7 +835,13 @@ describe('WebhookService', () => {
       chatbot.handleInbound.mockRejectedValue(new Error('bot roto'));
 
       await expect(
-        service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null),
+        service.runInboundEffects(
+          'company-a',
+          'conv-1',
+          'hola',
+          '+57300',
+          null,
+        ),
       ).resolves.toBeUndefined();
       expect(automationsService.processMessage).toHaveBeenCalled();
     });
@@ -869,9 +891,13 @@ describe('WebhookService', () => {
 
     it('un fallo importando historial no tumba el webhook', async () => {
       // Por el mismo webhook llegan los mensajes en vivo.
-      historySync.procesarHistorial.mockRejectedValue(new Error('formato raro'));
+      historySync.procesarHistorial.mockRejectedValue(
+        new Error('formato raro'),
+      );
 
-      await expect(service.processWebhook(conHistorial)).resolves.toBeUndefined();
+      await expect(
+        service.processWebhook(conHistorial),
+      ).resolves.toBeUndefined();
     });
   });
 });

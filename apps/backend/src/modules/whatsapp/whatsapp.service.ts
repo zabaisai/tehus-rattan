@@ -29,6 +29,28 @@ export class WhatsappService {
   // El numero indicado se resuelve SIEMPRE acotado a la empresa del contexto,
   // de modo que un phoneNumberId de otro tenant nunca pueda usarse para
   // enviar en su nombre.
+  /**
+   * Envia respondiendo POR DONDE ENTRO la conversacion.
+   *
+   * Existe para que ningun automatismo tenga que acordarse de resolver el
+   * numero. Un chatbot o una automatizacion que llame a `sendMessage` a secas
+   * contesta desde el principal, y con varios numeros eso significa que el
+   * cliente que escribio a Soporte recibe la respuesta desde Ventas.
+   */
+  async sendFromConversation(
+    companyId: string,
+    conversationId: string,
+    to: string,
+    message: string,
+  ): Promise<string | undefined> {
+    const desde =
+      await this.whatsappIntegrationService.findPhoneNumberIdForConversation(
+        companyId,
+        conversationId,
+      );
+    return this.sendMessage(companyId, to, message, desde);
+  }
+
   async sendMessage(
     companyId: string,
     to: string,

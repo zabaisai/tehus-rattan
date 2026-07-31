@@ -6,6 +6,7 @@ import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 describe('WhatsAppIntegrationController', () => {
   let managementService: any;
   let embeddedSignupService: any;
+  let numbersService: any;
   let controller: WhatsAppIntegrationController;
 
   const safeResponse = {
@@ -39,10 +40,52 @@ describe('WhatsAppIntegrationController', () => {
       disconnectLocal: jest.fn(),
       sendTest: jest.fn(),
     };
+    numbersService = {
+      listar: jest.fn(),
+      renombrar: jest.fn(),
+      marcarPrincipal: jest.fn(),
+    };
     controller = new WhatsAppIntegrationController(
       managementService,
       embeddedSignupService,
+      numbersService,
     );
+  });
+
+  describe('varios numeros', () => {
+    it('lista los numeros de LA empresa del token, no los que pidan', async () => {
+      await controller.listMyNumbers(buildRequest('company-a'));
+      expect(numbersService.listar).toHaveBeenCalledWith('company-a');
+    });
+
+    it('renombra acotado por la empresa del token', async () => {
+      await controller.renameMyNumber('num-1', buildRequest('company-a'), {
+        label: '  Soporte  ',
+      });
+      expect(numbersService.renombrar).toHaveBeenCalledWith(
+        'company-a',
+        'num-1',
+        '  Soporte  ',
+      );
+    });
+
+    it('una etiqueta ausente se manda como null: es borrarla, no "sin cambios"', async () => {
+      await controller.renameMyNumber('num-1', buildRequest('company-a'), {});
+      expect(numbersService.renombrar).toHaveBeenCalledWith(
+        'company-a',
+        'num-1',
+        null,
+      );
+    });
+
+    it('marca principal pasando quien lo hizo, para que quede en auditoria', async () => {
+      await controller.setMyPrimaryNumber('num-1', buildRequest('company-a'));
+      expect(numbersService.marcarPrincipal).toHaveBeenCalledWith(
+        'company-a',
+        'num-1',
+        { userId: 'user-1', role: 'ADMIN' },
+      );
+    });
   });
 
   describe('GET /me', () => {
