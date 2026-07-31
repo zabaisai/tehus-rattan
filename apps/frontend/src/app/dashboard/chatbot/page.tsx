@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bot, Plus, Rocket, Trash2 } from 'lucide-react';
 import {
@@ -26,9 +26,7 @@ const ESTADO_SESION: Record<string, string> = {
 export default function ChatbotPage() {
   const queryClient = useQueryClient();
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
-  const [borrador, setBorrador] = useState<FlujoChatbot | null>(null);
-  const [aviso, setAviso] = useState<string | null>(null);
-  const [guardando, setGuardando] = useState(false);
+  const [errorLista, setErrorLista] = useState<string | null>(null);
 
   const { data: flujos } = useQuery({
     queryKey: ['chatbot', 'flows'],
@@ -43,14 +41,6 @@ export default function ChatbotPage() {
 
   const flujo = flujos?.find((f) => f.id === seleccionado) ?? null;
 
-  // El borrador se carga al cambiar de flujo. Se guarda en estado local y no
-  // se escribe en cada tecla: guardar en cada pulsación publicaría versiones
-  // a medio escribir contra la base decenas de veces por minuto.
-  useEffect(() => {
-    setBorrador(flujo ? flujo.draftNodes : null);
-    setAviso(null);
-  }, [flujo]);
-
   async function refrescar() {
     await queryClient.invalidateQueries({ queryKey: ['chatbot'] });
   }
@@ -59,45 +49,6 @@ export default function ChatbotPage() {
     const creado = await createFlow({ name: 'Flujo sin nombre' });
     await refrescar();
     setSeleccionado(creado.id);
-  }
-
-  async function guardarBorrador() {
-    if (!flujo || !borrador) return;
-    setGuardando(true);
-    try {
-      await updateFlow(flujo.id, { draftNodes: borrador });
-      setAviso('Borrador guardado. Todavía no atiende a nadie.');
-      await refrescar();
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  async function publicar() {
-    if (!flujo || !borrador) return;
-    // Se comprueba antes de llamar para dar el aviso al instante; el servidor
-    // vuelve a validar y es quien manda.
-    const problemas = validarFlujo(borrador);
-    if (problemas.length) {
-      setAviso('Corrige los problemas marcados antes de publicar.');
-      return;
-    }
-
-    setGuardando(true);
-    try {
-      await updateFlow(flujo.id, { draftNodes: borrador });
-      await publishFlow(flujo.id);
-      setAviso(
-        flujo.isActive
-          ? 'Publicado. Ya atiende con la versión nueva.'
-          : 'Publicado. Actívalo para que empiece a atender.',
-      );
-      await refrescar();
-    } catch {
-      setAviso('No se pudo publicar. Revisa los problemas marcados.');
-    } finally {
-      setGuardando(false);
-    }
   }
 
   async function alternarActivo(f: FlujoResumen) {
@@ -113,7 +64,7 @@ export default function ChatbotPage() {
     } catch {
       // El backend rechaza borrar un flujo con conversaciones en curso; su
       // motivo es más útil que un genérico, pero aquí basta con no mentir.
-      setAviso(
+      setErrorLista(
         'No se puede eliminar: hay conversaciones usándolo. Desactívalo y espera a que terminen.',
       );
     }
@@ -138,6 +89,15 @@ export default function ChatbotPage() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+        <div className="space-y-2">
+        {errorLista && (
+          <p
+            role="alert"
+            className="rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-xs text-red-700"
+          >
+            {errorLista}
+          </p>
+        )}
         <ul className="h-fit divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
           {!flujos?.length && (
             <li className="px-3 py-8 text-center">
@@ -190,6 +150,7 @@ export default function ChatbotPage() {
             </li>
           ))}
         </ul>
+        </div>
 
         <div className="space-y-3">
           {!flujo && (
@@ -198,47 +159,16 @@ export default function ChatbotPage() {
             </p>
           )}
 
-          {flujo && borrador && (
-            <>
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stone-200 bg-white p-3">
-                <input
-                  value={flujo.name}
-                  onChange={(e) =>
-                    void updateFlow(flujo.id, { name: e.target.value }).then(
-                      refrescar,
-                    )
-                  }
-                  aria-label="Nombre del flujo"
-                  className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-1.5 text-sm outline-none focus:border-stone-500"
-                />
-                <button
-                  onClick={() => void guardarBorrador()}
-                  disabled={guardando}
-                  className="rounded-md border border-stone-300 px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50 disabled:opacity-50"
-                >
-                  Guardar borrador
-                </button>
-                <button
-                  onClick={() => void publicar()}
-                  disabled={guardando}
-                  className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-800 disabled:opacity-50"
-                >
-                  <Rocket size={13} />
-                  Publicar
-                </button>
-              </div>
-
-              {aviso && (
-                <p
-                  role="status"
-                  className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700"
-                >
-                  {aviso}
-                </p>
-              )}
-
-              <ChatbotFlowEditor flujo={borrador} onChange={setBorrador} />
-            </>
+          {flujo && (
+            // `key` remonta el editor al cambiar de flujo, y con ello reinicia
+            // su borrador. Sin esto haria falta un efecto que sincronizara el
+            // estado local con el flujo elegido, y sincronizar estado con
+            // efectos provoca renderizados en cascada.
+            <PanelDeFlujo
+              key={flujo.id}
+              flujo={flujo}
+              onGuardado={refrescar}
+            />
           )}
         </div>
       </div>
@@ -281,5 +211,107 @@ export default function ChatbotPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Edición de UN flujo. Vive aparte para que su borrador se reinicie al
+ * cambiar de flujo por remontaje (`key`) en vez de por un efecto que
+ * sincronice estado, que es lo que provoca renderizados en cascada.
+ */
+function PanelDeFlujo({
+  flujo,
+  onGuardado,
+}: {
+  flujo: FlujoResumen;
+  onGuardado: () => Promise<void> | void;
+}) {
+  // El borrador NO se escribe en cada tecla: guardar en cada pulsación
+  // mandaría decenas de escrituras por minuto contra la base.
+  const [borrador, setBorrador] = useState<FlujoChatbot>(flujo.draftNodes);
+  const [aviso, setAviso] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
+
+  async function guardarBorrador() {
+    setGuardando(true);
+    try {
+      await updateFlow(flujo.id, { draftNodes: borrador });
+      setAviso('Borrador guardado. Todavía no atiende a nadie.');
+      await onGuardado();
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function publicar() {
+    // Se comprueba antes de llamar para dar el aviso al instante; el servidor
+    // vuelve a validar y es quien manda.
+    if (validarFlujo(borrador).length) {
+      setAviso('Corrige los problemas marcados antes de publicar.');
+      return;
+    }
+
+    setGuardando(true);
+    try {
+      await updateFlow(flujo.id, { draftNodes: borrador });
+      await publishFlow(flujo.id);
+      setAviso(
+        flujo.isActive
+          ? 'Publicado. Ya atiende con la versión nueva.'
+          : 'Publicado. Actívalo para que empiece a atender.',
+      );
+      await onGuardado();
+    } catch {
+      setAviso('No se pudo publicar. Revisa los problemas marcados.');
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-stone-200 bg-white p-3">
+        <input
+          defaultValue={flujo.name}
+          onBlur={(e) => {
+            // Al salir del campo y no en cada tecla, por el mismo motivo que
+            // el borrador.
+            if (e.target.value !== flujo.name) {
+              void updateFlow(flujo.id, { name: e.target.value }).then(
+                onGuardado,
+              );
+            }
+          }}
+          aria-label="Nombre del flujo"
+          className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-1.5 text-sm outline-none focus:border-stone-500"
+        />
+        <button
+          onClick={() => void guardarBorrador()}
+          disabled={guardando}
+          className="rounded-md border border-stone-300 px-3 py-1.5 text-xs text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+        >
+          Guardar borrador
+        </button>
+        <button
+          onClick={() => void publicar()}
+          disabled={guardando}
+          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+        >
+          <Rocket size={13} />
+          Publicar
+        </button>
+      </div>
+
+      {aviso && (
+        <p
+          role="status"
+          className="rounded-md border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700"
+        >
+          {aviso}
+        </p>
+      )}
+
+      <ChatbotFlowEditor flujo={borrador} onChange={setBorrador} />
+    </>
   );
 }
