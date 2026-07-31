@@ -9,6 +9,7 @@
     "node": ">=22"
   },
   "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "build": "nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

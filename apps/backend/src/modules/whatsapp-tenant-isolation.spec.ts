@@ -3,6 +3,7 @@ import { WhatsAppIntegrationService } from './whatsapp-integration/whatsapp-inte
 import { WhatsAppTokenCryptoService } from './whatsapp-integration/whatsapp-token-crypto.service';
 import { WebhookService } from './webhook/webhook.service';
 import { WhatsappService } from './whatsapp/whatsapp.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -149,7 +150,12 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
     beforeEach(() => {
       prisma = buildFakePrisma([integrationA, integrationB]);
-      whatsappIntegrationService = new WhatsAppIntegrationService(prisma);
+      // El doble solo implementa lo que este servicio consulta. La asercion
+      // dice exactamente eso: es un Prisma parcial a proposito, no un
+      // descuido.
+      whatsappIntegrationService = new WhatsAppIntegrationService(
+        prisma as unknown as PrismaService,
+      );
       conversationsService = {
         findOrCreate: jest.fn().mockResolvedValue({ id: 'conversation-x' }),
       };
@@ -278,7 +284,12 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       jest.clearAllMocks();
 
       const prisma = buildFakePrisma([integrationA, integrationB]);
-      whatsappIntegrationService = new WhatsAppIntegrationService(prisma);
+      // Doble parcial a proposito: solo implementa lo que este servicio
+      // consulta. La asercion lo dice explicitamente en vez de dejar un
+      // error de tipos abierto.
+      whatsappIntegrationService = new WhatsAppIntegrationService(
+        prisma as unknown as PrismaService,
+      );
       service = new WhatsappService(
         whatsappIntegrationService,
         tokenCryptoService,
@@ -308,7 +319,11 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
       const [url, , options] = mockedAxios.post.mock.calls[0];
       expect(url).not.toContain('phone-b');
-      expect(options.headers.Authorization).not.toBe('Bearer token-b');
+      // Se afirma que la cabecera EXISTE antes de mirarla: si la llamada
+      // llegara sin opciones, un acceso opcional daria `undefined` y la
+      // comparacion pasaria sola sin haber comprobado nada.
+      expect(options?.headers?.Authorization).toBeDefined();
+      expect(options?.headers?.Authorization).not.toBe('Bearer token-b');
     });
 
     it('sends via Company B integration using phone-b and token-b only', async () => {
@@ -326,7 +341,8 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
       const [url, , options] = mockedAxios.post.mock.calls[0];
       expect(url).not.toContain('phone-a');
-      expect(options.headers.Authorization).not.toBe('Bearer token-a');
+      expect(options?.headers?.Authorization).toBeDefined();
+      expect(options?.headers?.Authorization).not.toBe('Bearer token-a');
     });
   });
 });

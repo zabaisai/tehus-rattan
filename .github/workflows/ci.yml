@@ -35,6 +35,8 @@ jobs:
           cache-dependency-path: apps/frontend/package-lock.json
       - run: npm ci
       - run: npm test
+      - name: Typecheck (incluye tests)
+        run: npm run typecheck
       - run: npm run lint
       - name: Build
         run: npm run build
@@ -80,6 +82,14 @@ jobs:
         run: npx prisma generate
       - name: Prisma validate
         run: npx prisma validate
+      # Comprueba TAMBIEN los ficheros de prueba, que `npm run build` no ve:
+      # usa tsconfig.build.json, que los excluye. Sin este paso, un spec que
+      # instancia un servicio con menos argumentos de los que pide su
+      # constructor pasa el CI sin que nadie se entere — y esa desalineacion
+      # ha llegado a dejar mocks DESPLAZADOS, con la cola ocupando la posicion
+      # de las notificaciones y las pruebas pasando igualmente.
+      - name: Typecheck (incluye specs)
+        run: npm run typecheck
       - name: Unit tests
         run: npm test -- --runInBand
       - name: Build

@@ -234,7 +234,11 @@ describe('ProductsImportService', () => {
 
     const imageBuffer = Buffer.from(TINY_PNG_BASE64, 'base64');
     const imageId = workbook.addImage({
-      buffer: imageBuffer,
+      // `Buffer.from` devuelve `Buffer<ArrayBuffer>` en los tipos nuevos de
+      // Node, y exceljs sigue declarando el `Buffer` generico. Es el mismo
+      // objeto en ejecucion; la asercion solo reconcilia las dos
+      // declaraciones.
+      buffer: imageBuffer as unknown as ExcelJS.Buffer,
       extension: 'png',
     });
     worksheet.addImage(imageId, {

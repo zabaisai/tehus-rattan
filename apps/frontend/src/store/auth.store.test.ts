@@ -51,7 +51,13 @@ describe('auth store (no JWT persistence)', () => {
   });
 
   it('has no token/isAuthenticated field on the state (token lives outside the store)', () => {
-    const state = useAuthStore.getState() as Record<string, unknown>;
+    // Doble asercion porque `AuthState` no solapa con un indice de cadena:
+    // la prueba comprueba precisamente que NO existen esas claves, asi que
+    // mirarlo como objeto generico es el punto.
+    const state = useAuthStore.getState() as unknown as Record<
+      string,
+      unknown
+    >;
     expect('token' in state).toBe(false);
     expect('isAuthenticated' in state).toBe(false);
   });

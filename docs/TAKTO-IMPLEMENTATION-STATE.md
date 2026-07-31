@@ -551,6 +551,10 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras constructor visual | **200 frontend verdes / 33 suites** |
 | 2026-07-31 | **CI** `efbcebe` | ❌ **failure** — E2E: `roles-guard` no arrancaba |
 | 2026-07-31 | tras chatbot v1 (motor) | **1133 unit / 347 e2e verdes** |
+| 2026-07-31 | **CI** `b1659bc` | ❌ **failure** — lint del frontend que publiqué a sabiendas |
+| 2026-07-31 | **CI** `dc5b26d`, `179cb54` | **success**, `head_sha` verificado |
+| 2026-07-31 | tras cotizaciones con PDF | **1167 unit / 347 e2e / 215 frontend verdes** |
+| 2026-07-31 | tras cerrar la deuda de tipos | **typecheck sin errores en ambos proyectos** |
 | 2026-07-31 | tras recuperación | **1106 unit / 324 e2e / 200 frontend verdes**, typecheck sin errores propios, lint y build limpios |
 | 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras historial de automatizaciones | **1106 unit / 324 e2e verdes** |
@@ -602,12 +606,17 @@ posición de las notificaciones y el outbox en la de la cola. Las pruebas
 pasaban porque no alcanzaban esos caminos. Corregido: los diez van nombrados
 y en orden.
 
-**Deuda de tipos registrada.** `npm run build` usa `tsconfig.build.json`, que
-**excluye los specs**, así que el CI nunca ve los errores de tipo de las
-pruebas. `npx tsc --noEmit -p tsconfig.json` sí. Tras la recuperación quedan
-**6 errores anteriores a esta rama** (un `Buffer` de exceljs y varios
-`possibly undefined` en mocks de fetch) que no se tocan para no mezclar deuda
-heredada con la introducida aquí.
+**Deuda de tipos: CERRADA.** `npm run build` usa `tsconfig.build.json`, que
+**excluye los specs**, así que el CI nunca veía los errores de tipo de las
+pruebas — y de ahí salieron dos fallos de esta sesión. Ahora:
+
+- los **6 errores heredados** están corregidos (el `Buffer` de exceljs, el
+  Prisma parcial y los `possibly undefined` en mocks de axios; estos últimos
+  además afirmando que la cabecera **existe** antes de compararla: con acceso
+  opcional a secas, la comparación pasaba sola sin comprobar nada);
+- hay `npm run typecheck` en ambos proyectos y **el CI lo ejecuta**, así que
+  un spec desalineado con el constructor que instancia vuelve rojo antes de
+  poder mezclarse.
 
 ## Aprendizaje operativo importante
 
