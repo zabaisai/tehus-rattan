@@ -9,9 +9,9 @@ import type { Redis } from 'ioredis';
 import { RealtimeGateway } from './realtime.gateway';
 import { isQueueWorker } from '../queue/queue.role';
 import {
-  conTiempoLimite,
   crearClientesRedis,
   estadoDelPuente,
+  puenteUtilizable,
   usaPuenteRedis,
 } from './realtime.redis';
 
@@ -53,12 +53,12 @@ export class RealtimeTransport implements OnModuleInit, OnModuleDestroy {
       pub.on('error', () => undefined);
       sub.on('error', () => undefined);
 
-      // Con límite de tiempo: un `ping` a un Redis inalcanzable no falla, se
-      // queda reintentando, y el worker se colgaría a mitad del arranque sin
-      // llegar nunca a consumir la cola.
-      const conectado = await conTiempoLimite(
-        Promise.all([pub.ping(), sub.ping()]),
-      );
+      // Espera a que ambos clientes estén LISTOS y solo entonces hace PING,
+      // todo acotado en el tiempo. Las dos mitades importan: sin la espera, el
+      // PING se rechaza al instante contra una Redis sana; sin el límite, un
+      // Redis inalcanzable dejaría el arranque del worker colgado sin llegar
+      // nunca a consumir la cola.
+      const conectado = await puenteUtilizable(pub, sub);
       if (!conectado) throw new Error('redis inalcanzable');
 
       // Sin puerto ni servidor HTTP: nadie se conecta aquí. Solo publica.

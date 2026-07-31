@@ -698,6 +698,72 @@ Corregido con una espera máxima de 3 s (`ESPERA_MAXIMA_REDIS_MS`),
 **Lección para quien reanude:** las suites no lo detectaron porque en pruebas
 `QUEUE_ENABLED=false`. Levantar el producto de verdad es lo que lo encontró.
 
+## Incidente: primer despliegue a staging revertido (`ac7e32d`)
+
+**Qué pasó.** El merge a `main` (`ac7e32d`) llegó verde, las 20 migraciones se
+aplicaron sin error y con los datos intactos, y aun así `/api/health/status`
+devolvió `degraded`: base, cola, worker y outbox `up`, pero el **puente de
+tiempo real** en `redis-inalcanzable`.
+
+**Causa, reproducida dentro del contenedor.** No era la infraestructura:
+
+```
+con enableOfflineQueue:false -> FALLA: Stream isn't writeable and enableOfflineQueue options is false
+esperando ready              -> PONG
+```
+
+`crearClientesRedis()` construía el cliente y llamaba a `ping()` acto seguido.
+ioredis conecta de forma asíncrona, así que el socket aún no era escribible y,
+con `enableOfflineQueue: false`, el comando se rechazaba **al instante**. Ese
+rechazo se leía como «Redis inalcanzable» y el puente quedaba apagado en
+**todos** los arranques, contra una Redis sana — la misma que BullMQ usaba sin
+problema, porque BullMQ sí espera a la conexión. Por eso `queue` salía `up` y
+`realtime` `down` a la vez: la pista estaba en el propio health.
+
+Lo irónico: `enableOfflineQueue: false` se había añadido para arreglar un
+cuelgue de arranque. Arregló el cuelgue e introdujo esto.
+
+**Qué se hizo.** Rollback documentado completo: restaurar el dump
+pre-migración (21 migraciones, conteos idénticos), devolver las imágenes
+`:58dfb76` y smoke test **17/17** exigiendo ese release. `postgres`, `caddy` y
+`takto-web` conservaron su ID de contenedor: nunca se recrearon.
+
+**Corrección.** `esperarListo()` espera el evento `ready` —acotado, y
+retirando siempre sus escuchadores— antes del PING; `puenteUtilizable()` reúne
+espera + PING en una sola función para que backend y worker no puedan volver a
+divergir. `enableOfflineQueue: false` se conserva: lo que faltaba no era la
+cola, era esperar.
+
+**Lección para quien reanude:** la suite pasaba porque el doble de Redis
+aceptaba `ping()` siempre. Un doble que no puede reproducir el fallo no
+protege de nada. Las pruebas nuevas fallan contra el código anterior — se
+comprobó reintroduciendo el defecto: **5 rojas**.
+
+## Incidente de seguridad: `SMTP_PASSWORD` expuesta en la salida
+
+**Qué pasó.** Para leer el usuario de base de datos ejecuté
+`set -a; . ./.env.staging`. Bash falló al analizar una línea posterior y, al
+informar del error de sintaxis, **incluyó el contenido de esa línea**, que era
+`SMTP_PASSWORD`. El valor quedó en el registro de la sesión.
+
+**Alcance.** Solo esa variable. No se imprimió ninguna otra credencial; el
+fichero conserva permisos `600 deploy:deploy` y no se copió a ningún sitio.
+
+**Por qué ocurrió.** `source` sobre un fichero de entorno lo ejecuta como
+script: cualquier valor con comillas, `)`, `|` o `$` se interpreta, y el
+mensaje de error de bash cita la línea completa. Un `.env` no es un script.
+
+**Cómo se lee a partir de ahora** — nunca `source`, y sin volcar el valor:
+
+```bash
+# Dentro del contenedor, que ya tiene la variable en su entorno:
+docker compose -f docker-compose.staging.yml exec -T postgres \
+  sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "..."'
+```
+
+**Acción pendiente del operador:** rotar `SMTP_PASSWORD`. El despliegue queda
+detenido hasta la confirmación explícita «SMTP rotada».
+
 ## Incidente: CI rojo en `efbcebe` (recuperado)
 
 **Qué pasó.** `efbcebe` añadió `AutomationRunsService` y `PrismaService` al

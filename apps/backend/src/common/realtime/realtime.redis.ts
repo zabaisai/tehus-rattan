@@ -66,6 +66,51 @@ export function crearClientesRedis(env: NodeJS.ProcessEnv = process.env): {
 }
 
 /**
+ * Espera a que el cliente esté LISTO para aceptar comandos.
+ *
+ * EXISTE POR UN FALLO QUE LLEGÓ A STAGING. `ping()` se llamaba nada más
+ * construir el cliente. ioredis conecta de forma asíncrona, así que el socket
+ * todavía no era escribible y, con `enableOfflineQueue: false`, el comando se
+ * rechazaba EN EL ACTO con "Stream isn't writeable". El resultado se
+ * interpretaba como "Redis inalcanzable" y el puente quedaba desactivado en
+ * TODOS los arranques, contra una Redis perfectamente sana —la misma que
+ * BullMQ usaba sin problema, porque BullMQ sí espera a la conexión—.
+ *
+ * `enableOfflineQueue: false` se conserva a propósito: es lo que hace que un
+ * comando posterior contra una Redis caída falle rápido en vez de quedarse
+ * encolado para siempre. Lo que faltaba no era la cola, era esperar.
+ *
+ * Los escuchadores se retiran SIEMPRE al salir. Sin eso, cada arranque fallido
+ * dejaría un `once('ready')` vivo sobre un cliente que ioredis sigue
+ * reintentando, y una reconexión posterior resolvería una promesa que ya no
+ * mira nadie.
+ */
+export function esperarListo(cliente: Redis): Promise<void> {
+  // Ya está listo: no hay nada que esperar y suscribirse ahora significaría
+  // esperar al SIGUIENTE 'ready', que quizá no llegue nunca.
+  if (cliente.status === 'ready') return Promise.resolve();
+
+  return new Promise<void>((resolver, rechazar) => {
+    const limpiar = () => {
+      cliente.removeListener('ready', alListo);
+      cliente.removeListener('end', alCerrar);
+    };
+    const alListo = () => {
+      limpiar();
+      resolver();
+    };
+    // 'end' es el final de la vía: ioredis ya no reintenta. Sin escucharlo, la
+    // espera se agotaría por tiempo cuando la respuesta ya se conoce.
+    const alCerrar = () => {
+      limpiar();
+      rechazar(new Error('conexión cerrada'));
+    };
+    cliente.once('ready', alListo);
+    cliente.once('end', alCerrar);
+  });
+}
+
+/**
  * Resuelve a `false` si la comprobación no termina a tiempo, en vez de
  * quedarse esperando. El temporizador se limpia siempre: dejarlo vivo
  * mantendría el proceso despierto y un `docker stop` tardaría de más.
@@ -91,6 +136,29 @@ export async function conTiempoLimite(
   } finally {
     if (temporizador) clearTimeout(temporizador);
   }
+}
+
+/**
+ * Comprobación completa del par de clientes: esperar a que ambos estén listos
+ * y solo entonces hacer PING, todo dentro del mismo límite de tiempo.
+ *
+ * Se ofrece como una sola función porque el backend y el worker abren el
+ * puente por caminos distintos y ANTES cada uno escribía su propia versión de
+ * la comprobación. Dos copias de esta secuencia son dos oportunidades de
+ * repetir exactamente el fallo que esto arregla.
+ */
+export async function puenteUtilizable(
+  pub: Redis,
+  sub: Redis,
+  ms = ESPERA_MAXIMA_REDIS_MS,
+): Promise<boolean> {
+  return conTiempoLimite(
+    (async () => {
+      await Promise.all([esperarListo(pub), esperarListo(sub)]);
+      await Promise.all([pub.ping(), sub.ping()]);
+    })(),
+    ms,
+  );
 }
 
 /**
@@ -125,7 +193,12 @@ export class RedisIoAdapter extends IoAdapter {
    * NUNCA bloquea el arranque más de `ESPERA_MAXIMA_REDIS_MS`: un backend que
    * no llega a escuchar es mucho peor que uno sin tiempo real.
    */
-  async conectar(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  async conectar(
+    env: NodeJS.ProcessEnv = process.env,
+    // Acotable desde las pruebas: esperar los 3 s reales por cada caso de
+    // Redis-que-no-llega convertiría la suite en algo que nadie ejecuta.
+    ms = ESPERA_MAXIMA_REDIS_MS,
+  ): Promise<boolean> {
     const { pub, sub } = crearClientesRedis(env);
     this.clientes = [pub, sub];
     // Un fallo posterior de Redis no debe tumbar el proceso por un
@@ -133,9 +206,7 @@ export class RedisIoAdapter extends IoAdapter {
     pub.on('error', () => undefined);
     sub.on('error', () => undefined);
 
-    const conectado = await conTiempoLimite(
-      Promise.all([pub.ping(), sub.ping()]),
-    );
+    const conectado = await puenteUtilizable(pub, sub, ms);
 
     if (!conectado) {
       this.logger.warn(
