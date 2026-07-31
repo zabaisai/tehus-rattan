@@ -186,6 +186,13 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
           .fn()
           .mockResolvedValue({ leadId: null, creado: false, assignedTo: null }),
       } as never;
+      // El bot no atiende: estas pruebas cubren el enrutado por empresa, y un
+      // bot activo se comeria los mensajes antes de llegar a lo que se mide.
+      const chatbotMock = {
+        handleInbound: jest
+          .fn()
+          .mockResolvedValue({ atendido: false, motivo: 'sin-flujo' }),
+      } as never;
 
       webhookService = new WebhookService(
         prisma,
@@ -198,6 +205,7 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         inboundQueueMock,
         outboxMock,
         leadIntakeMock,
+        chatbotMock,
       );
     });
 

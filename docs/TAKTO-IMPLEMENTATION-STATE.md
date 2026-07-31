@@ -306,7 +306,17 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       15 pruebas
 - [ ] Notificaciones (productores completos)
 - [ ] WhatsApp: salud, medios, plantillas, estados
-- [ ] Cotizaciones + PDF real
+- [x] **Cotizaciones con PDF en servidor** — PDFKit, no Chromium (decisión
+      11): un Chromium por PDF multiplica por diez la memoria del contenedor
+      para dibujar una tabla. En el servidor y no imprimiendo la pantalla
+      porque un PDF hecho por el navegador depende de la impresora, el zoom y
+      la versión de Chrome de quien lo genere: dos personas mandarían
+      documentos distintos al mismo cliente. **Lo que DICE el documento vive
+      en una función pura** (`quote-document.ts`) separada del dibujado: el
+      contenido de un PDF va comprimido y no se puede comprobar buscando
+      texto, así que sin esa separación las decisiones que importan —qué
+      campos se omiten, si aparece la línea de descuento— quedarían sin
+      probar · 68 pruebas
 - [ ] Configuración y personalización por empresa
 - [ ] Plataforma y soporte
 

@@ -52,6 +52,36 @@ export class QuotesService {
     });
   }
 
+  /**
+   * Todo lo que el PDF necesita, resuelto en una consulta y acotado por
+   * empresa. El contacto viene del lead: es a quien se dirige el documento,
+   * y sin el la cotizacion sale con el titulo de la oportunidad como
+   * destinatario, que es un apano y se nota.
+   */
+  async findForPdf(id: string, companyId: string) {
+    const quote = await this.prisma.quote.findFirst({
+      where: { id, companyId },
+      include: {
+        items: { orderBy: { createdAt: 'asc' } },
+        company: {
+          select: {
+            ...COMPANY_IDENTITY_SELECT,
+            currency: true,
+            locale: true,
+          },
+        },
+        lead: {
+          select: {
+            title: true,
+            contact: { select: { name: true, phone: true } },
+          },
+        },
+      },
+    });
+    if (!quote) throw new NotFoundException('Cotización no encontrada');
+    return quote;
+  }
+
   async findById(id: string, companyId: string) {
     const quote = await this.prisma.quote.findFirst({
       where: { id, companyId },

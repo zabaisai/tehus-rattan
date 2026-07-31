@@ -4,7 +4,9 @@ import { Suspense, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Printer, Trash2 } from 'lucide-react';
-import { getQuotes, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from '@/lib/quotes';
+import { getQuotes, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS,
+  abrirQuotePdf,
+} from '@/lib/quotes';
 import { QuoteStatus } from '@/types';
 import { QuoteDetailModal } from '@/components/quotes/QuoteDetailModal';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -145,9 +147,9 @@ function QuotesPageContent() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      window.open(`/dashboard/quotes/${quote.id}/print`, '_blank');
+                      void abrirQuotePdf(quote.id, quote.number);
                     }}
-                    aria-label="Ver documento imprimible"
+                    aria-label="Descargar el PDF de la cotización"
                     className="rounded p-2 text-stone-400 hover:bg-amber-50 hover:text-amber-700"
                   >
                     <Printer size={16} />
@@ -213,7 +215,7 @@ function QuotesPageContent() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          window.open(`/dashboard/quotes/${quote.id}/print`, '_blank');
+                          void abrirQuotePdf(quote.id, quote.number);
                         }}
                         title="Ver documento imprimible"
                         className="rounded p-1.5 text-stone-400 hover:bg-amber-50 hover:text-amber-700"
