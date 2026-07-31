@@ -179,8 +179,12 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       AppModule, sin servidor HTTP, `stop_grace_period` 60 s
 - [x] **QueueModule registrado** + `/health/queue` aislado de `/health/ready`
       · `QueuePingService` con conexión propia y perezosa · 11 pruebas
-- [ ] Procesadores reales enganchados a las colas
-- [ ] El webhook debe ENCOLAR en vez de ejecutar en línea
+- [x] **Productor enganchado**: el webhook hace persistir + encolar, con
+      idempotencia por `messageId` y **marcha atrás en línea** si Redis falla
+- [x] **`queue.role.ts`**: el backend produce, el worker consume · prueba de
+      que hay exactamente UN consumidor en un despliegue normal
+- [ ] **Procesador (consumidor) en el worker** — falta registrar el `Worker`
+      de BullMQ que ejecute `runInboundEffects`
 - [ ] Outbox/eventos durables
 - [ ] WebSockets autenticados y aislados por empresa
 - [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
@@ -348,7 +352,9 @@ revisaron y no se duplicaron.
 | 2026-07-31 | **CI** `531b12b` (dual-write etapa) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras bloque 6 infra | 920 unit / 233 e2e verdes |
 | 2026-07-31 | **CI** `eebaa91` (Redis + worker) | **success**, `head_sha` verificado |
-| 2026-07-31 | tras QueueModule | **931 unit / 233 e2e verdes** |
+| 2026-07-31 | tras QueueModule | 931 unit / 233 e2e verdes |
+| 2026-07-31 | **CI** `53fac94` (QueueModule) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras productor de cola | **958 unit / 233 e2e verdes** |
 
 ## Despliegues
 
@@ -379,32 +385,38 @@ verde de un SHA anterior no cubre el código nuevo.
 ## Próximo comando seguro
 
 Bloques 0–4 completos. Bloque 5 en dual-write. Bloque 6 con Redis, worker,
-config de cola y salud **ya enganchados**; faltan los procesadores.
+config, salud y **productor** listos. Falta el **consumidor**.
 
 ```
-# BLOQUE 6, FASE 3 — procesadores reales
+# BLOQUE 6, FASE 4 — el procesador en el worker
 #
-# Lo que YA existe y esta probado:
-#   - Redis en ambos compose, con healthcheck y sin puertos publicados
-#   - queue.config.ts: 3 colas, backoff exponencial, removeOnFail:false (DLQ)
-#   - src/worker.ts: proceso separado, AppModule sin HTTP, drena en SIGTERM
-#   - QueueModule + /health/queue (informa, no decide)
+# Lo que YA existe y esta probado (958 unit verdes):
+#   - Redis en ambos compose; worker como proceso separado
+#   - queue.config.ts: 3 colas, backoff, removeOnFail:false (DLQ)
+#   - queue.role.ts: backend produce / worker consume, con prueba de que solo
+#     hay UN consumidor
+#   - InboundQueueService: encola con jobId = messageId (idempotente) y
+#     devuelve false en vez de lanzar si Redis falla
+#   - WebhookService.runInboundEffects(): publico, lo comparten el camino
+#     encolado y el camino en linea
 #
-# Lo que falta:
-# 1. Registrar las Queue de BullMQ como providers, usando
-#    buildRedisConnection() y DEFAULT_JOB_OPTIONS.
-# 2. Procesador de takto.inbound: recibe { messageId } y ejecuta los efectos
-#    que hoy corren DENTRO del webhook (automatizaciones, notificaciones).
-# 3. El webhook pasa a: persistir + encolar. Nada mas. Es lo que da el ack
-#    rapido que Meta exige y lo que hace que un fallo de automatizacion deje
-#    de poder afectar a la recepcion del mensaje.
-# 4. Idempotencia por jobId = messageId: un reintento de Meta no debe duplicar
-#    efectos. Es el mismo principio que ya protege wamid.
-# 5. Pruebas: job idempotente, reintento con backoff, y que un job fallido
-#    QUEDE en la cola para poder reejecutarlo.
+# Lo que falta, en src/common/queue/inbound.processor.ts:
+# 1. Un provider que, SOLO si shouldConsumeQueue(), cree un `Worker` de BullMQ
+#    sobre QUEUE_NAMES.INBOUND con buildRedisConnection().
+# 2. Su handler recibe InboundMessageJob y llama a
+#    webhookService.runInboundEffects(companyId, conversationId, body,
+#    contactPhone, assignedTo). OJO: hay que resolver `assignedTo` leyendo la
+#    conversacion, porque el job no lo lleva (puede haber cambiado entre el
+#    encolado y el procesado).
+# 3. onApplicationShutdown: worker.close() para drenar en SIGTERM. El compose
+#    ya da 60s de gracia.
+# 4. Pruebas: el worker NO se crea cuando shouldConsumeQueue() es false; el
+#    handler ejecuta los efectos; un fallo deja el job en la cola.
 #
-# Solo el worker debe registrar procesadores; el backend solo produce. Si
-# ambos procesaran, un job correria dos veces.
+# Cuidado con la dependencia circular: WebhookModule ya importa QueueModule.
+# Si el procesador vive en QueueModule e inyecta WebhookService, habra ciclo.
+# Opcion mas limpia: que el procesador viva en WebhookModule, que ya tiene
+# ambas piezas a mano.
 ```
 
 **Recordatorios de seguridad vigentes**
