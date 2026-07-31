@@ -4,7 +4,15 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 import { NotificationsService } from '../notifications/notifications.service';
 
-export type FiltroAsignacion = 'me' | 'unassigned' | 'any' | string;
+/**
+ * Filtro de asignacion: `me`, `unassigned`, `any` o el id de un asesor.
+ *
+ * Es `string` y no una union con los literales porque el id de asesor es
+ * abierto: un `'me' | 'unassigned' | 'any' | string` colapsa a `string` y no
+ * documenta nada, solo aparenta precision. Los valores especiales viven aqui,
+ * en la documentacion, y se validan en `construirWhere`.
+ */
+export type FiltroAsignacion = string;
 
 export interface FiltrosBandeja {
   search?: string;
@@ -99,7 +107,7 @@ export class InboxService {
     const hayMas = conversaciones.length > take;
     const pagina = hayMas ? conversaciones.slice(0, take) : conversaciones;
 
-    const conNoLeidos = await this.anadirNoLeidos(pagina, userId);
+    const conNoLeidos = await this.anadirNoLeidos(pagina);
     return { items: conNoLeidos, hasMore: hayMas };
   }
 
@@ -206,11 +214,7 @@ export class InboxService {
         if (!ESTADOS.includes(accion.status)) {
           throw new BadRequestException('Estado no valido');
         }
-        return this.aplicar(
-          ids,
-          { status: accion.status as never },
-          companyId,
-        );
+        return this.aplicar(ids, { status: accion.status as never }, companyId);
       case 'read':
         return this.marcarEnLote(ids, userId, companyId, true);
       case 'unread':
@@ -298,8 +302,12 @@ export class InboxService {
 
   /**
    * Cuenta los entrantes posteriores a la marca de lectura de cada
-   * conversacion. Va en una consulta agrupada y no una por hilo: con una
-   * bandeja de treinta conversaciones serian treinta consultas.
+   * conversacion.
+   *
+   * Una sola consulta para toda la pagina, no una por hilo: con treinta
+   * conversaciones en pantalla serian treinta idas a la base. La marca de
+   * lectura ya viene incluida y filtrada por el usuario que pregunta, asi
+   * que aqui no hace falta saber quien es.
    */
   private async anadirNoLeidos(
     conversaciones: Array<{
@@ -307,23 +315,12 @@ export class InboxService {
       reads?: Array<{ lastReadAt: Date }>;
       [k: string]: unknown;
     }>,
-    userId: string,
   ) {
     if (!conversaciones.length) return [];
 
     const marcas = new Map(
       conversaciones.map((c) => [c.id, c.reads?.[0]?.lastReadAt ?? null]),
     );
-
-    const grupos = await this.prisma.message.groupBy({
-      by: ['conversationId'],
-      where: {
-        conversationId: { in: conversaciones.map((c) => c.id) },
-        direction: 'INBOUND',
-      },
-      _count: { _all: true },
-      _max: { createdAt: true },
-    });
 
     // Para contar solo los posteriores a la marca hace falta el detalle, asi
     // que se piden las fechas de los entrantes de golpe. Sigue siendo UNA
@@ -344,10 +341,9 @@ export class InboxService {
       }
     }
 
-    void grupos;
     return conversaciones.map(({ reads, ...c }) => ({
       ...c,
-      unreadCount: sinLeer.get(c.id as string) ?? 0,
+      unreadCount: sinLeer.get(c.id) ?? 0,
       lastReadAt: reads?.[0]?.lastReadAt ?? null,
     }));
   }
