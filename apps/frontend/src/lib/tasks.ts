@@ -14,6 +14,8 @@ export async function createTask(payload: {
   type?: string;
   leadId?: string;
   contactId?: string;
+  // Permite crear la tarea desde el propio chat sin salir de la conversacion.
+  conversationId?: string;
   assignedTo?: string;
 }): Promise<Task> {
   const { data } = await api.post<Task>('/tasks', payload);

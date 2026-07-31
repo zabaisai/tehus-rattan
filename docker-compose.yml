@@ -26,5 +26,25 @@ services:
     depends_on:
       - postgres
 
+  # Paridad con staging: la cola durable tambien en desarrollo, para que un
+  # comportamiento que dependa de Redis no aparezca solo al desplegar.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: >-
+      redis-server
+      --appendonly yes
+      --maxmemory-policy noeviction
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_dev:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
+  redis_data_dev:

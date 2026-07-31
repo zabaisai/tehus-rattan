@@ -84,10 +84,10 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
 
   return (
     <Modal title="Agregar producto" onClose={onClose} maxWidth="md" stackedZIndex>
-        {isLoading && <p className="text-sm text-stone-400">Cargando catálogo...</p>}
+        {isLoading && <p className="text-sm text-neutral-400">Cargando catálogo...</p>}
 
         {noProductsAtAll && (
-          <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-stone-300 py-8 text-center text-stone-400">
+          <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-neutral-300 py-8 text-center text-neutral-400">
             <Package size={24} strokeWidth={1.5} />
             <p className="text-sm">Primero crea o importa productos en el catálogo.</p>
           </div>
@@ -97,19 +97,19 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
           <form onSubmit={handleSubmit}>
             <div className="mb-3 flex gap-2">
               <div className="relative flex-1">
-                <Search size={14} className="absolute left-2.5 top-2.5 text-stone-400" />
+                <Search size={14} className="absolute left-2.5 top-2.5 text-neutral-400" />
                 <input
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Buscar producto"
-                  className="w-full rounded-md border border-stone-300 py-2 pl-7 pr-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                  className="w-full rounded-md border border-neutral-300 py-2 pl-7 pr-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
               </div>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               >
                 <option value="">Todas</option>
                 {PRODUCT_CATEGORIES.map((c) => (
@@ -120,14 +120,14 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
               </select>
             </div>
 
-            <div className="mb-3 max-h-40 overflow-y-auto rounded-md border border-stone-200">
+            <div className="mb-3 max-h-40 overflow-y-auto rounded-md border border-neutral-200">
               {filtered.length === 0 && (
-                <p className="p-3 text-xs text-stone-400">Sin resultados.</p>
+                <p className="p-3 text-xs text-neutral-400">Sin resultados.</p>
               )}
               {filtered.map((product) => (
                 <label
                   key={product.id}
-                  className={`flex cursor-pointer items-center justify-between gap-2 border-b border-stone-100 px-3 py-2 text-sm last:border-b-0 hover:bg-stone-50 ${
+                  className={`flex cursor-pointer items-center justify-between gap-2 border-b border-neutral-100 px-3 py-2 text-sm last:border-b-0 hover:bg-neutral-50 ${
                     selectedProductId === product.id ? 'bg-amber-50' : ''
                   }`}
                 >
@@ -139,9 +139,9 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                       onChange={() => selectProduct(product.id)}
                       className="h-3.5 w-3.5"
                     />
-                    <span className="text-stone-800">{product.name}</span>
+                    <span className="text-neutral-800">{product.name}</span>
                   </span>
-                  <span className="text-xs text-stone-500">
+                  <span className="text-xs text-neutral-500">
                     {currencyFormatter.format(product.price)}
                   </span>
                 </label>
@@ -152,7 +152,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
               <>
                 <div className="mb-3 grid grid-cols-2 gap-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600">
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">
                       Cantidad
                     </label>
                     <input
@@ -161,11 +161,11 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                       step={1}
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
-                      className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                      className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-stone-600">
+                    <label className="mb-1 block text-xs font-medium text-neutral-600">
                       Precio unitario
                     </label>
                     <input
@@ -174,13 +174,13 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                       step="0.01"
                       value={unitPrice}
                       onChange={(e) => setUnitPrice(e.target.value)}
-                      className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                      className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                     />
                   </div>
                 </div>
 
                 <div className="mb-4">
-                  <label className="mb-1 block text-xs font-medium text-stone-600">
+                  <label className="mb-1 block text-xs font-medium text-neutral-600">
                     Notas (opcional)
                   </label>
                   <textarea
@@ -188,7 +188,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                     onChange={(e) => setNotes(e.target.value)}
                     rows={2}
                     placeholder="Color, acabado, condiciones..."
-                    className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                    className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                   />
                 </div>
               </>
@@ -200,14 +200,14 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving || !selectedProductId}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
               >
                 {saving ? 'Agregando...' : 'Agregar'}
               </button>

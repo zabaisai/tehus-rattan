@@ -41,7 +41,9 @@ export class OnboardingController {
   // executes before FileFieldsInterceptor/multer has parsed the multipart
   // body — body.inviteCode (and any "data" field content) isn't available
   // yet at that point for a multipart request.
-  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding } })
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding },
+  })
   @UseGuards(OnboardingInviteGuard)
   @Post('company')
   @UseInterceptors(

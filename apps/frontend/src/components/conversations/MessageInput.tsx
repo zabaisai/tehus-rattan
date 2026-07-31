@@ -30,7 +30,7 @@ export function MessageInput({
   }
 
   return (
-    <div className="border-t border-stone-200 bg-white">
+    <div className="border-t border-neutral-200 bg-white">
       {error && (
         <p className="px-3 pt-2 text-xs font-medium text-red-600">{error}</p>
       )}
@@ -40,12 +40,12 @@ export function MessageInput({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="Escribe un mensaje..."
-          className="flex-1 rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         />
         <button
           type="submit"
           disabled={sending || !value.trim()}
-          className="flex items-center justify-center rounded-md bg-stone-900 p-2 text-white hover:bg-stone-800 disabled:opacity-50"
+          className="flex items-center justify-center rounded-md bg-brand-primary p-2 text-white hover:bg-primary-900 disabled:opacity-50"
         >
           <Send size={16} />
         </button>

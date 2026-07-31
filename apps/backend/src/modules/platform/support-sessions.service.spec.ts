@@ -62,17 +62,19 @@ describe('SupportSessionsService', () => {
         status: 'ACTIVE',
       });
       prisma.supportSession.findFirst.mockResolvedValue(null);
-      prisma.supportSession.create.mockImplementation(async ({ data }: any) => ({
-        id: 'session-1',
-        actorUserId: data.actorUserId,
-        companyId: data.companyId,
-        reason: data.reason,
-        status: 'ACTIVE',
-        expiresAt: data.expiresAt,
-        endedAt: null,
-        createdAt: new Date('2026-07-08T12:00:00.000Z'),
-        company: { id: 'company-a', name: 'Company A', status: 'ACTIVE' },
-      }));
+      prisma.supportSession.create.mockImplementation(
+        async ({ data }: any) => ({
+          id: 'session-1',
+          actorUserId: data.actorUserId,
+          companyId: data.companyId,
+          reason: data.reason,
+          status: 'ACTIVE',
+          expiresAt: data.expiresAt,
+          endedAt: null,
+          createdAt: new Date('2026-07-08T12:00:00.000Z'),
+          company: { id: 'company-a', name: 'Company A', status: 'ACTIVE' },
+        }),
+      );
     }
 
     it('creates a support session with the required reason', async () => {
@@ -102,10 +104,7 @@ describe('SupportSessionsService', () => {
 
     it('rejects a reason longer than 500 characters', async () => {
       await expect(
-        service.createSession(
-          { ...validDto, reason: 'a'.repeat(501) },
-          actor,
-        ),
+        service.createSession({ ...validDto, reason: 'a'.repeat(501) }, actor),
       ).rejects.toThrow(BadRequestException);
       expect(prisma.company.findUnique).not.toHaveBeenCalled();
     });
@@ -236,11 +235,13 @@ describe('SupportSessionsService', () => {
 
     it('closes an owned session and records END_SUPPORT_SESSION', async () => {
       prisma.supportSession.findUnique.mockResolvedValue(activeSession);
-      prisma.supportSession.update.mockImplementation(async ({ data }: any) => ({
-        ...activeSession,
-        status: data.status,
-        endedAt: data.endedAt,
-      }));
+      prisma.supportSession.update.mockImplementation(
+        async ({ data }: any) => ({
+          ...activeSession,
+          status: data.status,
+          endedAt: data.endedAt,
+        }),
+      );
 
       const result = await service.endSession('session-1', actor);
 
@@ -383,10 +384,7 @@ describe('SupportSessionsService', () => {
       prisma.supportSession.findUnique.mockResolvedValue(activeSession);
       prisma.conversation.findMany.mockResolvedValue([rawConversation]);
 
-      const result = await service.listSessionConversations(
-        'session-1',
-        actor,
-      );
+      const result = await service.listSessionConversations('session-1', actor);
 
       expect(result).toEqual([
         {
@@ -490,10 +488,7 @@ describe('SupportSessionsService', () => {
       prisma.supportSession.findUnique.mockResolvedValue(activeSession);
       prisma.conversation.findMany.mockResolvedValue([rawConversation]);
 
-      const result = await service.listSessionConversations(
-        'session-1',
-        actor,
-      );
+      const result = await service.listSessionConversations('session-1', actor);
 
       expect(JSON.stringify(result)).not.toContain('"messages"');
       result.forEach((item: any) => {
@@ -506,10 +501,7 @@ describe('SupportSessionsService', () => {
       prisma.supportSession.findUnique.mockResolvedValue(activeSession);
       prisma.conversation.findMany.mockResolvedValue([rawConversation]);
 
-      const result = await service.listSessionConversations(
-        'session-1',
-        actor,
-      );
+      const result = await service.listSessionConversations('session-1', actor);
 
       expect(JSON.stringify(result)).not.toContain('"notes"');
       result.forEach((item: any) => {
@@ -521,10 +513,7 @@ describe('SupportSessionsService', () => {
       prisma.supportSession.findUnique.mockResolvedValue(activeSession);
       prisma.conversation.findMany.mockResolvedValue([rawConversation]);
 
-      const result = await service.listSessionConversations(
-        'session-1',
-        actor,
-      );
+      const result = await service.listSessionConversations('session-1', actor);
 
       const serialized = JSON.stringify(result).toLowerCase();
       expect(serialized).not.toContain('password');

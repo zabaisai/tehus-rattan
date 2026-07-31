@@ -36,13 +36,11 @@ describe('AuthController', () => {
   });
 
   it('applies OnboardingInviteGuard to POST /auth/register', () => {
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- reflection only, never invoked
     const guards = Reflect.getMetadata(GUARDS_METADATA, controller.register);
     expect(guards).toContain(OnboardingInviteGuard);
   });
 
   it('does not gate /auth/login with the onboarding invite guard', () => {
-    // eslint-disable-next-line @typescript-eslint/unbound-method -- reflection only, never invoked
     const guards = Reflect.getMetadata(GUARDS_METADATA, controller.login) ?? [];
     expect(guards).not.toContain(OnboardingInviteGuard);
   });

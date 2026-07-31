@@ -40,8 +40,12 @@ describe('password-policy', () => {
     });
 
     it('enforces the documented minimum length', () => {
-      expect(isStrongPassword('Aa1!' + 'x'.repeat(PASSWORD_MIN_LENGTH - 5))).toBe(false);
-      expect(isStrongPassword('Aa1!' + 'x'.repeat(PASSWORD_MIN_LENGTH - 4))).toBe(true);
+      expect(
+        isStrongPassword('Aa1!' + 'x'.repeat(PASSWORD_MIN_LENGTH - 5)),
+      ).toBe(false);
+      expect(
+        isStrongPassword('Aa1!' + 'x'.repeat(PASSWORD_MIN_LENGTH - 4)),
+      ).toBe(true);
     });
   });
 

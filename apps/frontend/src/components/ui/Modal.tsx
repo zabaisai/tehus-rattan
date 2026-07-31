@@ -82,8 +82,8 @@ export function Modal({
         tabIndex={-1}
         className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-xl bg-white shadow-lg outline-none sm:max-h-[85vh] sm:rounded-lg ${MAX_WIDTH_CLASSES[maxWidth]}`}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-stone-100 px-4 py-4 sm:border-0 sm:px-5 sm:pb-0 sm:pt-5">
-          <h3 id={titleId} className="min-w-0 truncate text-sm font-semibold text-stone-900">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-neutral-100 px-4 py-4 sm:border-0 sm:px-5 sm:pb-0 sm:pt-5">
+          <h3 id={titleId} className="min-w-0 truncate text-sm font-semibold text-neutral-900">
             {title}
           </h3>
           <div className="flex shrink-0 items-center gap-3">
@@ -93,7 +93,7 @@ export function Modal({
                 type="button"
                 onClick={onClose}
                 aria-label="Cerrar"
-                className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-md p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
               >
                 <X size={18} />
               </button>
@@ -108,7 +108,7 @@ export function Modal({
         </div>
 
         {footer && (
-          <div className="shrink-0 border-t border-stone-100 px-4 py-3 sm:px-5">{footer}</div>
+          <div className="shrink-0 border-t border-neutral-100 px-4 py-3 sm:px-5">{footer}</div>
         )}
       </div>
     </div>

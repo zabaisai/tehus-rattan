@@ -1,4 +1,8 @@
-import { ArgumentMetadata, BadRequestException, ValidationPipe } from '@nestjs/common';
+import {
+  ArgumentMetadata,
+  BadRequestException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { CreateContactDto } from './contacts/dto/create-contact.dto';
 import { CreateLeadDto } from './leads/dto/create-lead.dto';
 import { UpdateLeadDto } from './leads/dto/update-lead.dto';
@@ -179,6 +183,6 @@ describe('DTO tenant field whitelist (real ValidationPipe)', () => {
     expect(result).toBeInstanceOf(CreateContactDto);
     expect(result.phone).toBe('+50255550000');
     expect(result.name).toBe('Jane Doe');
-    expect((result as any).companyId).toBeUndefined();
+    expect(result.companyId).toBeUndefined();
   });
 });

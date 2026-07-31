@@ -27,7 +27,7 @@ describe('InvitationCodesController', () => {
       const dto = { intendedCompanyName: 'Acme' };
       service.create.mockResolvedValue({ id: 'invitation-1' });
 
-      await controller.create(dto as any, buildRequest());
+      await controller.create(dto, buildRequest());
 
       expect(service.create).toHaveBeenCalledWith(dto, {
         actorUserId: 'super-admin-1',
@@ -58,7 +58,10 @@ describe('InvitationCodesController', () => {
 
   describe('POST /admin/invitation-codes/:id/revoke', () => {
     it('delegates to revoke with the id and the actor from the JWT', async () => {
-      service.revoke.mockResolvedValue({ id: 'invitation-1', status: 'REVOKED' });
+      service.revoke.mockResolvedValue({
+        id: 'invitation-1',
+        status: 'REVOKED',
+      });
 
       await controller.revoke('invitation-1', buildRequest());
 
@@ -73,7 +76,10 @@ describe('InvitationCodesController', () => {
 
   describe('guards', () => {
     it('applies exactly 2 class-level guards, the second being PlatformGuard', () => {
-      const guards = Reflect.getMetadata('__guards__', InvitationCodesController);
+      const guards = Reflect.getMetadata(
+        '__guards__',
+        InvitationCodesController,
+      );
 
       expect(guards).toHaveLength(2);
       expect(guards[1]).toBe(PlatformGuard);

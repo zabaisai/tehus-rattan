@@ -83,7 +83,9 @@ export class LeadProductsService {
         where: { id: existing.id },
         data: {
           quantity: existing.quantity + quantity,
-          ...(data.unitPrice !== undefined ? { unitPrice: data.unitPrice } : {}),
+          ...(data.unitPrice !== undefined
+            ? { unitPrice: data.unitPrice }
+            : {}),
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
         },
         include: { product: { select: PRODUCT_SELECT } },

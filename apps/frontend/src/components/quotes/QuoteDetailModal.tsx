@@ -129,17 +129,17 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
       onClose={onClose}
       maxWidth="2xl"
     >
-        {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
+        {isLoading && <p className="text-sm text-neutral-400">Cargando...</p>}
         {isError && <p className="text-sm text-red-600">No se pudo cargar la cotización.</p>}
 
         {quote && !editing && (
           <div>
             <div className="mb-3 flex items-start justify-between gap-2">
               <div>
-                <p className="text-base font-medium text-stone-900">
+                <p className="text-base font-medium text-neutral-900">
                   {quote.title || 'Sin título'}
                 </p>
-                <p className="text-xs text-stone-500">Lead: {quote.lead.title}</p>
+                <p className="text-xs text-neutral-500">Lead: {quote.lead.title}</p>
               </div>
               <select
                 value={quote.status}
@@ -155,9 +155,9 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
               </select>
             </div>
 
-            <div className="overflow-x-auto rounded-md border border-stone-200">
+            <div className="overflow-x-auto rounded-md border border-neutral-200">
               <table className="w-full min-w-[420px] text-left text-xs">
-                <thead className="bg-stone-50 text-stone-500">
+                <thead className="bg-neutral-50 text-neutral-500">
                   <tr>
                     <th className="px-2 py-1.5 font-medium">Producto</th>
                     <th className="px-2 py-1.5 font-medium">Cantidad</th>
@@ -167,19 +167,19 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
                 </thead>
                 <tbody>
                   {(quote.items ?? []).map((item) => (
-                    <tr key={item.id} className="border-t border-stone-100 align-top">
+                    <tr key={item.id} className="border-t border-neutral-100 align-top">
                       <td className="px-2 py-1.5">
-                        <p className="font-medium text-stone-800">{item.name}</p>
+                        <p className="font-medium text-neutral-800">{item.name}</p>
                         {item.category && (
-                          <p className="text-[10px] text-stone-400">{item.category}</p>
+                          <p className="text-[10px] text-neutral-400">{item.category}</p>
                         )}
                         {item.notes && (
-                          <p className="mt-0.5 text-[10px] italic text-stone-400">{item.notes}</p>
+                          <p className="mt-0.5 text-[10px] italic text-neutral-400">{item.notes}</p>
                         )}
                       </td>
                       <td className="px-2 py-1.5">{item.quantity}</td>
                       <td className="px-2 py-1.5">{moneyFormatter.format(item.unitPrice)}</td>
-                      <td className="px-2 py-1.5 font-medium text-stone-800">
+                      <td className="px-2 py-1.5 font-medium text-neutral-800">
                         {moneyFormatter.format(item.subtotal)}
                       </td>
                     </tr>
@@ -190,31 +190,31 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
 
             <dl className="mt-3 space-y-1 text-sm">
               <div className="flex justify-between">
-                <dt className="text-stone-500">Subtotal</dt>
-                <dd className="text-stone-800">{moneyFormatter.format(quote.subtotal)}</dd>
+                <dt className="text-neutral-500">Subtotal</dt>
+                <dd className="text-neutral-800">{moneyFormatter.format(quote.subtotal)}</dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-stone-500">Descuento</dt>
-                <dd className="text-stone-800">{moneyFormatter.format(quote.discount)}</dd>
+                <dt className="text-neutral-500">Descuento</dt>
+                <dd className="text-neutral-800">{moneyFormatter.format(quote.discount)}</dd>
               </div>
               <div className="flex justify-between text-base font-semibold">
-                <dt className="text-stone-900">Total</dt>
-                <dd className="text-stone-900">{moneyFormatter.format(quote.total)}</dd>
+                <dt className="text-neutral-900">Total</dt>
+                <dd className="text-neutral-900">{moneyFormatter.format(quote.total)}</dd>
               </div>
             </dl>
 
             {(quote.notes || quote.validUntil) && (
-              <div className="mt-3 space-y-1.5 border-t border-stone-100 pt-3 text-sm">
+              <div className="mt-3 space-y-1.5 border-t border-neutral-100 pt-3 text-sm">
                 {quote.notes && (
                   <div>
-                    <dt className="text-xs font-medium text-stone-500">Notas</dt>
-                    <dd className="text-stone-800">{quote.notes}</dd>
+                    <dt className="text-xs font-medium text-neutral-500">Notas</dt>
+                    <dd className="text-neutral-800">{quote.notes}</dd>
                   </div>
                 )}
                 {quote.validUntil && (
                   <div>
-                    <dt className="text-xs font-medium text-stone-500">Válida hasta</dt>
-                    <dd className="text-stone-800">{formatDate(quote.validUntil)}</dd>
+                    <dt className="text-xs font-medium text-neutral-500">Válida hasta</dt>
+                    <dd className="text-neutral-800">{formatDate(quote.validUntil)}</dd>
                   </div>
                 )}
               </div>
@@ -234,7 +234,7 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
               <button
                 type="button"
                 onClick={startEditing}
-                className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
               >
                 Editar
               </button>
@@ -253,45 +253,45 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
         {quote && editing && (
           <form onSubmit={handleSaveEdit}>
             <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-stone-600">Título</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Título</label>
               <input
                 type="text"
                 value={titleDraft}
                 onChange={(e) => setTitleDraft(e.target.value)}
-                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
 
             <div className="mb-3 grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-600">Descuento</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Descuento</label>
                 <input
                   type="number"
                   min={0}
                   step="0.01"
                   value={discountDraft}
                   onChange={(e) => setDiscountDraft(e.target.value)}
-                  className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-600">Válida hasta</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Válida hasta</label>
                 <input
                   type="date"
                   value={validUntilDraft}
                   onChange={(e) => setValidUntilDraft(e.target.value)}
-                  className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
               </div>
             </div>
 
             <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium text-stone-600">Notas</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Notas</label>
               <textarea
                 value={notesDraft}
                 onChange={(e) => setNotesDraft(e.target.value)}
                 rows={3}
-                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
 
@@ -304,14 +304,14 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
                   setEditing(false);
                   setError('');
                 }}
-                className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
               >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>

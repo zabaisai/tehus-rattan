@@ -36,22 +36,22 @@ export function LeadCard({
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') onOpen(lead.id);
           }}
-          className={`mb-2 cursor-pointer rounded-md border border-stone-200 bg-white p-3 shadow-sm transition-shadow hover:border-stone-300 ${
-            snapshot.isDragging ? 'shadow-md ring-1 ring-stone-300' : ''
+          className={`mb-2 cursor-pointer rounded-md border border-neutral-200 bg-white p-3 shadow-sm transition-shadow hover:border-neutral-300 ${
+            snapshot.isDragging ? 'shadow-md ring-1 ring-neutral-300' : ''
           }`}
         >
-          <p className="text-sm font-medium text-stone-900">{lead.title}</p>
-          <p className="mt-0.5 text-xs text-stone-500">
+          <p className="text-sm font-medium text-neutral-900">{lead.title}</p>
+          <p className="mt-0.5 text-xs text-neutral-500">
             {lead.contact.name || lead.contact.phone}
           </p>
           <div className="mt-2 flex items-center justify-between">
             {formatCurrency(lead.value) && (
-              <span className="text-xs font-medium text-stone-700">
+              <span className="text-xs font-medium text-neutral-700">
                 {formatCurrency(lead.value)}
               </span>
             )}
             {lead.agent && (
-              <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-600">
+              <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600">
                 {lead.agent.name}
               </span>
             )}
@@ -74,7 +74,7 @@ export function LeadCard({
               id={`move-stage-${lead.id}`}
               value={lead.stageId}
               onChange={(e) => onMoveStage(lead.id, e.target.value)}
-              className="w-full rounded-md border border-stone-300 bg-white px-2 py-1.5 text-xs text-stone-700 outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 bg-white px-2 py-1.5 text-xs text-neutral-700 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
               {stages.map((s) => (
                 <option key={s.id} value={s.id}>

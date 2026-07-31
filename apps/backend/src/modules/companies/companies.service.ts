@@ -39,8 +39,13 @@ export class CompaniesService {
       // Company.phone is unique — surface the real cause instead of an
       // opaque 500, matching how WhatsAppIntegrationManagementService
       // handles the equivalent phoneNumberId collision.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-        throw new ConflictException('El teléfono ya está registrado para otra empresa');
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'El teléfono ya está registrado para otra empresa',
+        );
       }
       throw error;
     }

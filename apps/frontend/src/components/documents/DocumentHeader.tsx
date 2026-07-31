@@ -30,7 +30,7 @@ export function DocumentHeader({ title, fields, company, readOnly }: DocumentHea
   const companyName = company.name;
 
   return (
-    <div className="mb-4 flex items-start justify-between gap-4 border-b-2 border-stone-800 pb-3">
+    <div className="mb-4 flex items-start justify-between gap-4 border-b-2 border-neutral-800 pb-3">
       <div className="flex items-center gap-3">
         {logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -41,11 +41,11 @@ export function DocumentHeader({ title, fields, company, readOnly }: DocumentHea
           </div>
         )}
         <div>
-          <p className="text-sm font-bold uppercase tracking-wide text-stone-900">
+          <p className="text-sm font-bold uppercase tracking-wide text-neutral-900">
             {companyName}
           </p>
           {company.legalName && company.legalName !== companyName && (
-            <p className="text-[10px] text-stone-500">{company.legalName}</p>
+            <p className="text-[10px] text-neutral-500">{company.legalName}</p>
           )}
           <p className="text-xs font-semibold uppercase tracking-wide text-[#A57014]">
             {title}
@@ -53,14 +53,14 @@ export function DocumentHeader({ title, fields, company, readOnly }: DocumentHea
         </div>
       </div>
 
-      <table className="border border-stone-800 text-xs">
+      <table className="border border-neutral-800 text-xs">
         <tbody>
           {fields.map((field) => (
             <tr key={field.label}>
-              <td className="whitespace-nowrap border border-stone-800 bg-white px-2 py-1 font-medium">
+              <td className="whitespace-nowrap border border-neutral-800 bg-white px-2 py-1 font-medium">
                 {field.label}
               </td>
-              <td className="border border-stone-800 bg-[#E7D7C9] p-0">
+              <td className="border border-neutral-800 bg-[#E7D7C9] p-0">
                 {readOnly ? (
                   <span className="block w-32 px-2 py-1 text-xs">{field.value}</span>
                 ) : (

@@ -64,7 +64,7 @@ export function CreateCompanyModal({
     <Modal title="Nueva empresa" onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Nombre de empresa
             </label>
             <input
@@ -73,12 +73,12 @@ export function CreateCompanyModal({
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
               placeholder="Nombre de la empresa"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Teléfono de empresa (opcional)
             </label>
             <input
@@ -86,12 +86,12 @@ export function CreateCompanyModal({
               value={companyPhone}
               onChange={(e) => setCompanyPhone(e.target.value)}
               placeholder="+573001234567"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Nombre del admin
             </label>
             <input
@@ -100,12 +100,12 @@ export function CreateCompanyModal({
               value={adminName}
               onChange={(e) => setAdminName(e.target.value)}
               placeholder="Nombre del administrador"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Email del admin
             </label>
             <input
@@ -114,12 +114,12 @@ export function CreateCompanyModal({
               value={adminEmail}
               onChange={(e) => setAdminEmail(e.target.value)}
               placeholder="admin@empresa.com"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Contraseña temporal
             </label>
             <input
@@ -130,9 +130,9 @@ export function CreateCompanyModal({
               value={adminPassword}
               onChange={(e) => setAdminPassword(e.target.value)}
               placeholder="Mínimo 6 caracteres"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-            <p className="mt-1 text-xs text-stone-400">
+            <p className="mt-1 text-xs text-neutral-400">
               Compártela por un canal seguro. No se volverá a mostrar.
             </p>
           </div>
@@ -143,14 +143,14 @@ export function CreateCompanyModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+              className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
             >
               {saving ? 'Creando...' : 'Crear empresa'}
             </button>

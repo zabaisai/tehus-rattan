@@ -39,7 +39,7 @@ export function ConfirmDialog({
 
   return (
     <Modal title={title} onClose={onClose} maxWidth="sm" stackedZIndex>
-      <div className="text-sm text-stone-600">{message}</div>
+      <div className="text-sm text-neutral-600">{message}</div>
 
       {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
 
@@ -48,7 +48,7 @@ export function ConfirmDialog({
           type="button"
           onClick={onClose}
           disabled={saving}
-          className="rounded-md px-3 py-2 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+          className="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-50"
         >
           Cancelar
         </button>

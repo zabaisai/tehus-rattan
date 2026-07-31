@@ -11,6 +11,10 @@ import { AppModule } from './app.module';
 import { applySecurityHeaders } from './common/security/security.setup';
 import { buildCorsOptions } from './common/security/cors.options';
 import { RELEASE_INFO } from './common/release/release.info';
+import {
+  RedisIoAdapter,
+  usaPuenteRedis,
+} from './common/realtime/realtime.redis';
 
 // Explicit body-size ceilings. Small by default — the only large uploads are
 // multipart (product import / logo), which are bounded separately by their own
@@ -32,7 +36,10 @@ async function bootstrap() {
   // Bound the JSON/urlencoded parsers so a huge body cannot exhaust memory.
   // rawBody capture is preserved (Nest buffers it in the parser's verify hook).
   app.useBodyParser('json', { limit: JSON_BODY_LIMIT });
-  app.useBodyParser('urlencoded', { limit: URLENCODED_BODY_LIMIT, extended: true });
+  app.useBodyParser('urlencoded', {
+    limit: URLENCODED_BODY_LIMIT,
+    extended: true,
+  });
 
   // Behind the Caddy reverse proxy, Express only sees plain HTTP from the
   // proxy. Trust the single hop so req.protocol / req.ip reflect the real
@@ -51,6 +58,17 @@ async function bootstrap() {
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
   app.enableCors(buildCorsOptions(process.env));
+
+  // Tiempo real entre procesos. El worker de la cola no tiene servidor HTTP:
+  // publica en Redis y es este adaptador el que hace llegar el evento a los
+  // clientes conectados aquí. Sin él, todo lo que procesa el worker —mensajes
+  // entrantes incluidos— no se vería hasta el siguiente polling.
+  if (usaPuenteRedis(process.env)) {
+    const adaptador = new RedisIoAdapter(app);
+    if (await adaptador.conectar(process.env)) {
+      app.useWebSocketAdapter(adaptador);
+    }
+  }
 
   app.useGlobalPipes(
     new ValidationPipe({

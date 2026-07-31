@@ -91,8 +91,8 @@ export function DocumentCalculator() {
               onClick={() => setTemplateType(type)}
               className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 templateType === type
-                  ? 'bg-stone-900 text-white'
-                  : 'border border-stone-300 text-stone-700 hover:bg-stone-100'
+                  ? 'bg-brand-primary text-white'
+                  : 'border border-neutral-300 text-neutral-700 hover:bg-neutral-100'
               }`}
             >
               {DOCUMENT_TEMPLATE_LABELS[type]}

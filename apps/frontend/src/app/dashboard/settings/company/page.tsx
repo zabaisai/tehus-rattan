@@ -31,8 +31,8 @@ function mapCompanyError(err: unknown): string {
 }
 
 const inputClass =
-  "w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500";
-const labelClass = "mb-1.5 block text-xs font-medium text-stone-600";
+  "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500";
+const labelClass = "mb-1.5 block text-xs font-medium text-neutral-600";
 
 function LogoUploader({
   label,
@@ -84,14 +84,14 @@ function LogoUploader({
   return (
     <div>
       <label className={labelClass}>{label}</label>
-      <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-stone-300 bg-stone-50 text-center hover:bg-stone-100">
+      <label className="flex h-28 w-28 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 text-center hover:bg-neutral-100">
         {displayUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={displayUrl} alt={label} className="h-16 w-16 rounded object-contain" />
         ) : (
           <>
-            <Upload size={16} className="text-stone-400" />
-            <span className="px-2 text-[10px] text-stone-400">PNG, JPG o WEBP</span>
+            <Upload size={16} className="text-neutral-400" />
+            <span className="px-2 text-[10px] text-neutral-400">PNG, JPG o WEBP</span>
           </>
         )}
         <input
@@ -105,7 +105,7 @@ function LogoUploader({
           }}
         />
       </label>
-      {uploading && <p className="mt-1 text-xs text-stone-400">Subiendo...</p>}
+      {uploading && <p className="mt-1 text-xs text-neutral-400">Subiendo...</p>}
       {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
     </div>
   );
@@ -180,8 +180,8 @@ function CompanySettingsForm({ company }: { company: Company }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-lg border border-stone-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-stone-800">Logo de la empresa</h3>
+      <div className="rounded-lg border border-neutral-200 bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-neutral-800">Logo de la empresa</h3>
         <div className="flex flex-wrap gap-6">
           <LogoUploader
             label="Logo principal"
@@ -198,9 +198,9 @@ function CompanySettingsForm({ company }: { company: Company }) {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-lg border border-stone-200 bg-white p-5">
-        <h3 className="mb-4 text-sm font-semibold text-stone-800">Datos de la empresa</h3>
-        <p className="mb-4 text-xs text-stone-400">
+      <form onSubmit={handleSubmit} className="rounded-lg border border-neutral-200 bg-white p-5">
+        <h3 className="mb-4 text-sm font-semibold text-neutral-800">Datos de la empresa</h3>
+        <p className="mb-4 text-xs text-neutral-400">
           Perfil comercial de tu empresa dentro del CRM. Los datos fiscales para
           cotizaciones se configuran en la sección de abajo.
         </p>
@@ -282,11 +282,11 @@ function CompanySettingsForm({ company }: { company: Company }) {
           />
         </div>
 
-        <div className="mt-8 border-t border-stone-100 pt-6">
-          <h3 className="mb-1 text-sm font-semibold text-stone-800">
+        <div className="mt-8 border-t border-neutral-100 pt-6">
+          <h3 className="mb-1 text-sm font-semibold text-neutral-800">
             Identidad fiscal (para cotizaciones)
           </h3>
-          <p className="mb-4 text-xs text-stone-400">
+          <p className="mb-4 text-xs text-neutral-400">
             Todos los campos son opcionales. Se usan para el encabezado y el pie
             de las cotizaciones impresas de tu empresa. Los que dejes vacíos
             simplemente no aparecen en el documento.
@@ -336,7 +336,7 @@ function CompanySettingsForm({ company }: { company: Company }) {
           </div>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-4 border-t border-stone-100 pt-6 sm:grid-cols-3">
+        <div className="mt-8 grid grid-cols-1 gap-4 border-t border-neutral-100 pt-6 sm:grid-cols-3">
           <div>
             <label className={labelClass}>Color principal</label>
             <div className="flex items-center gap-2">
@@ -344,7 +344,7 @@ function CompanySettingsForm({ company }: { company: Company }) {
                 type="color"
                 value={form.primaryColor}
                 onChange={(e) => patch({ primaryColor: e.target.value })}
-                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-stone-300 bg-transparent p-0.5"
+                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
               />
               <input
                 type="text"
@@ -361,7 +361,7 @@ function CompanySettingsForm({ company }: { company: Company }) {
                 type="color"
                 value={form.accentColor}
                 onChange={(e) => patch({ accentColor: e.target.value })}
-                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-stone-300 bg-transparent p-0.5"
+                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
               />
               <input
                 type="text"
@@ -378,7 +378,7 @@ function CompanySettingsForm({ company }: { company: Company }) {
                 type="color"
                 value={form.backgroundColor}
                 onChange={(e) => patch({ backgroundColor: e.target.value })}
-                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-stone-300 bg-transparent p-0.5"
+                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
               />
               <input
                 type="text"
@@ -397,7 +397,7 @@ function CompanySettingsForm({ company }: { company: Company }) {
           <button
             type="submit"
             disabled={saving}
-            className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+            className="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-900 disabled:opacity-50"
           >
             {saving ? "Guardando..." : "Guardar cambios"}
           </button>
@@ -418,22 +418,22 @@ export default function CompanySettingsPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-stone-900">Empresa</h2>
-      <p className="mt-1 text-sm text-stone-500">
+      <h2 className="text-xl font-semibold text-neutral-900">Empresa</h2>
+      <p className="mt-1 text-sm text-neutral-500">
         Edita el perfil, branding y logo de tu empresa dentro del CRM.
       </p>
 
       <div className="mt-6">
         {!canManage && (
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <p className="text-sm text-stone-600">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <p className="text-sm text-neutral-600">
               No tienes permiso para administrar la configuración de la empresa.
             </p>
           </div>
         )}
 
         {canManage && isLoading && (
-          <p className="text-sm text-stone-400">Cargando...</p>
+          <p className="text-sm text-neutral-400">Cargando...</p>
         )}
 
         {canManage && isError && (

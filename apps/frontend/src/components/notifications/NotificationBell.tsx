@@ -81,7 +81,7 @@ export function NotificationBell() {
         }
         aria-haspopup="true"
         aria-expanded={open}
-        className="relative rounded-md p-2 text-stone-600 hover:bg-stone-100 hover:text-stone-900"
+        className="relative rounded-md p-2 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
       >
         <Bell size={19} aria-hidden />
         {unread > 0 && (
@@ -98,17 +98,17 @@ export function NotificationBell() {
         <div
           role="menu"
           aria-label="Notificaciones"
-          className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-stone-200 bg-white shadow-lg"
+          className="absolute right-0 z-50 mt-2 w-80 max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg"
         >
-          <div className="flex items-center justify-between border-b border-stone-100 px-3 py-2">
-            <span className="text-sm font-semibold text-stone-800">
+          <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
+            <span className="text-sm font-semibold text-neutral-800">
               Notificaciones
             </span>
             {unread > 0 && (
               <button
                 type="button"
                 onClick={markAll}
-                className="flex items-center gap-1 text-xs text-stone-500 hover:text-stone-800"
+                className="flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800"
               >
                 <Check size={13} aria-hidden /> Marcar todas
               </button>
@@ -117,11 +117,11 @@ export function NotificationBell() {
 
           <div className="max-h-96 overflow-y-auto">
             {isLoading ? (
-              <p className="px-3 py-6 text-center text-sm text-stone-400">
+              <p className="px-3 py-6 text-center text-sm text-neutral-400">
                 Cargando…
               </p>
             ) : !page || page.items.length === 0 ? (
-              <p className="px-3 py-8 text-center text-sm text-stone-400">
+              <p className="px-3 py-8 text-center text-sm text-neutral-400">
                 No tienes notificaciones.
               </p>
             ) : (
@@ -131,14 +131,14 @@ export function NotificationBell() {
                     <button
                       type="button"
                       onClick={() => openItem(n)}
-                      className={`flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-stone-50 ${n.readAt ? '' : 'bg-emerald-50/40'}`}
+                      className={`flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-neutral-50 ${n.readAt ? '' : 'bg-emerald-50/40'}`}
                     >
-                      <span className="mt-0.5 text-stone-400">
+                      <span className="mt-0.5 text-neutral-400">
                         <CategoryIcon category={n.category} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5">
-                          <span className="truncate text-sm font-medium text-stone-800">
+                          <span className="truncate text-sm font-medium text-neutral-800">
                             {n.title}
                           </span>
                           {!n.readAt && (
@@ -149,11 +149,11 @@ export function NotificationBell() {
                           )}
                         </span>
                         {n.bodyPreview && (
-                          <span className="mt-0.5 block truncate text-xs text-stone-500">
+                          <span className="mt-0.5 block truncate text-xs text-neutral-500">
                             {n.bodyPreview}
                           </span>
                         )}
-                        <span className="mt-0.5 block text-[11px] text-stone-400">
+                        <span className="mt-0.5 block text-[11px] text-neutral-400">
                           {relativeTime(n.createdAt)}
                         </span>
                       </span>
@@ -164,11 +164,11 @@ export function NotificationBell() {
             )}
           </div>
 
-          <div className="border-t border-stone-100 px-3 py-2 text-center">
+          <div className="border-t border-neutral-100 px-3 py-2 text-center">
             <Link
               href="/dashboard/notifications"
               onClick={() => setOpen(false)}
-              className="text-sm text-stone-600 hover:text-stone-900"
+              className="text-sm text-neutral-600 hover:text-neutral-900"
             >
               Ver todas
             </Link>

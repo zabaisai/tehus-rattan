@@ -59,7 +59,7 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
     <Modal title={isEditing ? 'Editar producto' : 'Nuevo producto'} onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Nombre
             </label>
             <input
@@ -68,19 +68,19 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Sala Primavera"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Categoría
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               >
                 <option value="">Sin categoría</option>
                 {PRODUCT_CATEGORIES.map((c) => (
@@ -91,7 +91,7 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Precio base
               </label>
               <input
@@ -102,13 +102,13 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder="11700000"
-                className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Descripción
             </label>
             <textarea
@@ -116,15 +116,15 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               placeholder="Material: Ratán natural. Medidas: Sofá 230x93x63, poltronas 117x93."
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-            <p className="mt-1 text-[11px] text-stone-400">
+            <p className="mt-1 text-[11px] text-neutral-400">
               Incluye material y medidas como parte de la descripción.
             </p>
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Imagen (URL)
             </label>
             <input
@@ -132,17 +132,17 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           {isEditing && (
-            <label className="mb-4 flex items-center gap-2 text-xs font-medium text-stone-600">
+            <label className="mb-4 flex items-center gap-2 text-xs font-medium text-neutral-600">
               <input
                 type="checkbox"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-stone-300"
+                className="h-3.5 w-3.5 rounded border-neutral-300"
               />
               Producto activo
             </label>
@@ -154,14 +154,14 @@ export function ProductModal({ product, onClose, onSubmit }: ProductModalProps) 
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+              className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
             >
               {saving ? 'Guardando...' : 'Guardar'}
             </button>

@@ -50,8 +50,11 @@ fi
 log "4/12 Building images (release $GIT_SHA)"
 compose build
 
-log "5/12 Starting PostgreSQL"
-compose up -d postgres
+log "5/12 Starting PostgreSQL and Redis"
+# Redis va con PostgreSQL, antes que backend y worker: ambos lo declaran como
+# dependencia sana. Levantarlo despues haria que arrancasen sin cola y se
+# quedasen en modo degradado hasta el siguiente reinicio.
+compose up -d postgres redis
 
 log "6/12 Waiting for PostgreSQL healthcheck"
 attempts=0
@@ -73,7 +76,11 @@ log "7/12 Pre-migration backup (DB + uploads, checksummed)"
 log "8/12 Running Prisma migrations (migrate deploy — never migrate dev/reset)"
 compose run --rm backend npx prisma migrate deploy
 
-log "9/12 Starting all services"
+log "9/12 Starting all services (incluye worker de la cola)"
+# `compose up -d` sin argumentos levanta TODO, incluido el worker. Ojo al
+# desplegar solo una parte: `up -d --no-deps backend frontend` YA NO BASTA,
+# porque dejaria el worker con la imagen anterior y por tanto con codigo
+# distinto al del backend.
 compose up -d
 
 log "10/12 Current service status"

@@ -1,7 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CLOSED_SESSION_RETENTION_DAYS, LOGIN_EVENT_RETENTION_DAYS } from './sessions.constants';
+import {
+  CLOSED_SESSION_RETENTION_DAYS,
+  LOGIN_EVENT_RETENTION_DAYS,
+} from './sessions.constants';
+import { shouldRunScheduledJobs } from '../../common/scheduling/scheduling.role';
 
 // Retention policy — must be reflected in the privacy policy before this
 // ships to production:
@@ -23,6 +27,8 @@ export class SessionCleanupService {
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async handleScheduledCleanup(): Promise<void> {
+    // Un solo proceso: ver common/scheduling/scheduling.role.ts.
+    if (!shouldRunScheduledJobs()) return;
     await this.cleanupExpiredLoginEvents();
     await this.cleanupClosedSessions();
   }
@@ -33,7 +39,9 @@ export class SessionCleanupService {
       where: { createdAt: { lt: cutoff } },
     });
     if (result.count > 0) {
-      this.logger.log(`Eliminados ${result.count} eventos de login vencidos (retención de ${LOGIN_EVENT_RETENTION_DAYS} días)`);
+      this.logger.log(
+        `Eliminados ${result.count} eventos de login vencidos (retención de ${LOGIN_EVENT_RETENTION_DAYS} días)`,
+      );
     }
     return result.count;
   }
@@ -46,12 +54,20 @@ export class SessionCleanupService {
         OR: [
           { loggedOutAt: { lt: cutoff } },
           { AND: [{ loggedOutAt: null }, { revokedAt: { lt: cutoff } }] },
-          { AND: [{ loggedOutAt: null }, { revokedAt: null }, { updatedAt: { lt: cutoff } }] },
+          {
+            AND: [
+              { loggedOutAt: null },
+              { revokedAt: null },
+              { updatedAt: { lt: cutoff } },
+            ],
+          },
         ],
       },
     });
     if (result.count > 0) {
-      this.logger.log(`Eliminadas ${result.count} sesiones cerradas vencidas (retención de ${CLOSED_SESSION_RETENTION_DAYS} días)`);
+      this.logger.log(
+        `Eliminadas ${result.count} sesiones cerradas vencidas (retención de ${CLOSED_SESSION_RETENTION_DAYS} días)`,
+      );
     }
     return result.count;
   }

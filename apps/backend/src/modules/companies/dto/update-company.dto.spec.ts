@@ -50,10 +50,22 @@ describe('UpdateCompanyDto', () => {
     expect(errors.some((e) => e.property === 'accentColor')).toBe(true);
   });
 
-  it.each(['id', 'status', 'slug', 'companyId', 'createdAt', 'updatedAt', 'logoUrl', 'secondaryLogoUrl'])(
+  it.each([
+    'id',
+    'status',
+    'slug',
+    'companyId',
+    'createdAt',
+    'updatedAt',
+    'logoUrl',
+    'secondaryLogoUrl',
+  ])(
     'rejects the forbidden field "%s" instead of silently ignoring it',
     async (field) => {
-      const errors = await validatePayload({ name: 'Tehus Rattan', [field]: 'anything' });
+      const errors = await validatePayload({
+        name: 'Tehus Rattan',
+        [field]: 'anything',
+      });
       expect(errors.length).toBeGreaterThan(0);
     },
   );
@@ -137,7 +149,9 @@ describe('UpdateCompanyDto', () => {
     });
 
     it('accepts values exactly at the max length but rejects one over', async () => {
-      expect(await validatePayload({ address: 'x'.repeat(200) })).toHaveLength(0);
+      expect(await validatePayload({ address: 'x'.repeat(200) })).toHaveLength(
+        0,
+      );
       const over = await validatePayload({ address: 'x'.repeat(201) });
       expect(over.some((e) => e.property === 'address')).toBe(true);
     });

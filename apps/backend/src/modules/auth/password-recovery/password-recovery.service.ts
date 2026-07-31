@@ -84,18 +84,18 @@ export class PasswordRecoveryService {
     }
 
     const plainToken = await this.tokens.issueForUser(
-      user!.id,
+      user.id,
       requestedIpPreview,
     );
     if (!plainToken) return; // resend cooldown — still generic
 
     await this.deliverAndAudit({
-      user: user!,
+      user: user,
       plainToken,
       requestedIpPreview,
       action: 'PASSWORD_RESET_REQUESTED',
-      actorUserId: user!.id,
-      actorRole: user!.role,
+      actorUserId: user.id,
+      actorRole: user.role,
     });
   }
 

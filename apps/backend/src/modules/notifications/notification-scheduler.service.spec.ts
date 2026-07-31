@@ -1,5 +1,18 @@
 import { NotificationSchedulerService } from './notification-scheduler.service';
 
+// Los trabajos programados corren en UN SOLO proceso (ver
+// common/scheduling/scheduling.role.ts). Se declara el entorno aqui en vez de
+// depender de como se invoque la suite: una prueba que pasa o falla segun el
+// entorno de quien la lanza no prueba nada.
+const colaOriginal = process.env.QUEUE_ENABLED;
+beforeAll(() => {
+  process.env.QUEUE_ENABLED = 'false';
+});
+afterAll(() => {
+  if (colaOriginal === undefined) delete process.env.QUEUE_ENABLED;
+  else process.env.QUEUE_ENABLED = colaOriginal;
+});
+
 function build() {
   const prisma = {
     task: { findMany: jest.fn().mockResolvedValue([]) },

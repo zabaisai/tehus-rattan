@@ -42,7 +42,7 @@ export default function QuotePrintPage() {
         <button
           type="button"
           onClick={() => router.push('/dashboard/quotes')}
-          className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-stone-600 hover:bg-stone-100"
+          className="flex items-center gap-1.5 rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
         >
           <ArrowLeft size={16} />
           Volver
@@ -61,7 +61,7 @@ export default function QuotePrintPage() {
         )}
       </div>
 
-      {quoteLoading && <p className="text-sm text-stone-400">Cargando cotización...</p>}
+      {quoteLoading && <p className="text-sm text-neutral-400">Cargando cotización...</p>}
 
       {quoteError && (
         <p className="text-sm text-red-600">

@@ -90,7 +90,7 @@ export function CreateInvitationCodeModal({
         {!created && (
           <form onSubmit={handleSubmit}>
             <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-stone-600">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Nombre de la empresa invitada
               </label>
               <input
@@ -99,12 +99,12 @@ export function CreateInvitationCodeModal({
                 value={companyName}
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Nombre de la empresa"
-                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
 
             <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-stone-600">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Correo de contacto (opcional)
               </label>
               <input
@@ -112,12 +112,12 @@ export function CreateInvitationCodeModal({
                 value={contactEmail}
                 onChange={(e) => setContactEmail(e.target.value)}
                 placeholder="contacto@empresa.com"
-                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
 
             <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium text-stone-600">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Fecha de vencimiento (opcional)
               </label>
               <input
@@ -125,9 +125,9 @@ export function CreateInvitationCodeModal({
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
                 min={new Date().toISOString().slice(0, 10)}
-                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
-              <p className="mt-1 text-xs text-stone-400">
+              <p className="mt-1 text-xs text-neutral-400">
                 Déjalo vacío para que el código no venza.
               </p>
             </div>
@@ -138,14 +138,14 @@ export function CreateInvitationCodeModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
               >
                 {saving ? 'Generando...' : 'Generar código'}
               </button>
@@ -165,14 +165,14 @@ export function CreateInvitationCodeModal({
               </p>
             </div>
 
-            <div className="mb-4 flex items-center gap-2 rounded-md border border-stone-300 bg-stone-50 p-3">
-              <code className="flex-1 break-all text-sm font-semibold text-stone-900">
+            <div className="mb-4 flex items-center gap-2 rounded-md border border-neutral-300 bg-neutral-50 p-3">
+              <code className="flex-1 break-all text-sm font-semibold text-neutral-900">
                 {created.code}
               </code>
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex shrink-0 items-center gap-1 rounded-md bg-stone-900 px-2.5 py-1.5 text-xs text-white hover:bg-stone-800"
+                className="flex shrink-0 items-center gap-1 rounded-md bg-brand-primary px-2.5 py-1.5 text-xs text-white hover:bg-primary-900"
               >
                 {copied ? <Check size={13} /> : <Copy size={13} />}
                 {copied ? 'Copiado' : 'Copiar'}
@@ -181,7 +181,7 @@ export function CreateInvitationCodeModal({
 
             {copyError && <p className="mb-3 text-xs text-red-600">{copyError}</p>}
 
-            <label className="mb-4 flex items-start gap-2 text-xs text-stone-600">
+            <label className="mb-4 flex items-start gap-2 text-xs text-neutral-600">
               <input
                 type="checkbox"
                 checked={confirmedCopy}
@@ -196,7 +196,7 @@ export function CreateInvitationCodeModal({
                 type="button"
                 onClick={handleClose}
                 disabled={!confirmedCopy}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Cerrar
               </button>

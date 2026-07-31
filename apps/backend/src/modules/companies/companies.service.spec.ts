@@ -10,7 +10,9 @@ describe('CompaniesService', () => {
     prisma = {
       company: {
         findUnique: jest.fn(),
-        update: jest.fn((args: any) => Promise.resolve({ id: args.where.id, ...args.data })),
+        update: jest.fn((args: any) =>
+          Promise.resolve({ id: args.where.id, ...args.data }),
+        ),
       },
     };
     service = new CompaniesService(prisma);
@@ -27,7 +29,9 @@ describe('CompaniesService', () => {
 
     const result = await service.findById('company-a');
 
-    expect(prisma.company.findUnique).toHaveBeenCalledWith({ where: { id: 'company-a' } });
+    expect(prisma.company.findUnique).toHaveBeenCalledWith({
+      where: { id: 'company-a' },
+    });
     expect(result).toEqual(company);
   });
 
@@ -105,9 +109,9 @@ describe('CompaniesService', () => {
     );
     prisma.company.update.mockRejectedValue(prismaError);
 
-    await expect(service.update('company-a', { phone: '+573001112233' })).rejects.toThrow(
-      ConflictException,
-    );
+    await expect(
+      service.update('company-a', { phone: '+573001112233' }),
+    ).rejects.toThrow(ConflictException);
   });
 
   it('rethrows any other error unchanged', async () => {

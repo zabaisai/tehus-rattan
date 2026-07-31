@@ -21,7 +21,15 @@ describe('LeadsService.remove (e2e, real database)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    service = new LeadsService(prisma);
+    service = new LeadsService(prisma, {
+      messageCreated: jest.fn(),
+      messageStatusChanged: jest.fn(),
+      leadUpdated: jest.fn(),
+      taskUpdated: jest.fn(),
+      notificationCreated: jest.fn(),
+      toCompany: jest.fn(),
+      toUser: jest.fn(),
+    } as never);
 
     const company = await prisma.company.create({
       data: { name: 'E2E Leads Delete Test Co' },

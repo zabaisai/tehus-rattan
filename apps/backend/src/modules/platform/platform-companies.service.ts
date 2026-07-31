@@ -60,7 +60,13 @@ export class PlatformCompaniesService {
         _count: {
           select: { contacts: true, leads: true, conversations: true },
         },
-        whatsappIntegration: { select: { status: true } },
+        // Una empresa puede tener varios numeros: se toma la PRINCIPAL para
+        // el resumen. El desempate es el mismo que usa el envio.
+        whatsappIntegrations: {
+          select: { status: true },
+          orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }],
+          take: 1,
+        },
       },
     });
 
@@ -99,7 +105,9 @@ export class PlatformCompaniesService {
             products: true,
           },
         },
-        whatsappIntegration: {
+        whatsappIntegrations: {
+          orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }],
+          take: 1,
           select: {
             status: true,
             phoneNumberId: true,
@@ -132,11 +140,11 @@ export class PlatformCompaniesService {
         products: company._count.products,
       },
       whatsapp: {
-        connected: company.whatsappIntegration?.status === 'CONNECTED',
-        status: company.whatsappIntegration?.status ?? null,
-        phoneNumberId: company.whatsappIntegration?.phoneNumberId ?? null,
+        connected: company.whatsappIntegrations[0]?.status === 'CONNECTED',
+        status: company.whatsappIntegrations[0]?.status ?? null,
+        phoneNumberId: company.whatsappIntegrations[0]?.phoneNumberId ?? null,
         displayPhoneNumber:
-          company.whatsappIntegration?.displayPhoneNumber ?? null,
+          company.whatsappIntegrations[0]?.displayPhoneNumber ?? null,
       },
     };
   }
@@ -343,7 +351,9 @@ export class PlatformCompaniesService {
             products: true,
           },
         },
-        whatsappIntegration: {
+        whatsappIntegrations: {
+          orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }],
+          take: 1,
           select: {
             status: true,
             phoneNumberId: true,
@@ -357,54 +367,52 @@ export class PlatformCompaniesService {
       throw new NotFoundException('Empresa no encontrada');
     }
 
-    const [recentLeads, recentConversations, recentTasks] = await Promise.all(
-      [
-        this.prisma.lead.findMany({
-          where: { companyId: trimmedId },
-          orderBy: { updatedAt: 'desc' },
-          take: 5,
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            createdAt: true,
-            updatedAt: true,
-            stage: { select: { name: true } },
-            agent: { select: { id: true, name: true } },
-          },
-        }),
-        // No messages, no last message preview, no conversation content —
-        // this is a support overview, not a way to read what was said.
-        this.prisma.conversation.findMany({
-          where: { companyId: trimmedId },
-          orderBy: { updatedAt: 'desc' },
-          take: 5,
-          select: {
-            id: true,
-            status: true,
-            channel: true,
-            createdAt: true,
-            updatedAt: true,
-            contact: { select: { id: true, name: true } },
-            agent: { select: { id: true, name: true } },
-          },
-        }),
-        this.prisma.task.findMany({
-          where: { companyId: trimmedId },
-          orderBy: { updatedAt: 'desc' },
-          take: 5,
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            dueDate: true,
-            createdAt: true,
-            updatedAt: true,
-            agent: { select: { id: true, name: true } },
-          },
-        }),
-      ],
-    );
+    const [recentLeads, recentConversations, recentTasks] = await Promise.all([
+      this.prisma.lead.findMany({
+        where: { companyId: trimmedId },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          createdAt: true,
+          updatedAt: true,
+          stage: { select: { name: true } },
+          agent: { select: { id: true, name: true } },
+        },
+      }),
+      // No messages, no last message preview, no conversation content —
+      // this is a support overview, not a way to read what was said.
+      this.prisma.conversation.findMany({
+        where: { companyId: trimmedId },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          status: true,
+          channel: true,
+          createdAt: true,
+          updatedAt: true,
+          contact: { select: { id: true, name: true } },
+          agent: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.task.findMany({
+        where: { companyId: trimmedId },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          dueDate: true,
+          createdAt: true,
+          updatedAt: true,
+          agent: { select: { id: true, name: true } },
+        },
+      }),
+    ]);
 
     // Each list above is already sorted by updatedAt desc, so item [0] of
     // each is the single most-recently-touched row of that entity type —
@@ -460,11 +468,11 @@ export class PlatformCompaniesService {
         products: company._count.products,
       },
       whatsapp: {
-        connected: company.whatsappIntegration?.status === 'CONNECTED',
-        status: company.whatsappIntegration?.status ?? null,
-        phoneNumberId: company.whatsappIntegration?.phoneNumberId ?? null,
+        connected: company.whatsappIntegrations[0]?.status === 'CONNECTED',
+        status: company.whatsappIntegrations[0]?.status ?? null,
+        phoneNumberId: company.whatsappIntegrations[0]?.phoneNumberId ?? null,
         displayPhoneNumber:
-          company.whatsappIntegration?.displayPhoneNumber ?? null,
+          company.whatsappIntegrations[0]?.displayPhoneNumber ?? null,
       },
       recentLeads: recentLeads.map((lead) => ({
         id: lead.id,
@@ -506,10 +514,7 @@ export class PlatformCompaniesService {
     return value as CompanyStatus;
   }
 
-  private requireNonBlank(
-    value: string | undefined,
-    message: string,
-  ): string {
+  private requireNonBlank(value: string | undefined, message: string): string {
     if (!value?.trim()) {
       throw new BadRequestException(message);
     }
@@ -525,7 +530,7 @@ export class PlatformCompaniesService {
     updatedAt: Date;
     users: { isActive: boolean }[];
     _count: { contacts: number; leads: number; conversations: number };
-    whatsappIntegration: { status: string } | null;
+    whatsappIntegrations: { status: string }[];
   }) {
     return {
       id: company.id,
@@ -539,7 +544,8 @@ export class PlatformCompaniesService {
       totalContacts: company._count.contacts,
       totalLeads: company._count.leads,
       totalConversations: company._count.conversations,
-      whatsappConnected: company.whatsappIntegration?.status === 'CONNECTED',
+      whatsappConnected:
+        company.whatsappIntegrations[0]?.status === 'CONNECTED',
     };
   }
 }

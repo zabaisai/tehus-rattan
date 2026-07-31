@@ -57,7 +57,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusColors: Record<string, string> = {
-  OPEN: 'bg-stone-100 text-stone-600',
+  OPEN: 'bg-neutral-100 text-neutral-600',
   WON: 'bg-green-50 text-green-700',
   LOST: 'bg-red-50 text-red-700',
 };
@@ -286,13 +286,13 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
   return (
     <>
       <Modal title="Detalle del lead" onClose={onClose} maxWidth="2xl">
-        {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
+        {isLoading && <p className="text-sm text-neutral-400">Cargando...</p>}
         {isError && <p className="text-sm text-red-600">No se pudo cargar el lead.</p>}
 
         {lead && !editing && (
           <div>
             <div className="mb-3 flex items-start justify-between gap-2">
-              <p className="text-base font-medium text-stone-900">{lead.title}</p>
+              <p className="text-base font-medium text-neutral-900">{lead.title}</p>
               <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${statusColors[lead.status]}`}>
                 {statusLabels[lead.status]}
               </span>
@@ -300,20 +300,20 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
 
             <dl className="space-y-2 text-sm">
               <div>
-                <dt className="text-xs font-medium text-stone-500">Contacto</dt>
-                <dd className="text-stone-800">{lead.contact.name || lead.contact.phone}</dd>
+                <dt className="text-xs font-medium text-neutral-500">Contacto</dt>
+                <dd className="text-neutral-800">{lead.contact.name || lead.contact.phone}</dd>
               </div>
 
               <div>
-                <dt className="text-xs font-medium text-stone-500">Pipeline / etapa</dt>
-                <dd className="flex items-center gap-2 text-stone-800">
+                <dt className="text-xs font-medium text-neutral-500">Pipeline / etapa</dt>
+                <dd className="flex items-center gap-2 text-neutral-800">
                   <span>{lead.pipeline.name}</span>
-                  <span className="text-stone-300">·</span>
+                  <span className="text-neutral-300">·</span>
                   <select
                     value={lead.stage.id}
                     onChange={(e) => handleStageChange(e.target.value)}
                     disabled={saving}
-                    className="rounded-md border border-stone-300 px-1.5 py-1 text-xs outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 disabled:bg-stone-100"
+                    className="rounded-md border border-neutral-300 px-1.5 py-1 text-xs outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
                   >
                     {sortedStages.map((s) => (
                       <option key={s.id} value={s.id}>
@@ -326,34 +326,34 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
 
               {formatCurrency(lead.value) && (
                 <div>
-                  <dt className="text-xs font-medium text-stone-500">Valor</dt>
-                  <dd className="text-stone-800">{formatCurrency(lead.value)}</dd>
+                  <dt className="text-xs font-medium text-neutral-500">Valor</dt>
+                  <dd className="text-neutral-800">{formatCurrency(lead.value)}</dd>
                 </div>
               )}
 
               {formatDate(lead.expectedCloseDate) && (
                 <div>
-                  <dt className="text-xs font-medium text-stone-500">Cierre esperado</dt>
-                  <dd className="text-stone-800">{formatDate(lead.expectedCloseDate)}</dd>
+                  <dt className="text-xs font-medium text-neutral-500">Cierre esperado</dt>
+                  <dd className="text-neutral-800">{formatDate(lead.expectedCloseDate)}</dd>
                 </div>
               )}
 
               <div>
-                <dt className="text-xs font-medium text-stone-500">Responsable</dt>
-                <dd className="text-stone-800">{lead.agent?.name || 'Sin asignar'}</dd>
+                <dt className="text-xs font-medium text-neutral-500">Responsable</dt>
+                <dd className="text-neutral-800">{lead.agent?.name || 'Sin asignar'}</dd>
               </div>
 
               {lead.status === 'LOST' && lead.lostReason && (
                 <div>
-                  <dt className="text-xs font-medium text-stone-500">Motivo de pérdida</dt>
-                  <dd className="text-stone-800">{lead.lostReason}</dd>
+                  <dt className="text-xs font-medium text-neutral-500">Motivo de pérdida</dt>
+                  <dd className="text-neutral-800">{lead.lostReason}</dd>
                 </div>
               )}
             </dl>
 
-            <div className="mt-4 border-t border-stone-100 pt-4">
+            <div className="mt-4 border-t border-neutral-100 pt-4">
               <div className="mb-2 flex items-center justify-between">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-stone-500">
+                <h4 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                   Productos del lead
                 </h4>
                 <button
@@ -367,15 +367,15 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
               </div>
 
               {(leadProducts?.length ?? 0) === 0 && (
-                <p className="rounded-md border border-dashed border-stone-200 py-4 text-center text-xs text-stone-400">
+                <p className="rounded-md border border-dashed border-neutral-200 py-4 text-center text-xs text-neutral-400">
                   Este lead todavía no tiene productos asociados.
                 </p>
               )}
 
               {(leadProducts?.length ?? 0) > 0 && (
-                <div className="overflow-x-auto rounded-md border border-stone-200">
+                <div className="overflow-x-auto rounded-md border border-neutral-200">
                   <table className="w-full min-w-[480px] text-left text-xs">
-                    <thead className="bg-stone-50 text-stone-500">
+                    <thead className="bg-neutral-50 text-neutral-500">
                       <tr>
                         <th className="px-2 py-1.5 font-medium">Producto</th>
                         <th className="px-2 py-1.5 font-medium">Cantidad</th>
@@ -388,11 +388,11 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                       {leadProducts?.map((item) => {
                         const isRowEditing = editingProductId === item.id;
                         return (
-                          <tr key={item.id} className="border-t border-stone-100 align-top">
+                          <tr key={item.id} className="border-t border-neutral-100 align-top">
                             <td className="px-2 py-1.5">
-                              <p className="font-medium text-stone-800">{item.product.name}</p>
+                              <p className="font-medium text-neutral-800">{item.product.name}</p>
                               {item.product.category && (
-                                <p className="text-[10px] text-stone-400">{item.product.category}</p>
+                                <p className="text-[10px] text-neutral-400">{item.product.category}</p>
                               )}
                               {isRowEditing ? (
                                 <input
@@ -400,11 +400,11 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                   value={productNotesDraft}
                                   onChange={(e) => setProductNotesDraft(e.target.value)}
                                   placeholder="Notas"
-                                  className="mt-1 w-full rounded border border-stone-300 px-1.5 py-1 text-[11px] outline-none focus:border-stone-500"
+                                  className="mt-1 w-full rounded border border-neutral-300 px-1.5 py-1 text-[11px] outline-none focus:border-neutral-500"
                                 />
                               ) : (
                                 item.notes && (
-                                  <p className="mt-0.5 text-[10px] italic text-stone-400">{item.notes}</p>
+                                  <p className="mt-0.5 text-[10px] italic text-neutral-400">{item.notes}</p>
                                 )
                               )}
                             </td>
@@ -416,7 +416,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                   step={1}
                                   value={productQuantityDraft}
                                   onChange={(e) => setProductQuantityDraft(e.target.value)}
-                                  className="w-16 rounded border border-stone-300 px-1.5 py-1 text-xs outline-none focus:border-stone-500"
+                                  className="w-16 rounded border border-neutral-300 px-1.5 py-1 text-xs outline-none focus:border-neutral-500"
                                 />
                               ) : (
                                 item.quantity
@@ -430,13 +430,13 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                   step="0.01"
                                   value={productPriceDraft}
                                   onChange={(e) => setProductPriceDraft(e.target.value)}
-                                  className="w-24 rounded border border-stone-300 px-1.5 py-1 text-xs outline-none focus:border-stone-500"
+                                  className="w-24 rounded border border-neutral-300 px-1.5 py-1 text-xs outline-none focus:border-neutral-500"
                                 />
                               ) : (
                                 moneyFormatter.format(item.unitPrice)
                               )}
                             </td>
-                            <td className="px-2 py-1.5 font-medium text-stone-800">
+                            <td className="px-2 py-1.5 font-medium text-neutral-800">
                               {moneyFormatter.format(item.subtotal)}
                             </td>
                             <td className="px-2 py-1.5">
@@ -454,7 +454,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                     <button
                                       type="button"
                                       onClick={cancelEditingProduct}
-                                      className="rounded p-1 text-stone-400 hover:bg-stone-100"
+                                      className="rounded p-1 text-neutral-400 hover:bg-neutral-100"
                                     >
                                       <X size={13} />
                                     </button>
@@ -464,14 +464,14 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                     <button
                                       type="button"
                                       onClick={() => startEditingProduct(item.id)}
-                                      className="rounded p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                                      className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                                     >
                                       <Pencil size={13} />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveProduct(item.id)}
-                                      className="rounded p-1 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                                      className="rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
                                     >
                                       <Trash2 size={13} />
                                     </button>
@@ -484,11 +484,11 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                       })}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-stone-200 bg-stone-50">
-                        <td colSpan={3} className="px-2 py-1.5 text-right text-xs font-medium text-stone-600">
+                      <tr className="border-t border-neutral-200 bg-neutral-50">
+                        <td colSpan={3} className="px-2 py-1.5 text-right text-xs font-medium text-neutral-600">
                           Total estimado
                         </td>
-                        <td colSpan={2} className="px-2 py-1.5 text-sm font-semibold text-stone-900">
+                        <td colSpan={2} className="px-2 py-1.5 text-sm font-semibold text-neutral-900">
                           {moneyFormatter.format(leadProductsTotal)}
                         </td>
                       </tr>
@@ -499,23 +499,23 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
 
               {productError && <p className="mt-2 text-xs text-red-600">{productError}</p>}
 
-              <p className="mt-2 text-[11px] text-stone-400">
+              <p className="mt-2 text-[11px] text-neutral-400">
                 Estos productos servirán como base para una futura cotización.
               </p>
 
-              <div className="mt-3 flex items-center justify-between gap-2 border-t border-stone-100 pt-3">
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-neutral-100 pt-3">
                 <div>
                   <button
                     type="button"
                     onClick={() => setCreateQuoteModalOpen(true)}
                     disabled={(leadProducts?.length ?? 0) === 0}
-                    className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <FileText size={14} />
                     Crear cotización
                   </button>
                   {(leadProducts?.length ?? 0) === 0 && (
-                    <p className="mt-1 text-[11px] text-stone-400">
+                    <p className="mt-1 text-[11px] text-neutral-400">
                       Agrega productos al lead antes de crear una cotización.
                     </p>
                   )}
@@ -540,15 +540,15 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
             {justSaved && !error && <p className="mt-3 text-xs text-green-600">Cambios guardados</p>}
 
             {lostReasonOpen && (
-              <div className="mt-3 rounded-md border border-stone-200 bg-stone-50 p-3">
-                <label className="mb-1 block text-xs font-medium text-stone-600">
+              <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+                <label className="mb-1 block text-xs font-medium text-neutral-600">
                   Motivo de pérdida (opcional)
                 </label>
                 <textarea
                   value={lostReasonDraft}
                   onChange={(e) => setLostReasonDraft(e.target.value)}
                   rows={2}
-                  className="w-full rounded-md border border-stone-300 px-2 py-1.5 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                  className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
                 <div className="mt-2 flex justify-end gap-2">
                   <button
@@ -557,7 +557,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                       setLostReasonOpen(false);
                       setLostReasonDraft('');
                     }}
-                    className="rounded-md px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100"
+                    className="rounded-md px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-100"
                   >
                     Cancelar
                   </button>
@@ -578,7 +578,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                 <button
                   type="button"
                   onClick={startEditing}
-                  className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                  className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
                 >
                   Editar
                 </button>
@@ -610,45 +610,45 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
         {lead && editing && (
           <form onSubmit={handleSaveEdit}>
             <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-stone-600">Título</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Título</label>
               <input
                 type="text"
                 required
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
 
             <div className="mb-3 grid grid-cols-2 gap-2">
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-600">Valor</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Valor</label>
                 <input
                   type="number"
                   min="0"
                   step="0.01"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
-                  className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-stone-600">Cierre esperado</label>
+                <label className="mb-1 block text-xs font-medium text-neutral-600">Cierre esperado</label>
                 <input
                   type="date"
                   value={expectedCloseDate}
                   onChange={(e) => setExpectedCloseDate(e.target.value)}
-                  className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
               </div>
             </div>
 
             <div className="mb-4">
-              <label className="mb-1 block text-xs font-medium text-stone-600">Responsable</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Responsable</label>
               <select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
-                className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               >
                 <option value="">Sin asignar</option>
                 {users
@@ -660,7 +660,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                   ))}
               </select>
               {!assignedTo && lead.assignedTo && (
-                <p className="mt-1 text-[11px] text-stone-400">
+                <p className="mt-1 text-[11px] text-neutral-400">
                   Este lead ya tiene responsable asignado; el backend no permite quitarlo, solo reasignarlo.
                 </p>
               )}
@@ -675,14 +675,14 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                   setEditing(false);
                   setError('');
                 }}
-                className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
               >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>

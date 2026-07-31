@@ -37,7 +37,7 @@ describe('InvitationCodesService', () => {
   describe('create', () => {
     it('creates an invitation, hashes the code, and returns the plaintext exactly once', async () => {
       const result = await service.create(
-        { intendedCompanyName: '  Acme  ' } as any,
+        { intendedCompanyName: '  Acme  ' },
         actor,
       );
 
@@ -49,7 +49,9 @@ describe('InvitationCodesService', () => {
           }),
         }),
       );
-      expect(result.code).toMatch(/^TEHUS-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/);
+      expect(result.code).toMatch(
+        /^TEHUS-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/,
+      );
       expect(auditLogService.record).toHaveBeenCalledWith(
         prisma,
         expect.objectContaining({ action: 'CREATE_INVITATION_CODE' }),
@@ -77,13 +79,15 @@ describe('InvitationCodesService', () => {
 
     it('never persists the plaintext code, only its hash and a masked preview', async () => {
       const result = await service.create(
-        { intendedCompanyName: 'Acme' } as any,
+        { intendedCompanyName: 'Acme' },
         actor,
       );
 
       const createCall = prisma.invitationCode.create.mock.calls[0][0];
       expect(createCall.data.codeHash).not.toBe(result.code);
-      expect(createCall.data.codePreview).toMatch(/^TEHUS-\*{4}-\*{4}-\*{4}-[0-9A-F]{4}$/);
+      expect(createCall.data.codePreview).toMatch(
+        /^TEHUS-\*{4}-\*{4}-\*{4}-[0-9A-F]{4}$/,
+      );
       expect(createCall.data.codePreview).not.toBe(result.code);
     });
   });
@@ -147,7 +151,9 @@ describe('InvitationCodesService', () => {
     });
 
     it('rejects a blank id', async () => {
-      await expect(service.revoke('   ', actor)).rejects.toThrow(BadRequestException);
+      await expect(service.revoke('   ', actor)).rejects.toThrow(
+        BadRequestException,
+      );
       expect(prisma.invitationCode.findUnique).not.toHaveBeenCalled();
     });
 
@@ -173,7 +179,9 @@ describe('InvitationCodesService', () => {
       // non-ACTIVE invitation.
       expect(prisma.invitationCode.updateMany).toHaveBeenCalledTimes(1);
       expect(prisma.invitationCode.updateMany).not.toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'REVOKED' }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'REVOKED' }),
+        }),
       );
     });
 

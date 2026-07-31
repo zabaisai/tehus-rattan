@@ -38,6 +38,44 @@ model Company {
   address     String? // Dirección
   quoteFooter String? // Texto/condiciones opcionales para el pie de cotizaciones
 
+  // Configuración regional. Con default para que toda empresa existente y
+  // futura tenga un valor válido sin backfill manual: hasta ahora las fechas
+  // se renderizaban en la zona del navegador y los montos sin moneda
+  // explícita, lo que es ambiguo en cuanto entra una segunda empresa.
+  // `businessHours` queda nullable a propósito: "sin horario definido" es un
+  // estado distinto de "horario vacío", y las reglas de asignación deben
+  // poder distinguirlos.
+  timezone      String @default("America/Bogota")
+  currency      String @default("COP")
+  locale        String @default("es-CO")
+  businessHours Json?
+
+  // Asignación automática de conversaciones y oportunidades entrantes.
+  // Activada por defecto: una empresa que estrena el CRM prefiere que el
+  // mensaje llegue a alguien antes que quedarse esperando a que un
+  // administrador descubra que hay una bandeja sin asignar. Se puede apagar y
+  // entonces todo entra sin asesor, a la bandeja común.
+  autoAssignEnabled Boolean @default(true)
+
+  /// Minutos que puede pasar un mensaje entrante sin respuesta antes de
+  /// considerarse incumplido. `null` = sin compromiso definido, que es lo
+  /// contrario de "cero minutos": una empresa sin SLA no debe recibir alarmas
+  /// por cada conversacion.
+  responseSlaMinutes Int?
+
+  /// Meses que se conservan conversaciones y mensajes cerrados antes de
+  /// poder purgarlos. `null` = SIN PURGA, que es el valor por defecto a
+  /// proposito (decision 13): borrar el historial comercial de una empresa
+  /// sin que lo haya pedido es irreversible, y "por defecto no se borra nada"
+  /// es la unica postura defendible.
+  retentionMonths Int?
+
+  /// Confirmacion explicita de que la empresa acepta la purga. Sin esto, un
+  /// `retentionMonths` puesto por error empezaria a borrar solo.
+  retentionPurgeEnabled Boolean @default(false)
+
+  dataRequests DataRequest[]
+
   users                User[]
   contacts             Contact[]
   conversations        Conversation[]
@@ -48,15 +86,19 @@ model Company {
   notes                Note[]
   products             Product[]
   quotes               Quote[]
-  whatsappIntegration  WhatsAppIntegration?
+  whatsappIntegrations WhatsAppIntegration[]
   whatsappSignupStates WhatsAppEmbeddedSignupState[]
   notifications        Notification[]
   notificationPrefs    NotificationPreference[]
   auditLogs            AuditLog[]                    @relation("AuditLogAffectedCompany")
   supportSessions      SupportSession[]
+  automationRuns       AutomationRun[]
+  chatbotFlows         ChatbotFlow[]
+  chatbotSessions      ChatbotSession[]
   invitationCodesUsed  InvitationCode[]
   userSessions         UserSession[]
   loginEvents          LoginEvent[]
+  outboxEvents         OutboxEvent[]
 
   @@map("companies")
 }
@@ -70,6 +112,20 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  // ── Reparto automático ──────────────────────────────────────
+  // Quién entra en el turno. Separado de `isActive` porque son cosas
+  // distintas: un supervisor puede estar perfectamente activo y aun así no
+  // querer recibir conversaciones nuevas. Desactivarlo NO le quita las que ya
+  // tiene, solo lo saca del reparto.
+  autoAssignEnabled Boolean @default(true)
+
+  // Última vez que este usuario recibió algo por reparto automático. Es lo
+  // que hace el round-robin: siempre le toca a quien lleva más tiempo sin
+  // recibir. Guardarlo en la fila (en vez de un contador en memoria) hace que
+  // el turno sobreviva a reinicios y funcione con varios procesos, que es
+  // justo donde un round-robin ingenuo se rompe y empieza a repetir persona.
+  lastAssignedAt DateTime?
 
   companyId       String?
   company         Company?           @relation(fields: [companyId], references: [id])
@@ -94,7 +150,12 @@ model User {
   notifications           Notification[]           @relation("NotificationRecipient")
   notificationsAuthored   Notification[]           @relation("NotificationActor")
   notificationPreferences NotificationPreference[]
+  conversationReads       ConversationRead[]
 
+  // Elegir a quién le toca es una consulta caliente: ocurre en cada mensaje
+  // entrante de un contacto nuevo. Con este índice sale directa, sin recorrer
+  // los usuarios de la empresa.
+  @@index([companyId, isActive, autoAssignEnabled, lastAssignedAt])
   @@map("users")
 }
 
@@ -135,9 +196,36 @@ model Conversation {
   assignedTo String?
   agent      User?   @relation(fields: [assignedTo], references: [id])
 
+  // Oportunidad comercial que originó esta conversación. Nullable a
+  // propósito y para siempre: no toda conversación es una venta (soporte,
+  // consultas, spam), y forzarla obligaría a inventar oportunidades vacías.
+  // Es el vínculo que hoy falta y que deja 4 de 4 conversaciones fuera del
+  // pipeline. `SetNull` al borrar el lead: la conversación y sus mensajes son
+  // el registro de lo que ocurrió y no deben desaparecer con la oportunidad.
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  // Numero de la empresa por el que ENTRO esta conversacion.
+  //
+  // Sin esto, una empresa con dos numeros contesta siempre desde el
+  // principal: quien escribio a "Soporte" recibe la respuesta desde
+  // "Ventas", un numero que no reconoce y al que no habia escrito.
+  //
+  // Nullable porque las conversaciones anteriores a este campo no pueden
+  // saberlo, y porque un CSV importado no tiene numero de entrada. En ambos
+  // casos el envio cae en el principal, que es el comportamiento de siempre.
+  whatsappIntegrationId String?
+  whatsappIntegration   WhatsAppIntegration? @relation(fields: [whatsappIntegrationId], references: [id], onDelete: SetNull)
+
   messages Message[]
   notes    Note[]
+  tasks    Task[]
+  reads    ConversationRead[]
+  chatbotSessions ChatbotSession[]
 
+  @@index([companyId, status, lastMessageAt])
+  @@index([companyId, assignedTo])
+  @@index([leadId])
   @@map("conversations")
 }
 
@@ -147,13 +235,64 @@ model Message {
   body      String?
   type      MessageType   @default(TEXT)
   direction Direction
+
+  /// De donde salio este mensaje.
+  ///
+  /// EXISTE PARA QUE EL HISTORIAL IMPORTADO NO DISPARE NADA. Un mensaje de
+  /// hace seis meses no debe crear una oportunidad, ni ejecutar
+  /// automatizaciones, ni despertar al chatbot: eso mandaria cientos de
+  /// WhatsApp a clientes por conversaciones que ya terminaron. Sin este campo
+  /// no hay forma de distinguirlo de un mensaje que acaba de llegar.
+  source MessageSource @default(LIVE)
   status    MessageStatus @default(QUEUED)
   createdAt DateTime      @default(now())
+
+  // ── Medios ──────────────────────────────────────────────────
+  // El binario NO se guarda aquí. `mediaId` es el identificador de Meta, que
+  // caduca; `mediaUrl` apunta al archivo ya descargado y servido por el CRM
+  // tras autenticar. Separarlos permite reintentar la descarga sin perder la
+  // referencia original y detectar los medios que aún no se han traído.
+  mediaId       String?
+  mediaUrl      String?
+  mediaMimeType String?
+  mediaFileName String?
+  mediaSize     Int?
+  mediaDuration Int? // segundos, para audio y video
+  caption       String?
+
+  // Ubicación y contacto compartido. JSON porque su forma la define Meta y
+  // normalizarla en columnas obligaría a migrar cada vez que cambie.
+  location Json?
+  contacts Json?
+
+  // Mensaje al que responde este, tal como lo entrega Meta (context.id). Se
+  // guarda el wamid y no una FK: la respuesta puede referirse a un mensaje
+  // anterior a la conexión, que el CRM nunca llegó a almacenar.
+  replyToWamid String?
+
+  // Payload de interactivos (botones y listas) ya sanitizado.
+  interactive Json?
+
+  // ── Estados de entrega ──────────────────────────────────────
+  // Hoy el estado nunca pasa de SENT porque los payloads `statuses` de Meta
+  // se descartan. Estas marcas permiten reflejar el ciclo real y detectar
+  // envíos fallidos sin releer el log.
+  sentAt      DateTime?
+  deliveredAt DateTime?
+  readAt      DateTime?
+  failedAt    DateTime?
+
+  // Clasificador de error ya redactado; NUNCA la respuesta cruda de Meta,
+  // que puede incluir el token o datos del destinatario.
+  errorCode    String?
+  errorMessage String?
 
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
 
   @@index([conversationId, createdAt])
+  @@index([conversationId, status])
+  @@index([status, createdAt])
   @@map("messages")
 }
 
@@ -171,10 +310,105 @@ model Automation {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  /// Version actual de la definicion. Sube en cada cambio de disparador,
+  /// condiciones o acciones. Permite responder a "esto se ejecuto asi porque
+  /// la automatizacion decia otra cosa entonces", que sin versionar es
+  /// imposible de reconstruir.
+  version Int @default(1)
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
+  versions AutomationVersion[]
+  runs     AutomationRun[]
+
   @@map("automations")
+}
+
+/// Foto de la definicion en el momento de publicarse.
+///
+/// Sin esto, el historial de ejecuciones seria enganoso: se veria QUE paso
+/// pero no la regla que lo provoco, porque la automatizacion pudo cambiar
+/// despues. Es tambien lo que permite revertir a una version anterior sin
+/// reconstruirla de memoria.
+model AutomationVersion {
+  id      String @id @default(cuid())
+  version Int
+
+  trigger    String
+  conditions Json?
+  actions    Json
+
+  /// Quien la publico. Nullable porque una automatizacion puede nacer de una
+  /// plantilla o de una migracion, sin autor humano.
+  createdBy String?
+  createdAt DateTime @default(now())
+
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, version])
+  @@map("automation_versions")
+}
+
+enum AutomationRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  /// Agotados los reintentos. Queda para inspeccion y reejecucion manual: es
+  /// el equivalente a una dead-letter queue, en la base y no en Redis, para
+  /// que sobreviva a un reinicio de Redis.
+  DEAD
+}
+
+/// Una ejecucion de una automatizacion.
+///
+/// EXISTE PORQUE HOY NO HAY NINGUN RASTRO. El motor actual ejecuta en linea y
+/// se traga los errores en un `logger.error`: si una automatizacion deja de
+/// funcionar, nadie se entera, y cuando alguien pregunta "¿por que no se
+/// mando ese mensaje?" no hay nada que mirar.
+model AutomationRun {
+  id String @id @default(cuid())
+
+  /// Version de la definicion que se ejecuto. Con la automatizacion ya
+  /// modificada, es lo unico que explica el resultado.
+  automationVersion Int
+
+  status   AutomationRunStatus @default(PENDING)
+  attempts Int                 @default(0)
+
+  /// Que disparo la ejecucion y sobre que. Sin PII: ids, nunca el texto del
+  /// mensaje ni el telefono.
+  triggerType String
+
+  /// Resultado de cada accion, en orden. Permite ver donde se rompio una
+  /// ejecucion a medias, que es justo lo que un log plano no deja reconstruir.
+  steps Json?
+
+  /// Clasificador del error, nunca el mensaje crudo del proveedor.
+  lastError String?
+
+  /// Misma llave que el outbox: garantiza que un reintento del mensaje no
+  /// vuelva a ejecutar las acciones.
+  idempotencyKey String @unique
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  automationId String
+  automation   Automation @relation(fields: [automationId], references: [id], onDelete: Cascade)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+
+  @@index([companyId, createdAt])
+  @@index([automationId, createdAt])
+  @@index([status, createdAt])
+  @@map("automation_runs")
 }
 
 // ─────────────────────────────────────────────
@@ -187,11 +421,25 @@ model Pipeline {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Orden de presentación en el selector. Separado de `createdAt` para que
+  // reordenar no dependa de cuándo se creó cada pipeline.
+  order Int @default(0)
+
+  // Archivar en lugar de borrar: un pipeline con leads no se puede eliminar
+  // (RESTRICT en la FK), así que archivar es la única forma de retirarlo de
+  // la vista sin perder su historial comercial.
+  isArchived Boolean @default(false)
+
   companyId String
   company   Company         @relation(fields: [companyId], references: [id])
   stages    PipelineStage[]
   leads     Lead[]
 
+  // La unicidad del predeterminado por empresa NO se puede expresar aquí:
+  // Prisma no soporta índices parciales. Se crea como SQL en la migración
+  // (`pipelines_one_default_per_company`) y se refuerza en el servicio dentro
+  // de una transacción. Ver la nota en el propio migration.sql.
+  @@index([companyId, isArchived, order])
   @@map("pipelines")
 }
 
@@ -203,11 +451,30 @@ model PipelineStage {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Probabilidad de cierre en porcentaje (0-100). Nullable a propósito: "sin
+  // definir" no es lo mismo que 0%, y el pronóstico ponderado debe poder
+  // ignorar las etapas que aún no la tienen en vez de contarlas como perdidas.
+  probability Int?
+
+  // Semántica comercial de la etapa. Hoy el cierre vive en `Lead.status`;
+  // este campo permite que el pipeline declare qué etapa SIGNIFICA ganado o
+  // perdido, que es lo que necesitan las automatizaciones por cambio de etapa
+  // y las métricas de conversión. Se introduce como aditivo: `Lead.status`
+  // sigue siendo la fuente de verdad hasta que la transición se complete.
+  type StageType @default(OPEN)
+
   pipelineId String
   pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
   leads      Lead[]
 
+  @@index([pipelineId, order])
   @@map("pipeline_stages")
+}
+
+enum StageType {
+  OPEN
+  WON
+  LOST
 }
 
 model Lead {
@@ -235,12 +502,16 @@ model Lead {
   assignedTo String?
   agent      User?   @relation(fields: [assignedTo], references: [id])
 
-  stageHistory LeadStageHistory[]
-  tasks        Task[]
-  notes        Note[]
-  leadProducts LeadProduct[]
-  quotes       Quote[]
+  stageHistory  LeadStageHistory[]
+  tasks         Task[]
+  conversations Conversation[]
+  notes         Note[]
+  leadProducts  LeadProduct[]
+  quotes        Quote[]
 
+  @@index([companyId, status])
+  @@index([pipelineId, stageId])
+  @@index([contactId])
   @@map("leads")
 }
 
@@ -309,9 +580,18 @@ model Task {
   contactId String?
   contact   Contact? @relation(fields: [contactId], references: [id])
 
+  // Conversación de origen. Permite crear una tarea desde el chat sin salir
+  // de él y mostrar en la conversación las tareas que genera. `SetNull` para
+  // que archivar o borrar una conversación no borre el seguimiento.
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
   assignedTo String?
   agent      User?   @relation(fields: [assignedTo], references: [id])
 
+  @@index([companyId, status, dueDate])
+  @@index([companyId, assignedTo])
+  @@index([conversationId])
   @@map("tasks")
 }
 
@@ -471,9 +751,30 @@ model WhatsAppIntegration {
   createdAt            DateTime                  @default(now())
   updatedAt            DateTime                  @updatedAt
 
-  companyId String  @unique
+  // Numero principal de la empresa. Es el que se usa para enviar cuando el
+  // llamador no indica cual, de modo que `findFirst` deje de devolver una fila
+  // arbitraria en cuanto haya varios numeros.
+  isPrimary Boolean @default(false)
+
+  // Nombre interno para que el asesor no tenga que reconocer un phoneNumberId
+  // de 16 digitos en la interfaz ("Ventas", "Soporte", "Numero de prueba").
+  label String?
+
+  // Orden de presentacion en los selectores.
+  order Int @default(0)
+
+  // `companyId` YA NO es unico: una empresa puede conectar varios numeros.
+  // Lo que sigue garantizado en base:
+  //   - `phoneNumberId` unico GLOBAL: un numero pertenece a una sola empresa,
+  //     que es lo que hace inequivoco el enrutamiento del webhook.
+  //   - `whatsapp_one_primary_per_company` (indice parcial en el SQL de la
+  //     migracion): una sola integracion principal por empresa.
+  companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
+  conversations Conversation[]
+
+  @@index([companyId, isPrimary])
   @@map("whatsapp_integrations")
 }
 
@@ -675,6 +976,13 @@ enum MessageType {
   VIDEO
   DOCUMENT
   TEMPLATE
+  // Tipos que Meta entrega y que hoy se descartaban en el webhook.
+  STICKER
+  LOCATION
+  CONTACTS
+  INTERACTIVE
+  REACTION
+  UNSUPPORTED
 }
 
 enum Direction {
@@ -879,4 +1187,302 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ─────────────────────────────────────────────
+// OUTBOX DURABLE
+// ─────────────────────────────────────────────
+// Resuelve la ventana entre "el dato ya está persistido" y "sus efectos se
+// encolaron". Sin esto, si el proceso muere justo después del commit y antes
+// del enqueue, el mensaje queda guardado y sus efectos no ocurren nunca: ni
+// asignación, ni tarea, ni aviso al asesor. Nada lo detecta, porque no hay
+// error en ningún log.
+//
+// El evento se escribe en LA MISMA TRANSACCIÓN que el cambio esencial, así
+// que o existen ambos o no existe ninguno. Un dispatcher posterior lo empuja
+// a la cola y lo marca completado.
+model OutboxEvent {
+  id   String @id @default(cuid())
+  type String
+
+  // Acotado por empresa como todo lo demás: un evento nunca es global.
+  companyId String
+
+  payload Json
+
+  // Clave de deduplicación. UNIQUE: si el mismo hecho se registra dos veces
+  // (reintento de Meta, reproceso), la segunda inserción falla y no se
+  // duplican efectos. Suele ser el id del mensaje.
+  idempotencyKey String @unique
+
+  status   OutboxStatus @default(PENDING)
+  attempts Int          @default(0)
+
+  // Cuándo puede volver a intentarse. El backoff se materializa aquí, de modo
+  // que sobrevive a un reinicio: un retraso en memoria se perdería.
+  availableAt DateTime @default(now())
+
+  // Clasificador ya redactado; NUNCA el payload crudo del error, que puede
+  // arrastrar PII o secretos.
+  lastError String?
+
+  // Marca de cuándo se reclamó, para poder recuperar los que quedaron
+  // colgados si el proceso murió a mitad.
+  claimedAt   DateTime?
+  processedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  // El índice que usa el dispatcher para reclamar lotes.
+  @@index([status, availableAt])
+  @@index([companyId, status])
+  @@map("outbox_events")
+}
+
+enum OutboxStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ─────────────────────────────────────────────
+// LATIDO DE COMPONENTES
+// ─────────────────────────────────────────────
+
+/// Ultima senal de vida de cada proceso de fondo.
+///
+/// EXISTE PORQUE EL WORKER NO EXPONE PUERTO. No tiene endpoint que sondear, y
+/// preguntarle a Redis si el worker vive no sirve: Redis puede estar
+/// perfectamente y el worker muerto, que es justo el caso peor —los eventos
+/// se encolan, nadie los consume y todo parece sano—.
+///
+/// Vive en PostgreSQL y no en Redis a proposito: si el latido dependiera de
+/// Redis, una caida de Redis borraria la evidencia de la caida del worker.
+model SystemHeartbeat {
+  /// Nombre del componente: `queue-worker`, y los que vengan.
+  component String @id
+
+  seenAt DateTime @updatedAt
+
+  /// Datos no sensibles para diagnostico: release y pid. Nunca secretos.
+  detail Json?
+
+  @@map("system_heartbeats")
+}
+
+/// Hasta donde ha leido CADA usuario en una conversacion.
+///
+/// Es por usuario y no un booleano en la conversacion porque la bandeja es
+/// compartida: que un supervisor abra un hilo no significa que el asesor
+/// asignado ya lo haya visto, y un unico `isRead` haria desaparecer el aviso
+/// de la persona equivocada.
+///
+/// Se guarda una MARCA DE TIEMPO y no un contador: los mensajes nuevos llegan
+/// despues, asi que "no leidos" se deriva comparando `lastReadAt` con la fecha
+/// de los mensajes entrantes. Un contador habria que mantenerlo sincronizado
+/// en cada alta y se desincroniza en cuanto algo falla a medias.
+model ConversationRead {
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lastReadAt DateTime @default(now())
+
+  @@id([conversationId, userId])
+  @@index([userId, lastReadAt])
+  @@map("conversation_reads")
+}
+
+// ─────────────────────────────────────────────
+// CHATBOT
+// ─────────────────────────────────────────────
+
+enum ChatbotFlowStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Un flujo de chatbot.
+///
+/// BORRADOR Y PUBLICADO SON DOS COSAS DISTINTAS a proposito: el flujo se edita
+/// mientras hay clientes conversando con la version anterior. Sin esa
+/// separacion, guardar a media edicion dejaria a la gente a mitad de un flujo
+/// que ya no existe.
+model ChatbotFlow {
+  id       String            @id @default(cuid())
+  name     String
+  status   ChatbotFlowStatus @default(DRAFT)
+  isActive Boolean           @default(false)
+
+  /// Definicion EN EDICION. Nunca es la que atiende a nadie.
+  draftNodes Json
+
+  /// Version publicada vigente. `null` = nunca se ha publicado.
+  publishedVersion Int?
+
+  /// Palabras que lo inician. Vacio = se inicia con cualquier primer mensaje.
+  triggerKeywords String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  versions ChatbotFlowVersion[]
+  sessions ChatbotSession[]
+
+  @@index([companyId, isActive])
+  @@map("chatbot_flows")
+}
+
+/// Foto inmutable de un flujo publicado.
+///
+/// Las sesiones apuntan a la VERSION, no al flujo: quien empezo a conversar
+/// con la version 3 la termina con la version 3 aunque se publique la 4 a
+/// mitad. Cambiarle el flujo bajo los pies a alguien que esta respondiendo
+/// preguntas es la forma mas rapida de dejarlo en un nodo que ya no existe.
+model ChatbotFlowVersion {
+  id      String @id @default(cuid())
+  version Int
+  nodes   Json
+
+  publishedBy String?
+  publishedAt DateTime @default(now())
+
+  flowId String
+  flow   ChatbotFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  sessions ChatbotSession[]
+
+  @@unique([flowId, version])
+  @@map("chatbot_flow_versions")
+}
+
+enum ChatbotSessionStatus {
+  ACTIVE
+  /// Paso a manos de una persona. Terminal: el bot no la retoma solo.
+  HANDED_OVER
+  COMPLETED
+  /// Sin respuesta del cliente durante demasiado tiempo.
+  ABANDONED
+}
+
+/// Estado de una conversacion dentro de un flujo.
+///
+/// UNA POR CONVERSACION ACTIVA. El indice parcial que lo garantiza vive en el
+/// SQL de la migracion: Prisma no sabe expresar indices parciales, y sin el,
+/// dos mensajes simultaneos abririan dos sesiones y el cliente veria el flujo
+/// duplicado.
+model ChatbotSession {
+  id String @id @default(cuid())
+
+  status      ChatbotSessionStatus @default(ACTIVE)
+  currentNode String
+
+  /// Respuestas recogidas hasta ahora. Es lo que permite que un flujo
+  /// pregunte el nombre en el paso 1 y lo use en el paso 4.
+  context Json?
+
+  /// Cuantos mensajes lleva. Corta bucles: un flujo mal construido que se
+  /// apunte a si mismo dejaria de responder en vez de escribir sin parar al
+  /// cliente.
+  steps Int @default(0)
+
+  startedAt        DateTime  @default(now())
+  lastInteractionAt DateTime @default(now())
+  endedAt          DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  flowId String
+  flow   ChatbotFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  flowVersionId String
+  flowVersion   ChatbotFlowVersion @relation(fields: [flowVersionId], references: [id])
+
+  @@index([conversationId, status])
+  @@index([companyId, status, lastInteractionAt])
+  @@map("chatbot_sessions")
+}
+
+enum DataRequestType {
+  /// Copia de los datos de la empresa.
+  EXPORT
+  /// Solicitud de eliminacion. NO borra: registra y espera aprobacion.
+  DELETION
+}
+
+enum DataRequestStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+}
+
+/// Solicitud de exportacion o eliminacion de datos.
+///
+/// LA ELIMINACION NO SE EJECUTA AL PEDIRLA. Se registra, queda PENDING y
+/// exige una aprobacion aparte. Un endpoint que borrase el historial completo
+/// de una empresa en una sola llamada es exactamente el tipo de accion que no
+/// deberia existir: irreversible, disparable por error y sin rastro de quien
+/// la pidio.
+model DataRequest {
+  id     String            @id @default(cuid())
+  type   DataRequestType
+  status DataRequestStatus @default(PENDING)
+
+  /// Por que se pide. Obligatorio: una solicitud sin motivo no se puede
+  /// revisar ni defender despues.
+  reason String
+
+  requestedBy String?
+  approvedBy  String?
+
+  /// Quien la ejecuto, que puede no ser quien la aprobo. Separar los tres
+  /// papeles -pedir, aprobar, ejecutar- es lo que permite exigir que no sean
+  /// la misma persona.
+  executedBy String?
+
+  /// Confirmacion escrita a mano por quien ejecuta. Se compara con el nombre
+  /// de la empresa: teclear el nombre completo es la ultima barrera antes de
+  /// un borrado irreversible, y la unica que no se pasa por accidente.
+  confirmationText String?
+
+  /// Motivo del rechazo, si se rechaza. Obligatorio: rechazar sin explicar
+  /// deja a quien lo pidio sin saber que corregir.
+  rejectionReason String?
+
+  /// Resumen de lo hecho: cuantas filas por tabla. Sin contenido.
+  result Json?
+
+  requestedAt DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([status, requestedAt])
+  @@map("data_requests")
+}
+
+enum MessageSource {
+  /// Llegado por webhook en tiempo real. Dispara efectos.
+  LIVE
+  /// Sincronizacion de historial que envia Meta al conectar en coexistencia.
+  /// Llega una sola vez y NO dispara efectos.
+  HISTORY_SYNC
+  /// Importacion controlada desde CSV. Tampoco dispara efectos.
+  CSV_IMPORT
 }

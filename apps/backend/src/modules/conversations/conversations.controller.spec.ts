@@ -31,6 +31,9 @@ describe('ConversationsController', () => {
       conversationsService,
       messagesService,
       whatsappService,
+      // La bandeja no participa en estas pruebas -cubren el envio de un
+      // mensaje-, pero el controlador la exige.
+      {} as never,
     );
   });
 
@@ -38,16 +41,18 @@ describe('ConversationsController', () => {
     it('creates an OUTBOUND SENT message with the wamid when WhatsApp accepts the message', async () => {
       whatsappService.sendMessage.mockResolvedValue('wamid.123');
 
-      const result = await controller.sendWhatsApp(
-        'conv-1',
-        buildRequest(),
-        { message: 'Hola, ya tenemos tu pedido listo' },
-      );
+      const result = await controller.sendWhatsApp('conv-1', buildRequest(), {
+        message: 'Hola, ya tenemos tu pedido listo',
+      });
 
+      // El cuarto argumento es el numero desde el que se envia. Aqui es
+      // undefined porque la conversacion de prueba no tiene numero asociado
+      // -como las anteriores a este campo-, y entonces se cae al principal.
       expect(whatsappService.sendMessage).toHaveBeenCalledWith(
         'company-a',
         '50255551111',
         'Hola, ya tenemos tu pedido listo',
+        undefined,
       );
       expect(messagesService.create).toHaveBeenCalledWith({
         companyId: 'company-a',
@@ -66,11 +71,9 @@ describe('ConversationsController', () => {
         new Error('No se pudo enviar el mensaje de WhatsApp'),
       );
 
-      const result = await controller.sendWhatsApp(
-        'conv-1',
-        buildRequest(),
-        { message: 'Mensaje que el asesor intento enviar' },
-      );
+      const result = await controller.sendWhatsApp('conv-1', buildRequest(), {
+        message: 'Mensaje que el asesor intento enviar',
+      });
 
       expect(messagesService.create).toHaveBeenCalledWith({
         companyId: 'company-a',

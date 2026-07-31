@@ -75,10 +75,10 @@ export default function ContactsPage() {
   return (
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-stone-900">Contactos</h2>
+        <h2 className="text-xl font-semibold text-neutral-900">Contactos</h2>
         <button
           onClick={openCreateModal}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
         >
           <Plus size={16} />
           Nuevo contacto
@@ -88,18 +88,18 @@ export default function ContactsPage() {
       <div className="mb-4 relative sm:max-w-xs">
         <Search
           size={15}
-          className="absolute left-2.5 top-2.5 text-stone-400"
+          className="absolute left-2.5 top-2.5 text-neutral-400"
         />
         <input
           type="text"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nombre, teléfono o correo"
-          className="w-full rounded-md border border-stone-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-neutral-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         />
       </div>
 
-      {isLoading && <p className="py-10 text-center text-sm text-stone-400">Cargando...</p>}
+      {isLoading && <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>}
 
       {!isLoading && filtered.length === 0 && (
         <EmptyState icon={Users} message="No hay contactos." />
@@ -112,30 +112,30 @@ export default function ContactsPage() {
             {filtered.map((contact) => (
               <div
                 key={contact.id}
-                className="rounded-lg border border-stone-200 bg-white p-3"
+                className="rounded-lg border border-neutral-200 bg-white p-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-stone-900">
+                    <p className="truncate text-sm font-medium text-neutral-900">
                       {contact.name || "—"}
                     </p>
-                    <p className="mt-0.5 text-xs text-stone-600">{contact.phone}</p>
+                    <p className="mt-0.5 text-xs text-neutral-600">{contact.phone}</p>
                     {contact.email && (
-                      <p className="truncate text-xs text-stone-500">{contact.email}</p>
+                      <p className="truncate text-xs text-neutral-500">{contact.email}</p>
                     )}
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <button
                       onClick={() => openEditModal(contact)}
                       aria-label="Editar contacto"
-                      className="rounded p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                      className="rounded p-2 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                     >
                       <Pencil size={15} />
                     </button>
                     <button
                       onClick={() => handleDelete(contact.id)}
                       aria-label="Eliminar contacto"
-                      className="rounded p-2 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600"
                     >
                       <Trash2 size={15} />
                     </button>
@@ -146,10 +146,10 @@ export default function ContactsPage() {
           </div>
 
           {/* Escritorio/tablet: tabla tradicional */}
-          <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white sm:block">
+          <div className="hidden overflow-x-auto rounded-lg border border-neutral-200 bg-white sm:block">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
+                <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
                   <th className="px-4 py-2.5 font-medium">Nombre</th>
                   <th className="px-4 py-2.5 font-medium">Teléfono</th>
                   <th className="px-4 py-2.5 font-medium">Correo</th>
@@ -160,13 +160,13 @@ export default function ContactsPage() {
                 {filtered.map((contact) => (
                   <tr
                     key={contact.id}
-                    className="border-b border-stone-100 last:border-0"
+                    className="border-b border-neutral-100 last:border-0"
                   >
-                    <td className="px-4 py-2.5 text-stone-800">
+                    <td className="px-4 py-2.5 text-neutral-800">
                       {contact.name || "—"}
                     </td>
-                    <td className="px-4 py-2.5 text-stone-600">{contact.phone}</td>
-                    <td className="px-4 py-2.5 text-stone-600">
+                    <td className="px-4 py-2.5 text-neutral-600">{contact.phone}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">
                       {contact.email || "—"}
                     </td>
                     <td className="px-4 py-2.5">
@@ -174,14 +174,14 @@ export default function ContactsPage() {
                         <button
                           onClick={() => openEditModal(contact)}
                           aria-label="Editar contacto"
-                          className="rounded p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                          className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                         >
                           <Pencil size={14} />
                         </button>
                         <button
                           onClick={() => handleDelete(contact.id)}
                           aria-label="Eliminar contacto"
-                          className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                          className="rounded p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
                         >
                           <Trash2 size={14} />
                         </button>

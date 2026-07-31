@@ -25,9 +25,15 @@ describe('AppThrottlerGuard.getTracker', () => {
   });
 
   it('gives different devices different buckets, and is stable for one device', async () => {
-    const a1 = await guard.getTracker(req({ cookies: { [DEVICE_ID_COOKIE]: 'device-A' } }));
-    const a2 = await guard.getTracker(req({ cookies: { [DEVICE_ID_COOKIE]: 'device-A' } }));
-    const b = await guard.getTracker(req({ cookies: { [DEVICE_ID_COOKIE]: 'device-B' } }));
+    const a1 = await guard.getTracker(
+      req({ cookies: { [DEVICE_ID_COOKIE]: 'device-A' } }),
+    );
+    const a2 = await guard.getTracker(
+      req({ cookies: { [DEVICE_ID_COOKIE]: 'device-A' } }),
+    );
+    const b = await guard.getTracker(
+      req({ cookies: { [DEVICE_ID_COOKIE]: 'device-B' } }),
+    );
     expect(a1).toBe(a2);
     expect(a1).not.toBe(b);
   });
@@ -58,7 +64,10 @@ describe('AppThrottlerGuard.getTracker', () => {
 
   it('does NOT device-bucket non-refresh routes: login stays per-IP', async () => {
     const key = await guard.getTracker(
-      req({ originalUrl: '/api/auth/login', cookies: { [DEVICE_ID_COOKIE]: 'device-A' } }),
+      req({
+        originalUrl: '/api/auth/login',
+        cookies: { [DEVICE_ID_COOKIE]: 'device-A' },
+      }),
     );
     expect(key).toBe('203.0.113.7');
   });

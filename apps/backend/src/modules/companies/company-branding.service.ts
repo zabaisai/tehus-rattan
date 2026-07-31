@@ -20,7 +20,9 @@ const ALLOWED_MIME_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 // The only source of truth for what a file actually is — extension and
 // mimetype above are both attacker-controlled and only used as a cheap,
 // early rejection, never to decide what gets written to disk.
-export function detectImageExtension(buffer: Buffer): 'png' | 'jpg' | 'webp' | null {
+export function detectImageExtension(
+  buffer: Buffer,
+): 'png' | 'jpg' | 'webp' | null {
   if (
     buffer.length >= 8 &&
     buffer[0] === 0x89 &&
@@ -35,7 +37,12 @@ export function detectImageExtension(buffer: Buffer): 'png' | 'jpg' | 'webp' | n
     return 'png';
   }
 
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+  if (
+    buffer.length >= 3 &&
+    buffer[0] === 0xff &&
+    buffer[1] === 0xd8 &&
+    buffer[2] === 0xff
+  ) {
     return 'jpg';
   }
 
@@ -58,7 +65,9 @@ export class CompanyBrandingService {
   // file *before* creating anything in the database, without duplicating
   // this logic. Returns the verified extension so callers that already
   // called this don't need to re-run magic-byte detection themselves.
-  assertValidLogoFile(file: UploadedLogoFile | undefined): 'png' | 'jpg' | 'webp' {
+  assertValidLogoFile(
+    file: UploadedLogoFile | undefined,
+  ): 'png' | 'jpg' | 'webp' {
     this.validateFile(file);
 
     const extension = detectImageExtension(file!.buffer);
@@ -78,7 +87,12 @@ export class CompanyBrandingService {
   ) {
     const extension = this.assertValidLogoFile(file);
 
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'branding', companyId);
+    const uploadsDir = path.join(
+      process.cwd(),
+      'uploads',
+      'branding',
+      companyId,
+    );
     fs.mkdirSync(uploadsDir, { recursive: true });
 
     const safeName = `${type}-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.${extension}`;
@@ -108,11 +122,15 @@ export class CompanyBrandingService {
 
     const ext = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      throw new BadRequestException('Formato no permitido. Usa PNG, JPG o WEBP');
+      throw new BadRequestException(
+        'Formato no permitido. Usa PNG, JPG o WEBP',
+      );
     }
 
     if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      throw new BadRequestException('Formato no permitido. Usa PNG, JPG o WEBP');
+      throw new BadRequestException(
+        'Formato no permitido. Usa PNG, JPG o WEBP',
+      );
     }
 
     if (file.size > MAX_LOGO_SIZE) {

@@ -33,9 +33,15 @@ export function buildContentSecurityPolicy(opts: {
     : `'self' 'unsafe-inline'`;
   if (metaSdk) scriptSrc += ` ${META_SCRIPT}`;
 
+  // El canal de tiempo real va al MISMO host que la API, en wss. La
+  // especificacion dice que un origen https cubre tambien wss, pero se declara
+  // explicito: no todos los navegadores lo aplicaron siempre igual, y el
+  // sintoma de fallar seria un canal que no conecta sin error visible.
+  const wsOrigin = apiOrigin.replace(/^http/i, 'ws');
+
   let connectSrc = isDev
     ? `'self' ${apiOrigin} ws: wss:`
-    : `'self' ${apiOrigin}`;
+    : `'self' ${apiOrigin} ${wsOrigin}`;
   if (metaSdk) connectSrc += ` ${META_CONNECT}`;
 
   const frameSrc = metaSdk ? META_FRAME : `'none'`;

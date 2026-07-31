@@ -20,7 +20,7 @@ bad()  { printf '\033[1;31mFAIL: %s\033[0m\n' "$1"; failures=$((failures + 1)); 
 echo "== Container status =="
 docker compose -f "$COMPOSE_FILE" ps
 
-for svc in postgres backend frontend caddy; do
+for svc in postgres redis backend worker frontend caddy; do
   state="$(docker compose -f "$COMPOSE_FILE" ps -q "$svc" | xargs -r docker inspect -f '{{.State.Status}}' 2>/dev/null)"
   if [ "$state" = "running" ]; then
     ok "$svc container is running"
@@ -28,6 +28,44 @@ for svc in postgres backend frontend caddy; do
     bad "$svc container is not running (state: ${state:-not found})"
   fi
 done
+
+echo ""
+echo "== Durable queue (informational, NEVER fails the deploy) =="
+# La cola caida degrada el procesamiento diferido, no el CRM: por eso este
+# bloque informa y no marca el despliegue como fallido. El endpoint devuelve
+# 200 siempre, con state=up|down|disabled.
+queue_json="$(docker compose -f "$COMPOSE_FILE" exec -T backend wget -qO- http://127.0.0.1:3001/api/health/queue 2>/dev/null || true)"
+case "$queue_json" in
+  *'"state":"up"'*)       ok "queue reachable (state: up)" ;;
+  *'"state":"disabled"'*) ok "queue disabled by configuration (QUEUE_ENABLED=false)" ;;
+  *'"state":"down"'*)     warn "queue unreachable (state: down) - deferred processing degraded, CRM still serving" ;;
+  *)                      warn "could not read queue state" ;;
+esac
+
+echo ""
+echo "== System health (aggregate: db + queue + worker + outbox + realtime) =="
+# Responde una pregunta distinta de /api/health: no es "¿atiende?" sino
+# "¿esta el sistema haciendo TODO su trabajo?". Con Redis o el worker caidos
+# las conversaciones se guardan y la interfaz responde, asi que las sondas
+# clasicas dan verde mientras los efectos de cada mensaje entrante se acumulan
+# sin procesar. Aqui eso sale como "degraded".
+sys_json="$(docker compose -f "$COMPOSE_FILE" exec -T backend wget -qO- http://127.0.0.1:3001/api/health/status 2>/dev/null || true)"
+case "$sys_json" in
+  *'"status":"ok"'*)       ok "system fully healthy (status: ok)" ;;
+  *'"status":"degraded"'*) warn "system DEGRADED - the CRM serves, but something is not being processed. Detail:" ;;
+  *'"status":"down"'*)     bad "system down (status: down)" ;;
+  *)                       warn "could not read aggregate system status" ;;
+esac
+# Con degradacion se imprime el detalle por componente: sin el, "degraded" no
+# dice a quien llamar.
+case "$sys_json" in
+  *'"status":"degraded"'*)
+    for comp in queue worker outbox realtime; do
+      estado="$(printf '%s' "$sys_json" | sed -n "s/.*\"$comp\":{\"state\":\"\([a-z]*\)\".*/\1/p")"
+      [ -n "$estado" ] && echo "     - $comp: $estado"
+    done
+    ;;
+esac
 
 echo ""
 echo "== Backend health (internal, container-to-container) =="

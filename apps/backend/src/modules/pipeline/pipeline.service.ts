@@ -9,13 +9,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class PipelineService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(companyId: string) {
+  // Por defecto oculta los archivados: son pipelines retirados de la
+  // operación, no borrados. `includeArchived` los recupera para la pantalla
+  // de administración.
+  async findAll(companyId: string, includeArchived = false) {
     return this.prisma.pipeline.findMany({
-      where: { companyId },
+      where: { companyId, ...(includeArchived ? {} : { isArchived: false }) },
       include: {
         stages: { orderBy: { order: 'asc' } },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ order: 'asc' }, { createdAt: 'asc' }],
     });
   }
 
@@ -30,23 +33,65 @@ export class PipelineService {
     return pipeline;
   }
 
-  async create(companyId: string, data: { name: string; isDefault?: boolean }) {
-    return this.prisma.pipeline.create({
-      data: { ...data, companyId },
+  async create(
+    companyId: string,
+    data: { name: string; isDefault?: boolean; order?: number },
+  ) {
+    // Marcar predeterminado desmarca el anterior EN LA MISMA TRANSACCIÓN. El
+    // índice parcial `pipelines_one_default_per_company` lo garantiza a nivel
+    // de base; hacerlo aquí evita que el usuario vea un error de constraint
+    // por una operación que sí es legítima.
+    return this.prisma.$transaction(async (tx) => {
+      if (data.isDefault) {
+        await tx.pipeline.updateMany({
+          where: { companyId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+      return tx.pipeline.create({ data: { ...data, companyId } });
     });
   }
 
   async update(
     id: string,
     companyId: string,
-    data: { name?: string; isDefault?: boolean },
+    data: {
+      name?: string;
+      isDefault?: boolean;
+      order?: number;
+      isArchived?: boolean;
+    },
   ) {
-    await this.findById(id, companyId);
-    return this.prisma.pipeline.update({ where: { id }, data });
+    const actual = await this.findById(id, companyId);
+
+    // Una empresa no puede quedarse sin predeterminado: ni desmarcándolo ni
+    // archivándolo. Sin él, la creación automática de oportunidades no tiene
+    // dónde colocar el lead.
+    if (actual.isDefault && (data.isDefault === false || data.isArchived)) {
+      throw new BadRequestException(
+        'No se puede desmarcar ni archivar el pipeline predeterminado. Marca otro como predeterminado primero.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (data.isDefault) {
+        await tx.pipeline.updateMany({
+          where: { companyId, isDefault: true, id: { not: id } },
+          data: { isDefault: false },
+        });
+      }
+      return tx.pipeline.update({ where: { id }, data });
+    });
   }
 
   async remove(id: string, companyId: string) {
-    await this.findById(id, companyId);
+    const actual = await this.findById(id, companyId);
+
+    if (actual.isDefault) {
+      throw new BadRequestException(
+        'No se puede eliminar el pipeline predeterminado. Marca otro como predeterminado primero.',
+      );
+    }
 
     const stageCount = await this.prisma.pipelineStage.count({
       where: { pipelineId: id },
@@ -75,7 +120,13 @@ export class PipelineService {
   async createStage(
     pipelineId: string,
     companyId: string,
-    data: { name: string; order?: number; color?: string },
+    data: {
+      name: string;
+      order?: number;
+      color?: string;
+      probability?: number;
+      type?: 'OPEN' | 'WON' | 'LOST';
+    },
   ) {
     await this.findById(pipelineId, companyId);
 
@@ -97,7 +148,13 @@ export class PipelineService {
     pipelineId: string,
     stageId: string,
     companyId: string,
-    data: { name?: string; order?: number; color?: string },
+    data: {
+      name?: string;
+      order?: number;
+      color?: string;
+      probability?: number;
+      type?: 'OPEN' | 'WON' | 'LOST';
+    },
   ) {
     await this.findById(pipelineId, companyId);
 

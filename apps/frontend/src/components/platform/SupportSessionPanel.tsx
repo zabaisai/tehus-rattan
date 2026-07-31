@@ -30,7 +30,7 @@ const statusLabels: Record<SupportSessionStatus, string> = {
 
 const statusColors: Record<SupportSessionStatus, string> = {
   ACTIVE: 'bg-emerald-50 text-emerald-700',
-  ENDED: 'bg-stone-100 text-stone-600',
+  ENDED: 'bg-neutral-100 text-neutral-600',
   EXPIRED: 'bg-amber-50 text-amber-700',
 };
 
@@ -97,9 +97,9 @@ export function SupportSessionPanel({
   }
 
   return (
-    <div className="border-t border-stone-100 pt-4">
+    <div className="border-t border-neutral-100 pt-4">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-xs font-semibold text-stone-500">
+        <p className="text-xs font-semibold text-neutral-500">
           Sesión de soporte
         </p>
         <span
@@ -109,17 +109,17 @@ export function SupportSessionPanel({
         </span>
       </div>
 
-      <div className="rounded-md border border-stone-100 p-3 text-sm">
+      <div className="rounded-md border border-neutral-100 p-3 text-sm">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <p className="text-xs text-stone-500">Empresa</p>
-            <p className="text-stone-800">{session.company.name}</p>
+            <p className="text-xs text-neutral-500">Empresa</p>
+            <p className="text-neutral-800">{session.company.name}</p>
           </div>
           <div>
-            <p className="text-xs text-stone-500">
+            <p className="text-xs text-neutral-500">
               {isActive ? 'Expira en' : 'Expiraba'}
             </p>
-            <p className="text-stone-800">
+            <p className="text-neutral-800">
               {isActive
                 ? `${minutesUntil(session.expiresAt)} min (${formatDate(session.expiresAt)})`
                 : formatDate(session.expiresAt)}
@@ -127,8 +127,8 @@ export function SupportSessionPanel({
           </div>
         </div>
         <div className="mt-3">
-          <p className="text-xs text-stone-500">Motivo</p>
-          <p className="whitespace-pre-wrap text-stone-800">{session.reason}</p>
+          <p className="text-xs text-neutral-500">Motivo</p>
+          <p className="whitespace-pre-wrap text-neutral-800">{session.reason}</p>
         </div>
 
         {isActive && (
@@ -146,7 +146,7 @@ export function SupportSessionPanel({
         )}
 
         {!isActive && (
-          <p className="mt-3 text-xs text-stone-400">
+          <p className="mt-3 text-xs text-neutral-400">
             Esta sesión ya no está activa. Inicia una nueva para ver
             conversaciones.
           </p>
@@ -155,12 +155,12 @@ export function SupportSessionPanel({
 
       {isActive && (
         <div className="mt-3">
-          <p className="mb-2 text-xs font-semibold text-stone-500">
+          <p className="mb-2 text-xs font-semibold text-neutral-500">
             Conversaciones (vista superficial, sin mensajes)
           </p>
 
           {isLoading && (
-            <p className="text-xs text-stone-400">Cargando conversaciones...</p>
+            <p className="text-xs text-neutral-400">Cargando conversaciones...</p>
           )}
 
           {!isLoading && isError && (
@@ -170,7 +170,7 @@ export function SupportSessionPanel({
           )}
 
           {!isLoading && !isError && (conversations?.length ?? 0) === 0 && (
-            <p className="text-xs text-stone-400">Sin conversaciones.</p>
+            <p className="text-xs text-neutral-400">Sin conversaciones.</p>
           )}
 
           {!isLoading && !isError && (conversations?.length ?? 0) > 0 && (
@@ -178,26 +178,26 @@ export function SupportSessionPanel({
               {conversations!.map((conversation) => (
                 <li
                   key={conversation.id}
-                  className="rounded-md border border-stone-100 px-3 py-2"
+                  className="rounded-md border border-neutral-100 px-3 py-2"
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-stone-800">
+                    <p className="text-neutral-800">
                       {conversation.contact?.name ?? 'Contacto sin nombre'}
                     </p>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                         {conversation.status}
                       </span>
                       <button
                         type="button"
                         onClick={() => setOpenConversationId(conversation.id)}
-                        className="rounded-md border border-stone-200 px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                        className="rounded-md border border-neutral-200 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
                       >
                         Ver mensajes
                       </button>
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-stone-500">
+                  <p className="mt-1 text-xs text-neutral-500">
                     {conversation.channel} ·{' '}
                     {conversation.assignedUser?.name ?? 'Sin asignar'} ·{' '}
                     {formatDate(conversation.updatedAt)}
@@ -212,16 +212,16 @@ export function SupportSessionPanel({
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
+              className="rounded-md px-2 py-1 text-neutral-600 hover:bg-neutral-100 disabled:opacity-40"
             >
               Anterior
             </button>
-            <span className="text-stone-400">Página {page}</span>
+            <span className="text-neutral-400">Página {page}</span>
             <button
               type="button"
               disabled={(conversations?.length ?? 0) < CONVERSATIONS_LIMIT}
               onClick={() => setPage((p) => p + 1)}
-              className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
+              className="rounded-md px-2 py-1 text-neutral-600 hover:bg-neutral-100 disabled:opacity-40"
             >
               Siguiente
             </button>

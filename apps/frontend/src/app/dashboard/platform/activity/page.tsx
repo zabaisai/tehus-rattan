@@ -25,13 +25,13 @@ function StatCard({
   hint?: string;
 }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
+    <div className="rounded-lg border border-neutral-200 bg-white p-4">
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-xs font-medium text-stone-500">{label}</span>
-        <Icon size={16} className="text-stone-400" />
+        <span className="text-xs font-medium text-neutral-500">{label}</span>
+        <Icon size={16} className="text-neutral-400" />
       </div>
-      <div className="text-2xl font-semibold text-stone-900">{value}</div>
-      {hint && <p className="mt-1 text-xs text-stone-400">{hint}</p>}
+      <div className="text-2xl font-semibold text-neutral-900">{value}</div>
+      {hint && <p className="mt-1 text-xs text-neutral-400">{hint}</p>}
     </div>
   );
 }
@@ -53,9 +53,9 @@ export default function PlatformActivityPage() {
   if (!isPlatformSuperAdmin) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Actividad y seguridad</h2>
-        <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-          <p className="text-sm text-stone-600">
+        <h2 className="text-xl font-semibold text-neutral-900">Actividad y seguridad</h2>
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <p className="text-sm text-neutral-600">
             No tienes permiso para acceder a esta sección.
           </p>
         </div>
@@ -66,23 +66,23 @@ export default function PlatformActivityPage() {
   return (
     <div>
       <div className="mb-5">
-        <h2 className="text-xl font-semibold text-stone-900">Actividad y seguridad</h2>
-        <p className="mt-1 text-sm text-stone-500">
+        <h2 className="text-xl font-semibold text-neutral-900">Actividad y seguridad</h2>
+        <p className="mt-1 text-sm text-neutral-500">
           Uso del CRM, sesiones y dispositivos reconocidos en todas las empresas. Para el
           detalle de una empresa, ábrela desde{' '}
-          <span className="font-medium text-stone-700">Plataforma &gt; Empresas</span>{' '}
+          <span className="font-medium text-neutral-700">Plataforma &gt; Empresas</span>{' '}
           y usa &quot;Ver actividad&quot;.
         </p>
       </div>
 
       {isLoading && (
-        <div className="rounded-lg border border-stone-200 bg-white p-6 text-center text-sm text-stone-400">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-400">
           Cargando...
         </div>
       )}
 
       {!isLoading && isError && (
-        <div className="rounded-lg border border-stone-200 bg-white p-6 text-center text-sm text-red-600">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-red-600">
           No se pudo cargar el resumen de actividad.
         </div>
       )}

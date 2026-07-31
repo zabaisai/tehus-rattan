@@ -69,7 +69,12 @@ describe('QuotesService', () => {
           quantity: 1,
           unitPrice: 300,
           notes: 'Color natural',
-          product: { id: 'product-b', name: 'Silla Colonial', description: null, category: 'Sillas' },
+          product: {
+            id: 'product-b',
+            name: 'Silla Colonial',
+            description: null,
+            category: 'Sillas',
+          },
         }),
       ]);
       prisma.quote.findMany.mockResolvedValue([]);
@@ -77,7 +82,12 @@ describe('QuotesService', () => {
         Promise.resolve({ id: 'quote-1', ...args.data }),
       );
 
-      const result = await service.createFromLead(leadId, companyId, 'user-a', {});
+      const result = await service.createFromLead(
+        leadId,
+        companyId,
+        'user-a',
+        {},
+      );
 
       expect(prisma.quote.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -133,7 +143,11 @@ describe('QuotesService', () => {
 
       expect(prisma.quote.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          data: expect.objectContaining({ subtotal: 200, discount: 500, total: 0 }),
+          data: expect.objectContaining({
+            subtotal: 200,
+            discount: 500,
+            total: 0,
+          }),
         }),
       );
       expect(result.total).toBe(0);
@@ -168,7 +182,12 @@ describe('QuotesService', () => {
         Promise.resolve({ id: 'quote-4', ...args.data }),
       );
 
-      const result = await service.createFromLead(leadId, companyId, 'user-a', {});
+      const result = await service.createFromLead(
+        leadId,
+        companyId,
+        'user-a',
+        {},
+      );
 
       expect(result.number).toBe('COT-0004');
     });
@@ -181,7 +200,12 @@ describe('QuotesService', () => {
         Promise.resolve({ id: 'quote-1', ...args.data }),
       );
 
-      const result = await service.createFromLead(leadId, companyId, 'user-a', {});
+      const result = await service.createFromLead(
+        leadId,
+        companyId,
+        'user-a',
+        {},
+      );
       expect(result.number).toBe('COT-0001');
     });
   });
@@ -225,9 +249,9 @@ describe('QuotesService', () => {
     it('rejects reading a quote belonging to another company', async () => {
       prisma.quote.findFirst.mockResolvedValue(null);
 
-      await expect(service.findById('quote-b', companyId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findById('quote-b', companyId),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it("includes the owning company's fiscal identity (for the printable document)", async () => {
@@ -290,39 +314,61 @@ describe('QuotesService', () => {
 
   describe('update', () => {
     it('updates the status of an owned quote', async () => {
-      prisma.quote.findFirst.mockResolvedValue({ id: 'quote-1', subtotal: 200, discount: 0 });
+      prisma.quote.findFirst.mockResolvedValue({
+        id: 'quote-1',
+        subtotal: 200,
+        discount: 0,
+      });
       prisma.quote.update.mockResolvedValue({ id: 'quote-1', status: 'SENT' });
 
-      const result = await service.update('quote-1', companyId, { status: 'SENT' as any });
+      const result = await service.update('quote-1', companyId, {
+        status: 'SENT',
+      });
 
       expect(prisma.quote.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'quote-1' },
-          data: expect.objectContaining({ status: 'SENT', discount: 0, total: 200 }),
+          data: expect.objectContaining({
+            status: 'SENT',
+            discount: 0,
+            total: 200,
+          }),
         }),
       );
       expect(result.status).toBe('SENT');
     });
 
     it('recalculates total when discount changes', async () => {
-      prisma.quote.findFirst.mockResolvedValue({ id: 'quote-1', subtotal: 200, discount: 0 });
+      prisma.quote.findFirst.mockResolvedValue({
+        id: 'quote-1',
+        subtotal: 200,
+        discount: 0,
+      });
       prisma.quote.update.mockImplementation((args: any) =>
         Promise.resolve({ id: 'quote-1', ...args.data }),
       );
 
-      const result = await service.update('quote-1', companyId, { discount: 80 });
+      const result = await service.update('quote-1', companyId, {
+        discount: 80,
+      });
 
       expect(result.discount).toBe(80);
       expect(result.total).toBe(120);
     });
 
     it('keeps total at 0 when discount exceeds subtotal', async () => {
-      prisma.quote.findFirst.mockResolvedValue({ id: 'quote-1', subtotal: 200, discount: 0 });
+      prisma.quote.findFirst.mockResolvedValue({
+        id: 'quote-1',
+        subtotal: 200,
+        discount: 0,
+      });
       prisma.quote.update.mockImplementation((args: any) =>
         Promise.resolve({ id: 'quote-1', ...args.data }),
       );
 
-      const result = await service.update('quote-1', companyId, { discount: 999 });
+      const result = await service.update('quote-1', companyId, {
+        discount: 999,
+      });
 
       expect(result.total).toBe(0);
     });
@@ -339,26 +385,39 @@ describe('QuotesService', () => {
 
   describe('remove', () => {
     it('deletes a DRAFT quote', async () => {
-      prisma.quote.findFirst.mockResolvedValue({ id: 'quote-1', status: 'DRAFT' });
+      prisma.quote.findFirst.mockResolvedValue({
+        id: 'quote-1',
+        status: 'DRAFT',
+      });
       prisma.quote.delete.mockResolvedValue({ id: 'quote-1' });
 
       const result = await service.remove('quote-1', companyId);
 
-      expect(prisma.quote.delete).toHaveBeenCalledWith({ where: { id: 'quote-1' } });
+      expect(prisma.quote.delete).toHaveBeenCalledWith({
+        where: { id: 'quote-1' },
+      });
       expect(result).toEqual({ id: 'quote-1' });
     });
 
     it('deletes a SENT quote', async () => {
-      prisma.quote.findFirst.mockResolvedValue({ id: 'quote-1', status: 'SENT' });
+      prisma.quote.findFirst.mockResolvedValue({
+        id: 'quote-1',
+        status: 'SENT',
+      });
       prisma.quote.delete.mockResolvedValue({ id: 'quote-1' });
 
       await service.remove('quote-1', companyId);
 
-      expect(prisma.quote.delete).toHaveBeenCalledWith({ where: { id: 'quote-1' } });
+      expect(prisma.quote.delete).toHaveBeenCalledWith({
+        where: { id: 'quote-1' },
+      });
     });
 
     it('rejects deleting an ACCEPTED quote', async () => {
-      prisma.quote.findFirst.mockResolvedValue({ id: 'quote-1', status: 'ACCEPTED' });
+      prisma.quote.findFirst.mockResolvedValue({
+        id: 'quote-1',
+        status: 'ACCEPTED',
+      });
 
       await expect(service.remove('quote-1', companyId)).rejects.toBeInstanceOf(
         BadRequestException,

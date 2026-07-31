@@ -90,3 +90,24 @@ describe("buildContentSecurityPolicy (development)", () => {
     expect(csp).not.toContain("upgrade-insecure-requests");
   });
 });
+
+describe('canal de tiempo real', () => {
+  it('permite wss hacia el mismo host que la API en produccion', () => {
+    const csp = buildContentSecurityPolicy({
+      apiOrigin: 'https://api.ejemplo.com',
+      isDev: false,
+    });
+
+    expect(csp).toContain('wss://api.ejemplo.com');
+  });
+
+  it('no abre wss hacia cualquier host', () => {
+    const csp = buildContentSecurityPolicy({
+      apiOrigin: 'https://api.ejemplo.com',
+      isDev: false,
+    });
+
+    expect(csp).not.toContain('connect-src wss:');
+    expect(csp).not.toMatch(/connect-src[^;]*\swss:\s/);
+  });
+});

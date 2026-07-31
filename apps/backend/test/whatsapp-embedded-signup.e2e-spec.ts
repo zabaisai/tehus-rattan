@@ -14,6 +14,7 @@ import { WhatsAppEmbeddedSignupService } from '../src/modules/whatsapp-integrati
 import { WhatsAppEmbeddedSignupStateService } from '../src/modules/whatsapp-integration/whatsapp-embedded-signup-state.service';
 import { WhatsAppTokenCryptoService } from '../src/modules/whatsapp-integration/whatsapp-token-crypto.service';
 import { WhatsAppMetaClientService } from '../src/modules/whatsapp-integration/whatsapp-meta-client.service';
+import { WhatsAppNumbersService } from '../src/modules/whatsapp-integration/whatsapp-numbers.service';
 import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
 import {
@@ -26,6 +27,16 @@ const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
 // Minimal in-memory Prisma for the two models the flow touches. Enough to
 // exercise single-use state, cross-company uniqueness and status persistence
 // through the real HTTP pipeline — no real DB, no real Meta.
+/** Aplica un `select` de Prisma sobre una fila del doble. */
+function proyectar(fila: any, select?: Record<string, boolean>) {
+  if (!select) return fila;
+  const salida: Record<string, unknown> = {};
+  for (const clave of Object.keys(select)) {
+    if (select[clave]) salida[clave] = fila[clave] ?? null;
+  }
+  return salida;
+}
+
 function buildFakePrisma() {
   const states: any[] = [];
   const integrations: any[] = [];
@@ -82,6 +93,10 @@ function buildFakePrisma() {
         integrations.find(
           (i) =>
             i.companyId === where.companyId &&
+            // El `id` se respeta: sin esto, buscar un id ajeno devolveria el
+            // primer numero de la empresa y la prueba de aislamiento pasaria
+            // por el motivo equivocado.
+            (!where.id || i.id === where.id) &&
             (!where.status || i.status === where.status),
         ) ?? null,
       upsert: async ({ where, create, update }: any) => {
@@ -105,6 +120,27 @@ function buildFakePrisma() {
           }
         }
         return { count };
+      },
+      // Lo que necesita el listado de numeros. `findFirst` de arriba ya acota
+      // por companyId, que es lo que hace que un id ajeno no resuelva.
+      //
+      // Respeta `select` a proposito: sin proyectar, el doble devolveria la
+      // fila entera -token incluido- y la prueba de que el listado no filtra
+      // el token pasaria o fallaria por lo que hace el doble, no el codigo.
+      findMany: async ({ where, select }: any) =>
+        integrations
+          .filter((i) => i.companyId === where.companyId)
+          .map((i) => proyectar(i, select)),
+      update: async ({ where, data, select }: any) => {
+        const fila = integrations.find((i) => i.id === where.id);
+        if (!fila) throw new Error('no existe');
+        Object.assign(fila, data);
+        return proyectar(fila, select);
+      },
+      findUniqueOrThrow: async ({ where, select }: any) => {
+        const fila = integrations.find((i) => i.id === where.id);
+        if (!fila) throw new Error('no existe');
+        return proyectar(fila, select);
       },
     },
     $transaction: async (cb: any) => cb(client),
@@ -142,16 +178,14 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
       configId: () => 'config-id',
       graphVersion: () => 'v25.0',
       exchangeCode: jest.fn().mockResolvedValue('SECRET-TOKEN'),
-      listPhoneNumbers: jest
-        .fn()
-        .mockResolvedValue([
-          {
-            id: PHONE,
-            displayPhoneNumber: '+57 300 555 4521',
-            verifiedName: 'Tehus QA',
-            platformType: 'CLOUD_API',
-          },
-        ]),
+      listPhoneNumbers: jest.fn().mockResolvedValue([
+        {
+          id: PHONE,
+          displayPhoneNumber: '+57 300 555 4521',
+          verifiedName: 'Tehus QA',
+          platformType: 'CLOUD_API',
+        },
+      ]),
       subscribeAppToWaba: jest.fn().mockResolvedValue(undefined),
       sendText: jest.fn().mockResolvedValue(undefined),
     };
@@ -200,6 +234,10 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
         WhatsAppTokenCryptoService,
         WhatsAppEmbeddedSignupStateService,
         WhatsAppEmbeddedSignupService,
+        // El controlador tambien depende del servicio de numeros. Va REAL, no
+        // como mock: comparte prisma con el resto y asi el listado se prueba
+        // sobre las mismas filas que crea el alta.
+        WhatsAppNumbersService,
       ],
     }).compile();
 
@@ -365,5 +403,66 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
       .set('Authorization', `Bearer ${token('ADMIN', 'company-a')}`)
       .expect(201);
     expect(res.body.status).toBe('DISCONNECTED');
+  });
+
+  // ── Varios numeros ────────────────────────────────────────────
+  describe('numeros de la empresa', () => {
+    const numeros = (role: string, company: string) =>
+      request(app.getHttpServer())
+        .get('/api/whatsapp-integrations/me/numbers')
+        .set('Authorization', `Bearer ${token(role, company)}`);
+
+    it('un AGENT SI puede listarlos: necesita saber desde que numero se contesta', async () => {
+      await numeros('AGENT', 'company-a').expect(200);
+    });
+
+    it('el listado nunca trae el token', async () => {
+      const res = await numeros('ADMIN', 'company-a').expect(200);
+      const serializado = JSON.stringify(res.body);
+      expect(serializado).not.toMatch(/accessToken/i);
+      expect(serializado).not.toContain('e2e-encryption-key');
+    });
+
+    it('un AGENT NO puede renombrar ni cambiar el principal', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/whatsapp-integrations/me/numbers/cualquiera')
+        .set('Authorization', `Bearer ${token('AGENT', 'company-a')}`)
+        .send({ label: 'Mio' })
+        .expect(403);
+
+      await request(app.getHttpServer())
+        .post('/api/whatsapp-integrations/me/numbers/cualquiera/primary')
+        .set('Authorization', `Bearer ${token('AGENT', 'company-a')}`)
+        .expect(403);
+    });
+
+    it('sin sesion no se listan', async () => {
+      await request(app.getHttpServer())
+        .get('/api/whatsapp-integrations/me/numbers')
+        .expect(401);
+    });
+
+    it('una etiqueta demasiado larga se rechaza antes de tocar la base (400)', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/whatsapp-integrations/me/numbers/cualquiera')
+        .set('Authorization', `Bearer ${token('ADMIN', 'company-a')}`)
+        .send({ label: 'x'.repeat(41) })
+        .expect(400);
+    });
+
+    it('un campo no permitido se rechaza (400)', async () => {
+      await request(app.getHttpServer())
+        .patch('/api/whatsapp-integrations/me/numbers/cualquiera')
+        .set('Authorization', `Bearer ${token('ADMIN', 'company-a')}`)
+        .send({ label: 'Ventas', isPrimary: true })
+        .expect(400);
+    });
+
+    it('un numero que no es de la empresa no se encuentra (404)', async () => {
+      await request(app.getHttpServer())
+        .post('/api/whatsapp-integrations/me/numbers/de-otra-empresa/primary')
+        .set('Authorization', `Bearer ${token('ADMIN', 'company-a')}`)
+        .expect(404);
+    });
   });
 });

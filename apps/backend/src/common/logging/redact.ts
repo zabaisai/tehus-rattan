@@ -6,7 +6,8 @@ const REDACTED = '[REDACTED]';
 // Sensitive by NAME (headers or object keys). Never log these values:
 // Authorization/cookies, the auth JWT, refresh/device tokens, DB URL, the
 // WhatsApp app secret and token-encryption key, and any generic secret/password.
-const SENSITIVE_KEY = /^(authorization|cookie|set-cookie|x-hub-signature(-256)?|token|access[_-]?token|refresh[_-]?token|jwt|device[_-]?id|password|secret|database_url|whatsapp_app_secret|whatsapp_token_encryption_key|jwt_secret)$/i;
+const SENSITIVE_KEY =
+  /^(authorization|cookie|set-cookie|x-hub-signature(-256)?|token|access[_-]?token|refresh[_-]?token|jwt|device[_-]?id|password|secret|database_url|whatsapp_app_secret|whatsapp_token_encryption_key|jwt_secret)$/i;
 
 export function redactKey(key: string): boolean {
   return SENSITIVE_KEY.test(key);

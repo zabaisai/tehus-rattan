@@ -4,6 +4,7 @@ import {
   setAccessToken,
   clearAccessToken,
 } from "@/lib/auth-token";
+import { closeRealtimeSocket } from "@/lib/realtime";
 
 // Auth lifecycle:
 // - "bootstrapping": app just loaded; a controlled /auth/refresh is deciding
@@ -48,6 +49,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   setStatus: (status) => set({ status }),
   clearSession: () => {
     clearAccessToken();
+    // El canal se cierra con la sesion: un socket vivo con un token ya
+    // invalidado seguiria recibiendo eventos de la empresa hasta que el
+    // servidor lo tirase.
+    closeRealtimeSocket();
     set({ user: null, status: "anonymous" });
   },
 }));

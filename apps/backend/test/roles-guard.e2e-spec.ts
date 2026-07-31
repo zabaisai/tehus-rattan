@@ -11,6 +11,7 @@ import { AnalyticsController } from '../src/modules/analytics/analytics.controll
 import { AnalyticsService } from '../src/modules/analytics/analytics.service';
 import { AutomationsController } from '../src/modules/automations/automations.controller';
 import { AutomationsService } from '../src/modules/automations/automations.service';
+import { AutomationRunsService } from '../src/modules/automations/automation-runs.service';
 import {
   buildFakeSessionPrisma,
   encodeSid,
@@ -27,6 +28,10 @@ const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
 // mocked so this test exercises auth/roles only, never real data.
 const analyticsServiceMock = {
   getOverview: jest.fn(),
+};
+
+const automationRunsServiceMock = {
+  listar: jest.fn(),
 };
 
 const automationsServiceMock = {
@@ -67,6 +72,11 @@ describe('RolesGuard (e2e) — class-level @Roles enforcement', () => {
         { provide: PrismaService, useValue: buildFakeSessionPrisma() },
         { provide: AnalyticsService, useValue: analyticsServiceMock },
         { provide: AutomationsService, useValue: automationsServiceMock },
+        // El controlador tambien pide el historial de ejecuciones. Se simula
+        // igual que los servicios: esta suite comprueba autenticacion y roles,
+        // no datos. Un doble vacio basta porque un AGENT debe recibir 403
+        // ANTES de que el controlador llegue a llamar a nada.
+        { provide: AutomationRunsService, useValue: automationRunsServiceMock },
       ],
     }).compile();
 

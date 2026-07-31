@@ -213,7 +213,7 @@ export function BrandingStep({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoPreview} alt="" className="h-6 w-6 rounded object-cover" />
             ) : (
-              <div className="h-6 w-6 rounded bg-stone-200" />
+              <div className="h-6 w-6 rounded bg-neutral-200" />
             )}
             <span className="text-xs text-[#0B0F10]">Login</span>
           </div>

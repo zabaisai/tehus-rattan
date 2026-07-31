@@ -49,7 +49,7 @@ export function PrintableDocumentShell({ children }: PrintableDocumentShellProps
       <div className="overflow-x-auto print:overflow-visible">
         <div
           id="printable-document"
-          className="mx-auto w-full min-w-[640px] max-w-[850px] border border-stone-300 bg-white p-3 text-[13px] text-stone-900 shadow-sm sm:p-6 print:min-w-0 print:max-w-none print:border-0 print:p-0 print:shadow-none"
+          className="mx-auto w-full min-w-[640px] max-w-[850px] border border-neutral-300 bg-white p-3 text-[13px] text-neutral-900 shadow-sm sm:p-6 print:min-w-0 print:max-w-none print:border-0 print:p-0 print:shadow-none"
         >
           {children}
         </div>

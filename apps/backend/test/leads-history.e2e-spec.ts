@@ -26,7 +26,9 @@ describe('Lead stage history (e2e, real database)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    service = new LeadsService(prisma);
+    // El emisor de tiempo real se sustituye: esta prueba mide el historial en
+    // base real, no la propagacion por socket.
+    service = new LeadsService(prisma, { leadUpdated: jest.fn() } as never);
 
     const companyA = await prisma.company.create({
       data: { name: 'E2E Leads History Test Co A' },
@@ -39,7 +41,11 @@ describe('Lead stage history (e2e, real database)', () => {
     companyBId = companyB.id;
 
     const contactA = await prisma.contact.create({
-      data: { companyId: companyAId, phone: '+10000000001', name: 'E2E History Contact' },
+      data: {
+        companyId: companyAId,
+        phone: '+10000000001',
+        name: 'E2E History Contact',
+      },
     });
     contactAId = contactA.id;
 
@@ -78,8 +84,12 @@ describe('Lead stage history (e2e, real database)', () => {
     await prisma.leadStageHistory.deleteMany({
       where: { leadId: { in: createdLeadIds } },
     });
-    await prisma.lead.deleteMany({ where: { companyId: { in: [companyAId, companyBId] } } });
-    await prisma.pipelineStage.deleteMany({ where: { pipelineId: pipelineAId } });
+    await prisma.lead.deleteMany({
+      where: { companyId: { in: [companyAId, companyBId] } },
+    });
+    await prisma.pipelineStage.deleteMany({
+      where: { pipelineId: pipelineAId },
+    });
     await prisma.pipeline.delete({ where: { id: pipelineAId } });
     await prisma.contact.delete({ where: { id: contactAId } });
     await prisma.user.delete({ where: { id: creatorUserId } });
@@ -155,8 +165,8 @@ describe('Lead stage history (e2e, real database)', () => {
     });
     createdLeadIds.push(lead.id);
 
-    await expect(service.getHistory(lead.id, companyBId)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.getHistory(lead.id, companyBId),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

@@ -37,7 +37,10 @@ function round2(value: number): number {
 export class QuotesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(companyId: string, filters: { leadId?: string; status?: string }) {
+  async findAll(
+    companyId: string,
+    filters: { leadId?: string; status?: string },
+  ) {
     return this.prisma.quote.findMany({
       where: {
         companyId,
@@ -47,6 +50,36 @@ export class QuotesService {
       include: { lead: { select: LEAD_SELECT } },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Todo lo que el PDF necesita, resuelto en una consulta y acotado por
+   * empresa. El contacto viene del lead: es a quien se dirige el documento,
+   * y sin el la cotizacion sale con el titulo de la oportunidad como
+   * destinatario, que es un apano y se nota.
+   */
+  async findForPdf(id: string, companyId: string) {
+    const quote = await this.prisma.quote.findFirst({
+      where: { id, companyId },
+      include: {
+        items: { orderBy: { createdAt: 'asc' } },
+        company: {
+          select: {
+            ...COMPANY_IDENTITY_SELECT,
+            currency: true,
+            locale: true,
+          },
+        },
+        lead: {
+          select: {
+            title: true,
+            contact: { select: { name: true, phone: true } },
+          },
+        },
+      },
+    });
+    if (!quote) throw new NotFoundException('Cotización no encontrada');
+    return quote;
   }
 
   async findById(id: string, companyId: string) {
@@ -82,7 +115,9 @@ export class QuotesService {
     const leadProducts = await this.prisma.leadProduct.findMany({
       where: { leadId },
       include: {
-        product: { select: { id: true, name: true, description: true, category: true } },
+        product: {
+          select: { id: true, name: true, description: true, category: true },
+        },
       },
     });
     if (leadProducts.length === 0) {
@@ -102,7 +137,9 @@ export class QuotesService {
       notes: lp.notes,
     }));
 
-    const subtotal = round2(itemsData.reduce((sum, item) => sum + item.subtotal, 0));
+    const subtotal = round2(
+      itemsData.reduce((sum, item) => sum + item.subtotal, 0),
+    );
     const discount = data.discount ?? 0;
     const total = Math.max(0, round2(subtotal - discount));
     const number = await this.generateNextNumber(companyId);
@@ -131,7 +168,10 @@ export class QuotesService {
       // companyId+number is unique — a concurrent request could in theory
       // compute the same next number for the same company at the same time.
       // Surface that as a clean, retryable 409 instead of a raw 500.
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
         throw new ConflictException(
           'No se pudo generar el número de la cotización, intenta de nuevo',
         );
@@ -187,7 +227,9 @@ export class QuotesService {
     if (!quote) throw new NotFoundException('Cotización no encontrada');
 
     if (quote.status === 'ACCEPTED') {
-      throw new BadRequestException('No se puede eliminar una cotización aceptada');
+      throw new BadRequestException(
+        'No se puede eliminar una cotización aceptada',
+      );
     }
 
     await this.prisma.quote.delete({ where: { id } });

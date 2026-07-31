@@ -183,7 +183,7 @@ export class WhatsAppEmbeddedSignupService {
         integration.phoneNumberId,
         token,
         to,
-        'Mensaje de prueba de conexión desde el CRM Tehus Rattan. Puedes ignorarlo.',
+        'Mensaje de prueba de conexión desde TAKTO. Puedes ignorarlo.',
       );
       ok = true;
       return { status: 'ok' as const };
@@ -257,8 +257,12 @@ export class WhatsAppEmbeddedSignupService {
       const method = isCoexistence ? 'COEXISTENCE' : 'EMBEDDED_SIGNUP';
 
       const integration = await this.prisma.$transaction(async (tx) => {
+        // Clave por phoneNumberId, que es unico GLOBAL: reconectar el mismo
+        // numero lo actualiza, y conectar uno distinto anade una segunda
+        // integracion a la empresa. Antes se hacia por companyId, lo que solo
+        // funcionaba con un numero por empresa.
         const saved = await tx.whatsAppIntegration.upsert({
-          where: { companyId },
+          where: { phoneNumberId: dto.phoneNumberId },
           create: {
             companyId,
             phoneNumberId: dto.phoneNumberId,
@@ -324,8 +328,10 @@ export class WhatsAppEmbeddedSignupService {
   }
 
   async getConnectionStatus(companyId: string) {
-    const integration = await this.prisma.whatsAppIntegration.findUnique({
+    // Con varios numeros por empresa se resuelve la PRINCIPAL.
+    const integration = await this.prisma.whatsAppIntegration.findFirst({
       where: { companyId },
+      orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { createdAt: 'asc' }],
     });
     if (integration) {
       return this.toSafeStatus(integration);

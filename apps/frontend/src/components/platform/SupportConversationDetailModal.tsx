@@ -64,16 +64,16 @@ export function SupportConversationDetailModal({
               type="button"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
+              className="rounded-md px-2 py-1 text-neutral-600 hover:bg-neutral-100 disabled:opacity-40"
             >
               Anterior
             </button>
-            <span className="text-stone-400">Página {detail.page}</span>
+            <span className="text-neutral-400">Página {detail.page}</span>
             <button
               type="button"
               disabled={detail.messages.length < MESSAGES_LIMIT}
               onClick={() => setPage((p) => p + 1)}
-              className="rounded-md px-2 py-1 text-stone-600 hover:bg-stone-100 disabled:opacity-40"
+              className="rounded-md px-2 py-1 text-neutral-600 hover:bg-neutral-100 disabled:opacity-40"
             >
               Siguiente
             </button>
@@ -82,7 +82,7 @@ export function SupportConversationDetailModal({
       }
     >
         {isLoading && (
-          <p className="text-sm text-stone-400">Cargando...</p>
+          <p className="text-sm text-neutral-400">Cargando...</p>
         )}
 
         {!isLoading && isError && (
@@ -93,37 +93,37 @@ export function SupportConversationDetailModal({
 
         {!isLoading && !isError && detail && (
           <>
-            <div className="mb-4 border-b border-stone-100 pb-4 text-sm">
+            <div className="mb-4 border-b border-neutral-100 pb-4 text-sm">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div>
-                  <p className="text-xs text-stone-500">Estado</p>
-                  <p className="text-stone-800">{detail.conversation.status}</p>
+                  <p className="text-xs text-neutral-500">Estado</p>
+                  <p className="text-neutral-800">{detail.conversation.status}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Canal</p>
-                  <p className="text-stone-800">{detail.conversation.channel}</p>
+                  <p className="text-xs text-neutral-500">Canal</p>
+                  <p className="text-neutral-800">{detail.conversation.channel}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Agente asignado</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Agente asignado</p>
+                  <p className="text-neutral-800">
                     {detail.conversation.assignedUser?.name ?? 'Sin asignar'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Creada</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Creada</p>
+                  <p className="text-neutral-800">
                     {formatDate(detail.conversation.createdAt)}
                   </p>
                 </div>
               </div>
-              <p className="mt-3 text-xs text-stone-400">
+              <p className="mt-3 text-xs text-neutral-400">
                 Actualizada: {formatDate(detail.conversation.updatedAt)}
               </p>
             </div>
 
             <div>
               {detail.messages.length === 0 ? (
-                <p className="text-center text-sm text-stone-400">
+                <p className="text-center text-sm text-neutral-400">
                   Sin mensajes en esta página.
                 </p>
               ) : (
@@ -138,13 +138,13 @@ export function SupportConversationDetailModal({
                         <div
                           className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
                             isOutbound
-                              ? 'bg-stone-900 text-white'
-                              : 'border border-stone-200 bg-white text-stone-800'
+                              ? 'bg-brand-primary text-white'
+                              : 'border border-neutral-200 bg-white text-neutral-800'
                           }`}
                         >
                           <p
                             className={`mb-1 text-[10px] uppercase tracking-wide ${
-                              isOutbound ? 'text-stone-300' : 'text-stone-400'
+                              isOutbound ? 'text-neutral-300' : 'text-neutral-400'
                             }`}
                           >
                             {isOutbound ? 'Equipo' : 'Contacto'} · {message.type}
@@ -157,7 +157,7 @@ export function SupportConversationDetailModal({
                           </p>
                           <p
                             className={`mt-1 text-[10px] ${
-                              isOutbound ? 'text-stone-300' : 'text-stone-400'
+                              isOutbound ? 'text-neutral-300' : 'text-neutral-400'
                             }`}
                           >
                             {formatTime(message.createdAt)}

@@ -139,6 +139,14 @@ export interface Conversation {
   contact: Contact;
   agent: { id: string; name: string } | null;
   messages?: Message[];
+  // Oportunidad ligada. Nullable para siempre: no toda conversacion es una
+  // venta (soporte, consultas, spam).
+  lead?: {
+    id: string;
+    title: string;
+    status: Lead["status"];
+    stage: LeadStageRef | null;
+  } | null;
 }
 
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";

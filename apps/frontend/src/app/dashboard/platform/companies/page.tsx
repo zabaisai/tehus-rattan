@@ -105,9 +105,9 @@ export default function PlatformCompaniesPage() {
   if (!isPlatformSuperAdmin) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Empresas</h2>
-        <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-          <p className="text-sm text-stone-600">
+        <h2 className="text-xl font-semibold text-neutral-900">Empresas</h2>
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <p className="text-sm text-neutral-600">
             No tienes permiso para acceder a esta sección.
           </p>
         </div>
@@ -119,14 +119,14 @@ export default function PlatformCompaniesPage() {
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-stone-900">Empresas</h2>
-          <p className="mt-1 text-sm text-stone-500">
+          <h2 className="text-xl font-semibold text-neutral-900">Empresas</h2>
+          <p className="mt-1 text-sm text-neutral-500">
             Administra las empresas que usan el CRM.
           </p>
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
         >
           <Plus size={16} />
           Nueva empresa
@@ -137,21 +137,21 @@ export default function PlatformCompaniesPage() {
         <div className="relative max-w-xs flex-1">
           <Search
             size={15}
-            className="absolute left-2.5 top-2.5 text-stone-400"
+            className="absolute left-2.5 top-2.5 text-neutral-400"
           />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre"
-            className="w-full rounded-md border border-stone-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+            className="w-full rounded-md border border-neutral-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
         </div>
 
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as CompanyStatus | '')}
-          className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         >
           {statusFilterOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -166,17 +166,17 @@ export default function PlatformCompaniesPage() {
       )}
 
       {isLoading && (
-        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 lg:hidden">
+        <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-neutral-400 lg:hidden">
           Cargando...
         </p>
       )}
       {!isLoading && isError && (
-        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-red-600 lg:hidden">
+        <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-red-600 lg:hidden">
           No se pudo cargar el listado de empresas.
         </p>
       )}
       {!isLoading && !isError && (companies?.length ?? 0) === 0 && (
-        <p className="rounded-lg border border-stone-200 bg-white py-6 text-center text-sm text-stone-400 lg:hidden">
+        <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-neutral-400 lg:hidden">
           No hay empresas.
         </p>
       )}
@@ -185,11 +185,11 @@ export default function PlatformCompaniesPage() {
           no se apilen y agranden las filas como pasaba a 768px con la tabla. */}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:hidden">
         {companies?.map((company) => (
-          <div key={company.id} className="rounded-lg border border-stone-200 bg-white p-3">
+          <div key={company.id} className="rounded-lg border border-neutral-200 bg-white p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-stone-900">{company.name}</p>
-                <p className="mt-0.5 text-xs text-stone-500">{company.phone || '-'}</p>
+                <p className="truncate text-sm font-medium text-neutral-900">{company.name}</p>
+                <p className="mt-0.5 text-xs text-neutral-500">{company.phone || '-'}</p>
               </div>
               <span
                 className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[company.status]}`}
@@ -197,36 +197,36 @@ export default function PlatformCompaniesPage() {
                 {statusLabels[company.status]}
               </span>
             </div>
-            <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-stone-600">
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-neutral-600">
               <div>
-                <p className="text-stone-400">Usuarios</p>
+                <p className="text-neutral-400">Usuarios</p>
                 <p>{company.activeUsers} / {company.totalUsers}</p>
               </div>
               <div>
-                <p className="text-stone-400">Leads</p>
+                <p className="text-neutral-400">Leads</p>
                 <p>{company.totalLeads}</p>
               </div>
               <div>
-                <p className="text-stone-400">WhatsApp</p>
+                <p className="text-neutral-400">WhatsApp</p>
                 <p>{company.whatsappConnected ? 'Sí' : 'No'}</p>
               </div>
             </div>
-            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-stone-100 pt-3">
+            <div className="mt-3 flex flex-wrap gap-1.5 border-t border-neutral-100 pt-3">
               <button
                 onClick={() => setDetailCompanyId(company.id)}
-                className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-700"
+                className="rounded-md bg-neutral-100 px-2.5 py-1.5 text-xs text-neutral-700"
               >
                 Ver detalle
               </button>
               <button
                 onClick={() => router.push(`/dashboard/platform/activity/${company.id}`)}
-                className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-700"
+                className="rounded-md bg-neutral-100 px-2.5 py-1.5 text-xs text-neutral-700"
               >
                 Ver actividad
               </button>
               <button
                 onClick={() => setSupportOverviewCompanyId(company.id)}
-                className="rounded-md bg-stone-100 px-2.5 py-1.5 text-xs text-stone-700"
+                className="rounded-md bg-neutral-100 px-2.5 py-1.5 text-xs text-neutral-700"
               >
                 Ver soporte
               </button>
@@ -259,10 +259,10 @@ export default function PlatformCompaniesPage() {
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white lg:block">
+      <div className="hidden overflow-x-auto rounded-lg border border-neutral-200 bg-white lg:block">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
+            <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
               <th className="whitespace-nowrap px-4 py-2.5 font-medium">Empresa</th>
               <th className="whitespace-nowrap px-4 py-2.5 font-medium">Teléfono</th>
               <th className="whitespace-nowrap px-4 py-2.5 font-medium">Estado</th>
@@ -278,7 +278,7 @@ export default function PlatformCompaniesPage() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-stone-400">
+                <td colSpan={10} className="px-4 py-6 text-center text-neutral-400">
                   Cargando...
                 </td>
               </tr>
@@ -294,7 +294,7 @@ export default function PlatformCompaniesPage() {
 
             {!isLoading && !isError && (companies?.length ?? 0) === 0 && (
               <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-stone-400">
+                <td colSpan={10} className="px-4 py-6 text-center text-neutral-400">
                   No hay empresas.
                 </td>
               </tr>
@@ -303,10 +303,10 @@ export default function PlatformCompaniesPage() {
             {companies?.map((company) => (
               <tr
                 key={company.id}
-                className="border-b border-stone-100 last:border-0"
+                className="border-b border-neutral-100 last:border-0"
               >
-                <td className="px-4 py-2.5 text-stone-800">{company.name}</td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-800">{company.name}</td>
+                <td className="px-4 py-2.5 text-neutral-600">
                   {company.phone || '-'}
                 </td>
                 <td className="px-4 py-2.5">
@@ -316,43 +316,43 @@ export default function PlatformCompaniesPage() {
                     {statusLabels[company.status]}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {company.activeUsers} / {company.totalUsers}
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {company.totalContacts}
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {company.totalLeads}
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {company.totalConversations}
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {company.whatsappConnected ? 'Sí' : 'No'}
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {formatDate(company.createdAt)}
                 </td>
                 <td className="px-4 py-2.5">
                   <div className="flex flex-wrap justify-end gap-1.5">
                     <button
                       onClick={() => setDetailCompanyId(company.id)}
-                      className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                      className="rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
                     >
                       Ver detalle
                     </button>
 
                     <button
                       onClick={() => router.push(`/dashboard/platform/activity/${company.id}`)}
-                      className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                      className="rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
                     >
                       Ver actividad
                     </button>
 
                     <button
                       onClick={() => setSupportOverviewCompanyId(company.id)}
-                      className="rounded-md px-2 py-1 text-xs text-stone-600 hover:bg-stone-100"
+                      className="rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
                     >
                       Ver soporte
                     </button>

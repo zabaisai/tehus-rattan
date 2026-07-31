@@ -57,8 +57,10 @@ export class WhatsAppIntegrationManagementService {
       'companyId no puede estar vacio',
     );
 
-    const integration = await this.prisma.whatsAppIntegration.findUnique({
+    // La empresa puede tener varios numeros: se devuelve el PRINCIPAL.
+    const integration = await this.prisma.whatsAppIntegration.findFirst({
       where: { companyId: trimmedCompanyId },
+      orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { createdAt: 'asc' }],
     });
 
     if (!integration) return null;
@@ -130,8 +132,10 @@ export class WhatsAppIntegrationManagementService {
         match.displayPhoneNumber ?? displayPhoneNumber ?? null;
 
       const integration = await this.prisma.$transaction(async (tx) => {
+        // Clave por phoneNumberId (unico global): reconectar el mismo numero
+        // lo actualiza; conectar otro anade una segunda integracion.
         const saved = await tx.whatsAppIntegration.upsert({
-          where: { companyId: trimmedCompanyId },
+          where: { phoneNumberId },
           create: {
             companyId: trimmedCompanyId,
             phoneNumberId,
@@ -189,8 +193,9 @@ export class WhatsAppIntegrationManagementService {
       'companyId no puede estar vacio',
     );
 
-    const integration = await this.prisma.whatsAppIntegration.findUnique({
+    const integration = await this.prisma.whatsAppIntegration.findFirst({
       where: { companyId: trimmedCompanyId },
+      orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { createdAt: 'asc' }],
     });
 
     if (!integration) {
@@ -198,7 +203,7 @@ export class WhatsAppIntegrationManagementService {
     }
 
     const updated = await this.prisma.whatsAppIntegration.update({
-      where: { companyId: trimmedCompanyId },
+      where: { id: integration.id },
       data: {
         status: 'DISCONNECTED',
         disconnectedAt: new Date(),

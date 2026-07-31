@@ -1,39 +1,110 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PauseCircle, PlayCircle, ArrowLeft } from 'lucide-react';
 import {
-  getConversations,
+  getInbox,
+  getInboxCounters,
+  bulkConversations,
+  markConversationRead,
   getMessages,
   sendMessage,
   pauseConversation,
   resumeConversation,
+  type AccionMasiva,
+  type FiltrosBandeja,
 } from "@/lib/conversations";
+import { getCompanyUsers } from "@/lib/users";
 import { ConversationList } from "@/components/conversations/ConversationList";
 import { MessageThread } from "@/components/conversations/MessageThread";
 import { MessageInput } from "@/components/conversations/MessageInput";
+import { ConversationOpportunity } from "@/components/conversations/ConversationOpportunity";
+import { intervaloDeRefresco, useRealtime } from "@/lib/use-realtime";
+import { InboxFilters } from "@/components/conversations/InboxFilters";
+import { InboxBulkBar } from "@/components/conversations/InboxBulkBar";
 
 export default function ConversationsPage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
+  const [filtros, setFiltros] = useState<FiltrosBandeja>({});
+  const [seleccionadas, setSeleccionadas] = useState<string[]>([]);
 
-  const { data: conversations } = useQuery({
-    queryKey: ["conversations"],
-    queryFn: getConversations,
-    refetchInterval: 5000,
+  // Con canal abierto los mensajes llegan solos; el polling se relaja pero no
+  // desaparece, por si se pierde algun evento.
+  const { enVivo } = useRealtime(selectedId);
+  const refetchInterval = intervaloDeRefresco(enVivo);
+
+  // La clave lleva los filtros: cada combinacion es una lista distinta y
+  // compartir cache entre ellas mostraria resultados de otro filtro al
+  // cambiar de pestana.
+  const { data: bandeja } = useQuery({
+    queryKey: ["conversations", filtros],
+    queryFn: () => getInbox(filtros),
+    refetchInterval,
   });
+
+  const { data: contadores } = useQuery({
+    queryKey: ["conversations", "counters"],
+    queryFn: getInboxCounters,
+    refetchInterval,
+  });
+
+  const { data: asesores } = useQuery({
+    queryKey: ["users"],
+    queryFn: getCompanyUsers,
+    // La plantilla no cambia mientras se trabaja: pedirla con el mismo ritmo
+    // que las conversaciones seria trafico por nada.
+    staleTime: 5 * 60_000,
+  });
+
+  const conversations = useMemo(() => bandeja?.items ?? [], [bandeja]);
 
   const { data: messages } = useQuery({
     queryKey: ["messages", selectedId],
     queryFn: () => getMessages(selectedId as string),
     enabled: !!selectedId,
-    refetchInterval: 5000,
+    refetchInterval,
   });
 
   const selectedConversation =
-    conversations?.find((c) => c.id === selectedId) ?? null;
+    conversations.find((c) => c.id === selectedId) ?? null;
+
+  const refrescarBandeja = useCallback(
+    () => queryClient.invalidateQueries({ queryKey: ["conversations"] }),
+    [queryClient],
+  );
+
+  // Abrir un hilo lo marca leido. Va aqui y no en el onClick para que tambien
+  // cuente cuando la seleccion viene de otro sitio, y para que un mensaje
+  // nuevo en el hilo ya abierto no deje el contador encendido.
+  useEffect(() => {
+    if (!selectedId) return;
+    let cancelado = false;
+    void markConversationRead(selectedId)
+      .then(() => {
+        if (!cancelado) void refrescarBandeja();
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelado = true;
+    };
+  }, [selectedId, messages, refrescarBandeja]);
+
+  function alternarSeleccion(id: string) {
+    setSeleccionadas((previas) =>
+      previas.includes(id)
+        ? previas.filter((x) => x !== id)
+        : [...previas, id],
+    );
+  }
+
+  async function aplicarAccionMasiva(accion: AccionMasiva) {
+    await bulkConversations(seleccionadas, accion);
+    setSeleccionadas([]);
+    await refrescarBandeja();
+  }
 
   async function handleSend(message: string) {
     if (!selectedId) return;
@@ -59,20 +130,41 @@ export default function ConversationsPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden rounded-lg border border-stone-200 bg-white">
+    <div className="flex h-full overflow-hidden rounded-lg border border-neutral-200 bg-white">
       {/* Móvil: solo se muestra el listado O el chat, nunca ambos a la vez. */}
       <div
-        className={`w-full shrink-0 overflow-y-auto border-stone-200 sm:block sm:w-72 sm:border-r ${
+        className={`w-full shrink-0 overflow-y-auto border-neutral-200 sm:block sm:w-72 sm:border-r ${
           selectedId ? 'hidden sm:block' : 'block'
         }`}
       >
+        <InboxFilters
+          filtros={filtros}
+          contadores={contadores}
+          onChange={(siguiente) => {
+            // La seleccion se limpia al cambiar de filtro: mantenerla dejaria
+            // marcadas conversaciones que ya no se ven, y la accion masiva
+            // afectaria a algo invisible.
+            setSeleccionadas([]);
+            setFiltros(siguiente);
+          }}
+        />
+
+        <InboxBulkBar
+          seleccionadas={seleccionadas}
+          asesores={asesores ?? []}
+          onAccion={aplicarAccionMasiva}
+          onLimpiar={() => setSeleccionadas([])}
+        />
+
         <ConversationList
-          conversations={conversations ?? []}
+          conversations={conversations}
           selectedId={selectedId}
           onSelect={(id) => {
             setSendNotice(null);
             setSelectedId(id);
           }}
+          seleccionadas={seleccionadas}
+          onToggleSeleccion={alternarSeleccion}
         />
       </div>
 
@@ -80,28 +172,28 @@ export default function ConversationsPage() {
         className={`flex-1 flex-col sm:flex ${selectedId ? 'flex' : 'hidden'}`}
       >
         {!selectedConversation && (
-          <div className="flex flex-1 items-center justify-center text-sm text-stone-400">
+          <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">
             Selecciona una conversación
           </div>
         )}
 
         {selectedConversation && (
           <>
-            <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
+            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-2">
                 <button
                   onClick={() => setSelectedId(null)}
                   aria-label="Volver al listado de conversaciones"
-                  className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100 sm:hidden"
+                  className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 sm:hidden"
                 >
                   <ArrowLeft size={18} />
                 </button>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-stone-900">
+                  <p className="truncate text-sm font-medium text-neutral-900">
                     {selectedConversation.contact.name ||
                       selectedConversation.contact.phone}
                   </p>
-                  <p className="text-xs text-stone-400">
+                  <p className="text-xs text-neutral-400">
                     {selectedConversation.contact.phone}
                   </p>
                 </div>
@@ -127,6 +219,13 @@ export default function ConversationsPage() {
                 )}
               </button>
             </div>
+
+            <ConversationOpportunity
+              conversation={selectedConversation}
+              onTaskCreated={() =>
+                queryClient.invalidateQueries({ queryKey: ["tasks"] })
+              }
+            />
 
             {sendNotice && (
               <p className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700">

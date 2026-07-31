@@ -52,7 +52,7 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
     <Modal title="Crear cotización" onClose={onClose} maxWidth="md" stackedZIndex>
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Título (opcional)
             </label>
             <input
@@ -60,13 +60,13 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Cotización sala Primavera"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-3 grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Descuento (opcional)
               </label>
               <input
@@ -76,24 +76,24 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
                 value={discount}
                 onChange={(e) => setDiscount(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
                 Válida hasta (opcional)
               </label>
               <input
                 type="date"
                 value={validUntil}
                 onChange={(e) => setValidUntil(e.target.value)}
-                className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
           </div>
 
           <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Notas (opcional)
             </label>
             <textarea
@@ -101,7 +101,7 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Condiciones de entrega, forma de pago..."
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
@@ -111,14 +111,14 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
             >
               Cancelar
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+              className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
             >
               {saving ? 'Creando...' : 'Crear cotización'}
             </button>

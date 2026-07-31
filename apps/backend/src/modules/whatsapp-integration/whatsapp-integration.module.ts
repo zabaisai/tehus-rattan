@@ -3,6 +3,7 @@ import { PlatformModule } from '../platform/platform.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WhatsAppIntegrationService } from './whatsapp-integration.service';
 import { WhatsAppTokenCryptoService } from './whatsapp-token-crypto.service';
+import { TokenRotationService } from './token-rotation.service';
 import { WhatsAppIntegrationManagementService } from './whatsapp-integration-management.service';
 import { WhatsAppEmbeddedSignupStateService } from './whatsapp-embedded-signup-state.service';
 import { WhatsAppMetaClientService } from './whatsapp-meta-client.service';
@@ -10,6 +11,7 @@ import { WhatsAppEmbeddedSignupService } from './whatsapp-embedded-signup.servic
 import { WhatsAppIntegrationController } from './whatsapp-integration.controller';
 import { PlatformWhatsAppIntegrationController } from './platform-whatsapp-integration.controller';
 import { PlatformWhatsAppIntegrationService } from './platform-whatsapp-integration.service';
+import { WhatsAppNumbersService } from './whatsapp-numbers.service';
 
 @Module({
   // The support-gated platform controller lives HERE, not in PlatformModule,
@@ -21,6 +23,7 @@ import { PlatformWhatsAppIntegrationService } from './platform-whatsapp-integrat
     PlatformWhatsAppIntegrationController,
   ],
   providers: [
+    TokenRotationService,
     PlatformWhatsAppIntegrationService,
     WhatsAppIntegrationService,
     WhatsAppTokenCryptoService,
@@ -28,8 +31,10 @@ import { PlatformWhatsAppIntegrationService } from './platform-whatsapp-integrat
     WhatsAppEmbeddedSignupStateService,
     WhatsAppMetaClientService,
     WhatsAppEmbeddedSignupService,
+    WhatsAppNumbersService,
   ],
   exports: [
+    TokenRotationService,
     WhatsAppIntegrationService,
     WhatsAppTokenCryptoService,
     WhatsAppIntegrationManagementService,

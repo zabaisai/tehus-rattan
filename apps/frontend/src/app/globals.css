@@ -1,28 +1,185 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────────────────────
+   IDENTIDAD TAKTO
+   Traducción del paquete de marca (10-CRM-EXPORT/tokens) al formato
+   nativo de Tailwind 4, que se configura en CSS y no con un preset JS.
+   Los valores no se retocan: salen tal cual de `takto-tokens.json`.
+
+   REGLAS DE MARCA QUE ESTE ARCHIVO HACE CUMPLIR
+     · El naranja #FF6A00 NO se usa como texto fino sobre claro; para eso
+       existe `secondary-700` (#C24A00), que sí tiene contraste.
+     · Los botones naranjas llevan texto navy (#131C4A), no blanco.
+     · La marca TAKTO no se mezcla con la identidad de las empresas
+       cliente: los colores propios de cada empresa viven en su registro y
+       se aplican a SU material, nunca al armazón del producto.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  /* Marca */
+  --color-brand-primary: #131c4a;
+  --color-brand-secondary: #ff6a00;
+  --color-brand-on-primary: #ffffff;
+
+  /* Azul institucional */
+  --color-primary-50: #eef0f7;
+  --color-primary-100: #d9ddec;
+  --color-primary-200: #b3bad8;
+  --color-primary-300: #8a94bf;
+  --color-primary-400: #5f6ba1;
+  --color-primary-500: #3b477e;
+  --color-primary-600: #26315f;
+  --color-primary-700: #1a2352;
+  --color-primary-800: #131c4a;
+  --color-primary-900: #0e1538;
+  --color-primary-950: #080c20;
+
+  /* Naranja de acento */
+  --color-secondary-50: #fff3eb;
+  --color-secondary-100: #ffe1cc;
+  --color-secondary-200: #ffc299;
+  --color-secondary-300: #ffa366;
+  --color-secondary-400: #ff8533;
+  --color-secondary-500: #ff6a00;
+  --color-secondary-600: #e05c00;
+  --color-secondary-700: #c24a00;
+  --color-secondary-800: #963900;
+  --color-secondary-900: #6b2900;
+  --color-secondary-950: #3d1700;
+
+  /* Neutrales de marca: ligeramente azulados, que es lo que hace que el gris
+     del producto pertenezca a la misma familia que el navy en vez de parecer
+     una plantilla ajena.
+
+     Reemplazan por completo a la escala `stone` de Tailwind, que fue el puente
+     durante la migración: mientras existió, `stone-*` apuntaba a estos mismos
+     valores, así que renombrar los 1407 usos a `neutral-*` y retirar el puente
+     no cambió un solo píxel. Se comprobó comparando el conjunto de colores del
+     CSS compilado antes y después. */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #f7f8fa;
+  --color-neutral-100: #eff1f5;
+  --color-neutral-200: #e2e5ec;
+  --color-neutral-300: #cbd0db;
+  --color-neutral-400: #9aa1b2;
+  --color-neutral-500: #6e7688;
+  --color-neutral-600: #525a6b;
+  --color-neutral-700: #3b4252;
+  --color-neutral-800: #272c38;
+  --color-neutral-900: #171b24;
+  --color-neutral-950: #0d1017;
+
+  /* Semánticos */
+  --color-surface-default: #ffffff;
+  --color-surface-subtle: #f7f8fa;
+  --color-surface-inverse: #131c4a;
+  --color-line-default: #e2e5ec;
+  --color-line-strong: #cbd0db;
+  --color-line-focus: #3b477e;
+  --color-content-primary: #171b24;
+  --color-content-secondary: #525a6b;
+  --color-content-disabled: #9aa1b2;
+  --color-content-inverse: #ffffff;
+  --color-content-link: #1a2352;
+
+  /* Acciones. `on-secondary` es navy a propósito: texto blanco sobre
+     naranja no alcanza el contraste mínimo. */
+  --color-action-primary: #131c4a;
+  --color-action-primary-hover: #0e1538;
+  --color-action-secondary: #ff6a00;
+  --color-action-secondary-hover: #e05c00;
+  --color-action-on-secondary: #131c4a;
+  --color-action-quiet-bg: #eff1f5;
+
+  /* Estado */
+  --color-status-success: #0e8a5f;
+  --color-status-success-surface: #e6f5ef;
+  --color-status-warning: #b26a00;
+  --color-status-warning-surface: #fff4e0;
+  --color-status-error: #c42b2b;
+  --color-status-error-surface: #fceaea;
+  --color-status-info: #2a5fd6;
+  --color-status-info-surface: #e8effd;
+
+  /* Etapas del embudo. Viven en la marca y no en cada componente para que
+     el mismo estado se vea igual en el tablero, en la ficha y en un PDF. */
+  --color-pipeline-nuevo: #6e7688;
+  --color-pipeline-contactado: #2a5fd6;
+  --color-pipeline-cotizado: #c24a00;
+  --color-pipeline-negociacion: #3b477e;
+  --color-pipeline-ganado: #0e8a5f;
+  --color-pipeline-perdido: #c42b2b;
+
+  /* Tipografía: Archivo para titulares, IBM Plex Sans para interfaz, IBM
+     Plex Mono para cifras (alineación tabular). Las variables las define
+     `next/font/local` en el layout, autoalojadas: ninguna petición sale a
+     un tercero, que es además lo que exige la CSP. */
+  --font-brand: var(--font-archivo), "Helvetica Neue", Arial, sans-serif;
+  --font-sans: var(--font-plex-sans), "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  /* Sombras teñidas de navy en vez de negro puro: el gris neutro sobre un
+     fondo azulado se ve sucio. */
+  --shadow-xs: 0 1px 2px rgba(19, 28, 74, 0.06);
+  --shadow-sm:
+    0 1px 3px rgba(19, 28, 74, 0.1), 0 1px 2px rgba(19, 28, 74, 0.06);
+  --shadow-md: 0 4px 12px rgba(19, 28, 74, 0.1);
+  --shadow-lg: 0 12px 32px rgba(19, 28, 74, 0.14);
+
+  --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #171b24;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/* Sin variante oscura automática: el producto es claro en todas sus
+   pantallas y el `prefers-color-scheme` anterior solo invertía el fondo
+   del body, dejando el resto de la interfaz en claro. Un tema oscuro de
+   verdad es un trabajo aparte, no un media query. */
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+/* Titulares en Archivo con tracking negativo, como pide el manual. Va por
+   elemento y no por clase para que ningún titular se quede fuera por
+   olvido al crear una pantalla nueva. */
+h1,
+h2,
+h3 {
+  font-family: var(--font-brand);
+  letter-spacing: -0.02em;
+}
+
+/* Foco visible en TODO lo interactivo.
+   Los navegadores traen uno propio, pero cada `outline-none` que se escribe
+   para quitar el contorno azul por defecto lo elimina sin poner nada en su
+   lugar, y quien navega con teclado se queda sin saber donde esta. El
+   producto usa `outline-none` en practicamente todos sus campos.
+
+   NO va envuelto en `:where()`: eso lo dejaria con especificidad cero y
+   cualquier `.outline-none` lo anularia, que es exactamente el caso que
+   intenta cubrir. Con el selector desnudo -elemento + pseudoclase, 0-1-1-
+   gana a la clase de utilidad (0-1-0). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-line-focus);
+  outline-offset: 1px;
 }
 
 /* iOS Safari zooms the page in on focus when a form field's computed font
@@ -33,5 +190,17 @@ body {
   select,
   textarea {
     font-size: 16px;
+  }
+}
+
+/* Respeta a quien pide menos movimiento. Ninguna animación del producto es
+   informativa, así que apagarlas no quita nada. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

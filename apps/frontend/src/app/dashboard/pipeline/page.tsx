@@ -2,60 +2,79 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { KanbanSquare, Plus } from 'lucide-react';
 import { getPipelines } from '@/lib/pipeline';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
+import { useRealtime } from '@/lib/use-realtime';
+import { PipelineSelector } from '@/components/kanban/PipelineSelector';
+import { ListState } from '@/components/ui/ListState';
 
 export default function PipelinePage() {
   const queryClient = useQueryClient();
-  const { data: pipelines, isLoading } = useQuery({
+  // Una oportunidad que entra por WhatsApp aparece sola en el tablero.
+  useRealtime();
+  const { data: pipelines, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['pipelines'],
     queryFn: getPipelines,
   });
 
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  // `null` significa "aun no ha elegido": se resuelve al predeterminado. Fijar
+  // el id en cuanto cargan los pipelines obligaria a un efecto y a un
+  // renderizado extra sin ganar nada.
+  const [pipelineElegido, setPipelineElegido] = useState<string | null>(null);
 
-  if (isLoading) {
-    return <p className="text-sm text-stone-500">Cargando...</p>;
-  }
-
-  if (!pipelines || pipelines.length === 0) {
+  if (isLoading || isError || !pipelines?.length) {
     return (
-      <p className="text-sm text-stone-500">
-        No hay pipelines creados todavía.
-      </p>
+      <ListState
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={!pipelines?.length}
+        error={error}
+        onRetry={() => void refetch()}
+        icon={KanbanSquare}
+        emptyMessage="No hay pipelines creados todavía."
+      />
     );
   }
 
-  const defaultPipeline = pipelines.find((p) => p.isDefault) ?? pipelines[0];
+  const activo =
+    pipelines.find((p) => p.id === pipelineElegido) ??
+    pipelines.find((p) => p.isDefault) ??
+    pipelines[0];
 
   async function refreshKanban() {
-    await queryClient.invalidateQueries({ queryKey: ['kanban', defaultPipeline.id] });
+    await queryClient.invalidateQueries({ queryKey: ['kanban', activo.id] });
   }
 
   return (
     <div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-stone-900">
-          {defaultPipeline.name}
-        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-semibold text-neutral-900">{activo.name}</h2>
+          <PipelineSelector
+            pipelines={pipelines}
+            value={activo.id}
+            onChange={setPipelineElegido}
+          />
+        </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
         >
           <Plus size={16} />
           Nuevo lead
         </button>
       </div>
-      <KanbanBoard pipelineId={defaultPipeline.id} onLeadClick={setSelectedLeadId} />
+      <KanbanBoard pipelineId={activo.id} onLeadClick={setSelectedLeadId} />
 
       {createOpen && (
         <LeadFormModal
-          pipelineId={defaultPipeline.id}
-          stages={defaultPipeline.stages}
+          pipelineId={activo.id}
+          stages={activo.stages}
           onClose={() => setCreateOpen(false)}
           onCreated={async () => {
             await refreshKanban();
@@ -67,7 +86,7 @@ export default function PipelinePage() {
       {selectedLeadId && (
         <LeadDetailModal
           leadId={selectedLeadId}
-          stages={defaultPipeline.stages}
+          stages={activo.stages}
           onClose={() => setSelectedLeadId(null)}
           onChanged={refreshKanban}
         />

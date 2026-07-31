@@ -4,16 +4,21 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeEmitter,
+  ) {}
 
   async findAll(
     companyId: string,
     filters: {
       leadId?: string;
       contactId?: string;
+      conversationId?: string;
       status?: string;
       assignedTo?: string;
       overdue?: boolean;
@@ -27,6 +32,9 @@ export class TasksService {
       companyId,
       ...(filters.leadId && { leadId: filters.leadId }),
       ...(filters.contactId && { contactId: filters.contactId }),
+      ...(filters.conversationId && {
+        conversationId: filters.conversationId,
+      }),
       ...(filters.status && { status: filters.status }),
       ...(filters.assignedTo && { assignedTo: filters.assignedTo }),
       ...(filters.search && {
@@ -47,6 +55,7 @@ export class TasksService {
       include: {
         lead: { select: { id: true, title: true } },
         contact: { select: { id: true, name: true } },
+        conversation: { select: { id: true, status: true, channel: true } },
         agent: { select: { id: true, name: true } },
       },
       orderBy: { dueDate: 'asc' },
@@ -60,6 +69,7 @@ export class TasksService {
       include: {
         lead: { select: { id: true, title: true } },
         contact: { select: { id: true, name: true } },
+        conversation: { select: { id: true, status: true, channel: true } },
         agent: { select: { id: true, name: true } },
       },
     });
@@ -77,14 +87,16 @@ export class TasksService {
       type?: string;
       leadId?: string;
       contactId?: string;
+      conversationId?: string;
       assignedTo?: string;
     },
   ) {
     await this.validateAssignedUser(data.assignedTo, companyId);
     await this.validateLead(data.leadId, companyId);
     await this.validateContact(data.contactId, companyId);
+    await this.validateConversation(data.conversationId, companyId);
 
-    return this.prisma.task.create({
+    const creada = await this.prisma.task.create({
       data: {
         ...data,
         companyId,
@@ -93,6 +105,15 @@ export class TasksService {
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       },
     });
+
+    // Al responsable le llega ademas por su sala personal: una tarea nueva
+    // asignada es justo lo que no puede esperar al siguiente refresco.
+    this.realtime.taskUpdated(
+      companyId,
+      creada.id,
+      creada.assignedTo ?? undefined,
+    );
+    return creada;
   }
 
   async update(
@@ -110,7 +131,7 @@ export class TasksService {
     await this.findById(id, companyId);
     await this.validateAssignedUser(data.assignedTo, companyId);
 
-    return this.prisma.task.update({
+    const actualizada = await this.prisma.task.update({
       where: { id },
       data: {
         ...data,
@@ -119,14 +140,28 @@ export class TasksService {
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       },
     });
+
+    this.realtime.taskUpdated(
+      companyId,
+      actualizada.id,
+      actualizada.assignedTo ?? undefined,
+    );
+    return actualizada;
   }
 
   async complete(id: string, companyId: string) {
     await this.findById(id, companyId);
-    return this.prisma.task.update({
+    const completada = await this.prisma.task.update({
       where: { id },
       data: { status: 'COMPLETED' },
     });
+
+    this.realtime.taskUpdated(
+      companyId,
+      completada.id,
+      completada.assignedTo ?? undefined,
+    );
+    return completada;
   }
 
   async remove(id: string, companyId: string) {
@@ -134,7 +169,10 @@ export class TasksService {
     return this.prisma.task.delete({ where: { id } });
   }
 
-  private async validateAssignedUser(assignedTo: string | undefined, companyId: string) {
+  private async validateAssignedUser(
+    assignedTo: string | undefined,
+    companyId: string,
+  ) {
     if (assignedTo === undefined) return;
 
     if (!assignedTo.trim()) {
@@ -164,7 +202,10 @@ export class TasksService {
     if (!lead) throw new NotFoundException('Lead no encontrado');
   }
 
-  private async validateContact(contactId: string | undefined, companyId: string) {
+  private async validateContact(
+    contactId: string | undefined,
+    companyId: string,
+  ) {
     if (contactId === undefined) return;
 
     if (!contactId.trim()) {
@@ -177,6 +218,28 @@ export class TasksService {
     });
 
     if (!contact) throw new NotFoundException('Contacto no encontrado');
+  }
+
+  // Mismo patron que validateLead/validateContact: la conversacion debe
+  // pertenecer a la MISMA empresa antes de escribir nada, de modo que un id
+  // de otro tenant nunca llegue a la fila.
+  private async validateConversation(
+    conversationId: string | undefined,
+    companyId: string,
+  ) {
+    if (conversationId === undefined) return;
+
+    if (!conversationId.trim()) {
+      throw new BadRequestException('conversationId no puede estar vacio');
+    }
+
+    const conversation = await this.prisma.conversation.findFirst({
+      where: { id: conversationId, companyId },
+      select: { id: true },
+    });
+
+    if (!conversation)
+      throw new NotFoundException('Conversación no encontrada');
   }
 
   private parsePagination(limit?: string, offset?: string) {
@@ -193,7 +256,9 @@ export class TasksService {
     if (offset !== undefined) {
       const skip = Number(offset);
       if (!Number.isInteger(skip) || skip < 0) {
-        throw new BadRequestException('offset debe ser un entero mayor o igual a 0');
+        throw new BadRequestException(
+          'offset debe ser un entero mayor o igual a 0',
+        );
       }
       pagination.skip = skip;
     }

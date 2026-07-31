@@ -1,6 +1,9 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
-import { DEVICE_ID_COOKIE, DEVICE_ID_COOKIE_MAX_AGE_MS } from './sessions.constants';
+import {
+  DEVICE_ID_COOKIE,
+  DEVICE_ID_COOKIE_MAX_AGE_MS,
+} from './sessions.constants';
 import { generateOpaqueToken } from './utils/token.util';
 
 declare module 'express' {

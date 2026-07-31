@@ -14,6 +14,10 @@ export class PlatformAuditLogController {
     @Query('affectedCompanyId') affectedCompanyId?: string,
     @Query('actorUserId') actorUserId?: string,
   ) {
-    return this.auditLogService.list({ action, affectedCompanyId, actorUserId });
+    return this.auditLogService.list({
+      action,
+      affectedCompanyId,
+      actorUserId,
+    });
   }
 }

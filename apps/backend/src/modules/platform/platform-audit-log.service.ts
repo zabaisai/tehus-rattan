@@ -32,7 +32,10 @@ interface ListAuditLogsFilters {
 export class PlatformAuditLogService {
   constructor(private prisma: PrismaService) {}
 
-  async record(writer: AuditLogWriter, input: RecordAuditLogInput): Promise<void> {
+  async record(
+    writer: AuditLogWriter,
+    input: RecordAuditLogInput,
+  ): Promise<void> {
     try {
       await writer.auditLog.create({
         data: {

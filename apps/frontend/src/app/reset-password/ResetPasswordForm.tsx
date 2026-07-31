@@ -61,19 +61,19 @@ export function ResetPasswordForm() {
   }
 
   const inputClass =
-    'w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500';
+    'w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500';
 
   // No token in the URL at all → the link is malformed/incomplete.
   if (!token) {
     return (
       <Shell title="Enlace inválido">
-        <div className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
-          <p role="alert" className="text-sm leading-relaxed text-stone-700">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+          <p role="alert" className="text-sm leading-relaxed text-neutral-700">
             El enlace de recuperación es inválido o está incompleto.
           </p>
           <Link
             href="/forgot-password"
-            className="mt-6 inline-block text-sm text-stone-500 transition-colors hover:text-stone-700"
+            className="mt-6 inline-block text-sm text-neutral-500 transition-colors hover:text-neutral-700"
           >
             Solicitar un nuevo enlace
           </Link>
@@ -86,12 +86,12 @@ export function ResetPasswordForm() {
     <Shell title="Restablecer contraseña">
       <form
         onSubmit={handleSubmit}
-        className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm"
+        className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm"
       >
         <div className="mb-4">
           <label
             htmlFor="password"
-            className="mb-1.5 block text-sm font-medium text-stone-700"
+            className="mb-1.5 block text-sm font-medium text-neutral-700"
           >
             Nueva contraseña
           </label>
@@ -113,7 +113,7 @@ export function ResetPasswordForm() {
         <div className="mb-3">
           <label
             htmlFor="confirm"
-            className="mb-1.5 block text-sm font-medium text-stone-700"
+            className="mb-1.5 block text-sm font-medium text-neutral-700"
           >
             Confirmar contraseña
           </label>
@@ -128,12 +128,12 @@ export function ResetPasswordForm() {
           />
         </div>
 
-        <label className="mb-5 flex items-center gap-2 text-sm text-stone-600">
+        <label className="mb-5 flex items-center gap-2 text-sm text-neutral-600">
           <input
             type="checkbox"
             checked={showPassword}
             onChange={(e) => setShowPassword(e.target.checked)}
-            className="h-4 w-4 rounded border-stone-300"
+            className="h-4 w-4 rounded border-neutral-300"
           />
           Mostrar contraseña
         </label>
@@ -147,14 +147,14 @@ export function ResetPasswordForm() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-md bg-stone-900 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
+          className="w-full rounded-md bg-brand-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900 disabled:opacity-50"
         >
           {loading ? 'Guardando...' : 'Cambiar contraseña'}
         </button>
 
         <Link
           href="/forgot-password"
-          className="mt-4 block text-center text-sm text-stone-500 transition-colors hover:text-stone-700"
+          className="mt-4 block text-center text-sm text-neutral-500 transition-colors hover:text-neutral-700"
         >
           Solicitar un nuevo enlace
         </Link>
@@ -165,10 +165,10 @@ export function ResetPasswordForm() {
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
             {title}
           </h1>
         </div>

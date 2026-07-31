@@ -454,7 +454,9 @@ export class SupportSessionsService {
     if (pageInput !== undefined) {
       page = Number(pageInput);
       if (!Number.isInteger(page) || page < 1) {
-        throw new BadRequestException('page debe ser un entero mayor o igual a 1');
+        throw new BadRequestException(
+          'page debe ser un entero mayor o igual a 1',
+        );
       }
     }
 
@@ -478,10 +480,7 @@ export class SupportSessionsService {
     return value as SupportSessionStatus;
   }
 
-  private requireNonBlank(
-    value: string | undefined,
-    message: string,
-  ): string {
+  private requireNonBlank(value: string | undefined, message: string): string {
     if (!value?.trim()) {
       throw new BadRequestException(message);
     }
@@ -491,9 +490,7 @@ export class SupportSessionsService {
   private requireReason(value: string | undefined): string {
     const reason = this.requireNonBlank(value, 'reason no puede estar vacio');
     if (reason.length > REASON_MAX_LENGTH) {
-      throw new BadRequestException(
-        'reason no puede superar 500 caracteres',
-      );
+      throw new BadRequestException('reason no puede superar 500 caracteres');
     }
     return reason;
   }

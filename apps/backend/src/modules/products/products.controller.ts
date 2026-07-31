@@ -65,7 +65,9 @@ export class ProductsController {
   @Post('import')
   @UseFilters(ProductImportFileSizeFilter)
   @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES } }),
+    FileInterceptor('file', {
+      limits: { fileSize: MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES },
+    }),
   )
   importExcel(
     @UploadedFile() file: Express.Multer.File | undefined,

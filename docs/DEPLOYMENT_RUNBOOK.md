@@ -182,3 +182,66 @@ Template: `deploy/env/staging.env.example` (placeholders only). Key vars:
   Templates; media messages; delivery/read statuses.
 - High-availability / horizontal scale (shared rate-limit store, object storage
   for uploads) if the CRM grows beyond a single instance.
+
+---
+
+## Redis y worker de cola (desde 2026-07-31)
+
+El stack incorpora dos servicios nuevos. **Un despliegue que solo reconstruya
+`backend` y `frontend` ya no es correcto.**
+
+### Qué son
+
+| Servicio | Rol |
+|---|---|
+| `redis` | Cola durable (BullMQ). Transporta trabajos: automatizaciones diferidas, esperas, reintentos, descarga de medios. |
+| `worker` | Consume esa cola. Misma imagen que `backend`, arrancado con `WORKER_ROLE=queue`. |
+
+**Redis no es fuente de verdad.** El estado durable vive en PostgreSQL; Redis
+solo transporta trabajos. Perderlo degrada el procesamiento asíncrono, nunca
+los datos comerciales. Ningún job es la única copia de un hecho de negocio.
+
+### Orden de arranque
+
+1. `postgres` y `redis` primero. Backend y worker los declaran como
+   dependencia sana; levantarlos después haría que arrancasen sin cola y se
+   quedasen degradados hasta el siguiente reinicio.
+2. Migraciones (`prisma migrate deploy`).
+3. `compose up -d` sin argumentos: levanta todo, worker incluido.
+
+### Trampa a evitar
+
+`compose up -d --no-deps backend frontend` **ya no basta**. El worker comparte
+imagen con el backend: si no se recrea, se queda ejecutando código de la
+versión anterior mientras la API sirve la nueva. Los síntomas son sutiles —
+automatizaciones con comportamiento viejo— y difíciles de atribuir.
+
+### Variables
+
+`REDIS_HOST`, `REDIS_PORT` y `REDIS_PASSWORD` (vacía en staging). Ver
+`deploy/env/staging.env.example`. Redis vive solo en la red `internal`, sin
+puertos publicados, igual que PostgreSQL: por eso no lleva contraseña. Si
+alguna vez se expone, pasa a ser obligatoria.
+
+### Marcha atrás sin quitar nada
+
+`QUEUE_ENABLED=false` desactiva encolado y consumo: los efectos vuelven a
+ejecutarse en línea dentro del webhook, como antes de la cola. Es la salida
+rápida si Redis diera problemas, sin necesidad de revertir código ni imágenes.
+
+### Salud
+
+`GET /api/health/queue` devuelve `state: up | down | disabled`.
+
+**Responde 200 siempre, a propósito**, y `health-check.sh` lo trata como
+informativo. Que Redis esté caído no debe marcar el despliegue como fallido ni
+hacer fallar `/api/health/ready`: un readiness en 503 por Redis haría que el
+orquestador reiniciase un backend sano, convirtiendo una degradación parcial
+en una caída total.
+
+### Rollback
+
+Al revertir código hay que revertir **backend y worker a la vez**, porque
+comparten imagen. Redis no necesita rollback: los jobs pendientes se procesan
+con el código que haya, y los fallidos permanecen en la cola
+(`removeOnFail: false`) para reejecutarse.

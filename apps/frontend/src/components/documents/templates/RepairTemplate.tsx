@@ -94,14 +94,14 @@ export function RepairTemplate({
       />
 
       <div className="mb-3">
-        <div className="border border-stone-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
+        <div className="border border-neutral-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
           Observaciones de reparación
         </div>
         <textarea
           value={meta.observations}
           onChange={(e) => onMetaChange({ ...meta, observations: e.target.value })}
           rows={3}
-          className="w-full border border-t-0 border-stone-800 bg-[#E7D7C9] px-2 py-1 text-xs outline-none"
+          className="w-full border border-t-0 border-neutral-800 bg-[#E7D7C9] px-2 py-1 text-xs outline-none"
         />
       </div>
 

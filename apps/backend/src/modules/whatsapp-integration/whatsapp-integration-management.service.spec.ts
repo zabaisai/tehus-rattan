@@ -35,8 +35,10 @@ describe('WhatsAppIntegrationManagementService', () => {
   beforeEach(() => {
     prisma = {
       whatsAppIntegration: {
-        findUnique: jest.fn(),
+        // findFirst resuelve la integracion PRINCIPAL (modelo 1:N).
         findFirst: jest.fn().mockResolvedValue(null),
+        // findUnique sigue usandose para claves realmente unicas.
+        findUnique: jest.fn(),
         upsert: jest.fn(),
         update: jest.fn(),
       },
@@ -75,7 +77,7 @@ describe('WhatsAppIntegrationManagementService', () => {
 
   describe('getForCompany', () => {
     it('returns a safe response without accessTokenEncrypted', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         id: 'integration-a',
         companyId: 'company-a',
         displayPhoneNumber: '+50255550000',
@@ -91,8 +93,15 @@ describe('WhatsAppIntegrationManagementService', () => {
 
       const result = await service.getForCompany('company-a');
 
-      expect(prisma.whatsAppIntegration.findUnique).toHaveBeenCalledWith({
+      // 1:N: la empresa puede tener varios numeros, asi que se resuelve el
+      // PRINCIPAL con desempate explicito en vez de findUnique por companyId.
+      expect(prisma.whatsAppIntegration.findFirst).toHaveBeenCalledWith({
         where: { companyId: 'company-a' },
+        orderBy: [
+          { isPrimary: 'desc' },
+          { order: 'asc' },
+          { createdAt: 'asc' },
+        ],
       });
       expect(result).not.toBeNull();
       expect(result).not.toHaveProperty('accessTokenEncrypted');
@@ -100,7 +109,7 @@ describe('WhatsAppIntegrationManagementService', () => {
     });
 
     it('returns null when there is no integration for the company', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue(null);
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
 
       const result = await service.getForCompany('company-b');
 
@@ -111,16 +120,15 @@ describe('WhatsAppIntegrationManagementService', () => {
       await expect(service.getForCompany('   ')).rejects.toBeInstanceOf(
         BadRequestException,
       );
-      expect(prisma.whatsAppIntegration.findUnique).not.toHaveBeenCalled();
+      expect(prisma.whatsAppIntegration.findFirst).not.toHaveBeenCalled();
     });
   });
 
   describe('connectOrUpdateForCompany', () => {
     it('creates a new integration: encrypts the token, sets CONNECTED, connectedAt, clears disconnectedAt, and returns a safe response', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue(null);
-      prisma.whatsAppIntegration.upsert.mockImplementation(
-        ({ create }: any) =>
-          Promise.resolve({ id: 'integration-a', ...create }),
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
+      prisma.whatsAppIntegration.upsert.mockImplementation(({ create }: any) =>
+        Promise.resolve({ id: 'integration-a', ...create }),
       );
 
       const result = await service.connectOrUpdateForCompany(
@@ -132,7 +140,8 @@ describe('WhatsAppIntegrationManagementService', () => {
       expect(prisma.whatsAppIntegration.upsert).toHaveBeenCalledTimes(1);
       const call = prisma.whatsAppIntegration.upsert.mock.calls[0][0];
 
-      expect(call.where).toEqual({ companyId: 'company-a' });
+      // Clave por phoneNumberId (unico global), no por empresa.
+      expect(call.where).toEqual({ phoneNumberId: 'phone-a' });
       expect(call.create.companyId).toBe('company-a');
       expect(call.create.phoneNumberId).toBe('phone-a');
       expect(call.create.status).toBe('CONNECTED');
@@ -140,28 +149,28 @@ describe('WhatsAppIntegrationManagementService', () => {
       expect(call.create.disconnectedAt).toBeNull();
 
       expect(call.create.accessTokenEncrypted).not.toBe('plain-meta-token');
-      expect(
-        tokenCryptoService.decrypt(call.create.accessTokenEncrypted),
-      ).toBe('plain-meta-token');
+      expect(tokenCryptoService.decrypt(call.create.accessTokenEncrypted)).toBe(
+        'plain-meta-token',
+      );
 
       expect(result).not.toHaveProperty('accessTokenEncrypted');
     });
 
     it('updates an existing integration by companyId', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue(null);
-      prisma.whatsAppIntegration.upsert.mockImplementation(
-        ({ update }: any) =>
-          Promise.resolve({
-            id: 'integration-a',
-            companyId: 'company-a',
-            ...update,
-          }),
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
+      prisma.whatsAppIntegration.upsert.mockImplementation(({ update }: any) =>
+        Promise.resolve({
+          id: 'integration-a',
+          companyId: 'company-a',
+          ...update,
+        }),
       );
 
       await service.connectOrUpdateForCompany('company-a', validInput, actor);
 
       const call = prisma.whatsAppIntegration.upsert.mock.calls[0][0];
-      expect(call.where).toEqual({ companyId: 'company-a' });
+      // Clave por phoneNumberId (unico global), no por empresa.
+      expect(call.where).toEqual({ phoneNumberId: 'phone-a' });
       expect(call.update.phoneNumberId).toBe('phone-a');
       expect(call.update.status).toBe('CONNECTED');
       expect(call.update.disconnectedAt).toBeNull();
@@ -240,13 +249,12 @@ describe('WhatsAppIntegrationManagementService', () => {
       prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         companyId: 'company-a',
       });
-      prisma.whatsAppIntegration.upsert.mockImplementation(
-        ({ update }: any) =>
-          Promise.resolve({
-            id: 'integration-a',
-            companyId: 'company-a',
-            ...update,
-          }),
+      prisma.whatsAppIntegration.upsert.mockImplementation(({ update }: any) =>
+        Promise.resolve({
+          id: 'integration-a',
+          companyId: 'company-a',
+          ...update,
+        }),
       );
 
       await expect(
@@ -366,7 +374,7 @@ describe('WhatsAppIntegrationManagementService', () => {
 
   describe('disconnectForCompany', () => {
     it('sets status to DISCONNECTED and disconnectedAt', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         id: 'integration-a',
         companyId: 'company-a',
       });
@@ -388,14 +396,17 @@ describe('WhatsAppIntegrationManagementService', () => {
       const result = await service.disconnectForCompany('company-a');
 
       const call = prisma.whatsAppIntegration.update.mock.calls[0][0];
-      expect(call.where).toEqual({ companyId: 'company-a' });
+      // Desconectar actua sobre la fila YA resuelta (la principal), asi que
+      // la clave es su id: con varios numeros, `companyId` ya no identifica
+      // una unica integracion.
+      expect(call.where).toEqual({ id: 'integration-a' });
       expect(call.data.status).toBe('DISCONNECTED');
       expect(call.data.disconnectedAt).toBeInstanceOf(Date);
       expect(result.status).toBe('DISCONNECTED');
     });
 
     it('never calls delete and only updates the row', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         id: 'integration-a',
         companyId: 'company-a',
       });
@@ -419,7 +430,7 @@ describe('WhatsAppIntegrationManagementService', () => {
     });
 
     it('returns a safe response without accessTokenEncrypted', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         id: 'integration-a',
         companyId: 'company-a',
       });
@@ -443,7 +454,7 @@ describe('WhatsAppIntegrationManagementService', () => {
     });
 
     it('throws NotFoundException when there is no integration for the company', async () => {
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue(null);
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
 
       await expect(
         service.disconnectForCompany('company-a'),
@@ -461,10 +472,9 @@ describe('WhatsAppIntegrationManagementService', () => {
         .spyOn(console, 'error')
         .mockImplementation(() => {});
 
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue(null);
-      prisma.whatsAppIntegration.upsert.mockImplementation(
-        ({ create }: any) =>
-          Promise.resolve({ id: 'integration-a', ...create }),
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
+      prisma.whatsAppIntegration.upsert.mockImplementation(({ create }: any) =>
+        Promise.resolve({ id: 'integration-a', ...create }),
       );
       prisma.whatsAppIntegration.update.mockResolvedValue({
         id: 'integration-a',
@@ -480,7 +490,7 @@ describe('WhatsAppIntegrationManagementService', () => {
       });
 
       await service.connectOrUpdateForCompany('company-a', validInput, actor);
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         id: 'integration-a',
         companyId: 'company-a',
       });

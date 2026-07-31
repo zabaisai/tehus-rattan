@@ -60,7 +60,7 @@ describe('PlatformCompaniesService', () => {
       updatedAt: new Date('2026-01-02'),
       users: [{ isActive: true }, { isActive: false }],
       _count: { contacts: 3, leads: 5, conversations: 2 },
-      whatsappIntegration: { status: 'CONNECTED' },
+      whatsappIntegrations: [{ status: 'CONNECTED' }],
     };
 
     it('returns companies with superficial counts and no sensitive data', async () => {
@@ -148,11 +148,13 @@ describe('PlatformCompaniesService', () => {
           tasks: 1,
           products: 0,
         },
-        whatsappIntegration: {
-          status: 'CONNECTED',
-          phoneNumberId: 'phone-a',
-          displayPhoneNumber: '+50255550000',
-        },
+        whatsappIntegrations: [
+          {
+            status: 'CONNECTED',
+            phoneNumberId: 'phone-a',
+            displayPhoneNumber: '+50255550000',
+          },
+        ],
       });
 
       const result = await service.getCompanyDetail('company-a');
@@ -215,7 +217,7 @@ describe('PlatformCompaniesService', () => {
         ],
       }));
 
-      const result = await service.createCompany(validDto as any, actor);
+      const result = await service.createCompany(validDto, actor);
 
       const createCall = prisma.company.create.mock.calls[0][0];
       expect(createCall.data.status).toBe('ACTIVE');
@@ -254,7 +256,7 @@ describe('PlatformCompaniesService', () => {
         ],
       });
 
-      const result = await service.createCompany(validDto as any, actor);
+      const result = await service.createCompany(validDto, actor);
 
       expect(result).not.toHaveProperty('password');
       expect(result.admin).not.toHaveProperty('password');
@@ -303,7 +305,7 @@ describe('PlatformCompaniesService', () => {
         ],
       });
 
-      await service.createCompany(validDto as any, actor);
+      await service.createCompany(validDto, actor);
 
       expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
       const auditCall = prisma.auditLog.create.mock.calls[0][0].data;
@@ -378,7 +380,7 @@ describe('PlatformCompaniesService', () => {
 
       const result = await service.updateCompanyStatus(
         'company-a',
-        'SUSPENDED' as any,
+        'SUSPENDED',
         actor,
         'Falta de pago reportada',
       );
@@ -418,7 +420,7 @@ describe('PlatformCompaniesService', () => {
 
       const result = await service.updateCompanyStatus(
         'company-a',
-        'ACTIVE' as any,
+        'ACTIVE',
         actor,
       );
 
@@ -439,7 +441,7 @@ describe('PlatformCompaniesService', () => {
 
       const result = await service.updateCompanyStatus(
         'company-a',
-        'DELETED' as any,
+        'DELETED',
         actor,
       );
 
@@ -503,14 +505,22 @@ describe('PlatformCompaniesService', () => {
         tasks: 4,
         products: 2,
       },
-      whatsappIntegration: {
-        status: 'CONNECTED',
-        phoneNumberId: 'phone-a',
-        displayPhoneNumber: '+50255550000',
-      },
+      whatsappIntegrations: [
+        {
+          status: 'CONNECTED',
+          phoneNumberId: 'phone-a',
+          displayPhoneNumber: '+50255550000',
+        },
+      ],
     };
 
-    function stubQueries(overrides: Partial<{ leads: any[]; conversations: any[]; tasks: any[] }> = {}) {
+    function stubQueries(
+      overrides: Partial<{
+        leads: any[];
+        conversations: any[];
+        tasks: any[];
+      }> = {},
+    ) {
       prisma.company.findUnique.mockResolvedValue(rawCompany);
       prisma.lead.findMany.mockResolvedValue(overrides.leads ?? []);
       prisma.conversation.findMany.mockResolvedValue(
@@ -590,9 +600,7 @@ describe('PlatformCompaniesService', () => {
       const result = await service.getSupportOverview('company-a', actor);
 
       expect(result.recentConversations[0]).not.toHaveProperty('messages');
-      expect(result.recentConversations[0]).not.toHaveProperty(
-        'lastMessage',
-      );
+      expect(result.recentConversations[0]).not.toHaveProperty('lastMessage');
       expect(JSON.stringify(result)).not.toContain('"messages"');
     });
 

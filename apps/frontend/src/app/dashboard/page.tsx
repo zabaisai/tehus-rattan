@@ -55,8 +55,8 @@ export default function DashboardHomePage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-stone-900">Hola, {user?.name ?? ''}</h2>
-      <p className="mt-1 text-sm text-stone-500">{subtitle}</p>
+      <h2 className="text-xl font-semibold text-neutral-900">Hola, {user?.name ?? ''}</h2>
+      <p className="mt-1 text-sm text-neutral-500">{subtitle}</p>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard
@@ -94,23 +94,23 @@ export default function DashboardHomePage() {
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-stone-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-stone-800">Leads por etapa</h3>
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-neutral-800">Leads por etapa</h3>
           {!byStage || byStage.length === 0 ? (
-            <p className="text-sm text-stone-400">Sin datos.</p>
+            <p className="text-sm text-neutral-400">Sin datos.</p>
           ) : (
             <div className="space-y-2.5">
               {byStage.map((stage) => (
                 <div key={stage.stageId}>
                   <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="text-stone-700">{stage.stageName}</span>
-                    <span className="text-stone-400">
+                    <span className="text-neutral-700">{stage.stageName}</span>
+                    <span className="text-neutral-400">
                       {stage.count} · {formatCurrency(stage.totalValue)}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full rounded-full bg-stone-100">
+                  <div className="h-1.5 w-full rounded-full bg-neutral-100">
                     <div
-                      className="h-1.5 rounded-full bg-stone-800"
+                      className="h-1.5 rounded-full bg-neutral-800"
                       style={{
                         width: `${Math.max((stage.totalValue / maxStageValue) * 100, stage.count > 0 ? 4 : 0)}%`,
                       }}
@@ -122,22 +122,22 @@ export default function DashboardHomePage() {
           )}
         </div>
 
-        <div className="rounded-lg border border-stone-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-stone-800">Rendimiento por asesor</h3>
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-neutral-800">Rendimiento por asesor</h3>
           {!agents || agents.length === 0 ? (
-            <p className="text-sm text-stone-400">Sin datos.</p>
+            <p className="text-sm text-neutral-400">Sin datos.</p>
           ) : (
             <div className="space-y-2">
               {agents.map((agent) => (
                 <div
                   key={agent.agentId}
-                  className="flex flex-col gap-1 border-b border-stone-100 pb-2 text-sm last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                  className="flex flex-col gap-1 border-b border-neutral-100 pb-2 text-sm last:border-0 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                 >
-                  <span className="truncate text-stone-700">{agent.agentName}</span>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-500">
+                  <span className="truncate text-neutral-700">{agent.agentName}</span>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
                     <span>{agent.openLeads} abiertos</span>
                     <span className="text-emerald-600">{agent.wonCount} ganados</span>
-                    <span className="font-medium text-stone-800">
+                    <span className="font-medium text-neutral-800">
                       {formatCurrency(agent.wonValue)}
                     </span>
                   </div>
@@ -148,13 +148,13 @@ export default function DashboardHomePage() {
         </div>
 
         {lostReasons && lostReasons.length > 0 && (
-          <div className="rounded-lg border border-stone-200 bg-white p-4 lg:col-span-2">
-            <h3 className="mb-3 text-sm font-semibold text-stone-800">Motivos de pérdida</h3>
+          <div className="rounded-lg border border-neutral-200 bg-white p-4 lg:col-span-2">
+            <h3 className="mb-3 text-sm font-semibold text-neutral-800">Motivos de pérdida</h3>
             <div className="flex flex-wrap gap-2">
               {lostReasons.map((item) => (
                 <span
                   key={item.reason}
-                  className="rounded-full bg-stone-100 px-3 py-1 text-xs text-stone-600"
+                  className="rounded-full bg-neutral-100 px-3 py-1 text-xs text-neutral-600"
                 >
                   {item.reason} ({item.count})
                 </span>

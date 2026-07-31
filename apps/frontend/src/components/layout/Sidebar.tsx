@@ -20,6 +20,10 @@ import {
   KeyRound,
   ShieldCheck,
   X,
+  Zap,
+  Bot,
+  Trash2,
+  Database,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
@@ -78,6 +82,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     },
     { href: '/dashboard/platform/audit-logs', label: 'Auditoría', icon: ScrollText },
     {
+      href: '/dashboard/platform/deletion-requests',
+      label: 'Eliminaciones',
+      icon: Trash2,
+    },
+    {
       href: '/dashboard/platform/activity',
       label: 'Actividad y seguridad',
       icon: ShieldCheck,
@@ -97,16 +106,39 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         { href: '/dashboard/products', label: 'Productos', icon: Package },
         { href: '/dashboard/quotes', label: 'Cotizaciones', icon: FileText },
         { href: '/dashboard/documents/calculator', label: 'Documentos', icon: Calculator },
+        // Las automatizaciones mandan mensajes reales a clientes reales:
+        // solo quien administra la empresa deberia poder tocarlas, igual que
+        // la conexion de WhatsApp.
+        ...(canManageCompany
+          ? [
+              {
+                href: '/dashboard/automations',
+                label: 'Automatizaciones',
+                icon: Zap,
+              },
+              { href: '/dashboard/chatbot', label: 'Chatbot', icon: Bot },
+            ]
+          : []),
         ...(canManageWhatsApp
           ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
           : []),
         ...(canManageCompany
-          ? [{ href: '/dashboard/settings/company', label: 'Empresa', icon: Settings }]
+          ? [
+              { href: '/dashboard/settings/company', label: 'Empresa', icon: Settings },
+              // Retención, exportación y solicitud de eliminación. Enlazado y
+              // no escondido: una empresa tiene que poder llevarse sus datos
+              // sin escribirle a nadie.
+              { href: '/dashboard/settings/data', label: 'Datos', icon: Database },
+            ]
           : []),
       ];
 
   const logoUrl = company?.logoUrl ? resolveCompanyAssetUrl(company.logoUrl) : null;
-  const brandName = company?.name || 'Tehus Rattan';
+  // Dentro del espacio de trabajo manda la identidad de LA EMPRESA: es su
+  // casa. TAKTO solo aparece como respaldo mientras carga o si no hay
+  // nombre; mezclar ambas marcas en la misma barra es justo lo que el manual
+  // prohibe.
+  const brandName = company?.name || 'TAKTO';
   const activeColor = company?.primaryColor || undefined;
 
   function renderNav(onNavigate?: () => void) {
@@ -125,10 +157,15 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               href={item.href}
               onClick={onNavigate}
               style={isActive && activeColor ? { backgroundColor: activeColor } : undefined}
-              className={`flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
+              // El acento naranja marca DONDE ESTAS: una barra a la
+              // izquierda del elemento activo. Va como borde y no como fondo
+              // porque el naranja de marca a pantalla completa compite con el
+              // contenido, y porque asi convive con el color propio de cada
+              // empresa sin taparlo.
+              className={`flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
                 isActive
-                  ? `text-white ${activeColor ? '' : 'bg-stone-900'}`
-                  : 'text-stone-600 hover:bg-stone-100'
+                  ? `border-brand-secondary text-white ${activeColor ? '' : 'bg-brand-primary'}`
+                  : 'border-transparent text-neutral-600 hover:bg-neutral-100'
               }`}
             >
               <Icon size={16} strokeWidth={2} />
@@ -139,7 +176,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
         {isPlatformSuperAdmin && (
           <>
-            <div className="mb-1 mt-4 px-2.5 text-xs font-semibold uppercase tracking-wide text-stone-400">
+            <div className="mb-1 mt-4 px-2.5 text-xs font-semibold uppercase tracking-wide text-neutral-400">
               Plataforma
             </div>
             {platformNavItems.map((item) => {
@@ -151,8 +188,8 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   onClick={onNavigate}
                   className={`flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
                     pathname.startsWith(item.href)
-                      ? 'bg-stone-900 text-white'
-                      : 'text-stone-600 hover:bg-stone-100'
+                      ? 'bg-brand-primary text-white'
+                      : 'text-neutral-600 hover:bg-neutral-100'
                   }`}
                 >
                   <Icon size={16} strokeWidth={2} />
@@ -167,16 +204,16 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   }
 
   const brandHeader = (
-    <div className="flex shrink-0 items-center gap-2.5 border-b border-stone-200 px-5 py-4">
+    <div className="flex shrink-0 items-center gap-2.5 border-b border-neutral-200 px-5 py-4">
       {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={logoUrl} alt={brandName} className="h-8 w-8 shrink-0 rounded object-contain" />
       ) : null}
       <div className="min-w-0">
-        <h1 className="truncate text-sm font-semibold tracking-tight text-stone-900">
+        <h1 className="truncate text-sm font-semibold tracking-tight text-neutral-900">
           {brandName}
         </h1>
-        <p className="text-xs text-stone-500">CRM</p>
+        <p className="text-xs text-neutral-500">CRM</p>
       </div>
     </div>
   );
@@ -184,7 +221,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   return (
     <>
       {/* Desktop: fixed sidebar, always visible from the lg breakpoint up. */}
-      <aside className="hidden h-full w-60 shrink-0 flex-col border-r border-stone-200 bg-white lg:flex">
+      <aside className="hidden h-full w-60 shrink-0 flex-col border-r border-neutral-200 bg-white lg:flex">
         {brandHeader}
         {renderNav()}
       </aside>
@@ -207,19 +244,19 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             mobileOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-3">
+          <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-3">
             <div className="flex min-w-0 items-center gap-2.5">
               {logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={logoUrl} alt={brandName} className="h-7 w-7 shrink-0 rounded object-contain" />
               ) : null}
-              <span className="truncate text-sm font-semibold text-stone-900">{brandName}</span>
+              <span className="truncate text-sm font-semibold text-neutral-900">{brandName}</span>
             </div>
             <button
               type="button"
               onClick={onMobileClose}
               aria-label="Cerrar menú"
-              className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100"
+              className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100"
             >
               <X size={18} />
             </button>

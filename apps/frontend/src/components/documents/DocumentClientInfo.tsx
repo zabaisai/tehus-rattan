@@ -20,8 +20,8 @@ interface DocumentClientInfoProps {
 
 function InfoInput({ field, readOnly }: { field: DocumentInfoField; readOnly?: boolean }) {
   return (
-    <div className="flex flex-1 items-center border border-t-0 border-stone-800">
-      <span className="w-28 shrink-0 border-r border-stone-800 bg-white px-2 py-1 text-xs font-medium">
+    <div className="flex flex-1 items-center border border-t-0 border-neutral-800">
+      <span className="w-28 shrink-0 border-r border-neutral-800 bg-white px-2 py-1 text-xs font-medium">
         {field.label}
       </span>
       {readOnly ? (
@@ -41,7 +41,7 @@ function InfoInput({ field, readOnly }: { field: DocumentInfoField; readOnly?: b
 export function DocumentClientInfo({ title, fields, readOnly }: DocumentClientInfoProps) {
   return (
     <div className="mb-3">
-      <div className="border border-stone-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
+      <div className="border border-neutral-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
         {title}
       </div>
       {fields.map((entry, i) =>

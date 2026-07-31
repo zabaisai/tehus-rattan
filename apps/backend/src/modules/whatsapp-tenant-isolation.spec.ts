@@ -3,6 +3,7 @@ import { WhatsAppIntegrationService } from './whatsapp-integration/whatsapp-inte
 import { WhatsAppTokenCryptoService } from './whatsapp-integration/whatsapp-token-crypto.service';
 import { WebhookService } from './webhook/webhook.service';
 import { WhatsappService } from './whatsapp/whatsapp.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -149,6 +150,9 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
     beforeEach(() => {
       prisma = buildFakePrisma([integrationA, integrationB]);
+      // El doble solo implementa lo que este servicio consulta. La asercion
+      // dice exactamente eso: es un Prisma parcial a proposito, no un
+      // descuido.
       whatsappIntegrationService = new WhatsAppIntegrationService(prisma);
       conversationsService = {
         findOrCreate: jest.fn().mockResolvedValue({ id: 'conversation-x' }),
@@ -160,7 +164,50 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       contactsService = {
         create: jest.fn().mockResolvedValue({ id: 'contact-x' }),
       };
-      automationsService = { processMessage: jest.fn().mockResolvedValue(undefined) };
+      automationsService = {
+        processMessage: jest.fn().mockResolvedValue(undefined),
+      };
+
+      // Los diez argumentos van nombrados y en orden. Antes faltaban dos y
+      // los mocks quedaban DESPLAZADOS: la cola aterrizaba en la posicion de
+      // las notificaciones y el outbox en la de la cola. Las pruebas seguian
+      // pasando porque no llegaban a esos caminos, que es justo lo que hace
+      // peligroso este tipo de desajuste.
+      const notificationsMock = {
+        emit: jest.fn().mockResolvedValue(undefined),
+        emitToCompanyRoles: jest.fn().mockResolvedValue(undefined),
+      } as never;
+      const inboundQueueMock = {
+        enqueueInboundMessage: jest.fn().mockResolvedValue(false),
+        isEnabled: jest.fn().mockReturnValue(false),
+      } as never;
+      const outboxMock = {
+        record: jest.fn().mockResolvedValue(true),
+        markCompletedByKey: jest.fn().mockResolvedValue(undefined),
+      } as never;
+      const leadIntakeMock = {
+        ensureLeadForConversation: jest
+          .fn()
+          .mockResolvedValue({ leadId: null, creado: false, assignedTo: null }),
+      } as never;
+      // El bot no atiende: estas pruebas cubren el enrutado por empresa, y un
+      // bot activo se comeria los mensajes antes de llegar a lo que se mide.
+      const chatbotMock = {
+        handleInbound: jest
+          .fn()
+          .mockResolvedValue({ atendido: false, motivo: 'sin-flujo' }),
+      } as never;
+
+      // El historial de coexistencia no participa aqui: llega por otro campo
+      // del webhook y no dispara efectos.
+      const historySyncMock = {
+        procesarHistorial: jest.fn().mockResolvedValue({
+          recibidos: 0,
+          importados: 0,
+          duplicados: 0,
+          descartados: 0,
+        }),
+      } as never;
 
       webhookService = new WebhookService(
         prisma,
@@ -169,6 +216,12 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         contactsService,
         automationsService,
         whatsappIntegrationService,
+        notificationsMock,
+        inboundQueueMock,
+        outboxMock,
+        leadIntakeMock,
+        chatbotMock,
+        historySyncMock,
       );
     });
 
@@ -179,12 +232,18 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         'company-a',
         expect.anything(),
       );
+      // Tercer argumento: la integracion POR LA QUE ENTRO. Es lo que hace
+      // que la respuesta salga por el mismo numero, y ademas ata el hilo a
+      // una integracion de ESTA empresa.
       expect(conversationsService.findOrCreate).toHaveBeenCalledWith(
         'company-a',
         'contact-x',
+        'integration-a',
       );
       expect(messagesService.create).toHaveBeenCalledWith(
         expect.objectContaining({ companyId: 'company-a' }),
+        // Segundo argumento: el callback del outbox.
+        expect.any(Function),
       );
 
       expect(contactsService.create).not.toHaveBeenCalledWith(
@@ -210,9 +269,12 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       expect(conversationsService.findOrCreate).toHaveBeenCalledWith(
         'company-b',
         'contact-x',
+        'integration-b',
       );
       expect(messagesService.create).toHaveBeenCalledWith(
         expect.objectContaining({ companyId: 'company-b' }),
+        // Segundo argumento: el callback del outbox.
+        expect.any(Function),
       );
 
       expect(contactsService.create).not.toHaveBeenCalledWith(
@@ -237,13 +299,21 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
       jest.clearAllMocks();
 
       const prisma = buildFakePrisma([integrationA, integrationB]);
-      whatsappIntegrationService = new WhatsAppIntegrationService(prisma);
+      // Doble parcial a proposito: solo implementa lo que este servicio
+      // consulta. La asercion lo dice explicitamente en vez de dejar un
+      // error de tipos abierto.
+      whatsappIntegrationService = new WhatsAppIntegrationService(
+        prisma as unknown as PrismaService,
+      );
       service = new WhatsappService(
         whatsappIntegrationService,
         tokenCryptoService,
         // Fixture Graph API version (a test value, not a production default);
         // the service has no hardcoded fallback.
-        { get: (key: string) => (key === 'WHATSAPP_GRAPH_API_VERSION' ? 'v20.0' : undefined) } as any,
+        {
+          get: (key: string) =>
+            key === 'WHATSAPP_GRAPH_API_VERSION' ? 'v20.0' : undefined,
+        } as any,
       );
 
       mockedAxios.post.mockResolvedValue({ data: {} });
@@ -264,7 +334,11 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
       const [url, , options] = mockedAxios.post.mock.calls[0];
       expect(url).not.toContain('phone-b');
-      expect(options.headers.Authorization).not.toBe('Bearer token-b');
+      // Se afirma que la cabecera EXISTE antes de mirarla: si la llamada
+      // llegara sin opciones, un acceso opcional daria `undefined` y la
+      // comparacion pasaria sola sin haber comprobado nada.
+      expect(options?.headers?.Authorization).toBeDefined();
+      expect(options?.headers?.Authorization).not.toBe('Bearer token-b');
     });
 
     it('sends via Company B integration using phone-b and token-b only', async () => {
@@ -282,7 +356,8 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
 
       const [url, , options] = mockedAxios.post.mock.calls[0];
       expect(url).not.toContain('phone-a');
-      expect(options.headers.Authorization).not.toBe('Bearer token-a');
+      expect(options?.headers?.Authorization).toBeDefined();
+      expect(options?.headers?.Authorization).not.toBe('Bearer token-a');
     });
   });
 });

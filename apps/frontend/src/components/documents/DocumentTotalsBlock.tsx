@@ -32,18 +32,18 @@ export function DocumentTotalsBlock({ rows }: DocumentTotalsBlockProps) {
         {rows.map((row) => (
           <tr key={row.label}>
             <td
-              className={`border border-stone-800 bg-[#E7D7C9] px-2 py-1 font-medium ${
+              className={`border border-neutral-800 bg-[#E7D7C9] px-2 py-1 font-medium ${
                 row.emphasize ? 'text-sm font-bold' : ''
               }`}
             >
               {row.label}
             </td>
             {row.extraControl && (
-              <td className="border border-stone-800 bg-[#E7D7C9] p-0">{row.extraControl}</td>
+              <td className="border border-neutral-800 bg-[#E7D7C9] p-0">{row.extraControl}</td>
             )}
             {!row.hideValue && (
               <td
-                className={`border border-stone-800 bg-[#E7D7C9] px-2 py-1 text-right ${
+                className={`border border-neutral-800 bg-[#E7D7C9] px-2 py-1 text-right ${
                   row.emphasize ? 'text-sm font-bold' : ''
                 }`}
               >

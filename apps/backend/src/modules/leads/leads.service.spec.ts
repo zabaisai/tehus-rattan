@@ -1,5 +1,14 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import { LeadsService } from './leads.service';
+
+const realtimeStub = () =>
+  ({
+    messageCreated: jest.fn(),
+    messageStatusChanged: jest.fn(),
+    leadUpdated: jest.fn(),
+    taskUpdated: jest.fn(),
+    notificationCreated: jest.fn(),
+  }) as never;
 
 describe('LeadsService', () => {
   const companyId = 'company-a';
@@ -13,7 +22,9 @@ describe('LeadsService', () => {
     const prisma: any = {
       contact: { findFirst: jest.fn().mockResolvedValue({ id: 'contact-a' }) },
       pipelineStage: {
-        findFirst: jest.fn().mockResolvedValue({ id: 'stage-a', name: 'Nuevo lead' }),
+        findFirst: jest
+          .fn()
+          .mockResolvedValue({ id: 'stage-a', name: 'Nuevo lead' }),
       },
       pipeline: {
         findFirst: jest.fn().mockResolvedValue({ id: 'pipeline-a' }),
@@ -61,7 +72,7 @@ describe('LeadsService', () => {
   describe('create', () => {
     it('creates the lead and an initial stage history record (fromStageId null)', async () => {
       const prisma = buildPrisma();
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
 
       const result = await service.create(companyId, userId, buildData());
 
@@ -83,7 +94,7 @@ describe('LeadsService', () => {
 
     it('creates exactly one history record per lead creation', async () => {
       const prisma = buildPrisma();
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
 
       await service.create(companyId, userId, buildData());
 
@@ -100,9 +111,13 @@ describe('LeadsService', () => {
       prisma.lead.create.mockImplementation((args: any) =>
         Promise.resolve({ id: 'lead-2', ...args.data }),
       );
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
 
-      await service.create(companyId, userId, buildData({ stageId: 'stage-qualified' }));
+      await service.create(
+        companyId,
+        userId,
+        buildData({ stageId: 'stage-qualified' }),
+      );
 
       expect(prisma.leadStageHistory.create).toHaveBeenCalledWith({
         data: {
@@ -116,7 +131,7 @@ describe('LeadsService', () => {
 
     it('returns the created lead with contact/stage/agent relations populated', async () => {
       const prisma = buildPrisma();
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
 
       const result = await service.create(companyId, userId, buildData());
 
@@ -136,10 +151,14 @@ describe('LeadsService', () => {
     it('rolls back (never creates the lead) when the stage does not belong to the given pipeline', async () => {
       const prisma = buildPrisma();
       prisma.pipelineStage.findFirst.mockResolvedValue(null);
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
 
       await expect(
-        service.create(companyId, userId, buildData({ stageId: 'stage-other-tenant' })),
+        service.create(
+          companyId,
+          userId,
+          buildData({ stageId: 'stage-other-tenant' }),
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(prisma.lead.create).not.toHaveBeenCalled();
@@ -149,11 +168,11 @@ describe('LeadsService', () => {
     it('rolls back when the contact does not belong to the authenticated company', async () => {
       const prisma = buildPrisma();
       prisma.contact.findFirst.mockResolvedValue(null);
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
 
-      await expect(service.create(companyId, userId, buildData())).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.create(companyId, userId, buildData()),
+      ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(prisma.lead.create).not.toHaveBeenCalled();
       expect(prisma.leadStageHistory.create).not.toHaveBeenCalled();
@@ -162,11 +181,11 @@ describe('LeadsService', () => {
     it('rolls back when the pipeline does not belong to the authenticated company', async () => {
       const prisma = buildPrisma();
       prisma.pipeline.findFirst.mockResolvedValue(null);
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
 
-      await expect(service.create(companyId, userId, buildData())).rejects.toBeInstanceOf(
-        BadRequestException,
-      );
+      await expect(
+        service.create(companyId, userId, buildData()),
+      ).rejects.toBeInstanceOf(BadRequestException);
 
       expect(prisma.lead.create).not.toHaveBeenCalled();
       expect(prisma.leadStageHistory.create).not.toHaveBeenCalled();
@@ -174,17 +193,19 @@ describe('LeadsService', () => {
 
     it('propagates a failure creating the history record instead of leaving the lead partially created', async () => {
       const prisma = buildPrisma();
-      prisma.leadStageHistory.create.mockRejectedValue(new Error('db write failed'));
-      const service = new LeadsService(prisma);
+      prisma.leadStageHistory.create.mockRejectedValue(
+        new Error('db write failed'),
+      );
+      const service = new LeadsService(prisma, realtimeStub());
 
       // The transaction callback throws before returning — with a real
       // Prisma connection this aborts the whole transaction (lead.create is
       // rolled back too). This mock doesn't simulate the database rollback
       // itself, but proves the service never swallows the error or returns
       // a "successful" lead when the history write fails.
-      await expect(service.create(companyId, userId, buildData())).rejects.toThrow(
-        'db write failed',
-      );
+      await expect(
+        service.create(companyId, userId, buildData()),
+      ).rejects.toThrow('db write failed');
 
       expect(prisma.lead.findUniqueOrThrow).not.toHaveBeenCalled();
     });
@@ -209,7 +230,7 @@ describe('LeadsService', () => {
         stageId: 'stage-quote',
       });
 
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
       await service.changeStage('lead-1', companyId, 'stage-quote', userId);
 
       expect(prisma.leadStageHistory.create).toHaveBeenCalledWith({
@@ -229,7 +250,7 @@ describe('LeadsService', () => {
       prisma.lead.findFirst.mockResolvedValue({ id: 'lead-1', companyId });
       prisma.leadStageHistory.findMany.mockResolvedValue([]);
 
-      const service = new LeadsService(prisma);
+      const service = new LeadsService(prisma, realtimeStub());
       await service.getHistory('lead-1', companyId);
 
       expect(prisma.leadStageHistory.findMany).toHaveBeenCalledWith(

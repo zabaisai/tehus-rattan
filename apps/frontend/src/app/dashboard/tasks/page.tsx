@@ -6,10 +6,11 @@ import { Plus, Check, Trash2, Pencil, CheckSquare } from 'lucide-react';
 import { getTasks, createTask, updateTask, completeTask, deleteTask } from '@/lib/tasks';
 import { Task } from '@/types';
 import { TaskModal, TaskFormData } from '@/components/tasks/TaskModal';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { ListState } from '@/components/ui/ListState';
+import { intervaloDeRefresco, useRealtime } from '@/lib/use-realtime';
 
 const priorityColors: Record<string, string> = {
-  LOW: 'bg-stone-100 text-stone-600',
+  LOW: 'bg-neutral-100 text-neutral-600',
   MEDIUM: 'bg-blue-50 text-blue-700',
   HIGH: 'bg-orange-50 text-orange-700',
   URGENT: 'bg-red-50 text-red-700',
@@ -87,19 +88,19 @@ function TaskRow({
   ].filter(Boolean);
 
   return (
-    <div className="flex flex-col gap-2 border-b border-stone-100 px-3 py-2.5 last:border-0 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-2 border-b border-neutral-100 px-3 py-2.5 last:border-0 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 items-center gap-2.5">
         <button
           onClick={() => onComplete(task.id)}
           aria-label="Completar tarea"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-stone-300 text-transparent hover:border-stone-500 hover:text-stone-500"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-neutral-300 text-transparent hover:border-neutral-500 hover:text-neutral-500"
         >
           <Check size={13} />
         </button>
         <div className="min-w-0">
-          <p className="truncate text-sm text-stone-800">{task.title}</p>
+          <p className="truncate text-sm text-neutral-800">{task.title}</p>
           {relationParts.length > 0 && (
-            <p className="truncate text-xs text-stone-400">{relationParts.join(' · ')}</p>
+            <p className="truncate text-xs text-neutral-400">{relationParts.join(' · ')}</p>
           )}
         </div>
       </div>
@@ -115,14 +116,14 @@ function TaskRow({
         <button
           onClick={() => onEdit(task)}
           aria-label="Editar tarea"
-          className="rounded p-1.5 text-stone-300 hover:bg-stone-100 hover:text-stone-600"
+          className="rounded p-1.5 text-neutral-300 hover:bg-neutral-100 hover:text-neutral-600"
         >
           <Pencil size={13} />
         </button>
         <button
           onClick={() => onDelete(task.id)}
           aria-label="Eliminar tarea"
-          className="rounded p-1.5 text-stone-300 hover:bg-red-50 hover:text-red-600"
+          className="rounded p-1.5 text-neutral-300 hover:bg-red-50 hover:text-red-600"
         >
           <Trash2 size={13} />
         </button>
@@ -149,10 +150,10 @@ function TaskGroup({
   if (tasks.length === 0) return null;
   return (
     <div className="mb-4">
-      <h3 className={`mb-1.5 text-xs font-semibold uppercase tracking-wide ${accent ?? 'text-stone-500'}`}>
+      <h3 className={`mb-1.5 text-xs font-semibold uppercase tracking-wide ${accent ?? 'text-neutral-500'}`}>
         {title} ({tasks.length})
       </h3>
-      <div className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-neutral-200 bg-white">
         {tasks.map((task) => (
           <TaskRow key={task.id} task={task} onComplete={onComplete} onDelete={onDelete} onEdit={onEdit} />
         ))}
@@ -163,9 +164,12 @@ function TaskGroup({
 
 export default function TasksPage() {
   const queryClient = useQueryClient();
-  const { data: tasks, isLoading } = useQuery({
+  // Una tarea asignada por otro asesor aparece sola.
+  const { enVivo } = useRealtime();
+  const { data: tasks, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tasks'],
     queryFn: getTasks,
+    refetchInterval: intervaloDeRefresco(enVivo),
   });
 
   const [modalOpen, setModalOpen] = useState(false);
@@ -216,21 +220,26 @@ export default function TasksPage() {
   return (
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-stone-900">Tareas</h2>
+        <h2 className="text-xl font-semibold text-neutral-900">Tareas</h2>
         <button
           onClick={() => setModalOpen(true)}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
         >
           <Plus size={16} />
           Nueva tarea
         </button>
       </div>
 
-      {isLoading && <p className="py-10 text-center text-sm text-stone-400">Cargando...</p>}
-
-      {!isLoading && (tasks?.length ?? 0) === 0 && (
-        <EmptyState icon={CheckSquare} message="No hay tareas." />
-      )}
+      <ListState
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={(tasks?.length ?? 0) === 0}
+        error={error}
+        onRetry={() => void refetch()}
+        icon={CheckSquare}
+        emptyMessage="No hay tareas."
+        loadingMessage="Cargando..."
+      />
 
       <TaskGroup title="Vencidas" tasks={groups.overdue} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} accent="text-red-600" />
       <TaskGroup title="Hoy" tasks={groups.today} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} />

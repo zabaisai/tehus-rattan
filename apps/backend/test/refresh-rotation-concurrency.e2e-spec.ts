@@ -76,14 +76,19 @@ describe('Refresh token rotation concurrency (e2e, real database)', () => {
 
     // The stored hash matches ONLY the winner's new token; the session is
     // still ACTIVE (never revoked or corrupted by the race).
-    const stored = await prisma.userSession.findUnique({ where: { id: sessionId } });
+    const stored = await prisma.userSession.findUnique({
+      where: { id: sessionId },
+    });
     expect(stored?.refreshTokenHash).toBe(hashToken(winners[0]!.refreshToken));
     expect(stored?.refreshTokenHash).not.toBe(hashToken(plainToken));
     expect(stored?.status).toBe('ACTIVE');
 
     // The original token is now invalid; the winner's new token still rotates.
     expect(await service.rotateRefreshToken(plainToken, ctx)).toBeNull();
-    const again = await service.rotateRefreshToken(winners[0]!.refreshToken, ctx);
+    const again = await service.rotateRefreshToken(
+      winners[0]!.refreshToken,
+      ctx,
+    );
     expect(again).not.toBeNull();
   });
 });

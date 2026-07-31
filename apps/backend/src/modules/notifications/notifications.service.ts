@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 import { MailService } from '../mail/mail.service';
 import {
   ALL_CATEGORIES,
@@ -48,6 +49,7 @@ export class NotificationsService {
   constructor(
     private prisma: PrismaService,
     private mail: MailService,
+    private realtime: RealtimeEmitter,
   ) {}
 
   // Creates one notification, honoring the recipient's in-app preference and
@@ -113,7 +115,14 @@ export class NotificationsService {
   // notification failure must not break the triggering operation.
   async emit(input: CreateNotificationInput): Promise<void> {
     try {
-      await this.create(input);
+      const created = await this.create(input);
+      // El aviso en vivo se emite AQUI y no dentro de `create`: ese metodo
+      // acepta un writer transaccional, y emitir antes del commit haria que
+      // el cliente recargara y no encontrara todavia la notificacion. Este
+      // camino es fuera de transaccion, asi que la fila ya es visible.
+      if (created) {
+        this.realtime.notificationCreated(created.recipientUserId, created.id);
+      }
     } catch (error) {
       this.logger.warn(
         `Notification emit failed [${input.type}]: ${(error as Error).message}`,
