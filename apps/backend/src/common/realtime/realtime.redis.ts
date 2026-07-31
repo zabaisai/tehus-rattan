@@ -18,16 +18,65 @@ export function usaPuenteRedis(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.QUEUE_ENABLED?.trim() !== 'false';
 }
 
+/**
+ * Cuánto se espera a Redis antes de arrancar sin puente.
+ *
+ * EXISTE POR UN FALLO REAL: sin límite, un `ping()` a un Redis inalcanzable
+ * NO falla. ioredis encola el comando y reintenta la conexión para siempre,
+ * así que el proceso se queda colgado a mitad del arranque —ni escucha, ni
+ * responde al health, ni registra un error que explique por qué—. Es el peor
+ * modo de fallo posible: parece un cuelgue sin causa.
+ *
+ * Tres segundos son de sobra para un Redis en la misma red de Docker, y a
+ * cambio una máquina sin Redis arranca igual, solo que sin propagación entre
+ * procesos.
+ */
+export const ESPERA_MAXIMA_REDIS_MS = 3_000;
+
 /** Crea el par de conexiones que exige el adaptador (publicar y escuchar). */
 export function crearClientesRedis(env: NodeJS.ProcessEnv = process.env): {
   pub: Redis;
   sub: Redis;
 } {
-  const pub = new Redis(buildRedisConnection(env));
+  const pub = new Redis({
+    ...buildRedisConnection(env),
+    // Sin cola de espera: un comando enviado mientras no hay conexión falla
+    // en el acto en vez de quedarse guardado esperando un reintento.
+    enableOfflineQueue: false,
+    connectTimeout: ESPERA_MAXIMA_REDIS_MS,
+  });
   // El suscriptor DEBE ser una conexión aparte: en modo subscribe, Redis no
   // acepta otros comandos por el mismo socket.
   const sub = pub.duplicate();
   return { pub, sub };
+}
+
+/**
+ * Resuelve a `false` si la comprobación no termina a tiempo, en vez de
+ * quedarse esperando. El temporizador se limpia siempre: dejarlo vivo
+ * mantendría el proceso despierto y un `docker stop` tardaría de más.
+ */
+export async function conTiempoLimite(
+  tarea: Promise<unknown>,
+  ms = ESPERA_MAXIMA_REDIS_MS,
+): Promise<boolean> {
+  let temporizador: NodeJS.Timeout | undefined;
+  try {
+    await Promise.race([
+      tarea,
+      new Promise((_, rechazar) => {
+        temporizador = setTimeout(
+          () => rechazar(new Error('timeout')),
+          ms,
+        ).unref?.() as never;
+      }),
+    ]);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (temporizador) clearTimeout(temporizador);
+  }
 }
 
 /**
@@ -57,30 +106,43 @@ export class RedisIoAdapter extends IoAdapter {
     super(app);
   }
 
-  /** Devuelve `false` si no se pudo conectar, para poder seguir sin puente. */
+  /**
+   * Devuelve `false` si no se pudo conectar, para poder seguir sin puente.
+   * NUNCA bloquea el arranque más de `ESPERA_MAXIMA_REDIS_MS`: un backend que
+   * no llega a escuchar es mucho peor que uno sin tiempo real.
+   */
   async conectar(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
-    try {
-      const { pub, sub } = crearClientesRedis(env);
-      this.clientes = [pub, sub];
-      // Un fallo posterior de Redis no debe tumbar el proceso por un
-      // 'error' sin escuchador; ioredis reconecta solo.
-      pub.on('error', () => undefined);
-      sub.on('error', () => undefined);
-      await Promise.all([pub.ping(), sub.ping()]);
-      this.adaptador = createAdapter(pub, sub);
-      return true;
-    } catch {
+    const { pub, sub } = crearClientesRedis(env);
+    this.clientes = [pub, sub];
+    // Un fallo posterior de Redis no debe tumbar el proceso por un
+    // 'error' sin escuchador; ioredis reconecta solo.
+    pub.on('error', () => undefined);
+    sub.on('error', () => undefined);
+
+    const conectado = await conTiempoLimite(
+      Promise.all([pub.ping(), sub.ping()]),
+    );
+
+    if (!conectado) {
       this.logger.warn(
         'Sin puente de Redis para tiempo real: los eventos del worker no llegarán en vivo (el polling los cubre)',
       );
       await this.cerrar();
       return false;
     }
+
+    this.adaptador = createAdapter(pub, sub);
+    return true;
   }
 
   async cerrar(): Promise<void> {
     await Promise.all(
-      this.clientes.map((c) => c.quit().catch(() => undefined)),
+      // `disconnect` y no `quit`: si nunca hubo conexión, `quit` se queda
+      // esperando a poder enviar el comando.
+      this.clientes.map((c) => {
+        c.disconnect();
+        return Promise.resolve();
+      }),
     );
     this.clientes = [];
   }

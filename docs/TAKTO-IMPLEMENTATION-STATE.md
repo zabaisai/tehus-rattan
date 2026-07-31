@@ -258,7 +258,13 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       ningún `stone-*` el bloque se borra sin que cambie nada
 - [ ] Aplicar el naranja de acento a superficies concretas (hoy solo vive en
       el logotipo; el token existe y las reglas de contraste ya están fijadas)
-- [ ] QA visual en 6 viewports con el navegador
+- [x] **QA visual del login** (escritorio 1440×900, Chrome headless) — el
+      lockup TAKTO, la división TAK/TO, Archivo en el titular, IBM Plex Sans
+      en el cuerpo y los neutrales de marca se ven correctos. La captura
+      móvil se tomó sin emulación de dispositivo, así que **no es
+      concluyente** sobre el diseño responsive; el `<meta viewport>` sí se
+      verificó presente
+- [ ] QA visual del resto de pantallas (requiere sesión iniciada)
 - [ ] Design system con tokens semánticos + documentación
 - [ ] Favicon, manifest/PWA, Open Graph, metadatos
 - [ ] Fuentes Archivo / IBM Plex Sans / IBM Plex Mono
@@ -429,6 +435,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras tarea desde conversación | **1064 unit / 264 e2e / 137 frontend verdes** |
 | 2026-07-31 | **CI** `cef26f7` (chat → tarea) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras fundamento de marca TAKTO | **1064 unit / 264 e2e / 150 frontend verdes** |
+| 2026-07-31 | **CI** `3f7cb04` (branding) y `c1a4173` (neutrales) | **success**, `head_sha` verificado en ambos |
+| 2026-07-31 | tras arreglo del arranque sin Redis | **1071 unit / 264 e2e verdes** |
 
 ## Despliegues
 
@@ -437,6 +445,23 @@ _(ninguno en esta rama — staging sigue en `58dfb76`)_
 ## Bloqueadores
 
 _(ninguno)_
+
+## Fallo encontrado ejecutando el producto (no lo detectó ninguna prueba)
+
+**El backend se colgaba al arrancar sin Redis.** El puente de tiempo real
+hacía `ping()` y esperaba: un `ping` a un Redis inalcanzable **no falla**,
+ioredis encola el comando y reintenta la conexión para siempre. El proceso se
+quedaba a mitad del arranque —sin escuchar, sin responder al health y sin
+registrar la causa—, que es el peor modo de fallo posible porque parece un
+cuelgue sin explicación.
+
+Corregido con una espera máxima de 3 s (`ESPERA_MAXIMA_REDIS_MS`),
+`enableOfflineQueue: false` y `disconnect()` en vez de `quit()` al cerrar
+(`quit` también espera a poder enviar el comando si nunca hubo conexión).
+6 pruebas nuevas, incluida una tarea que no termina jamás.
+
+**Lección para quien reanude:** las suites no lo detectaron porque en pruebas
+`QUEUE_ENABLED=false`. Levantar el producto de verdad es lo que lo encontró.
 
 ## Aprendizaje operativo importante
 

@@ -8,7 +8,11 @@ import { Server } from 'socket.io';
 import type { Redis } from 'ioredis';
 import { RealtimeGateway } from './realtime.gateway';
 import { isQueueWorker } from '../queue/queue.role';
-import { crearClientesRedis, usaPuenteRedis } from './realtime.redis';
+import {
+  conTiempoLimite,
+  crearClientesRedis,
+  usaPuenteRedis,
+} from './realtime.redis';
 
 /**
  * Por dónde salen los eventos, según el proceso.
@@ -47,7 +51,14 @@ export class RealtimeTransport implements OnModuleInit, OnModuleDestroy {
       this.clientes = [pub, sub];
       pub.on('error', () => undefined);
       sub.on('error', () => undefined);
-      await Promise.all([pub.ping(), sub.ping()]);
+
+      // Con límite de tiempo: un `ping` a un Redis inalcanzable no falla, se
+      // queda reintentando, y el worker se colgaría a mitad del arranque sin
+      // llegar nunca a consumir la cola.
+      const conectado = await conTiempoLimite(
+        Promise.all([pub.ping(), sub.ping()]),
+      );
+      if (!conectado) throw new Error('redis inalcanzable');
 
       // Sin puerto ni servidor HTTP: nadie se conecta aquí. Solo publica.
       const { createAdapter } = await import('@socket.io/redis-adapter');
@@ -67,9 +78,9 @@ export class RealtimeTransport implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     await this.headless?.close();
     this.headless = undefined;
-    await Promise.all(
-      this.clientes.map((c) => c.quit().catch(() => undefined)),
-    );
+    // `disconnect` y no `quit`: si nunca hubo conexión, `quit` espera a poder
+    // enviar el comando y el cierre no termina nunca.
+    for (const cliente of this.clientes) cliente.disconnect();
     this.clientes = [];
   }
 }
