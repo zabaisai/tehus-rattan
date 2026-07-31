@@ -91,14 +91,14 @@ export default function LoginPage() {
   // pending), don't flash the login form.
   if (status !== 'anonymous') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-stone-50">
-        <p className="text-sm text-stone-500">Cargando...</p>
+      <div className="flex min-h-screen items-center justify-center bg-neutral-50">
+        <p className="text-sm text-neutral-500">Cargando...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center text-center">
           {/* Puerta de entrada del producto: aquí la marca es TAKTO. La
@@ -123,12 +123,12 @@ export default function LoginPage() {
 
         <form
           onSubmit={handleSubmit}
-          className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm"
+          className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm"
         >
           <div className="mb-4">
             <label
               htmlFor="email"
-              className="mb-1.5 block text-sm font-medium text-stone-700"
+              className="mb-1.5 block text-sm font-medium text-neutral-700"
             >
               Correo
             </label>
@@ -138,7 +138,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               placeholder="tu@correo.com"
             />
           </div>
@@ -146,7 +146,7 @@ export default function LoginPage() {
           <div className="mb-5">
             <label
               htmlFor="password"
-              className="mb-1.5 block text-sm font-medium text-stone-700"
+              className="mb-1.5 block text-sm font-medium text-neutral-700"
             >
               Contraseña
             </label>
@@ -156,7 +156,7 @@ export default function LoginPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               placeholder="••••••••"
             />
           </div>
@@ -164,7 +164,7 @@ export default function LoginPage() {
           <div className="mb-4 -mt-1 text-right">
             <Link
               href="/forgot-password"
-              className="text-sm text-stone-500 transition-colors hover:text-stone-700"
+              className="text-sm text-neutral-500 transition-colors hover:text-neutral-700"
             >
               ¿Olvidaste tu contraseña?
             </Link>

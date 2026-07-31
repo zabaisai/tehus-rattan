@@ -84,7 +84,7 @@ export function WhatsAppIntegrationForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
       <div>
-        <label className="mb-1 block text-xs font-medium text-stone-600">
+        <label className="mb-1 block text-xs font-medium text-neutral-600">
           Phone Number ID
         </label>
         <input
@@ -93,12 +93,12 @@ export function WhatsAppIntegrationForm({
           value={phoneNumberId}
           onChange={(e) => setPhoneNumberId(e.target.value)}
           placeholder="ID de Meta"
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-stone-600">
+        <label className="mb-1 block text-xs font-medium text-neutral-600">
           Access Token
         </label>
         <input
@@ -108,16 +108,16 @@ export function WhatsAppIntegrationForm({
           value={accessToken}
           onChange={(e) => setAccessToken(e.target.value)}
           placeholder="Token de acceso de Meta"
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         />
-        <p className="mt-1 text-xs text-stone-400">
+        <p className="mt-1 text-xs text-neutral-400">
           Por seguridad, el token nunca se muestra ni se guarda en el
           navegador. Para actualizar la integración debes pegarlo nuevamente.
         </p>
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-stone-600">
+        <label className="mb-1 block text-xs font-medium text-neutral-600">
           Número visible
         </label>
         <input
@@ -125,12 +125,12 @@ export function WhatsAppIntegrationForm({
           value={displayPhoneNumber}
           onChange={(e) => setDisplayPhoneNumber(e.target.value)}
           placeholder="+573001234567"
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         />
       </div>
 
       <div>
-        <label className="mb-1 block text-xs font-medium text-stone-600">
+        <label className="mb-1 block text-xs font-medium text-neutral-600">
           WABA ID
         </label>
         <input
@@ -139,9 +139,9 @@ export function WhatsAppIntegrationForm({
           value={wabaId}
           onChange={(e) => setWabaId(e.target.value)}
           placeholder="WhatsApp Business Account ID"
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         />
-        <p className="mt-1 text-xs text-stone-400">
+        <p className="mt-1 text-xs text-neutral-400">
           Obligatorio. El servidor comprueba con Meta que el Phone Number ID
           pertenece a esta WABA y suscribe la app para recibir mensajes.
         </p>

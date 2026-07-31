@@ -30,8 +30,8 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (status !== 'authenticated') {
     return (
-      <div className="flex h-screen items-center justify-center bg-stone-50">
-        <p className="text-sm text-stone-500">Cargando...</p>
+      <div className="flex h-screen items-center justify-center bg-neutral-50">
+        <p className="text-sm text-neutral-500">Cargando...</p>
       </div>
     );
   }

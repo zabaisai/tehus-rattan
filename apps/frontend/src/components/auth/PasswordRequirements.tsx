@@ -14,7 +14,7 @@ export function PasswordRequirements({ password }: { password: string }) {
           <li
             key={rule.id}
             className={`flex items-center gap-1.5 text-xs ${
-              met ? 'text-green-600' : 'text-stone-400'
+              met ? 'text-green-600' : 'text-neutral-400'
             }`}
           >
             <span aria-hidden="true">{met ? '✓' : '○'}</span>

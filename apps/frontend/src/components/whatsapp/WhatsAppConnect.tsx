@@ -49,10 +49,10 @@ const STATUS_PILL: Record<string, string> = {
   CONNECTED: 'bg-emerald-50 text-emerald-700',
   CONNECTING: 'bg-amber-50 text-amber-700',
   REAUTH_REQUIRED: 'bg-amber-50 text-amber-700',
-  DISCONNECTED: 'bg-stone-100 text-stone-600',
+  DISCONNECTED: 'bg-neutral-100 text-neutral-600',
   REVOKED: 'bg-red-50 text-red-700',
   ERROR: 'bg-red-50 text-red-700',
-  NOT_CONNECTED: 'bg-stone-100 text-stone-600',
+  NOT_CONNECTED: 'bg-neutral-100 text-neutral-600',
 };
 
 function mapError(err: unknown): string {
@@ -154,7 +154,7 @@ export function WhatsAppConnect() {
   };
 
   if (isLoading) {
-    return <p className="text-sm text-stone-400">Cargando estado de WhatsApp…</p>;
+    return <p className="text-sm text-neutral-400">Cargando estado de WhatsApp…</p>;
   }
   if (isError || !status) {
     return (
@@ -205,7 +205,7 @@ export function WhatsAppConnect() {
 function StatusPill({ status }: { status: string }) {
   return (
     <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[status] ?? 'bg-stone-100 text-stone-600'}`}
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_PILL[status] ?? 'bg-neutral-100 text-neutral-600'}`}
     >
       {STATUS_LABEL[status] ?? status}
     </span>
@@ -228,16 +228,16 @@ function DisconnectedView({
   error: string | null;
 }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-6">
+    <div className="rounded-lg border border-neutral-200 bg-white p-6">
       <div className="flex items-start gap-3">
         <span className="rounded-full bg-emerald-50 p-2 text-emerald-600">
           <MessageCircle className="h-5 w-5" aria-hidden />
         </span>
         <div>
-          <h3 className="text-base font-semibold text-stone-900">
+          <h3 className="text-base font-semibold text-neutral-900">
             Conecta tu WhatsApp Business
           </h3>
-          <p className="mt-1 text-sm text-stone-500">
+          <p className="mt-1 text-sm text-neutral-500">
             Conserva tu número de WhatsApp Business y administra las
             conversaciones desde el CRM.
           </p>
@@ -257,11 +257,11 @@ function DisconnectedView({
                 {done ? (
                   <Check className="h-4 w-4 text-emerald-600" aria-hidden />
                 ) : active ? (
-                  <Loader2 className="h-4 w-4 animate-spin text-stone-500" aria-hidden />
+                  <Loader2 className="h-4 w-4 animate-spin text-neutral-500" aria-hidden />
                 ) : (
-                  <span className="h-4 w-4 rounded-full border border-stone-300" aria-hidden />
+                  <span className="h-4 w-4 rounded-full border border-neutral-300" aria-hidden />
                 )}
-                <span className={done ? 'text-stone-500' : active ? 'text-stone-800' : 'text-stone-400'}>
+                <span className={done ? 'text-neutral-500' : active ? 'text-neutral-800' : 'text-neutral-400'}>
                   {label}
                 </span>
               </li>
@@ -279,7 +279,7 @@ function DisconnectedView({
             <MessageCircle className="h-4 w-4" aria-hidden />
             Conectar con Meta
           </button>
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-stone-400">
+          <p className="mt-3 flex items-center gap-1.5 text-xs text-neutral-400">
             <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
             La autenticación se realiza de forma segura con Meta. No necesitas
             copiar tokens ni identificadores.
@@ -327,9 +327,9 @@ function ConnectedView({
   };
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-6">
+    <div className="rounded-lg border border-neutral-200 bg-white p-6">
       <div className="flex items-center gap-3">
-        <h3 className="text-base font-semibold text-stone-900">
+        <h3 className="text-base font-semibold text-neutral-900">
           WhatsApp Business conectado
         </h3>
         <StatusPill status={status.status} />
@@ -369,8 +369,8 @@ function ConnectedView({
       </div>
 
       {/* Explicit connection test (only inside Meta's 24h conversation window). */}
-      <div className="mt-6 border-t border-stone-100 pt-4">
-        <p className="mb-2 text-sm font-medium text-stone-700">Probar conexión</p>
+      <div className="mt-6 border-t border-neutral-100 pt-4">
+        <p className="mb-2 text-sm font-medium text-neutral-700">Probar conexión</p>
         <div className="flex flex-wrap items-center gap-2">
           <label htmlFor="wa-test-to" className="sr-only">
             Número de destino (E.164)
@@ -382,7 +382,7 @@ function ConnectedView({
             placeholder="+573001234567"
             value={testTo}
             onChange={(e) => setTestTo(e.target.value)}
-            className="w-56 rounded-md border border-stone-300 px-3 py-1.5 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+            className="w-56 rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
           <button
             type="button"
@@ -393,11 +393,11 @@ function ConnectedView({
             {testing ? 'Enviando…' : 'Enviar prueba'}
           </button>
         </div>
-        <p className="mt-1.5 text-xs text-stone-400">
+        <p className="mt-1.5 text-xs text-neutral-400">
           Envía un mensaje de texto de prueba. Solo funciona si hay una
           conversación abierta con ese número (ventana de 24 h de Meta).
         </p>
-        {testMsg && <p className="mt-2 text-xs text-stone-600">{testMsg}</p>}
+        {testMsg && <p className="mt-2 text-xs text-neutral-600">{testMsg}</p>}
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
@@ -405,7 +405,7 @@ function ConnectedView({
           type="button"
           onClick={onReconnect}
           disabled={busy}
-          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
           Reconectar
         </button>
@@ -419,13 +419,13 @@ function ConnectedView({
         </button>
         <Link
           href="/dashboard/conversations"
-          className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+          className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
         >
           Ir a conversaciones
         </Link>
       </div>
 
-      <p className="mt-3 text-xs text-stone-400">
+      <p className="mt-3 text-xs text-neutral-400">
         La desconexión solo cambia el estado local en el CRM; no revoca el acceso
         en Meta ni afecta WhatsApp Business App. Los tokens nunca se muestran en
         esta pantalla.
@@ -438,8 +438,8 @@ function ConnectedView({
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-xs text-stone-500">{label}</p>
-      <p className="text-sm text-stone-800">{value}</p>
+      <p className="text-xs text-neutral-500">{label}</p>
+      <p className="text-sm text-neutral-800">{value}</p>
     </div>
   );
 }

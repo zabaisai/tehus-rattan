@@ -85,25 +85,25 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
     <Modal title="Nuevo lead" onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">Título</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Título</label>
             <input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Venta de muebles de rattan"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">Contacto</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Contacto</label>
             <select
               required
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
               disabled={loadingContacts}
-              className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 disabled:bg-stone-100"
+              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
             >
               <option value="">
                 {loadingContacts ? 'Cargando contactos...' : 'Selecciona un contacto'}
@@ -117,12 +117,12 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">Etapa</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Etapa</label>
             <select
               required
               value={stageId}
               onChange={(e) => setStageId(e.target.value)}
-              className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
               {sortedStages.map((s) => (
                 <option key={s.id} value={s.id}>
@@ -134,7 +134,7 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
 
           <div className="mb-3 grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">Valor</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Valor</label>
               <input
                 type="number"
                 min="0"
@@ -142,26 +142,26 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-stone-600">Cierre esperado</label>
+              <label className="mb-1 block text-xs font-medium text-neutral-600">Cierre esperado</label>
               <input
                 type="date"
                 value={expectedCloseDate}
                 onChange={(e) => setExpectedCloseDate(e.target.value)}
-                className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
           </div>
 
           <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium text-stone-600">Responsable</label>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">Responsable</label>
             <select
               value={assignedTo}
               onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
               <option value="">Sin asignar</option>
               {users
@@ -180,7 +180,7 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
             >
               Cancelar
             </button>

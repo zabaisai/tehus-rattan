@@ -51,24 +51,24 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
 
   return (
     <div className="mb-3">
-      <div className="border border-stone-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
+      <div className="border border-neutral-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
         Información del producto
       </div>
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="bg-white">
-            <th className="border border-stone-800 px-1 py-1 font-medium">Código</th>
-            <th className="border border-stone-800 px-1 py-1 font-medium">Descripción</th>
-            <th className="w-16 border border-stone-800 px-1 py-1 font-medium">Unidades</th>
-            <th className="w-28 border border-stone-800 px-1 py-1 font-medium">Valor unitario</th>
-            <th className="w-28 border border-stone-800 px-1 py-1 font-medium">Total</th>
-            {!readOnly && <th className="print-hidden w-8 border border-stone-800"></th>}
+            <th className="border border-neutral-800 px-1 py-1 font-medium">Código</th>
+            <th className="border border-neutral-800 px-1 py-1 font-medium">Descripción</th>
+            <th className="w-16 border border-neutral-800 px-1 py-1 font-medium">Unidades</th>
+            <th className="w-28 border border-neutral-800 px-1 py-1 font-medium">Valor unitario</th>
+            <th className="w-28 border border-neutral-800 px-1 py-1 font-medium">Total</th>
+            {!readOnly && <th className="print-hidden w-8 border border-neutral-800"></th>}
           </tr>
         </thead>
         <tbody>
           {items.map((item) => (
             <tr key={item.id}>
-              <td className="border border-stone-800 p-0">
+              <td className="border border-neutral-800 p-0">
                 {readOnly ? (
                   <span className="block px-1.5 py-1">{item.code}</span>
                 ) : (
@@ -79,7 +79,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                   />
                 )}
               </td>
-              <td className="border border-stone-800 p-0">
+              <td className="border border-neutral-800 p-0">
                 {readOnly ? (
                   <span className="block px-1.5 py-1">{item.description}</span>
                 ) : (
@@ -90,7 +90,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                   />
                 )}
               </td>
-              <td className="border border-stone-800 p-0">
+              <td className="border border-neutral-800 p-0">
                 {readOnly ? (
                   <span className="block px-1.5 py-1 text-right">{item.quantity}</span>
                 ) : (
@@ -104,7 +104,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                   />
                 )}
               </td>
-              <td className="border border-stone-800 p-0">
+              <td className="border border-neutral-800 p-0">
                 {readOnly ? (
                   <span className="block px-1.5 py-1 text-right">
                     {moneyFormatter.format(item.unitPrice)}
@@ -120,15 +120,15 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                   />
                 )}
               </td>
-              <td className="border border-stone-800 bg-[#F4EFE6] px-1.5 py-1 text-right font-medium">
+              <td className="border border-neutral-800 bg-[#F4EFE6] px-1.5 py-1 text-right font-medium">
                 {moneyFormatter.format(item.total)}
               </td>
               {!readOnly && (
-                <td className="print-hidden border border-stone-800 text-center">
+                <td className="print-hidden border border-neutral-800 text-center">
                   <button
                     type="button"
                     onClick={() => removeRow(item.id)}
-                    className="p-1 text-stone-400 hover:text-red-600"
+                    className="p-1 text-neutral-400 hover:text-red-600"
                   >
                     <Trash2 size={13} />
                   </button>

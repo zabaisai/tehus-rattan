@@ -35,7 +35,7 @@ export function ConversationList({
 }) {
   if (conversations.length === 0) {
     return (
-      <div className="p-4 text-center text-sm text-stone-400">
+      <div className="p-4 text-center text-sm text-neutral-400">
         No hay conversaciones que coincidan.
       </div>
     );
@@ -52,8 +52,8 @@ export function ConversationList({
         return (
           <div
             key={conv.id}
-            className={`flex items-start gap-2 border-b border-stone-100 px-2 transition-colors ${
-              selectedId === conv.id ? 'bg-stone-100' : 'hover:bg-stone-50'
+            className={`flex items-start gap-2 border-b border-neutral-100 px-2 transition-colors ${
+              selectedId === conv.id ? 'bg-neutral-100' : 'hover:bg-neutral-50'
             }`}
           >
             {permiteSeleccion && (
@@ -64,7 +64,7 @@ export function ConversationList({
                 aria-label={`Seleccionar la conversación de ${
                   conv.contact.name || conv.contact.phone
                 }`}
-                className="mt-3.5 shrink-0 accent-stone-800"
+                className="mt-3.5 shrink-0 accent-neutral-800"
               />
             )}
 
@@ -74,7 +74,7 @@ export function ConversationList({
             >
               <div className="flex w-full items-center justify-between gap-2">
                 <span
-                  className={`truncate text-sm text-stone-900 ${
+                  className={`truncate text-sm text-neutral-900 ${
                     // El peso extra es la señal que se capta sin mirar; el
                     // contador de color es la confirmación, no el aviso.
                     sinLeer ? 'font-semibold' : 'font-medium'
@@ -82,7 +82,7 @@ export function ConversationList({
                 >
                   {conv.contact.name || conv.contact.phone}
                 </span>
-                <span className="shrink-0 text-[11px] text-stone-400">
+                <span className="shrink-0 text-[11px] text-neutral-400">
                   {timeAgo(conv.lastMessageAt)}
                 </span>
               </div>
@@ -101,14 +101,14 @@ export function ConversationList({
                     Pausada
                   </span>
                 )}
-                <span className="rounded bg-stone-200 px-1.5 py-0.5 text-[10px] text-stone-600">
+                <span className="rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-600">
                   {ETIQUETA_ESTADO[conv.status] ?? conv.status}
                 </span>
                 {/* "Sin asignar" se dice explícitamente: es lo que hay que
                     resolver, y en una bandeja compartida no verlo significa
                     que nadie la está atendiendo. */}
                 {conv.agent ? (
-                  <span className="truncate text-[10px] text-stone-500">
+                  <span className="truncate text-[10px] text-neutral-500">
                     {conv.agent.name}
                   </span>
                 ) : (

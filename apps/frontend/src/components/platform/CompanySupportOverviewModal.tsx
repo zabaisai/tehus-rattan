@@ -90,7 +90,7 @@ export function CompanySupportOverviewModal({
           ) : undefined
         }
       >
-        {isLoading && <p className="text-sm text-stone-400">Cargando...</p>}
+        {isLoading && <p className="text-sm text-neutral-400">Cargando...</p>}
 
         {!isLoading && isError && (
           <p className="text-sm text-red-600">
@@ -102,7 +102,7 @@ export function CompanySupportOverviewModal({
           <div className="space-y-5 text-sm">
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="text-base font-semibold text-stone-900">
+                <h4 className="text-base font-semibold text-neutral-900">
                   {overview.company.name}
                 </h4>
                 <span
@@ -113,72 +113,72 @@ export function CompanySupportOverviewModal({
               </div>
               <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs text-stone-500">Teléfono</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Teléfono</p>
+                  <p className="text-neutral-800">
                     {overview.company.phone || '-'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Creada</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Creada</p>
+                  <p className="text-neutral-800">
                     {formatDate(overview.company.createdAt)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-neutral-500">
                     Última actualización
                   </p>
-                  <p className="text-stone-800">
+                  <p className="text-neutral-800">
                     {formatDate(overview.company.updatedAt)}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Última actividad</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Última actividad</p>
+                  <p className="text-neutral-800">
                     {formatDate(overview.lastActivityAt)}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-stone-100 pt-4">
-              <p className="mb-2 text-xs font-semibold text-stone-500">
+            <div className="border-t border-neutral-100 pt-4">
+              <p className="mb-2 text-xs font-semibold text-neutral-500">
                 Recursos
               </p>
               <div className="grid grid-cols-3 gap-3 sm:grid-cols-5">
                 <div>
-                  <p className="text-xs text-stone-500">Contactos</p>
-                  <p className="text-stone-800">{overview.counts.contacts}</p>
+                  <p className="text-xs text-neutral-500">Contactos</p>
+                  <p className="text-neutral-800">{overview.counts.contacts}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Leads</p>
-                  <p className="text-stone-800">{overview.counts.leads}</p>
+                  <p className="text-xs text-neutral-500">Leads</p>
+                  <p className="text-neutral-800">{overview.counts.leads}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Conversaciones</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Conversaciones</p>
+                  <p className="text-neutral-800">
                     {overview.counts.conversations}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Tareas</p>
-                  <p className="text-stone-800">{overview.counts.tasks}</p>
+                  <p className="text-xs text-neutral-500">Tareas</p>
+                  <p className="text-neutral-800">{overview.counts.tasks}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Productos</p>
-                  <p className="text-stone-800">{overview.counts.products}</p>
+                  <p className="text-xs text-neutral-500">Productos</p>
+                  <p className="text-neutral-800">{overview.counts.products}</p>
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-stone-100 pt-4">
+            <div className="border-t border-neutral-100 pt-4">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <p className="text-xs font-semibold text-stone-500">WhatsApp</p>
+                <p className="text-xs font-semibold text-neutral-500">WhatsApp</p>
                 {isSuperAdmin && hasActiveSession && session && (
                   <button
                     type="button"
                     onClick={() => setWhatsappModalOpen(true)}
-                    className="whitespace-nowrap rounded-md border border-stone-300 px-2.5 py-1 text-xs text-stone-700 hover:bg-stone-50"
+                    className="whitespace-nowrap rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
                   >
                     Configurar WhatsApp manualmente
                   </button>
@@ -186,56 +186,56 @@ export function CompanySupportOverviewModal({
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <p className="text-xs text-stone-500">Conectado</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Conectado</p>
+                  <p className="text-neutral-800">
                     {overview.whatsapp.connected ? 'Sí' : 'No'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Estado</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Estado</p>
+                  <p className="text-neutral-800">
                     {overview.whatsapp.status || '-'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Phone Number ID</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Phone Number ID</p>
+                  <p className="text-neutral-800">
                     {overview.whatsapp.phoneNumberId || '-'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-stone-500">Número visible</p>
-                  <p className="text-stone-800">
+                  <p className="text-xs text-neutral-500">Número visible</p>
+                  <p className="text-neutral-800">
                     {overview.whatsapp.displayPhoneNumber || '-'}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-stone-100 pt-4">
-              <p className="mb-2 text-xs font-semibold text-stone-500">
+            <div className="border-t border-neutral-100 pt-4">
+              <p className="mb-2 text-xs font-semibold text-neutral-500">
                 Usuarios ({overview.users.active} activos / {overview.users.total} total)
               </p>
               {overview.users.items.length === 0 ? (
-                <p className="text-xs text-stone-400">Sin usuarios.</p>
+                <p className="text-xs text-neutral-400">Sin usuarios.</p>
               ) : (
                 <ul className="space-y-2">
                   {overview.users.items.map((u) => (
                     <li
                       key={u.id}
-                      className="flex items-center justify-between rounded-md border border-stone-100 px-3 py-2"
+                      className="flex items-center justify-between rounded-md border border-neutral-100 px-3 py-2"
                     >
                       <div>
-                        <p className="text-stone-800">{u.name}</p>
-                        <p className="text-xs text-stone-500">{u.email}</p>
+                        <p className="text-neutral-800">{u.name}</p>
+                        <p className="text-xs text-neutral-500">{u.email}</p>
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-stone-600">
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-neutral-600">
                           {u.role}
                         </span>
                         <span
                           className={
-                            u.isActive ? 'text-emerald-600' : 'text-stone-400'
+                            u.isActive ? 'text-emerald-600' : 'text-neutral-400'
                           }
                         >
                           {u.isActive ? 'Activo' : 'Inactivo'}
@@ -247,26 +247,26 @@ export function CompanySupportOverviewModal({
               )}
             </div>
 
-            <div className="border-t border-stone-100 pt-4">
-              <p className="mb-2 text-xs font-semibold text-stone-500">
+            <div className="border-t border-neutral-100 pt-4">
+              <p className="mb-2 text-xs font-semibold text-neutral-500">
                 Leads recientes
               </p>
               {overview.recentLeads.length === 0 ? (
-                <p className="text-xs text-stone-400">Sin leads.</p>
+                <p className="text-xs text-neutral-400">Sin leads.</p>
               ) : (
                 <ul className="space-y-2">
                   {overview.recentLeads.map((lead) => (
                     <li
                       key={lead.id}
-                      className="rounded-md border border-stone-100 px-3 py-2"
+                      className="rounded-md border border-neutral-100 px-3 py-2"
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-stone-800">{lead.title}</p>
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                        <p className="text-neutral-800">{lead.title}</p>
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                           {lead.status}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-stone-500">
+                      <p className="mt-1 text-xs text-neutral-500">
                         {lead.stageName || 'Sin etapa'} ·{' '}
                         {lead.assignedUser?.name ?? 'Sin asignar'} ·{' '}
                         {formatDate(lead.updatedAt)}
@@ -277,28 +277,28 @@ export function CompanySupportOverviewModal({
               )}
             </div>
 
-            <div className="border-t border-stone-100 pt-4">
-              <p className="mb-2 text-xs font-semibold text-stone-500">
+            <div className="border-t border-neutral-100 pt-4">
+              <p className="mb-2 text-xs font-semibold text-neutral-500">
                 Conversaciones recientes
               </p>
               {overview.recentConversations.length === 0 ? (
-                <p className="text-xs text-stone-400">Sin conversaciones.</p>
+                <p className="text-xs text-neutral-400">Sin conversaciones.</p>
               ) : (
                 <ul className="space-y-2">
                   {overview.recentConversations.map((conversation) => (
                     <li
                       key={conversation.id}
-                      className="rounded-md border border-stone-100 px-3 py-2"
+                      className="rounded-md border border-neutral-100 px-3 py-2"
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-stone-800">
+                        <p className="text-neutral-800">
                           {conversation.contact?.name ?? 'Contacto sin nombre'}
                         </p>
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                           {conversation.status}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-stone-500">
+                      <p className="mt-1 text-xs text-neutral-500">
                         {conversation.channel} ·{' '}
                         {conversation.assignedUser?.name ?? 'Sin asignar'} ·{' '}
                         {formatDate(conversation.updatedAt)}
@@ -309,26 +309,26 @@ export function CompanySupportOverviewModal({
               )}
             </div>
 
-            <div className="border-t border-stone-100 pt-4">
-              <p className="mb-2 text-xs font-semibold text-stone-500">
+            <div className="border-t border-neutral-100 pt-4">
+              <p className="mb-2 text-xs font-semibold text-neutral-500">
                 Tareas recientes
               </p>
               {overview.recentTasks.length === 0 ? (
-                <p className="text-xs text-stone-400">Sin tareas.</p>
+                <p className="text-xs text-neutral-400">Sin tareas.</p>
               ) : (
                 <ul className="space-y-2">
                   {overview.recentTasks.map((task) => (
                     <li
                       key={task.id}
-                      className="rounded-md border border-stone-100 px-3 py-2"
+                      className="rounded-md border border-neutral-100 px-3 py-2"
                     >
                       <div className="flex items-center justify-between">
-                        <p className="text-stone-800">{task.title}</p>
-                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">
+                        <p className="text-neutral-800">{task.title}</p>
+                        <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
                           {task.status}
                         </span>
                       </div>
-                      <p className="mt-1 text-xs text-stone-500">
+                      <p className="mt-1 text-xs text-neutral-500">
                         Vence: {formatDate(task.dueDate)} ·{' '}
                         {task.assignedUser?.name ?? 'Sin asignar'} ·{' '}
                         {formatDate(task.updatedAt)}
@@ -339,7 +339,7 @@ export function CompanySupportOverviewModal({
               )}
             </div>
 
-            <p className="border-t border-stone-100 pt-4 text-xs text-stone-400">
+            <p className="border-t border-neutral-100 pt-4 text-xs text-neutral-400">
               Esta vista es superficial: no muestra mensajes ni contenido de
               conversaciones.
             </p>

@@ -71,21 +71,21 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
     <Modal title="Importar Excel" onClose={onClose} maxWidth="md">
         {!summary && (
           <>
-            <p className="mb-1 text-xs text-stone-500">
+            <p className="mb-1 text-xs text-neutral-500">
               Puedes importar un Excel aunque no todas las columnas estén completas.
               El sistema intentará adaptar nombre, categoría, precio, imagen y
               detalles al catálogo.
             </p>
-            <p className="mb-4 text-xs text-stone-500">
+            <p className="mb-4 text-xs text-neutral-500">
               Puedes importar archivos Excel de hasta {MAX_PRODUCT_IMPORT_FILE_SIZE_MB}MB y
               máximo {MAX_PRODUCT_IMPORT_ROWS.toLocaleString('es-CO')} filas.
             </p>
 
-            <label className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 py-6 text-center hover:bg-stone-100">
-              <Upload size={20} className="text-stone-400" />
-              <span className="text-xs text-stone-500">
+            <label className="mb-3 flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-4 py-6 text-center hover:bg-neutral-100">
+              <Upload size={20} className="text-neutral-400" />
+              <span className="text-xs text-neutral-500">
                 {file ? (
-                  <span className="flex items-center gap-1.5 font-medium text-stone-700">
+                  <span className="flex items-center gap-1.5 font-medium text-neutral-700">
                     <FileSpreadsheet size={14} />
                     {file.name}
                   </span>
@@ -107,7 +107,7 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
               >
                 Cancelar
               </button>
@@ -126,9 +126,9 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
         {summary && (
           <div>
             <div className="mb-4 grid grid-cols-3 gap-2 text-center">
-              <div className="rounded-md bg-stone-50 px-2 py-2">
-                <p className="text-lg font-semibold text-stone-900">{summary.totalRows}</p>
-                <p className="text-[11px] text-stone-500">Filas detectadas</p>
+              <div className="rounded-md bg-neutral-50 px-2 py-2">
+                <p className="text-lg font-semibold text-neutral-900">{summary.totalRows}</p>
+                <p className="text-[11px] text-neutral-500">Filas detectadas</p>
               </div>
               <div className="rounded-md bg-emerald-50 px-2 py-2">
                 <p className="text-lg font-semibold text-emerald-700">{summary.created}</p>

@@ -59,12 +59,12 @@ export function ConversationOpportunity({
   }
 
   return (
-    <div className="border-b border-stone-200 bg-stone-50/70 px-4 py-2">
+    <div className="border-b border-neutral-200 bg-neutral-50/70 px-4 py-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         {lead ? (
           <div className="flex min-w-0 items-center gap-2">
-            <Target size={14} className="shrink-0 text-stone-400" />
-            <span className="truncate text-xs font-medium text-stone-700">
+            <Target size={14} className="shrink-0 text-neutral-400" />
+            <span className="truncate text-xs font-medium text-neutral-700">
               {lead.title}
             </span>
             {lead.stage && (
@@ -83,13 +83,13 @@ export function ConversationOpportunity({
           // No toda conversación es una venta (soporte, consultas, spam), así
           // que "sin oportunidad" se muestra como un estado normal, no como
           // un error ni como algo que haya que corregir.
-          <span className="text-xs text-stone-400">Sin oportunidad asociada</span>
+          <span className="text-xs text-neutral-400">Sin oportunidad asociada</span>
         )}
 
         <button
           type="button"
           onClick={() => setAbierto((v) => !v)}
-          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-200/70"
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-neutral-600 hover:bg-neutral-200/70"
         >
           {creada ? (
             <>
@@ -113,7 +113,7 @@ export function ConversationOpportunity({
             onChange={(e) => setTitulo(e.target.value)}
             placeholder="¿Qué hay que hacer?"
             aria-label="Título de la tarea"
-            className="min-w-0 flex-1 rounded-md border border-stone-300 px-2.5 py-1.5 text-xs text-stone-900 outline-none focus:border-stone-500"
+            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-900 outline-none focus:border-neutral-500"
           />
           <button
             type="submit"

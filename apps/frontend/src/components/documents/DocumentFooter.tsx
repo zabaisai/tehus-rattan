@@ -30,7 +30,7 @@ export function DocumentFooter({ company }: DocumentFooterProps) {
   if (parts.length === 0) return null;
 
   return (
-    <p className="border-t border-stone-800 pt-1.5 text-center text-[9px] text-stone-600">
+    <p className="border-t border-neutral-800 pt-1.5 text-center text-[9px] text-neutral-600">
       {parts.join('  ·  ')}
     </p>
   );

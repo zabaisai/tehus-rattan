@@ -106,7 +106,7 @@ export function ChatbotFlowEditor({
             <li
               key={nodo.id}
               className={`rounded-md border bg-white ${
-                suyos.length ? 'border-red-300' : 'border-stone-200'
+                suyos.length ? 'border-red-300' : 'border-neutral-200'
               }`}
             >
               <div className="flex items-center gap-2 p-2">
@@ -124,10 +124,10 @@ export function ChatbotFlowEditor({
                       Inicio
                     </span>
                   )}
-                  <span className="shrink-0 rounded bg-stone-100 px-1.5 py-0.5 font-mono text-[10px] text-stone-600">
+                  <span className="shrink-0 rounded bg-neutral-100 px-1.5 py-0.5 font-mono text-[10px] text-neutral-600">
                     {nodo.id}
                   </span>
-                  <span className="truncate text-xs text-stone-700">
+                  <span className="truncate text-xs text-neutral-700">
                     {nodo.text?.trim() ||
                       TIPOS_NODO.find((t) => t.valor === nodo.type)?.etiqueta}
                   </span>
@@ -140,7 +140,7 @@ export function ChatbotFlowEditor({
                   <button
                     type="button"
                     onClick={() => onChange({ ...flujo, start: nodo.id })}
-                    className="shrink-0 rounded px-1.5 py-1 text-[10px] text-stone-500 hover:bg-stone-100"
+                    className="shrink-0 rounded px-1.5 py-1 text-[10px] text-neutral-500 hover:bg-neutral-100"
                   >
                     Marcar inicio
                   </button>
@@ -149,14 +149,14 @@ export function ChatbotFlowEditor({
                   type="button"
                   onClick={() => eliminarPaso(nodo.id)}
                   aria-label={`Eliminar el paso ${nodo.id}`}
-                  className="shrink-0 rounded p-1 text-stone-500 hover:bg-stone-100"
+                  className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100"
                 >
                   <Trash2 size={13} />
                 </button>
               </div>
 
               {abierto && (
-                <div className="space-y-2 border-t border-stone-100 p-2">
+                <div className="space-y-2 border-t border-neutral-100 p-2">
                   <select
                     value={nodo.type}
                     onChange={(e) =>
@@ -177,7 +177,7 @@ export function ChatbotFlowEditor({
                       })
                     }
                     aria-label={`Tipo del paso ${nodo.id}`}
-                    className="w-full rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                    className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                   >
                     {TIPOS_NODO.map((t) => (
                       <option key={t.valor} value={t.valor}>
@@ -185,7 +185,7 @@ export function ChatbotFlowEditor({
                       </option>
                     ))}
                   </select>
-                  <p className="text-[11px] text-stone-500">
+                  <p className="text-[11px] text-neutral-500">
                     {TIPOS_NODO.find((t) => t.valor === nodo.type)?.ayuda}
                   </p>
 
@@ -197,7 +197,7 @@ export function ChatbotFlowEditor({
                     rows={2}
                     placeholder="Lo que recibe el cliente. Puedes usar {{variable}}."
                     aria-label={`Texto del paso ${nodo.id}`}
-                    className="w-full rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                    className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                   />
 
                   {nodo.type === 'question' && (
@@ -208,12 +208,12 @@ export function ChatbotFlowEditor({
                       }
                       placeholder="Guardar la respuesta como… (ej: nombre)"
                       aria-label={`Variable del paso ${nodo.id}`}
-                      className="w-full rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                      className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                     />
                   )}
 
                   {(nodo.type === 'message' || nodo.type === 'question') && (
-                    <label className="block text-[11px] text-stone-600">
+                    <label className="block text-[11px] text-neutral-600">
                       Después va a
                       <select
                         value={nodo.next ?? ''}
@@ -223,7 +223,7 @@ export function ChatbotFlowEditor({
                           })
                         }
                         aria-label={`Paso siguiente de ${nodo.id}`}
-                        className="mt-0.5 w-full rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                        className="mt-0.5 w-full rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                       >
                         <option value="">Elige un paso…</option>
                         {ids
@@ -252,7 +252,7 @@ export function ChatbotFlowEditor({
                             }
                             placeholder="Lo que ve el cliente"
                             aria-label={`Opción ${i + 1} del paso ${nodo.id}`}
-                            className="min-w-0 flex-1 rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                           />
                           <select
                             value={opcion.next}
@@ -264,7 +264,7 @@ export function ChatbotFlowEditor({
                               })
                             }
                             aria-label={`Destino de la opción ${i + 1} del paso ${nodo.id}`}
-                            className="rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                            className="rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                           >
                             <option value="">Lleva a…</option>
                             {ids.map((id) => (
@@ -283,7 +283,7 @@ export function ChatbotFlowEditor({
                               })
                             }
                             aria-label={`Quitar la opción ${i + 1} del paso ${nodo.id}`}
-                            className="rounded p-1 text-stone-500 hover:bg-stone-100"
+                            className="rounded p-1 text-neutral-500 hover:bg-neutral-100"
                           >
                             <Trash2 size={12} />
                           </button>
@@ -299,7 +299,7 @@ export function ChatbotFlowEditor({
                             ],
                           })
                         }
-                        className="flex items-center gap-1 rounded-md border border-stone-300 px-2 py-1 text-[11px] text-stone-700 hover:bg-stone-50"
+                        className="flex items-center gap-1 rounded-md border border-neutral-300 px-2 py-1 text-[11px] text-neutral-700 hover:bg-neutral-50"
                       >
                         <Plus size={11} />
                         Añadir opción
@@ -324,7 +324,7 @@ export function ChatbotFlowEditor({
       <button
         type="button"
         onClick={anadirPaso}
-        className="flex items-center gap-1.5 rounded-md border border-stone-300 px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50"
+        className="flex items-center gap-1.5 rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50"
       >
         <Plus size={13} />
         Añadir paso

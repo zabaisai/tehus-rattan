@@ -130,10 +130,10 @@ export default function ConversationsPage() {
   }
 
   return (
-    <div className="flex h-full overflow-hidden rounded-lg border border-stone-200 bg-white">
+    <div className="flex h-full overflow-hidden rounded-lg border border-neutral-200 bg-white">
       {/* Móvil: solo se muestra el listado O el chat, nunca ambos a la vez. */}
       <div
-        className={`w-full shrink-0 overflow-y-auto border-stone-200 sm:block sm:w-72 sm:border-r ${
+        className={`w-full shrink-0 overflow-y-auto border-neutral-200 sm:block sm:w-72 sm:border-r ${
           selectedId ? 'hidden sm:block' : 'block'
         }`}
       >
@@ -172,28 +172,28 @@ export default function ConversationsPage() {
         className={`flex-1 flex-col sm:flex ${selectedId ? 'flex' : 'hidden'}`}
       >
         {!selectedConversation && (
-          <div className="flex flex-1 items-center justify-center text-sm text-stone-400">
+          <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">
             Selecciona una conversación
           </div>
         )}
 
         {selectedConversation && (
           <>
-            <div className="flex items-center justify-between border-b border-stone-200 px-4 py-2.5">
+            <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-2.5">
               <div className="flex min-w-0 items-center gap-2">
                 <button
                   onClick={() => setSelectedId(null)}
                   aria-label="Volver al listado de conversaciones"
-                  className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100 sm:hidden"
+                  className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 sm:hidden"
                 >
                   <ArrowLeft size={18} />
                 </button>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-stone-900">
+                  <p className="truncate text-sm font-medium text-neutral-900">
                     {selectedConversation.contact.name ||
                       selectedConversation.contact.phone}
                   </p>
-                  <p className="text-xs text-stone-400">
+                  <p className="text-xs text-neutral-400">
                     {selectedConversation.contact.phone}
                   </p>
                 </div>

@@ -63,22 +63,22 @@ export default function NotificationsPage() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-xl font-semibold text-stone-900">Notificaciones</h2>
-          <p className="mt-1 text-sm text-stone-500">
+          <h2 className="text-xl font-semibold text-neutral-900">Notificaciones</h2>
+          <p className="mt-1 text-sm text-neutral-500">
             Tus alertas de conversaciones, tareas, WhatsApp y más.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/dashboard/settings/notifications"
-            className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
           >
             Preferencias
           </Link>
           <button
             type="button"
             onClick={markAll}
-            className="rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+            className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
           >
             Marcar todas como leídas
           </button>
@@ -86,14 +86,14 @@ export default function NotificationsPage() {
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <div className="inline-flex rounded-md border border-stone-200 p-0.5" role="tablist">
+        <div className="inline-flex rounded-md border border-neutral-200 p-0.5" role="tablist">
           {(['all', 'unread'] as Filter[]).map((f) => (
             <button
               key={f}
               role="tab"
               aria-selected={filter === f}
               onClick={() => setFilter(f)}
-              className={`rounded px-3 py-1 text-sm ${filter === f ? 'bg-brand-primary text-white' : 'text-stone-600 hover:bg-stone-100'}`}
+              className={`rounded px-3 py-1 text-sm ${filter === f ? 'bg-brand-primary text-white' : 'text-neutral-600 hover:bg-neutral-100'}`}
             >
               {f === 'all' ? 'Todas' : 'No leídas'}
             </button>
@@ -106,7 +106,7 @@ export default function NotificationsPage() {
           id="notif-category"
           value={category}
           onChange={(e) => setCategory(e.target.value as NotificationCategory | '')}
-          className="rounded-md border border-stone-300 px-2 py-1.5 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         >
           <option value="">Todas las categorías</option>
           {(Object.keys(CATEGORY_LABELS) as NotificationCategory[]).map((c) => (
@@ -117,47 +117,47 @@ export default function NotificationsPage() {
         </select>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="mt-4 overflow-hidden rounded-lg border border-neutral-200 bg-white">
         {query.isLoading ? (
-          <p className="px-4 py-10 text-center text-sm text-stone-400">Cargando…</p>
+          <p className="px-4 py-10 text-center text-sm text-neutral-400">Cargando…</p>
         ) : query.isError ? (
           <div className="px-4 py-10 text-center">
             <p className="text-sm text-red-600">No se pudieron cargar las notificaciones.</p>
             <button
               type="button"
               onClick={() => query.refetch()}
-              className="mt-2 rounded-md border border-stone-300 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+              className="mt-2 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
             >
               Reintentar
             </button>
           </div>
         ) : items.length === 0 ? (
-          <p className="px-4 py-12 text-center text-sm text-stone-400">
+          <p className="px-4 py-12 text-center text-sm text-neutral-400">
             No tienes notificaciones{filter === 'unread' ? ' sin leer' : ''}.
           </p>
         ) : (
-          <ul className="divide-y divide-stone-100">
+          <ul className="divide-y divide-neutral-100">
             {items.map((n) => (
               <li key={n.id}>
                 <button
                   type="button"
                   onClick={() => open(n)}
-                  className={`flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-stone-50 ${n.readAt ? '' : 'bg-emerald-50/40'}`}
+                  className={`flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-neutral-50 ${n.readAt ? '' : 'bg-emerald-50/40'}`}
                 >
-                  <span className="mt-0.5 text-stone-400">
+                  <span className="mt-0.5 text-neutral-400">
                     <CategoryIcon category={n.category} size={18} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-stone-800">{n.title}</span>
+                      <span className="text-sm font-medium text-neutral-800">{n.title}</span>
                       {!n.readAt && (
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label="No leída" />
                       )}
                     </span>
                     {n.bodyPreview && (
-                      <span className="mt-0.5 block text-sm text-stone-500">{n.bodyPreview}</span>
+                      <span className="mt-0.5 block text-sm text-neutral-500">{n.bodyPreview}</span>
                     )}
-                    <span className="mt-0.5 block text-xs text-stone-400">
+                    <span className="mt-0.5 block text-xs text-neutral-400">
                       {CATEGORY_LABELS[n.category]} · {relativeTime(n.createdAt)}
                     </span>
                   </span>
@@ -174,7 +174,7 @@ export default function NotificationsPage() {
             type="button"
             onClick={() => query.fetchNextPage()}
             disabled={query.isFetchingNextPage}
-            className="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 disabled:opacity-50"
+            className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
           >
             {query.isFetchingNextPage ? 'Cargando…' : 'Cargar más'}
           </button>

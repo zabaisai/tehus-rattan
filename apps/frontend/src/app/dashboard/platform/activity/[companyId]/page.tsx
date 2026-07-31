@@ -40,7 +40,7 @@ const activityStatusColors: Record<CompanyActivityStatus, string> = {
   ACTIVE_TODAY: 'bg-emerald-50 text-emerald-700',
   ACTIVE_WEEK: 'bg-sky-50 text-sky-700',
   ACTIVE_MONTH: 'bg-amber-50 text-amber-700',
-  INACTIVE: 'bg-stone-100 text-stone-500',
+  INACTIVE: 'bg-neutral-100 text-neutral-500',
 };
 
 const sessionStatusLabels: Record<UserSessionStatus, string> = {
@@ -52,9 +52,9 @@ const sessionStatusLabels: Record<UserSessionStatus, string> = {
 
 const sessionStatusColors: Record<UserSessionStatus, string> = {
   ACTIVE: 'bg-emerald-50 text-emerald-700',
-  LOGGED_OUT: 'bg-stone-100 text-stone-500',
+  LOGGED_OUT: 'bg-neutral-100 text-neutral-500',
   REVOKED: 'bg-red-50 text-red-700',
-  EXPIRED: 'bg-stone-100 text-stone-400',
+  EXPIRED: 'bg-neutral-100 text-neutral-400',
 };
 
 const deviceTypeLabels: Record<DeviceType, string> = {
@@ -96,7 +96,7 @@ function DailyLoginsChart({ data }: { data: { date: string; count: number }[] })
                   </div>
                 )}
                 <div
-                  className="w-full rounded-t bg-stone-700 transition-colors group-hover:bg-brand-primary"
+                  className="w-full rounded-t bg-neutral-700 transition-colors group-hover:bg-brand-primary"
                   style={{ height: `${Math.max(heightPct, d.count > 0 ? 4 : 1)}%` }}
                 />
               </div>
@@ -104,7 +104,7 @@ function DailyLoginsChart({ data }: { data: { date: string; count: number }[] })
           );
         })}
       </div>
-      <div className="mt-1.5 flex gap-1 text-[10px] text-stone-400">
+      <div className="mt-1.5 flex gap-1 text-[10px] text-neutral-400">
         {data.map((d, i) => (
           <div key={d.date} className="flex-1 text-center">
             {i % 2 === 0
@@ -233,9 +233,9 @@ export default function CompanyActivityDetailPage() {
   if (!isPlatformSuperAdmin) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Actividad de la empresa</h2>
-        <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-          <p className="text-sm text-stone-600">
+        <h2 className="text-xl font-semibold text-neutral-900">Actividad de la empresa</h2>
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <p className="text-sm text-neutral-600">
             No tienes permiso para acceder a esta sección.
           </p>
         </div>
@@ -247,7 +247,7 @@ export default function CompanyActivityDetailPage() {
     <div>
       <button
         onClick={() => router.push('/dashboard/platform/companies')}
-        className="mb-3 flex items-center gap-1.5 text-sm text-stone-500 hover:text-stone-800"
+        className="mb-3 flex items-center gap-1.5 text-sm text-neutral-500 hover:text-neutral-800"
       >
         <ArrowLeft size={15} />
         Volver a empresas
@@ -255,10 +255,10 @@ export default function CompanyActivityDetailPage() {
 
       <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-stone-900">
+          <h2 className="text-xl font-semibold text-neutral-900">
             {company?.name ?? 'Actividad de la empresa'}
           </h2>
-          <p className="mt-1 text-sm text-stone-500">
+          <p className="mt-1 text-sm text-neutral-500">
             Actividad, sesiones y dispositivos reconocidos.
           </p>
         </div>
@@ -271,15 +271,15 @@ export default function CompanyActivityDetailPage() {
         )}
       </div>
 
-      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-stone-200">
+      <div className="mb-4 flex gap-1 overflow-x-auto border-b border-neutral-200">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               tab === t.id
-                ? 'border-stone-900 text-stone-900'
-                : 'border-transparent text-stone-500 hover:text-stone-800'
+                ? 'border-neutral-900 text-neutral-900'
+                : 'border-transparent text-neutral-500 hover:text-neutral-800'
             }`}
           >
             {t.label}
@@ -291,18 +291,18 @@ export default function CompanyActivityDetailPage() {
       {actionError && <p className="mb-3 text-sm text-red-600">{actionError}</p>}
 
       {activityLoading && (
-        <div className="rounded-lg border border-stone-200 bg-white p-6 text-center text-sm text-stone-400">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-400">
           Cargando...
         </div>
       )}
       {!activityLoading && activityError && (
-        <div className="rounded-lg border border-stone-200 bg-white p-6 text-center text-sm text-red-600">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-red-600">
           No se pudo cargar la actividad de esta empresa.
         </div>
       )}
 
       {!activityLoading && !activityError && activity && !activity.hasHistoricalData && tab !== 'usuarios' && tab !== 'sesiones' && (
-        <div className="rounded-lg border border-stone-200 bg-white p-6 text-center text-sm text-stone-500">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-500">
           {activity.message}
         </div>
       )}
@@ -325,10 +325,10 @@ export default function CompanyActivityDetailPage() {
         ) : null)}
 
       {!activityLoading && !activityError && tab === 'usuarios' && (
-        <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
+              <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
                 <th className="px-4 py-2.5 font-medium">Usuario</th>
                 <th className="px-4 py-2.5 font-medium">Rol</th>
                 <th className="px-4 py-2.5 font-medium">Estado</th>
@@ -340,16 +340,16 @@ export default function CompanyActivityDetailPage() {
               {(company?.users.items ?? []).map((u) => {
                 const neverLoggedIn = usersNeverLoggedInIds.has(u.id);
                 return (
-                  <tr key={u.id} className="border-b border-stone-100 last:border-0">
-                    <td className="px-4 py-2.5 text-stone-800">
+                  <tr key={u.id} className="border-b border-neutral-100 last:border-0">
+                    <td className="px-4 py-2.5 text-neutral-800">
                       {u.name}
-                      <div className="text-xs text-stone-400">{u.email}</div>
+                      <div className="text-xs text-neutral-400">{u.email}</div>
                     </td>
-                    <td className="px-4 py-2.5 text-stone-600">{u.role}</td>
-                    <td className="px-4 py-2.5 text-stone-600">
+                    <td className="px-4 py-2.5 text-neutral-600">{u.role}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">
                       {u.isActive ? 'Activo' : 'Inactivo'}
                     </td>
-                    <td className="px-4 py-2.5 text-stone-600">
+                    <td className="px-4 py-2.5 text-neutral-600">
                       {activity?.hasHistoricalData === false
                         ? 'Sin información histórica disponible'
                         : neverLoggedIn
@@ -372,7 +372,7 @@ export default function CompanyActivityDetailPage() {
               })}
               {(company?.users.items ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-stone-400">
+                  <td colSpan={5} className="px-4 py-6 text-center text-neutral-400">
                     No hay usuarios.
                   </td>
                 </tr>
@@ -384,17 +384,17 @@ export default function CompanyActivityDetailPage() {
 
       {!activityLoading && !activityError && activity && tab === 'actividad' && activity.hasHistoricalData && (
         <div className="space-y-4">
-          <div className="rounded-lg border border-stone-200 bg-white p-4">
-            <h3 className="mb-3 text-sm font-medium text-stone-700">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <h3 className="mb-3 text-sm font-medium text-neutral-700">
               Accesos exitosos por día (últimos 14 días)
             </h3>
             <DailyLoginsChart data={activity.dailyHistory} />
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
+                <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
                   <th className="px-4 py-2.5 font-medium">Usuario</th>
                   <th className="px-4 py-2.5 font-medium">Fecha</th>
                   <th className="px-4 py-2.5 font-medium">IP</th>
@@ -405,22 +405,22 @@ export default function CompanyActivityDetailPage() {
               </thead>
               <tbody>
                 {activity.recentLogins.map((l) => (
-                  <tr key={l.id} className="border-b border-stone-100 last:border-0">
-                    <td className="px-4 py-2.5 text-stone-800">{l.user.name}</td>
-                    <td className="px-4 py-2.5 text-stone-600">{formatDateTime(l.createdAt)}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-stone-600">
+                  <tr key={l.id} className="border-b border-neutral-100 last:border-0">
+                    <td className="px-4 py-2.5 text-neutral-800">{l.user.name}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">{formatDateTime(l.createdAt)}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-neutral-600">
                       {l.ipPreview ?? '-'}
                     </td>
-                    <td className="px-4 py-2.5 text-stone-600">{l.browser ?? '-'}</td>
-                    <td className="px-4 py-2.5 text-stone-600">{l.operatingSystem ?? '-'}</td>
-                    <td className="px-4 py-2.5 text-stone-600">
+                    <td className="px-4 py-2.5 text-neutral-600">{l.browser ?? '-'}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">{l.operatingSystem ?? '-'}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">
                       {deviceTypeLabels[l.deviceType]}
                     </td>
                   </tr>
                 ))}
                 {activity.recentLogins.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-6 text-center text-stone-400">
+                    <td colSpan={6} className="px-4 py-6 text-center text-neutral-400">
                       Sin accesos recientes.
                     </td>
                   </tr>
@@ -442,7 +442,7 @@ export default function CompanyActivityDetailPage() {
                 onChange={(e) =>
                   setSessionFilters((f) => ({ ...f, userId: e.target.value, page: 1 }))
                 }
-                className="rounded-md border border-stone-300 px-3 py-1.5 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
               <select
                 value={sessionFilters.status}
@@ -453,7 +453,7 @@ export default function CompanyActivityDetailPage() {
                     page: 1,
                   }))
                 }
-                className="rounded-md border border-stone-300 px-3 py-1.5 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               >
                 <option value="">Todos los estados</option>
                 <option value="ACTIVE">Activa</option>
@@ -470,7 +470,7 @@ export default function CompanyActivityDetailPage() {
                     page: 1,
                   }))
                 }
-                className="rounded-md border border-stone-300 px-3 py-1.5 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               >
                 <option value="">Todos los dispositivos</option>
                 <option value="DESKTOP">Escritorio</option>
@@ -489,10 +489,10 @@ export default function CompanyActivityDetailPage() {
             </button>
           </div>
 
-          <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+          <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
+                <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
                   <th className="px-4 py-2.5 font-medium">Usuario</th>
                   <th className="px-4 py-2.5 font-medium">Dispositivo</th>
                   <th className="px-4 py-2.5 font-medium">Navegador</th>
@@ -508,7 +508,7 @@ export default function CompanyActivityDetailPage() {
               <tbody>
                 {sessionsLoading && (
                   <tr>
-                    <td colSpan={10} className="px-4 py-6 text-center text-stone-400">
+                    <td colSpan={10} className="px-4 py-6 text-center text-neutral-400">
                       Cargando...
                     </td>
                   </tr>
@@ -522,26 +522,26 @@ export default function CompanyActivityDetailPage() {
                 )}
                 {!sessionsLoading && !sessionsError && (sessionsPage?.items.length ?? 0) === 0 && (
                   <tr>
-                    <td colSpan={10} className="px-4 py-6 text-center text-stone-400">
+                    <td colSpan={10} className="px-4 py-6 text-center text-neutral-400">
                       No hay sesiones para estos filtros.
                     </td>
                   </tr>
                 )}
                 {sessionsPage?.items.map((s) => (
-                  <tr key={s.id} className="border-b border-stone-100 last:border-0">
-                    <td className="px-4 py-2.5 text-stone-800">
+                  <tr key={s.id} className="border-b border-neutral-100 last:border-0">
+                    <td className="px-4 py-2.5 text-neutral-800">
                       {s.user.name}
-                      <div className="text-xs text-stone-400">{s.user.email}</div>
+                      <div className="text-xs text-neutral-400">{s.user.email}</div>
                     </td>
-                    <td className="px-4 py-2.5 text-stone-600">{deviceTypeLabels[s.deviceType]}</td>
-                    <td className="px-4 py-2.5 text-stone-600">{s.browser ?? '-'}</td>
-                    <td className="px-4 py-2.5 text-stone-600">{s.operatingSystem ?? '-'}</td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-stone-600">
+                    <td className="px-4 py-2.5 text-neutral-600">{deviceTypeLabels[s.deviceType]}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">{s.browser ?? '-'}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">{s.operatingSystem ?? '-'}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-neutral-600">
                       {s.ipPreview ?? '-'}
                     </td>
-                    <td className="px-4 py-2.5 text-stone-600">{formatDateTime(s.firstSeenAt)}</td>
-                    <td className="px-4 py-2.5 text-stone-600">{formatDateTime(s.lastLoginAt)}</td>
-                    <td className="px-4 py-2.5 text-stone-600">
+                    <td className="px-4 py-2.5 text-neutral-600">{formatDateTime(s.firstSeenAt)}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">{formatDateTime(s.lastLoginAt)}</td>
+                    <td className="px-4 py-2.5 text-neutral-600">
                       {formatDateTime(s.lastActivityAt)}
                     </td>
                     <td className="px-4 py-2.5">
@@ -569,7 +569,7 @@ export default function CompanyActivityDetailPage() {
           </div>
 
           {sessionsPage && sessionsPage.totalPages > 1 && (
-            <div className="mt-3 flex items-center justify-between text-sm text-stone-500">
+            <div className="mt-3 flex items-center justify-between text-sm text-neutral-500">
               <span>
                 Página {sessionsPage.page} de {sessionsPage.totalPages} ({sessionsPage.total}{' '}
                 sesiones)
@@ -578,14 +578,14 @@ export default function CompanyActivityDetailPage() {
                 <button
                   onClick={() => setSessionFilters((f) => ({ ...f, page: f.page - 1 }))}
                   disabled={sessionsPage.page <= 1}
-                  className="rounded-md border border-stone-300 px-2.5 py-1 text-xs disabled:opacity-40"
+                  className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs disabled:opacity-40"
                 >
                   Anterior
                 </button>
                 <button
                   onClick={() => setSessionFilters((f) => ({ ...f, page: f.page + 1 }))}
                   disabled={sessionsPage.page >= sessionsPage.totalPages}
-                  className="rounded-md border border-stone-300 px-2.5 py-1 text-xs disabled:opacity-40"
+                  className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs disabled:opacity-40"
                 >
                   Siguiente
                 </button>
@@ -614,7 +614,7 @@ export default function CompanyActivityDetailPage() {
           message={
             <>
               ¿Cerrar todas las sesiones activas de{' '}
-              <span className="font-medium text-stone-900">{confirmTarget.userName}</span>? Deberá
+              <span className="font-medium text-neutral-900">{confirmTarget.userName}</span>? Deberá
               iniciar sesión de nuevo en todos sus dispositivos.
             </>
           }
@@ -632,9 +632,9 @@ export default function CompanyActivityDetailPage() {
           title="Cerrar todas las sesiones de la empresa"
           message={
             <>
-              ¿Cerrar <span className="font-medium text-stone-900">todas</span> las sesiones
+              ¿Cerrar <span className="font-medium text-neutral-900">todas</span> las sesiones
               activas de{' '}
-              <span className="font-medium text-stone-900">{company?.name ?? 'esta empresa'}</span>
+              <span className="font-medium text-neutral-900">{company?.name ?? 'esta empresa'}</span>
               ? Todos los usuarios deberán iniciar sesión de nuevo.
             </>
           }
@@ -652,9 +652,9 @@ export default function CompanyActivityDetailPage() {
 
 function SummaryTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-stone-200 bg-white p-4">
-      <div className="text-xs text-stone-500">{label}</div>
-      <div className="mt-1 text-lg font-semibold text-stone-900">{value}</div>
+    <div className="rounded-lg border border-neutral-200 bg-white p-4">
+      <div className="text-xs text-neutral-500">{label}</div>
+      <div className="mt-1 text-lg font-semibold text-neutral-900">{value}</div>
     </div>
   );
 }

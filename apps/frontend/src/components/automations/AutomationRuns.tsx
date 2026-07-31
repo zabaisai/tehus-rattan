@@ -24,12 +24,12 @@ const ESTADOS: Record<
   },
   RUNNING: {
     etiqueta: 'En curso',
-    clase: 'text-stone-700 bg-stone-100',
+    clase: 'text-neutral-700 bg-neutral-100',
     icono: <Clock size={13} />,
   },
   PENDING: {
     etiqueta: 'Pendiente',
-    clase: 'text-stone-600 bg-stone-100',
+    clase: 'text-neutral-600 bg-neutral-100',
     icono: <Clock size={13} />,
   },
 };
@@ -49,14 +49,14 @@ export function AutomationRuns({
 }) {
   if (!ejecuciones.length) {
     return (
-      <p className="px-3 py-6 text-center text-xs text-stone-500">
+      <p className="px-3 py-6 text-center text-xs text-neutral-500">
         Todavía no se ha ejecutado ninguna automatización.
       </p>
     );
   }
 
   return (
-    <ul className="divide-y divide-stone-100">
+    <ul className="divide-y divide-neutral-100">
       {ejecuciones.map((run) => {
         const estado = ESTADOS[run.status];
         const pasos = run.steps ?? [];
@@ -70,20 +70,20 @@ export function AutomationRuns({
                 {estado.icono}
                 {estado.etiqueta}
               </span>
-              <span className="truncate text-xs font-medium text-stone-800">
+              <span className="truncate text-xs font-medium text-neutral-800">
                 {run.automation.name}
               </span>
               {/* La versión importa: la automatización pudo cambiar después,
                   y sin esto el historial no explicaría el resultado. */}
-              <span className="text-[10px] text-stone-400">
+              <span className="text-[10px] text-neutral-400">
                 v{run.automationVersion}
               </span>
               {run.attempts > 1 && (
-                <span className="text-[10px] text-stone-500">
+                <span className="text-[10px] text-neutral-500">
                   {run.attempts} intentos
                 </span>
               )}
-              <span className="ml-auto text-[10px] text-stone-400">
+              <span className="ml-auto text-[10px] text-neutral-400">
                 {new Date(run.createdAt).toLocaleString('es-CO')}
               </span>
             </div>
@@ -93,7 +93,7 @@ export function AutomationRuns({
                 {pasos.map((paso, i) => (
                   <li
                     key={i}
-                    className="flex items-center gap-1.5 text-[11px] text-stone-600"
+                    className="flex items-center gap-1.5 text-[11px] text-neutral-600"
                   >
                     {paso.ok ? (
                       <CheckCircle2 size={11} className="text-emerald-600" />
@@ -107,7 +107,7 @@ export function AutomationRuns({
                       <span className="text-red-600">({paso.error})</span>
                     )}
                     {paso.durationMs !== undefined && (
-                      <span className="text-stone-400">{paso.durationMs} ms</span>
+                      <span className="text-neutral-400">{paso.durationMs} ms</span>
                     )}
                   </li>
                 ))}

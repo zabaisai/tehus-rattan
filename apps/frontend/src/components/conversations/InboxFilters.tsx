@@ -59,7 +59,7 @@ export function InboxFilters({
   const hayFiltrosExtra = Boolean(filtros.search || filtros.status);
 
   return (
-    <div className="border-b border-stone-200 bg-white">
+    <div className="border-b border-neutral-200 bg-white">
       {/* Las pestanas SE ENVUELVEN, no se desplazan.
           La columna de la bandeja mide 288 px y las cuatro no caben en una
           linea: con `overflow-x-auto` quedaban recortadas y con flechas, es
@@ -74,8 +74,8 @@ export function InboxFilters({
             aria-current={activa === p.clave ? 'true' : undefined}
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
               activa === p.clave
-                ? 'bg-stone-100 text-stone-900'
-                : 'text-stone-500 hover:bg-stone-50'
+                ? 'bg-neutral-100 text-neutral-900'
+                : 'text-neutral-500 hover:bg-neutral-50'
             }`}
           >
             {p.etiqueta}
@@ -84,7 +84,7 @@ export function InboxFilters({
                 className={`rounded-full px-1.5 text-[10px] ${
                   p.clave === 'sinleer'
                     ? 'bg-secondary-500 text-brand-primary'
-                    : 'bg-stone-200 text-stone-600'
+                    : 'bg-neutral-200 text-neutral-600'
                 }`}
               >
                 {p.total}
@@ -98,14 +98,14 @@ export function InboxFilters({
         <div className="relative min-w-0 flex-1">
           <Search
             size={13}
-            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-stone-400"
+            className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400"
           />
           <input
             value={filtros.search ?? ''}
             onChange={(e) => onChange({ ...filtros, search: e.target.value })}
             placeholder="Buscar por nombre o teléfono"
             aria-label="Buscar conversaciones"
-            className="w-full rounded-md border border-stone-300 py-1.5 pl-7 pr-2 text-xs text-stone-900 outline-none focus:border-stone-500"
+            className="w-full rounded-md border border-neutral-300 py-1.5 pl-7 pr-2 text-xs text-neutral-900 outline-none focus:border-neutral-500"
           />
         </div>
 
@@ -115,7 +115,7 @@ export function InboxFilters({
             onChange({ ...filtros, status: e.target.value || undefined })
           }
           aria-label="Estado"
-          className="rounded-md border border-stone-300 px-2 py-1.5 text-xs text-stone-900 outline-none focus:border-stone-500"
+          className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs text-neutral-900 outline-none focus:border-neutral-500"
         >
           {ESTADOS.map((e) => (
             <option key={e.valor} value={e.valor}>
@@ -129,7 +129,7 @@ export function InboxFilters({
             onClick={() =>
               onChange({ ...filtros, search: undefined, status: undefined })
             }
-            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-stone-500 hover:bg-stone-100"
+            className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
           >
             <X size={12} />
             Limpiar

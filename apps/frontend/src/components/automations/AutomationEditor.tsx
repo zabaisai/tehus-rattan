@@ -125,7 +125,7 @@ export function AutomationEditor({
       <div>
         <label
           htmlFor="automatizacion-nombre"
-          className="mb-1 block text-xs font-medium text-stone-700"
+          className="mb-1 block text-xs font-medium text-neutral-700"
         >
           Nombre
         </label>
@@ -134,14 +134,14 @@ export function AutomationEditor({
           value={borrador.name}
           onChange={(e) => actualizar({ name: e.target.value })}
           placeholder="Saludo de bienvenida"
-          className="w-full rounded-md border border-stone-300 px-2.5 py-1.5 text-sm outline-none focus:border-stone-500"
+          className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm outline-none focus:border-neutral-500"
         />
       </div>
 
       <div>
         <label
           htmlFor="automatizacion-disparador"
-          className="mb-1 block text-xs font-medium text-stone-700"
+          className="mb-1 block text-xs font-medium text-neutral-700"
         >
           Cuándo se ejecuta
         </label>
@@ -158,7 +158,7 @@ export function AutomationEditor({
                 e.target.value === 'keyword' ? borrador.conditions : null,
             })
           }
-          className="w-full rounded-md border border-stone-300 px-2.5 py-1.5 text-sm outline-none focus:border-stone-500"
+          className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm outline-none focus:border-neutral-500"
         >
           {DISPARADORES.map((d) => (
             <option key={d.valor} value={d.valor}>
@@ -167,7 +167,7 @@ export function AutomationEditor({
           ))}
         </select>
         {disparador && (
-          <p className="mt-1 text-xs text-stone-500">{disparador.ayuda}</p>
+          <p className="mt-1 text-xs text-neutral-500">{disparador.ayuda}</p>
         )}
       </div>
 
@@ -175,7 +175,7 @@ export function AutomationEditor({
         <div>
           <label
             htmlFor="automatizacion-palabras"
-            className="mb-1 block text-xs font-medium text-stone-700"
+            className="mb-1 block text-xs font-medium text-neutral-700"
           >
             Palabras que la disparan
           </label>
@@ -194,9 +194,9 @@ export function AutomationEditor({
               });
             }}
             placeholder="precio, cotización, cuánto vale"
-            className="w-full rounded-md border border-stone-300 px-2.5 py-1.5 text-sm outline-none focus:border-stone-500"
+            className="w-full rounded-md border border-neutral-300 px-2.5 py-1.5 text-sm outline-none focus:border-neutral-500"
           />
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-neutral-500">
             Separadas por comas. Basta con que aparezca una.
           </p>
         </div>
@@ -204,7 +204,7 @@ export function AutomationEditor({
 
       <div>
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-medium text-stone-700">
+          <span className="text-xs font-medium text-neutral-700">
             Qué hace, en orden
           </span>
           <button
@@ -214,7 +214,7 @@ export function AutomationEditor({
                 actions: [...borrador.actions, { type: 'send_message' }],
               })
             }
-            className="flex items-center gap-1 rounded-md border border-stone-300 px-2 py-1 text-xs text-stone-700 hover:bg-stone-50"
+            className="flex items-center gap-1 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
           >
             <Plus size={12} />
             Añadir acción
@@ -222,7 +222,7 @@ export function AutomationEditor({
         </div>
 
         {borrador.actions.length === 0 && (
-          <p className="rounded-md border border-dashed border-stone-300 px-3 py-4 text-center text-xs text-stone-500">
+          <p className="rounded-md border border-dashed border-neutral-300 px-3 py-4 text-center text-xs text-neutral-500">
             Sin acciones no hará nada. Añade al menos una.
           </p>
         )}
@@ -231,10 +231,10 @@ export function AutomationEditor({
           {borrador.actions.map((accion, i) => (
             <li
               key={i}
-              className="rounded-md border border-stone-200 bg-stone-50 p-2"
+              className="rounded-md border border-neutral-200 bg-neutral-50 p-2"
             >
               <div className="flex items-center gap-2">
-                <span className="shrink-0 rounded bg-stone-200 px-1.5 py-0.5 text-[10px] font-medium text-stone-600">
+                <span className="shrink-0 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] font-medium text-neutral-600">
                   {i + 1}
                 </span>
                 <select
@@ -251,7 +251,7 @@ export function AutomationEditor({
                     })
                   }
                   aria-label={`Tipo de la acción ${i + 1}`}
-                  className="min-w-0 flex-1 rounded-md border border-stone-300 bg-white px-2 py-1 text-xs outline-none focus:border-stone-500"
+                  className="min-w-0 flex-1 rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs outline-none focus:border-neutral-500"
                 >
                   {ACCIONES.map((a) => (
                     <option key={a.valor} value={a.valor}>
@@ -265,7 +265,7 @@ export function AutomationEditor({
                   onClick={() => moverAccion(i, -1)}
                   disabled={i === 0}
                   aria-label={`Subir la acción ${i + 1}`}
-                  className="rounded p-1 text-stone-500 hover:bg-stone-200 disabled:opacity-30"
+                  className="rounded p-1 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30"
                 >
                   <ArrowUp size={13} />
                 </button>
@@ -274,7 +274,7 @@ export function AutomationEditor({
                   onClick={() => moverAccion(i, 1)}
                   disabled={i === borrador.actions.length - 1}
                   aria-label={`Bajar la acción ${i + 1}`}
-                  className="rounded p-1 text-stone-500 hover:bg-stone-200 disabled:opacity-30"
+                  className="rounded p-1 text-neutral-500 hover:bg-neutral-200 disabled:opacity-30"
                 >
                   <ArrowDown size={13} />
                 </button>
@@ -286,7 +286,7 @@ export function AutomationEditor({
                     })
                   }
                   aria-label={`Quitar la acción ${i + 1}`}
-                  className="rounded p-1 text-stone-500 hover:bg-stone-200"
+                  className="rounded p-1 text-neutral-500 hover:bg-neutral-200"
                 >
                   <Trash2 size={13} />
                 </button>
@@ -299,7 +299,7 @@ export function AutomationEditor({
                   placeholder="Texto que recibirá el cliente"
                   aria-label={`Mensaje de la acción ${i + 1}`}
                   rows={2}
-                  className="mt-2 w-full rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                  className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                 />
               )}
 
@@ -308,7 +308,7 @@ export function AutomationEditor({
                   value={accion.agentId ?? ''}
                   onChange={(e) => cambiarAccion(i, { agentId: e.target.value })}
                   aria-label={`Asesor de la acción ${i + 1}`}
-                  className="mt-2 w-full rounded-md border border-stone-300 bg-white px-2 py-1 text-xs outline-none focus:border-stone-500"
+                  className="mt-2 w-full rounded-md border border-neutral-300 bg-white px-2 py-1 text-xs outline-none focus:border-neutral-500"
                 >
                   <option value="">Elige un asesor…</option>
                   {asesores.map((a) => (
@@ -325,7 +325,7 @@ export function AutomationEditor({
                   onChange={(e) => cambiarAccion(i, { stage: e.target.value })}
                   placeholder="Nombre de la etapa destino"
                   aria-label={`Etapa de la acción ${i + 1}`}
-                  className="mt-2 w-full rounded-md border border-stone-300 px-2 py-1 text-xs outline-none focus:border-stone-500"
+                  className="mt-2 w-full rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-500"
                 />
               )}
             </li>
@@ -351,12 +351,12 @@ export function AutomationEditor({
       )}
 
       <div className="flex items-center justify-between gap-2">
-        <label className="flex items-center gap-1.5 text-xs text-stone-600">
+        <label className="flex items-center gap-1.5 text-xs text-neutral-600">
           <input
             type="checkbox"
             checked={borrador.isActive}
             onChange={(e) => actualizar({ isActive: e.target.checked })}
-            className="accent-stone-800"
+            className="accent-neutral-800"
           />
           Activa
         </label>
@@ -365,7 +365,7 @@ export function AutomationEditor({
           <button
             type="button"
             onClick={onCancelar}
-            className="rounded-md px-3 py-1.5 text-xs text-stone-600 hover:bg-stone-100"
+            className="rounded-md px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-100"
           >
             Cancelar
           </button>

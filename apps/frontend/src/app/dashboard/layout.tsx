@@ -43,14 +43,14 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (isPlatformSuperAdmin && !isOnPlatformRoute) {
     return (
-      <div className="flex h-screen items-center justify-center bg-stone-50">
-        <p className="text-sm text-stone-500">Redirigiendo...</p>
+      <div className="flex h-screen items-center justify-center bg-neutral-50">
+        <p className="text-sm text-neutral-500">Redirigiendo...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-stone-50">
+    <div className="flex h-screen overflow-hidden bg-neutral-50">
       <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setMobileNavOpen(true)} />

@@ -83,12 +83,12 @@ export function ChangeCompanyStatusModal({
 
   return (
     <Modal title={copy.title} onClose={onClose} maxWidth="sm">
-        <p className="mb-4 text-sm text-stone-600">
+        <p className="mb-4 text-sm text-neutral-600">
           {copy.message(companyName)}
         </p>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-stone-600">
+          <label className="mb-1 block text-xs font-medium text-neutral-600">
             Motivo (opcional)
           </label>
           <textarea
@@ -97,9 +97,9 @@ export function ChangeCompanyStatusModal({
             maxLength={500}
             rows={3}
             placeholder="Ej: falta de pago reportada"
-            className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
-          <p className="mt-1 text-xs text-stone-400">
+          <p className="mt-1 text-xs text-neutral-400">
             Queda registrado en la auditoría de la plataforma. Máximo 500
             caracteres.
           </p>
@@ -111,7 +111,7 @@ export function ChangeCompanyStatusModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
           >
             Cancelar
           </button>

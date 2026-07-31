@@ -73,10 +73,10 @@ export default function AutomationsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-stone-900">
+          <h2 className="text-xl font-semibold text-neutral-900">
             Automatizaciones
           </h2>
-          <p className="text-sm text-stone-500">
+          <p className="text-sm text-neutral-500">
             Reglas que se ejecutan solas cuando entra un mensaje.
           </p>
         </div>
@@ -92,8 +92,8 @@ export default function AutomationsPage() {
       </div>
 
       {enEdicion && (
-        <div className="rounded-lg border border-stone-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-semibold text-stone-900">
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-semibold text-neutral-900">
             {editando ? `Editar: ${editando.name}` : 'Nueva automatización'}
           </h3>
           <AutomationEditor
@@ -108,15 +108,15 @@ export default function AutomationsPage() {
         </div>
       )}
 
-      {isLoading && <p className="text-sm text-stone-500">Cargando…</p>}
+      {isLoading && <p className="text-sm text-neutral-500">Cargando…</p>}
 
       {!isLoading && !automatizaciones?.length && !enEdicion && (
-        <div className="rounded-lg border border-dashed border-stone-300 px-4 py-10 text-center">
-          <Zap size={20} className="mx-auto mb-2 text-stone-400" />
-          <p className="text-sm font-medium text-stone-700">
+        <div className="rounded-lg border border-dashed border-neutral-300 px-4 py-10 text-center">
+          <Zap size={20} className="mx-auto mb-2 text-neutral-400" />
+          <p className="text-sm font-medium text-neutral-700">
             Todavía no hay automatizaciones
           </p>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 text-xs text-neutral-500">
             Una regla típica: saludar automáticamente a quien escribe por
             primera vez.
           </p>
@@ -124,24 +124,24 @@ export default function AutomationsPage() {
       )}
 
       {!!automatizaciones?.length && (
-        <ul className="divide-y divide-stone-100 rounded-lg border border-stone-200 bg-white">
+        <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
           {automatizaciones.map((a) => (
             <li key={a.id} className="flex flex-wrap items-center gap-2 p-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium text-stone-900">
+                  <span className="truncate text-sm font-medium text-neutral-900">
                     {a.name}
                   </span>
-                  <span className="shrink-0 text-[10px] text-stone-400">
+                  <span className="shrink-0 text-[10px] text-neutral-400">
                     v{a.version}
                   </span>
                   {!a.isActive && (
-                    <span className="shrink-0 rounded bg-stone-200 px-1.5 py-0.5 text-[10px] text-stone-600">
+                    <span className="shrink-0 rounded bg-neutral-200 px-1.5 py-0.5 text-[10px] text-neutral-600">
                       Pausada
                     </span>
                   )}
                 </div>
-                <p className="truncate text-xs text-stone-500">
+                <p className="truncate text-xs text-neutral-500">
                   {DISPARADORES.find((d) => d.valor === a.trigger)?.etiqueta ??
                     a.trigger}
                   {' · '}
@@ -152,7 +152,7 @@ export default function AutomationsPage() {
 
               <button
                 onClick={() => void alternarActiva(a)}
-                className="rounded-md border border-stone-300 px-2 py-1 text-xs text-stone-700 hover:bg-stone-50"
+                className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
               >
                 {a.isActive ? 'Pausar' : 'Activar'}
               </button>
@@ -162,14 +162,14 @@ export default function AutomationsPage() {
                   setEditando(a);
                 }}
                 aria-label={`Editar ${a.name}`}
-                className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100"
+                className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100"
               >
                 <Pencil size={14} />
               </button>
               <button
                 onClick={() => void eliminar(a)}
                 aria-label={`Eliminar ${a.name}`}
-                className="rounded-md p-1.5 text-stone-500 hover:bg-stone-100"
+                className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100"
               >
                 <Trash2 size={14} />
               </button>
@@ -178,12 +178,12 @@ export default function AutomationsPage() {
         </ul>
       )}
 
-      <div className="rounded-lg border border-stone-200 bg-white">
-        <div className="border-b border-stone-200 px-3 py-2">
-          <h3 className="text-sm font-semibold text-stone-900">
+      <div className="rounded-lg border border-neutral-200 bg-white">
+        <div className="border-b border-neutral-200 px-3 py-2">
+          <h3 className="text-sm font-semibold text-neutral-900">
             Últimas ejecuciones
           </h3>
-          <p className="text-xs text-stone-500">
+          <p className="text-xs text-neutral-500">
             Qué hizo cada regla y dónde falló, si falló.
           </p>
         </div>

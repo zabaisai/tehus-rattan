@@ -27,12 +27,12 @@ export default function PipelinePage() {
   const [pipelineElegido, setPipelineElegido] = useState<string | null>(null);
 
   if (isLoading) {
-    return <p className="text-sm text-stone-500">Cargando...</p>;
+    return <p className="text-sm text-neutral-500">Cargando...</p>;
   }
 
   if (!pipelines || pipelines.length === 0) {
     return (
-      <p className="text-sm text-stone-500">
+      <p className="text-sm text-neutral-500">
         No hay pipelines creados todavía.
       </p>
     );
@@ -51,7 +51,7 @@ export default function PipelinePage() {
     <div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-semibold text-stone-900">{activo.name}</h2>
+          <h2 className="text-xl font-semibold text-neutral-900">{activo.name}</h2>
           <PipelineSelector
             pipelines={pipelines}
             value={activo.id}

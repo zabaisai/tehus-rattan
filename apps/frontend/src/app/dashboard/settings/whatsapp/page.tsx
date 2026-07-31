@@ -9,14 +9,14 @@ export default function WhatsAppSettingsPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-stone-900">WhatsApp</h2>
-      <p className="mt-1 text-sm text-stone-500">
+      <h2 className="text-xl font-semibold text-neutral-900">WhatsApp</h2>
+      <p className="mt-1 text-sm text-neutral-500">
         Conecta y administra WhatsApp Business para tu empresa.
       </p>
 
       {!canManage ? (
-        <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-          <p className="text-sm text-stone-600">
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <p className="text-sm text-neutral-600">
             No tienes permiso para administrar WhatsApp.
           </p>
         </div>

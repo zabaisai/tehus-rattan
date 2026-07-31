@@ -102,13 +102,13 @@ export default function ProductsPage() {
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-stone-900">Catálogo</h2>
-          <p className="text-xs text-stone-500">{catalogSubtitle}</p>
+          <h2 className="text-xl font-semibold text-neutral-900">Catálogo</h2>
+          <p className="text-xs text-neutral-500">{catalogSubtitle}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setImportModalOpen(true)}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-700 hover:bg-stone-100 sm:flex-none"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 sm:flex-none"
           >
             <FileSpreadsheet size={16} />
             Importar Excel
@@ -125,20 +125,20 @@ export default function ProductsPage() {
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
         <div className="relative w-full flex-1 sm:max-w-xs">
-          <Search size={15} className="absolute left-2.5 top-2.5 text-stone-400" />
+          <Search size={15} className="absolute left-2.5 top-2.5 text-neutral-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar productos"
-            className="w-full rounded-md border border-stone-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+            className="w-full rounded-md border border-neutral-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
         </div>
 
         <select
           value={category}
           onChange={(e) => setCategory(e.target.value)}
-          className="w-full rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-auto"
+          className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 sm:w-auto"
         >
           <option value="">Todas las categorías</option>
           {PRODUCT_CATEGORIES.map((c) => (
@@ -150,7 +150,7 @@ export default function ProductsPage() {
       </div>
 
       {isLoading && (
-        <p className="py-10 text-center text-sm text-stone-400">Cargando catálogo...</p>
+        <p className="py-10 text-center text-sm text-neutral-400">Cargando catálogo...</p>
       )}
 
       {!isLoading && filtered.length === 0 && (
@@ -162,9 +162,9 @@ export default function ProductsPage() {
           {filtered.map((product) => (
             <div
               key={product.id}
-              className="flex flex-col overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm"
+              className="flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
             >
-              <div className="flex h-36 items-center justify-center bg-stone-50">
+              <div className="flex h-36 items-center justify-center bg-neutral-50">
                 {product.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -173,15 +173,15 @@ export default function ProductsPage() {
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <Package size={32} strokeWidth={1.5} className="text-stone-300" />
+                  <Package size={32} strokeWidth={1.5} className="text-neutral-300" />
                 )}
               </div>
 
               <div className="flex flex-1 flex-col gap-1.5 p-4">
                 <div className="flex items-start justify-between gap-2">
-                  <h3 className="text-sm font-semibold text-stone-900">{product.name}</h3>
+                  <h3 className="text-sm font-semibold text-neutral-900">{product.name}</h3>
                   {!product.isActive && (
-                    <span className="shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-500">
+                    <span className="shrink-0 rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500">
                       Inactivo
                     </span>
                   )}
@@ -194,23 +194,23 @@ export default function ProductsPage() {
                 )}
 
                 {product.description && (
-                  <p className="line-clamp-2 text-xs text-stone-500">{product.description}</p>
+                  <p className="line-clamp-2 text-xs text-neutral-500">{product.description}</p>
                 )}
 
-                <p className="mt-1 text-base font-semibold text-stone-900">
+                <p className="mt-1 text-base font-semibold text-neutral-900">
                   {currencyFormatter.format(product.price)}
                 </p>
 
                 <div className="mt-auto flex justify-end gap-1 pt-2">
                   <button
                     onClick={() => openEditModal(product)}
-                    className="rounded p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                    className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
                   >
                     <Pencil size={14} />
                   </button>
                   <button
                     onClick={() => handleDeactivate(product.id)}
-                    className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
                   >
                     <Trash2 size={14} />
                   </button>

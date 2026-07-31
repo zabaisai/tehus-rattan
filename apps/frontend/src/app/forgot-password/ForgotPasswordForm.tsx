@@ -26,29 +26,29 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-stone-50 px-4">
+    <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-stone-900">
+          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
             Recuperar contraseña
           </h1>
-          <p className="mt-1 text-sm text-stone-500">
+          <p className="mt-1 text-sm text-neutral-500">
             Te enviaremos un enlace para restablecerla.
           </p>
         </div>
 
         {sent ? (
-          <div className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm">
+          <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
             <p
               role="status"
               aria-live="polite"
-              className="text-sm leading-relaxed text-stone-700"
+              className="text-sm leading-relaxed text-neutral-700"
             >
               {GENERIC_MESSAGE}
             </p>
             <Link
               href="/login"
-              className="mt-6 inline-block text-sm text-stone-500 transition-colors hover:text-stone-700"
+              className="mt-6 inline-block text-sm text-neutral-500 transition-colors hover:text-neutral-700"
             >
               Volver a iniciar sesión
             </Link>
@@ -56,12 +56,12 @@ export function ForgotPasswordForm() {
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="rounded-lg border border-stone-200 bg-white p-6 shadow-sm"
+            className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm"
           >
             <div className="mb-5">
               <label
                 htmlFor="email"
-                className="mb-1.5 block text-sm font-medium text-stone-700"
+                className="mb-1.5 block text-sm font-medium text-neutral-700"
               >
                 Correo
               </label>
@@ -71,7 +71,7 @@ export function ForgotPasswordForm() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm text-stone-900 outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 placeholder="tu@correo.com"
               />
             </div>
@@ -86,7 +86,7 @@ export function ForgotPasswordForm() {
 
             <Link
               href="/login"
-              className="mt-4 block text-center text-sm text-stone-500 transition-colors hover:text-stone-700"
+              className="mt-4 block text-center text-sm text-neutral-500 transition-colors hover:text-neutral-700"
             >
               Volver a iniciar sesión
             </Link>

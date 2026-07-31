@@ -92,7 +92,7 @@ export function DocumentCalculator() {
               className={`rounded-md px-3 py-2 text-sm font-medium transition-colors ${
                 templateType === type
                   ? 'bg-brand-primary text-white'
-                  : 'border border-stone-300 text-stone-700 hover:bg-stone-100'
+                  : 'border border-neutral-300 text-neutral-700 hover:bg-neutral-100'
               }`}
             >
               {DOCUMENT_TEMPLATE_LABELS[type]}

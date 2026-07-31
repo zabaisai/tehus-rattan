@@ -52,7 +52,7 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
     <Modal title={contact ? "Editar contacto" : "Nuevo contacto"} onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Teléfono
             </label>
             <input
@@ -62,12 +62,12 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+573001234567"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 disabled:bg-stone-100 disabled:text-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100 disabled:text-neutral-500"
             />
           </div>
 
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Nombre
             </label>
             <input
@@ -75,12 +75,12 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nombre del contacto"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
           <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium text-stone-600">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
               Correo
             </label>
             <input
@@ -88,7 +88,7 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="correo@ejemplo.com"
-              className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
 
@@ -98,7 +98,7 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
             >
               Cancelar
             </button>

@@ -18,7 +18,7 @@ export function MessageThread({ messages }: { messages: Message[] }) {
   return (
     <div className="flex-1 overflow-y-auto p-4">
       {messages.length === 0 && (
-        <p className="text-center text-sm text-stone-400">No hay mensajes todavía.</p>
+        <p className="text-center text-sm text-neutral-400">No hay mensajes todavía.</p>
       )}
 
       <div className="flex flex-col gap-2">
@@ -36,7 +36,7 @@ export function MessageThread({ messages }: { messages: Message[] }) {
                     ? 'border border-red-300 bg-red-50 text-red-700'
                     : isOutbound
                       ? 'bg-brand-primary text-white'
-                      : 'bg-white text-stone-800 border border-stone-200'
+                      : 'bg-white text-neutral-800 border border-neutral-200'
                 }`}
               >
                 <p className="whitespace-pre-wrap">{msg.body}</p>
@@ -45,8 +45,8 @@ export function MessageThread({ messages }: { messages: Message[] }) {
                     isFailed
                       ? 'font-medium text-red-600'
                       : isOutbound
-                        ? 'text-stone-300'
-                        : 'text-stone-400'
+                        ? 'text-neutral-300'
+                        : 'text-neutral-400'
                   }`}
                 >
                   {isFailed ? 'Error al enviar' : formatTime(msg.createdAt)}

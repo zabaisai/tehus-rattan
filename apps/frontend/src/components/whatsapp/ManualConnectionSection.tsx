@@ -18,26 +18,26 @@ export function ManualConnectionSection({ onChanged }: { onChanged: () => void }
   });
 
   return (
-    <div className="rounded-lg border border-stone-200 bg-white">
+    <div className="rounded-lg border border-neutral-200 bg-white">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-stone-700"
+        className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-medium text-neutral-700"
       >
         {open ? (
-          <ChevronDown className="h-4 w-4 text-stone-400" aria-hidden />
+          <ChevronDown className="h-4 w-4 text-neutral-400" aria-hidden />
         ) : (
-          <ChevronRight className="h-4 w-4 text-stone-400" aria-hidden />
+          <ChevronRight className="h-4 w-4 text-neutral-400" aria-hidden />
         )}
         Conexión manual (avanzada)
-        <span className="ml-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-500">
+        <span className="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-500">
           Solo super administrador
         </span>
       </button>
 
       {open && (
-        <div className="border-t border-stone-100 px-4 py-4">
+        <div className="border-t border-neutral-100 px-4 py-4">
           <div className="mb-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>

@@ -30,7 +30,7 @@ export function PipelineSelector({
         aria-label="Pipeline"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-stone-300 bg-white px-2.5 py-1.5 text-sm text-stone-900 outline-none focus:border-stone-500"
+        className="rounded-md border border-neutral-300 bg-white px-2.5 py-1.5 text-sm text-neutral-900 outline-none focus:border-neutral-500"
       >
         {pipelines.map((p) => (
           <option key={p.id} value={p.id}>

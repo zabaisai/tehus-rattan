@@ -46,10 +46,15 @@
   --color-secondary-900: #6b2900;
   --color-secondary-950: #3d1700;
 
-  /* Neutrales de marca. Conviven con la escala `stone` heredada mientras
-     dura la migración de pantallas: son ligeramente azulados, que es lo
-     que hace que el gris del producto pertenezca a la misma familia que
-     el navy en vez de parecer una plantilla ajena. */
+  /* Neutrales de marca: ligeramente azulados, que es lo que hace que el gris
+     del producto pertenezca a la misma familia que el navy en vez de parecer
+     una plantilla ajena.
+
+     Reemplazan por completo a la escala `stone` de Tailwind, que fue el puente
+     durante la migración: mientras existió, `stone-*` apuntaba a estos mismos
+     valores, así que renombrar los 1407 usos a `neutral-*` y retirar el puente
+     no cambió un solo píxel. Se comprobó comparando el conjunto de colores del
+     CSS compilado antes y después. */
   --color-neutral-0: #ffffff;
   --color-neutral-50: #f7f8fa;
   --color-neutral-100: #eff1f5;
@@ -62,27 +67,6 @@
   --color-neutral-800: #272c38;
   --color-neutral-900: #171b24;
   --color-neutral-950: #0d1017;
-
-  /* PUENTE: la escala `stone` heredada apunta a los neutrales de marca.
-     El producto usa `stone-*` en 929 sitios repartidos por 76 ficheros.
-     Reescribirlos a mano seria un barrido enorme, propenso a erratas y
-     dificil de revisar; redefinir la escala aqui rebautiza toda la interfaz
-     de una vez, sin tocar un solo componente y con vuelta atras inmediata.
-
-     Es deliberadamente un puente, no el destino: las pantallas nuevas deben
-     usar `neutral-*`. Cuando no quede ningun `stone-*`, este bloque se borra
-     y no cambia nada, porque los valores ya son los mismos. */
-  --color-stone-50: #f7f8fa;
-  --color-stone-100: #eff1f5;
-  --color-stone-200: #e2e5ec;
-  --color-stone-300: #cbd0db;
-  --color-stone-400: #9aa1b2;
-  --color-stone-500: #6e7688;
-  --color-stone-600: #525a6b;
-  --color-stone-700: #3b4252;
-  --color-stone-800: #272c38;
-  --color-stone-900: #171b24;
-  --color-stone-950: #0d1017;
 
   /* Semánticos */
   --color-surface-default: #ffffff;

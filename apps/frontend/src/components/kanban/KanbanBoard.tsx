@@ -93,7 +93,7 @@ export function KanbanBoard({
   }
 
   if (isLoading) {
-    return <p className="text-sm text-stone-500">Cargando pipeline...</p>;
+    return <p className="text-sm text-neutral-500">Cargando pipeline...</p>;
   }
 
   if (isError || !data) {

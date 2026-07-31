@@ -10,7 +10,7 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
 };
 
 export const QUOTE_STATUS_COLORS: Record<QuoteStatus, string> = {
-  DRAFT: 'bg-stone-100 text-stone-600',
+  DRAFT: 'bg-neutral-100 text-neutral-600',
   SENT: 'bg-blue-50 text-blue-700',
   ACCEPTED: 'bg-green-50 text-green-700',
   REJECTED: 'bg-red-50 text-red-700',

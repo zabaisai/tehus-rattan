@@ -11,7 +11,7 @@ export function DocumentTermsAndConditions({ terms }: DocumentTermsAndConditions
   if (!text) return null;
 
   return (
-    <p className="mb-3 whitespace-pre-line border border-stone-400 p-1.5 text-[7px] leading-tight text-stone-700">
+    <p className="mb-3 whitespace-pre-line border border-neutral-400 p-1.5 text-[7px] leading-tight text-neutral-700">
       {text}
     </p>
   );

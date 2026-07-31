@@ -26,13 +26,13 @@ export function DocumentSignatureBlock({
 }: DocumentSignatureBlockProps) {
   if (variant === 'single') {
     return (
-      <div className="mb-3 border border-stone-800">
-        <div className="border-b border-stone-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
+      <div className="mb-3 border border-neutral-800">
+        <div className="border-b border-neutral-800 bg-white px-2 py-1 text-xs font-bold uppercase tracking-wide">
           Firma y nombre de recibido
         </div>
         <div className="flex">
-          <div className="flex flex-1 items-center border-r border-stone-800">
-            <span className="w-16 shrink-0 border-r border-stone-800 px-2 py-1 text-xs font-medium">
+          <div className="flex flex-1 items-center border-r border-neutral-800">
+            <span className="w-16 shrink-0 border-r border-neutral-800 px-2 py-1 text-xs font-medium">
               Nombre
             </span>
             <input
@@ -42,7 +42,7 @@ export function DocumentSignatureBlock({
             />
           </div>
           <div className="flex flex-1 items-center">
-            <span className="w-16 shrink-0 border-r border-stone-800 px-2 py-1 text-xs font-medium">
+            <span className="w-16 shrink-0 border-r border-neutral-800 px-2 py-1 text-xs font-medium">
               Firma
             </span>
             <div className="h-8 flex-1" />
@@ -55,13 +55,13 @@ export function DocumentSignatureBlock({
   return (
     <div className="mb-3 flex gap-6">
       <div className="flex-1 text-center">
-        <div className="h-10 border-b border-stone-800" />
+        <div className="h-10 border-b border-neutral-800" />
         <p className="mt-1 text-xs font-bold uppercase tracking-wide">
           Firma {companyName || 'empresa'}
         </p>
       </div>
       <div className="flex-1 text-center">
-        <div className="h-10 border-b border-stone-800" />
+        <div className="h-10 border-b border-neutral-800" />
         <p className="mt-1 text-xs font-bold uppercase tracking-wide">Firma cliente</p>
       </div>
     </div>

@@ -73,8 +73,8 @@ function QuotesPageContent() {
   return (
     <div>
       <div className="mb-5">
-        <h2 className="text-xl font-semibold text-stone-900">Cotizaciones</h2>
-        <p className="text-xs text-stone-500">
+        <h2 className="text-xl font-semibold text-neutral-900">Cotizaciones</h2>
+        <p className="text-xs text-neutral-500">
           Nueva cotización desde lead: abre un lead con productos asociados y usa
           &quot;Crear cotización&quot;.
         </p>
@@ -85,7 +85,7 @@ function QuotesPageContent() {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           aria-label="Filtrar por estado"
-          className="rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         >
           <option value="">Todos los estados</option>
           {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
@@ -103,13 +103,13 @@ function QuotesPageContent() {
           // El marcador de posicion desaparece al escribir: quien usa lector
           // de pantalla se queda sin saber que campo es en cuanto empieza.
           aria-label="Filtrar por ID de oportunidad"
-          className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
+          className="rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
         />
       </div>
 
       {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
 
-      {isLoading && <p className="py-10 text-center text-sm text-stone-400">Cargando...</p>}
+      {isLoading && <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>}
 
       {!isLoading && (quotes?.length ?? 0) === 0 && (
         <EmptyState icon={FileText} message="No hay cotizaciones todavía." />
@@ -128,12 +128,12 @@ function QuotesPageContent() {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') setSelectedQuoteId(quote.id);
                 }}
-                className="cursor-pointer rounded-lg border border-stone-200 bg-white p-3"
+                className="cursor-pointer rounded-lg border border-neutral-200 bg-white p-3"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-stone-900">{quote.number}</p>
-                    <p className="truncate text-xs text-stone-500">{quote.lead.title}</p>
+                    <p className="text-sm font-medium text-neutral-900">{quote.number}</p>
+                    <p className="truncate text-xs text-neutral-500">{quote.lead.title}</p>
                   </div>
                   <span
                     className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${QUOTE_STATUS_COLORS[quote.status]}`}
@@ -142,19 +142,19 @@ function QuotesPageContent() {
                   </span>
                 </div>
                 <div className="mt-2 flex items-center justify-between">
-                  <p className="text-sm font-semibold text-stone-900">
+                  <p className="text-sm font-semibold text-neutral-900">
                     {moneyFormatter.format(quote.total)}
                   </p>
-                  <p className="text-xs text-stone-400">{formatDate(quote.createdAt)}</p>
+                  <p className="text-xs text-neutral-400">{formatDate(quote.createdAt)}</p>
                 </div>
-                <div className="mt-2 flex justify-end gap-1 border-t border-stone-100 pt-2">
+                <div className="mt-2 flex justify-end gap-1 border-t border-neutral-100 pt-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       void abrirQuotePdf(quote.id, quote.number);
                     }}
                     aria-label="Descargar el PDF de la cotización"
-                    className="rounded p-2 text-stone-400 hover:bg-amber-50 hover:text-amber-700"
+                    className="rounded p-2 text-neutral-400 hover:bg-amber-50 hover:text-amber-700"
                   >
                     <Printer size={16} />
                   </button>
@@ -164,7 +164,7 @@ function QuotesPageContent() {
                       handleDelete(quote.id);
                     }}
                     aria-label="Eliminar cotización"
-                    className="rounded p-2 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -174,9 +174,9 @@ function QuotesPageContent() {
           </div>
 
           {/* Escritorio/tablet: tabla tradicional */}
-          <div className="hidden overflow-x-auto rounded-lg border border-stone-200 bg-white sm:block">
+          <div className="hidden overflow-x-auto rounded-lg border border-neutral-200 bg-white sm:block">
           <table className="w-full text-left text-sm">
-            <thead className="bg-stone-50 text-xs text-stone-500">
+            <thead className="bg-neutral-50 text-xs text-neutral-500">
               <tr>
                 <th className="px-3 py-2 font-medium">Número</th>
                 <th className="px-3 py-2 font-medium">Lead</th>
@@ -193,10 +193,10 @@ function QuotesPageContent() {
                 <tr
                   key={quote.id}
                   onClick={() => setSelectedQuoteId(quote.id)}
-                  className="cursor-pointer border-t border-stone-100 hover:bg-stone-50"
+                  className="cursor-pointer border-t border-neutral-100 hover:bg-neutral-50"
                 >
-                  <td className="px-3 py-2 font-medium text-stone-800">{quote.number}</td>
-                  <td className="px-3 py-2 text-stone-600">{quote.lead.title}</td>
+                  <td className="px-3 py-2 font-medium text-neutral-800">{quote.number}</td>
+                  <td className="px-3 py-2 text-neutral-600">{quote.lead.title}</td>
                   <td className="px-3 py-2">
                     <span
                       className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${QUOTE_STATUS_COLORS[quote.status]}`}
@@ -204,16 +204,16 @@ function QuotesPageContent() {
                       {QUOTE_STATUS_LABELS[quote.status]}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-stone-600">
+                  <td className="px-3 py-2 text-neutral-600">
                     {moneyFormatter.format(quote.subtotal)}
                   </td>
-                  <td className="px-3 py-2 text-stone-600">
+                  <td className="px-3 py-2 text-neutral-600">
                     {moneyFormatter.format(quote.discount)}
                   </td>
-                  <td className="px-3 py-2 font-medium text-stone-900">
+                  <td className="px-3 py-2 font-medium text-neutral-900">
                     {moneyFormatter.format(quote.total)}
                   </td>
-                  <td className="px-3 py-2 text-stone-500">{formatDate(quote.createdAt)}</td>
+                  <td className="px-3 py-2 text-neutral-500">{formatDate(quote.createdAt)}</td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex justify-end gap-1">
                       <button
@@ -222,7 +222,7 @@ function QuotesPageContent() {
                           void abrirQuotePdf(quote.id, quote.number);
                         }}
                         title="Ver documento imprimible"
-                        className="rounded p-1.5 text-stone-400 hover:bg-amber-50 hover:text-amber-700"
+                        className="rounded p-1.5 text-neutral-400 hover:bg-amber-50 hover:text-amber-700"
                       >
                         <Printer size={14} />
                       </button>
@@ -232,7 +232,7 @@ function QuotesPageContent() {
                           handleDelete(quote.id);
                         }}
                         title="Eliminar"
-                        className="rounded p-1.5 text-stone-400 hover:bg-red-50 hover:text-red-600"
+                        className="rounded p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
                       >
                         <Trash2 size={14} />
                       </button>
@@ -259,7 +259,7 @@ function QuotesPageContent() {
 
 export default function QuotesPage() {
   return (
-    <Suspense fallback={<p className="py-10 text-center text-sm text-stone-400">Cargando...</p>}>
+    <Suspense fallback={<p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>}>
       <QuotesPageContent />
     </Suspense>
   );

@@ -72,15 +72,15 @@ export default function NotificationPreferencesPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-semibold text-stone-900">Notificaciones</h2>
-      <p className="mt-1 text-sm text-stone-500">
+      <h2 className="text-xl font-semibold text-neutral-900">Notificaciones</h2>
+      <p className="mt-1 text-sm text-neutral-500">
         Elige cómo quieres recibir cada tipo de alerta. El correo solo está
         disponible para categorías importantes.
       </p>
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-stone-200 bg-white">
+      <div className="mt-6 overflow-hidden rounded-lg border border-neutral-200 bg-white">
         {isLoading ? (
-          <p className="px-4 py-10 text-center text-sm text-stone-400">Cargando…</p>
+          <p className="px-4 py-10 text-center text-sm text-neutral-400">Cargando…</p>
         ) : isError ? (
           <p className="px-4 py-10 text-center text-sm text-red-600">
             No se pudieron cargar las preferencias.
@@ -88,7 +88,7 @@ export default function NotificationPreferencesPage() {
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-stone-100 text-left text-xs text-stone-500">
+              <tr className="border-b border-neutral-100 text-left text-xs text-neutral-500">
                 <th className="px-4 py-2 font-medium">Categoría</th>
                 <th className="px-4 py-2 text-center font-medium">En la app</th>
                 <th className="px-4 py-2 text-center font-medium">Correo</th>
@@ -96,8 +96,8 @@ export default function NotificationPreferencesPage() {
             </thead>
             <tbody>
               {prefs.map((p) => (
-                <tr key={p.category} className="border-b border-stone-50">
-                  <td className="px-4 py-2.5 text-stone-800">
+                <tr key={p.category} className="border-b border-neutral-50">
+                  <td className="px-4 py-2.5 text-neutral-800">
                     {CATEGORY_LABELS[p.category]}
                   </td>
                   <td className="px-4 py-2.5 text-center">
@@ -106,7 +106,7 @@ export default function NotificationPreferencesPage() {
                       aria-label={`En la app: ${CATEGORY_LABELS[p.category]}`}
                       checked={valueOf(p.category, 'inAppEnabled')}
                       onChange={(e) => toggle(p.category, 'inAppEnabled', e.target.checked)}
-                      className="h-4 w-4 accent-stone-900"
+                      className="h-4 w-4 accent-neutral-900"
                     />
                   </td>
                   <td className="px-4 py-2.5 text-center">
@@ -116,10 +116,10 @@ export default function NotificationPreferencesPage() {
                         aria-label={`Correo: ${CATEGORY_LABELS[p.category]}`}
                         checked={valueOf(p.category, 'emailEnabled')}
                         onChange={(e) => toggle(p.category, 'emailEnabled', e.target.checked)}
-                        className="h-4 w-4 accent-stone-900"
+                        className="h-4 w-4 accent-neutral-900"
                       />
                     ) : (
-                      <span className="text-xs text-stone-300">—</span>
+                      <span className="text-xs text-neutral-300">—</span>
                     )}
                   </td>
                 </tr>

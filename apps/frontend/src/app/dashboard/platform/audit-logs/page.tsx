@@ -73,15 +73,15 @@ function truncate(value: string | null, max = 36) {
 
 function MetadataView({ metadata }: { metadata: Record<string, unknown> | null }) {
   if (!metadata || Object.keys(metadata).length === 0) {
-    return <span className="text-stone-400">-</span>;
+    return <span className="text-neutral-400">-</span>;
   }
 
   return (
     <ul className="space-y-0.5 text-xs">
       {Object.entries(metadata).map(([key, value]) => (
         <li key={key} className="whitespace-nowrap">
-          <span className="text-stone-400">{metadataLabels[key] ?? key}:</span>{' '}
-          <span className="text-stone-700">{String(value ?? '-')}</span>
+          <span className="text-neutral-400">{metadataLabels[key] ?? key}:</span>{' '}
+          <span className="text-neutral-700">{String(value ?? '-')}</span>
         </li>
       ))}
     </ul>
@@ -92,14 +92,14 @@ function ActorCell({ log }: { log: PlatformAuditLog }) {
   if (log.actor) {
     return (
       <div>
-        <p className="text-stone-800">{log.actor.name}</p>
-        <p className="text-xs text-stone-500">{log.actor.email}</p>
+        <p className="text-neutral-800">{log.actor.name}</p>
+        <p className="text-xs text-neutral-500">{log.actor.email}</p>
       </div>
     );
   }
   // The actor's User row can be gone (e.g. deleted later) — the log still
   // keeps the role it was performed under, per the audit model's design.
-  return <span className="text-stone-400">{log.actorRole} (usuario eliminado)</span>;
+  return <span className="text-neutral-400">{log.actorRole} (usuario eliminado)</span>;
 }
 
 export default function PlatformAuditLogsPage() {
@@ -129,9 +129,9 @@ export default function PlatformAuditLogsPage() {
   if (!isPlatformSuperAdmin) {
     return (
       <div>
-        <h2 className="text-xl font-semibold text-stone-900">Auditoría</h2>
-        <div className="mt-6 rounded-lg border border-stone-200 bg-white p-4">
-          <p className="text-sm text-stone-600">
+        <h2 className="text-xl font-semibold text-neutral-900">Auditoría</h2>
+        <div className="mt-6 rounded-lg border border-neutral-200 bg-white p-4">
+          <p className="text-sm text-neutral-600">
             No tienes permiso para acceder a esta sección.
           </p>
         </div>
@@ -142,8 +142,8 @@ export default function PlatformAuditLogsPage() {
   return (
     <div>
       <div className="mb-5">
-        <h2 className="text-xl font-semibold text-stone-900">Auditoría</h2>
-        <p className="mt-1 text-sm text-stone-500">
+        <h2 className="text-xl font-semibold text-neutral-900">Auditoría</h2>
+        <p className="mt-1 text-sm text-neutral-500">
           Revisa las acciones sensibles realizadas en la plataforma.
         </p>
       </div>
@@ -152,7 +152,7 @@ export default function PlatformAuditLogsPage() {
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-auto"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 sm:w-auto"
         >
           {actionFilterOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -166,7 +166,7 @@ export default function PlatformAuditLogsPage() {
           value={affectedCompanyId}
           onChange={(e) => setAffectedCompanyId(e.target.value)}
           placeholder="ID de empresa afectada"
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-56"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 sm:w-56"
         />
 
         <input
@@ -174,14 +174,14 @@ export default function PlatformAuditLogsPage() {
           value={actorUserId}
           onChange={(e) => setActorUserId(e.target.value)}
           placeholder="ID del actor"
-          className="w-full rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500 sm:w-56"
+          className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 sm:w-56"
         />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-stone-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-neutral-200 bg-white">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-stone-200 bg-stone-50 text-left text-xs text-stone-500">
+            <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
               <th className="whitespace-nowrap px-4 py-2.5 font-medium">Fecha</th>
               <th className="whitespace-nowrap px-4 py-2.5 font-medium">Acción</th>
               <th className="whitespace-nowrap px-4 py-2.5 font-medium">Actor</th>
@@ -196,7 +196,7 @@ export default function PlatformAuditLogsPage() {
           <tbody>
             {isLoading && (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-stone-400">
+                <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
                   Cargando...
                 </td>
               </tr>
@@ -212,38 +212,38 @@ export default function PlatformAuditLogsPage() {
 
             {!isLoading && !isError && (logs?.length ?? 0) === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-stone-400">
+                <td colSpan={9} className="px-4 py-6 text-center text-neutral-400">
                   No hay registros de auditoría.
                 </td>
               </tr>
             )}
 
             {logs?.map((log) => (
-              <tr key={log.id} className="border-b border-stone-100 align-top last:border-0">
-                <td className="whitespace-nowrap px-4 py-2.5 text-stone-600">
+              <tr key={log.id} className="border-b border-neutral-100 align-top last:border-0">
+                <td className="whitespace-nowrap px-4 py-2.5 text-neutral-600">
                   {formatDate(log.createdAt)}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-stone-800">
+                <td className="whitespace-nowrap px-4 py-2.5 text-neutral-800">
                   {humanizeAction(log.action)}
                 </td>
                 <td className="px-4 py-2.5">
                   <ActorCell log={log} />
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {log.affectedCompany?.name ?? '-'}
                 </td>
-                <td className="px-4 py-2.5 text-stone-600">
+                <td className="px-4 py-2.5 text-neutral-600">
                   {log.entityType}
                   {log.entityId ? ` #${log.entityId}` : ''}
                 </td>
-                <td className="max-w-[16rem] px-4 py-2.5 text-stone-600">
+                <td className="max-w-[16rem] px-4 py-2.5 text-neutral-600">
                   {log.reason || '-'}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-stone-600">
+                <td className="whitespace-nowrap px-4 py-2.5 text-neutral-600">
                   {log.ipAddress || '-'}
                 </td>
                 <td
-                  className="whitespace-nowrap px-4 py-2.5 text-stone-600"
+                  className="whitespace-nowrap px-4 py-2.5 text-neutral-600"
                   title={log.userAgent ?? undefined}
                 >
                   {truncate(log.userAgent)}
