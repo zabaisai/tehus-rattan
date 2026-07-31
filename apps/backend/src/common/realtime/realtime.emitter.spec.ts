@@ -75,7 +75,10 @@ describe('RealtimeEmitter', () => {
       // superficie de exposición.
       emitter.messageCreated(EMPRESA_A, 'conv-1', {
         ...mensaje,
-        ...({ content: 'texto confidencial', from: '+573001112233' } as never),
+        ...({ content: 'texto confidencial', from: '+573001112233' } as Record<
+          string,
+          unknown
+        >),
       });
 
       const enviado = JSON.stringify(emit.mock.calls);

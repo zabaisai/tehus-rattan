@@ -164,6 +164,29 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         processMessage: jest.fn().mockResolvedValue(undefined),
       };
 
+      // Los diez argumentos van nombrados y en orden. Antes faltaban dos y
+      // los mocks quedaban DESPLAZADOS: la cola aterrizaba en la posicion de
+      // las notificaciones y el outbox en la de la cola. Las pruebas seguian
+      // pasando porque no llegaban a esos caminos, que es justo lo que hace
+      // peligroso este tipo de desajuste.
+      const notificationsMock = {
+        emit: jest.fn().mockResolvedValue(undefined),
+        emitToCompanyRoles: jest.fn().mockResolvedValue(undefined),
+      } as never;
+      const inboundQueueMock = {
+        enqueueInboundMessage: jest.fn().mockResolvedValue(false),
+        isEnabled: jest.fn().mockReturnValue(false),
+      } as never;
+      const outboxMock = {
+        record: jest.fn().mockResolvedValue(true),
+        markCompletedByKey: jest.fn().mockResolvedValue(undefined),
+      } as never;
+      const leadIntakeMock = {
+        ensureLeadForConversation: jest
+          .fn()
+          .mockResolvedValue({ leadId: null, creado: false, assignedTo: null }),
+      } as never;
+
       webhookService = new WebhookService(
         prisma,
         conversationsService,
@@ -171,16 +194,10 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         contactsService,
         automationsService,
         whatsappIntegrationService,
-        // La cola y el outbox no participan en el aislamiento: se simulan para
-        // que el webhook persista y registre el evento sin efectos reales.
-        {
-          enqueueInboundMessage: jest.fn().mockResolvedValue(false),
-          isEnabled: jest.fn().mockReturnValue(false),
-        } as never,
-        {
-          record: jest.fn().mockResolvedValue(true),
-          markCompletedByKey: jest.fn().mockResolvedValue(undefined),
-        } as never,
+        notificationsMock,
+        inboundQueueMock,
+        outboxMock,
+        leadIntakeMock,
       );
     });
 

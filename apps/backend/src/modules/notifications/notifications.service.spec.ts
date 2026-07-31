@@ -26,7 +26,15 @@ function build() {
   const mail = {
     sendNotificationEmail: jest.fn().mockResolvedValue(undefined),
   } as any;
-  const service = new NotificationsService(prisma, mail);
+  const service = new NotificationsService(prisma, mail, {
+    messageCreated: jest.fn(),
+    messageStatusChanged: jest.fn(),
+    leadUpdated: jest.fn(),
+    taskUpdated: jest.fn(),
+    notificationCreated: jest.fn(),
+    toCompany: jest.fn(),
+    toUser: jest.fn(),
+  } as never);
   return { service, prisma, mail };
 }
 

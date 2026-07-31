@@ -248,7 +248,7 @@ describe('Tiempo real (e2e, sockets reales, dos empresas)', () => {
         direction: 'INBOUND',
         type: 'text',
         createdAt: new Date(),
-        ...({ body: 'contenido privado' } as never),
+        ...({ body: 'contenido privado' } as Record<string, unknown>),
       });
       await esperar();
 
