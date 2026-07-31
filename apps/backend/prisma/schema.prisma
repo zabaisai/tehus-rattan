@@ -45,9 +45,9 @@ model Company {
   // `businessHours` queda nullable a propósito: "sin horario definido" es un
   // estado distinto de "horario vacío", y las reglas de asignación deben
   // poder distinguirlos.
-  timezone      String  @default("America/Bogota")
-  currency      String  @default("COP")
-  locale        String  @default("es-CO")
+  timezone      String @default("America/Bogota")
+  currency      String @default("COP")
+  locale        String @default("es-CO")
   businessHours Json?
 
   users                User[]
@@ -60,7 +60,7 @@ model Company {
   notes                Note[]
   products             Product[]
   quotes               Quote[]
-  whatsappIntegration  WhatsAppIntegration?
+  whatsappIntegrations WhatsAppIntegration[]
   whatsappSignupStates WhatsAppEmbeddedSignupState[]
   notifications        Notification[]
   notificationPrefs    NotificationPreference[]
@@ -338,9 +338,9 @@ model Lead {
   stageHistory  LeadStageHistory[]
   tasks         Task[]
   conversations Conversation[]
-  notes        Note[]
-  leadProducts LeadProduct[]
-  quotes       Quote[]
+  notes         Note[]
+  leadProducts  LeadProduct[]
+  quotes        Quote[]
 
   @@index([companyId, status])
   @@index([pipelineId, stageId])
@@ -596,12 +596,13 @@ model WhatsAppIntegration {
   // Orden de presentacion en los selectores.
   order Int @default(0)
 
-  // NOTA DE TRANSICION: `companyId` sigue siendo @unique en esta migracion.
-  // Se retira en una migracion POSTERIOR y separada, una vez que todo el
-  // codigo lea colecciones de integraciones y resuelva la principal. Hacer
-  // ambas cosas a la vez dejaria una ventana en la que el envio podria elegir
-  // el numero equivocado.
-  companyId String  @unique
+  // `companyId` YA NO es unico: una empresa puede conectar varios numeros.
+  // Lo que sigue garantizado en base:
+  //   - `phoneNumberId` unico GLOBAL: un numero pertenece a una sola empresa,
+  //     que es lo que hace inequivoco el enrutamiento del webhook.
+  //   - `whatsapp_one_primary_per_company` (indice parcial en el SQL de la
+  //     migracion): una sola integracion principal por empresa.
+  companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
   @@index([companyId, isPrimary])

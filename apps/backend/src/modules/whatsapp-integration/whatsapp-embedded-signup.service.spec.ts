@@ -41,7 +41,11 @@ function build(overrides: any = {}) {
   };
   const prisma = {
     whatsAppIntegration: {
+      // findUnique sigue siendo correcto para el guard cross-tenant: se
+      // consulta por phoneNumberId, que sigue siendo UNICO global.
       findUnique: jest.fn().mockResolvedValue(null),
+      // findFirst resuelve la integracion PRINCIPAL de la empresa (1:N).
+      findFirst: jest.fn().mockResolvedValue(null),
       updateMany: jest.fn().mockResolvedValue({ count: 1 }),
     },
     $transaction: jest.fn(async (cb: any) => cb(tx)),
@@ -257,6 +261,9 @@ describe('WhatsAppEmbeddedSignupService', () => {
 
     it('rejects with 409 when the phoneNumberId already belongs to another company', async () => {
       const { service, prisma } = build();
+      // El guard cross-tenant consulta por phoneNumberId (unico global), asi
+      // que sigue siendo findUnique. Es justamente lo que impide que un numero
+      // se conecte a dos empresas aunque una empresa pueda tener varios.
       prisma.whatsAppIntegration.findUnique.mockResolvedValue({
         companyId: 'company-b',
       });
@@ -368,7 +375,7 @@ describe('WhatsAppEmbeddedSignupService', () => {
   describe('getConnectionStatus', () => {
     it('returns a masked, token-free snapshot when connected', async () => {
       const { service, prisma } = build();
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         status: 'CONNECTED',
         connectionMethod: 'EMBEDDED_SIGNUP',
         displayPhoneNumber: '+57 300 555 4521',
@@ -390,7 +397,7 @@ describe('WhatsAppEmbeddedSignupService', () => {
 
     it('flags actionRequired + errorCode when the integration is in ERROR', async () => {
       const { service, prisma } = build();
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue({
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue({
         status: 'ERROR',
         connectionMethod: 'COEXISTENCE',
         displayPhoneNumber: '+57 300 555 4521',
@@ -408,7 +415,7 @@ describe('WhatsAppEmbeddedSignupService', () => {
 
     it('is CONNECTING when no integration exists yet but a state is active', async () => {
       const { service, prisma, stateService } = build();
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue(null);
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
       stateService.hasActiveState.mockResolvedValue(true);
       expect((await service.getConnectionStatus('company-a')).status).toBe(
         'CONNECTING',
@@ -417,7 +424,7 @@ describe('WhatsAppEmbeddedSignupService', () => {
 
     it('is NOT_CONNECTED when there is no integration and no active state', async () => {
       const { service, prisma, stateService } = build();
-      prisma.whatsAppIntegration.findUnique.mockResolvedValue(null);
+      prisma.whatsAppIntegration.findFirst.mockResolvedValue(null);
       stateService.hasActiveState.mockResolvedValue(false);
       expect((await service.getConnectionStatus('company-a')).status).toBe(
         'NOT_CONNECTED',
