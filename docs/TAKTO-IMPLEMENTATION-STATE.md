@@ -381,8 +381,9 @@ revisaron y no se duplicaron.
 | `20260731161636_add_auto_assignment_fields` | ✅ | ✅ | ❌ **no aplicada** | aditiva pura (3 columnas con default + 1 índice) | `DROP COLUMN` / `DROP INDEX` |
 
 > **Importante para quien reanude:** staging sigue con **21** migraciones y en
-> el release `58dfb76`. La 22ª existe solo en la rama y en la base local. No
-> se despliega hasta cerrar un lote coherente del bloque 2.
+> el release `58dfb76`. De la 22ª a la 31ª existen solo en la rama y en la
+> base local. No se despliegan hasta que los bloques funcionales y el branding
+> estén completos.
 
 ## Commits
 
@@ -561,8 +562,8 @@ antes de fallar la respuesta.
 
 **Recordatorios de seguridad vigentes**
 
-- **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 30
-  migraciones. **Nada desplegado, nada fusionado a main.**
+- **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por
+  **31** migraciones. **Nada desplegado, nada fusionado a main.**
 - No desplegar ni fusionar mientras las capacidades funcionales (bloques 7–10)
   y el branding sigan incompletos.
 - **No retirar `Conversation.stage` todavía**: el dual-write sigue vigente
