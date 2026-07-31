@@ -9,6 +9,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { maskPhone } from '../../common/logging/redact';
 import { InboundQueueService } from '../../common/queue/inbound-queue.service';
 import { LeadIntakeService } from '../leads/lead-intake.service';
+import { ChatbotService } from '../chatbot/chatbot.service';
 import {
   OutboxService,
   OUTBOX_TYPES,
@@ -29,6 +30,7 @@ export class WebhookService {
     private inboundQueue: InboundQueueService,
     private outbox: OutboxService,
     private leadIntake: LeadIntakeService,
+    private chatbot: ChatbotService,
   ) {}
 
   // Walks the whole Meta payload — every entry, every change, every message —
@@ -364,6 +366,42 @@ export class WebhookService {
     // El id del mensaje viaja como llave de idempotencia: si el job se
     // reintenta, las automatizaciones NO se vuelven a ejecutar y el cliente no
     // recibe el mismo WhatsApp dos veces.
+    // EL CHATBOT VA PRIMERO, Y SI RESPONDE LAS AUTOMATIZACIONES SE SALTAN.
+    //
+    // Es la estrategia unica frente al doble efecto, y vive aqui, en un solo
+    // sitio. Sin ella el cliente recibiria DOS mensajes por cada uno que
+    // envia -el del bot y el de la automatizacion- que es exactamente lo que
+    // hace que la gente deje de contestar. El bot ya respeta la pausa de la
+    // conversacion, asi que un asesor que toma el control silencia a ambos.
+    // El servicio ya captura sus propios fallos, pero se envuelve igual: si
+    // algun dia deja de hacerlo, un bot roto no puede impedir que el mensaje
+    // se procese. Mismo criterio que la entrada al tablero: preferimos una
+    // conversacion sin respuesta automatica a un mensaje sin procesar.
+    const respuestaBot = await this.chatbot
+      .handleInbound({ companyId, conversationId, contactPhone, text })
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `El chatbot fallo al atender el mensaje [${
+            error instanceof Error ? error.name : 'Error'
+          }]`,
+        );
+        return { atendido: false as const, motivo: 'error' as const };
+      });
+
+    if (respuestaBot.atendido) {
+      // Tambien se salta el aviso al asesor, y es deliberado: mientras el bot
+      // conversa, un "nuevo mensaje" por cada intercambio seria ruido puro. En
+      // el momento en que el bot entrega la conversacion, el asesor recibe SU
+      // aviso -CONVERSATION_ASSIGNED- desde el propio chatbot.
+      //
+      // La oportunidad ya se creo mas arriba: entrar al tablero no depende de
+      // quien conteste.
+      this.logger.log(
+        `Mensaje atendido por el chatbot (${respuestaBot.motivo})`,
+      );
+      return;
+    }
+
     await this.automationsService.processMessage(
       companyId,
       conversationId,

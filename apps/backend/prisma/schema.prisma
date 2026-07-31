@@ -80,6 +80,8 @@ model Company {
   auditLogs            AuditLog[]                    @relation("AuditLogAffectedCompany")
   supportSessions      SupportSession[]
   automationRuns       AutomationRun[]
+  chatbotFlows         ChatbotFlow[]
+  chatbotSessions      ChatbotSession[]
   invitationCodesUsed  InvitationCode[]
   userSessions         UserSession[]
   loginEvents          LoginEvent[]
@@ -194,6 +196,7 @@ model Conversation {
   notes    Note[]
   tasks    Task[]
   reads    ConversationRead[]
+  chatbotSessions ChatbotSession[]
 
   @@index([companyId, status, lastMessageAt])
   @@index([companyId, assignedTo])
@@ -1258,4 +1261,121 @@ model ConversationRead {
   @@id([conversationId, userId])
   @@index([userId, lastReadAt])
   @@map("conversation_reads")
+}
+
+// ─────────────────────────────────────────────
+// CHATBOT
+// ─────────────────────────────────────────────
+
+enum ChatbotFlowStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// Un flujo de chatbot.
+///
+/// BORRADOR Y PUBLICADO SON DOS COSAS DISTINTAS a proposito: el flujo se edita
+/// mientras hay clientes conversando con la version anterior. Sin esa
+/// separacion, guardar a media edicion dejaria a la gente a mitad de un flujo
+/// que ya no existe.
+model ChatbotFlow {
+  id       String            @id @default(cuid())
+  name     String
+  status   ChatbotFlowStatus @default(DRAFT)
+  isActive Boolean           @default(false)
+
+  /// Definicion EN EDICION. Nunca es la que atiende a nadie.
+  draftNodes Json
+
+  /// Version publicada vigente. `null` = nunca se ha publicado.
+  publishedVersion Int?
+
+  /// Palabras que lo inician. Vacio = se inicia con cualquier primer mensaje.
+  triggerKeywords String[] @default([])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  versions ChatbotFlowVersion[]
+  sessions ChatbotSession[]
+
+  @@index([companyId, isActive])
+  @@map("chatbot_flows")
+}
+
+/// Foto inmutable de un flujo publicado.
+///
+/// Las sesiones apuntan a la VERSION, no al flujo: quien empezo a conversar
+/// con la version 3 la termina con la version 3 aunque se publique la 4 a
+/// mitad. Cambiarle el flujo bajo los pies a alguien que esta respondiendo
+/// preguntas es la forma mas rapida de dejarlo en un nodo que ya no existe.
+model ChatbotFlowVersion {
+  id      String @id @default(cuid())
+  version Int
+  nodes   Json
+
+  publishedBy String?
+  publishedAt DateTime @default(now())
+
+  flowId String
+  flow   ChatbotFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  sessions ChatbotSession[]
+
+  @@unique([flowId, version])
+  @@map("chatbot_flow_versions")
+}
+
+enum ChatbotSessionStatus {
+  ACTIVE
+  /// Paso a manos de una persona. Terminal: el bot no la retoma solo.
+  HANDED_OVER
+  COMPLETED
+  /// Sin respuesta del cliente durante demasiado tiempo.
+  ABANDONED
+}
+
+/// Estado de una conversacion dentro de un flujo.
+///
+/// UNA POR CONVERSACION ACTIVA. El indice parcial que lo garantiza vive en el
+/// SQL de la migracion: Prisma no sabe expresar indices parciales, y sin el,
+/// dos mensajes simultaneos abririan dos sesiones y el cliente veria el flujo
+/// duplicado.
+model ChatbotSession {
+  id String @id @default(cuid())
+
+  status      ChatbotSessionStatus @default(ACTIVE)
+  currentNode String
+
+  /// Respuestas recogidas hasta ahora. Es lo que permite que un flujo
+  /// pregunte el nombre en el paso 1 y lo use en el paso 4.
+  context Json?
+
+  /// Cuantos mensajes lleva. Corta bucles: un flujo mal construido que se
+  /// apunte a si mismo dejaria de responder en vez de escribir sin parar al
+  /// cliente.
+  steps Int @default(0)
+
+  startedAt        DateTime  @default(now())
+  lastInteractionAt DateTime @default(now())
+  endedAt          DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  flowId String
+  flow   ChatbotFlow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  flowVersionId String
+  flowVersion   ChatbotFlowVersion @relation(fields: [flowVersionId], references: [id])
+
+  @@index([conversationId, status])
+  @@index([companyId, status, lastInteractionAt])
+  @@map("chatbot_sessions")
 }

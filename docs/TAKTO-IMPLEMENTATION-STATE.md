@@ -279,7 +279,24 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       **la prueba encontró un fallo real**: el campo de palabras clave se
       comía las comas, así que era imposible configurar más de una · 17
       pruebas
-- [ ] Chatbot (motor + constructor visual)
+- [x] **Chatbot v1: motor durable** — flujos con **borrador y publicado
+      separados** (se edita mientras hay gente conversando con la versión
+      anterior), versiones inmutables y sesiones atadas a la **versión**, no
+      al flujo: cambiarle el flujo bajo los pies a quien está respondiendo lo
+      deja en un nodo que ya no existe. Índice parcial `WHERE status =
+      'ACTIVE'` para una sola sesión por conversación —sin él, dos mensajes
+      simultáneos duplican el saludo—. Entrega a humano que **pausa** la
+      conversación para que el bot no se reenganche, y que **no depende de la
+      asignación**: si el asesor elegido ya no existe, la entrega se completa
+      igual y el cliente no queda atrapado con el bot. Tope de 30 pasos que
+      corta bucles entregando a una persona, no enmudeciendo ·
+      2 migraciones · 22 unit + 23 e2e reales
+- [x] **Estrategia única frente al doble efecto** — el chatbot va primero y,
+      si responde, las automatizaciones se saltan. Sin esa regla el cliente
+      recibe DOS mensajes por cada uno que envía. También se salta el aviso de
+      «nuevo mensaje» mientras el bot conversa; al entregar, el asesor recibe
+      el suyo · 5 pruebas
+- [ ] Chatbot: constructor visual
 - [ ] Notificaciones (productores completos)
 - [ ] WhatsApp: salud, medios, plantillas, estados
 - [ ] Cotizaciones + PDF real
@@ -516,6 +533,7 @@ revisaron y no se duplicaron.
 | 2026-07-31 | **CI** `e4d8c8a` (motor durable) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras constructor visual | **200 frontend verdes / 33 suites** |
 | 2026-07-31 | **CI** `efbcebe` | ❌ **failure** — E2E: `roles-guard` no arrancaba |
+| 2026-07-31 | tras chatbot v1 (motor) | **1133 unit / 347 e2e verdes** |
 | 2026-07-31 | tras recuperación | **1106 unit / 324 e2e / 200 frontend verdes**, typecheck sin errores propios, lint y build limpios |
 | 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras historial de automatizaciones | **1106 unit / 324 e2e verdes** |

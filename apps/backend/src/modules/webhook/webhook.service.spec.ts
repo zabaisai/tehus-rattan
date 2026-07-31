@@ -7,6 +7,7 @@ describe('WebhookService', () => {
   let inboundQueue: any;
   let outbox: any;
   let leadIntake: any;
+  let chatbot: any;
   let contactsService: any;
   let automationsService: any;
   let whatsappIntegrationService: any;
@@ -84,6 +85,13 @@ describe('WebhookService', () => {
         assignedTo: null,
       }),
     };
+    // Por defecto el bot NO atiende: la mayoria de estas pruebas cubren el
+    // camino sin chatbot. Las que lo necesitan lo activan explicitamente.
+    chatbot = {
+      handleInbound: jest
+        .fn()
+        .mockResolvedValue({ atendido: false, motivo: 'sin-flujo' }),
+    };
     service = new WebhookService(
       prisma,
       conversationsService,
@@ -95,6 +103,7 @@ describe('WebhookService', () => {
       inboundQueue,
       outbox,
       leadIntake,
+      chatbot,
     );
   });
 
@@ -721,6 +730,88 @@ describe('WebhookService', () => {
       );
 
       expect(leadIntake.ensureLeadForConversation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('chatbot y automatizaciones: una sola estrategia', () => {
+    beforeEach(() => {
+      prisma.conversation.findFirst.mockResolvedValue({
+        contactId: 'contact-a',
+        contact: { name: 'Ana' },
+      });
+    });
+
+    it('si el chatbot atiende, las automatizaciones NO corren', async () => {
+      // Sin esta regla el cliente recibiria DOS mensajes por cada uno que
+      // envia: el del bot y el de la automatizacion. Es lo que hace que la
+      // gente deje de contestar.
+      chatbot.handleInbound.mockResolvedValue({
+        atendido: true,
+        motivo: 'respondido',
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-1',
+      );
+
+      expect(automationsService.processMessage).not.toHaveBeenCalled();
+    });
+
+    it('si el chatbot atiende, tampoco se avisa al asesor de cada intercambio', async () => {
+      // Un "nuevo mensaje" por cada turno del bot seria ruido puro. Cuando el
+      // bot entrega la conversacion, el asesor recibe SU aviso desde el bot.
+      chatbot.handleInbound.mockResolvedValue({
+        atendido: true,
+        motivo: 'respondido',
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-1',
+      );
+
+      expect(notifications.emit).not.toHaveBeenCalled();
+    });
+
+    it('la oportunidad se crea AUNQUE conteste el bot', async () => {
+      // Entrar al tablero no depende de quien conteste.
+      chatbot.handleInbound.mockResolvedValue({
+        atendido: true,
+        motivo: 'respondido',
+      });
+
+      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+
+      expect(leadIntake.ensureLeadForConversation).toHaveBeenCalled();
+    });
+
+    it('si el chatbot NO atiende, las automatizaciones corren como siempre', async () => {
+      chatbot.handleInbound.mockResolvedValue({
+        atendido: false,
+        motivo: 'sin-flujo',
+      });
+
+      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+
+      expect(automationsService.processMessage).toHaveBeenCalled();
+    });
+
+    it('un fallo del chatbot no impide el resto del procesamiento', async () => {
+      // Preferimos una conversacion sin respuesta automatica a un mensaje sin
+      // procesar: las automatizaciones y el aviso deben seguir su curso.
+      chatbot.handleInbound.mockRejectedValue(new Error('bot roto'));
+
+      await expect(
+        service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null),
+      ).resolves.toBeUndefined();
+      expect(automationsService.processMessage).toHaveBeenCalled();
     });
   });
 });
