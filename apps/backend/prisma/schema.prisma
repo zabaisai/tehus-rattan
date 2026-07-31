@@ -50,6 +50,13 @@ model Company {
   locale        String @default("es-CO")
   businessHours Json?
 
+  // Asignación automática de conversaciones y oportunidades entrantes.
+  // Activada por defecto: una empresa que estrena el CRM prefiere que el
+  // mensaje llegue a alguien antes que quedarse esperando a que un
+  // administrador descubra que hay una bandeja sin asignar. Se puede apagar y
+  // entonces todo entra sin asesor, a la bandeja común.
+  autoAssignEnabled Boolean @default(true)
+
   users                User[]
   contacts             Contact[]
   conversations        Conversation[]
@@ -84,6 +91,20 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // ── Reparto automático ──────────────────────────────────────
+  // Quién entra en el turno. Separado de `isActive` porque son cosas
+  // distintas: un supervisor puede estar perfectamente activo y aun así no
+  // querer recibir conversaciones nuevas. Desactivarlo NO le quita las que ya
+  // tiene, solo lo saca del reparto.
+  autoAssignEnabled Boolean @default(true)
+
+  // Última vez que este usuario recibió algo por reparto automático. Es lo
+  // que hace el round-robin: siempre le toca a quien lleva más tiempo sin
+  // recibir. Guardarlo en la fila (en vez de un contador en memoria) hace que
+  // el turno sobreviva a reinicios y funcione con varios procesos, que es
+  // justo donde un round-robin ingenuo se rompe y empieza a repetir persona.
+  lastAssignedAt DateTime?
+
   companyId       String?
   company         Company?           @relation(fields: [companyId], references: [id])
   conversations   Conversation[]
@@ -108,6 +129,10 @@ model User {
   notificationsAuthored   Notification[]           @relation("NotificationActor")
   notificationPreferences NotificationPreference[]
 
+  // Elegir a quién le toca es una consulta caliente: ocurre en cada mensaje
+  // entrante de un contacto nuevo. Con este índice sale directa, sin recorrer
+  // los usuarios de la empresa.
+  @@index([companyId, isActive, autoAssignEnabled, lastAssignedAt])
   @@map("users")
 }
 

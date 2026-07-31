@@ -6,6 +6,7 @@ describe('WebhookService', () => {
   let messagesService: any;
   let inboundQueue: any;
   let outbox: any;
+  let leadIntake: any;
   let contactsService: any;
   let automationsService: any;
   let whatsappIntegrationService: any;
@@ -45,7 +46,10 @@ describe('WebhookService', () => {
   });
 
   beforeEach(() => {
-    prisma = { contact: { findFirst: jest.fn() } };
+    prisma = {
+      contact: { findFirst: jest.fn() },
+      conversation: { findFirst: jest.fn().mockResolvedValue(null) },
+    };
     conversationsService = { findOrCreate: jest.fn() };
     messagesService = {
       findByWamid: jest.fn(),
@@ -73,6 +77,11 @@ describe('WebhookService', () => {
       enqueueInboundMessage: jest.fn().mockResolvedValue(false),
       isEnabled: jest.fn().mockReturnValue(false),
     };
+    leadIntake = {
+      ensureLeadForConversation: jest
+        .fn()
+        .mockResolvedValue({ leadId: 'lead-1', creado: true, assignedTo: null }),
+    };
     service = new WebhookService(
       prisma,
       conversationsService,
@@ -83,6 +92,7 @@ describe('WebhookService', () => {
       notifications,
       inboundQueue,
       outbox,
+      leadIntake,
     );
   });
 
@@ -601,6 +611,96 @@ describe('WebhookService', () => {
       await service.processWebhook(buildPayload());
 
       expect(messagesService.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('efectos del entrante: entrada al tablero', () => {
+    beforeEach(() => {
+      prisma.conversation.findFirst.mockResolvedValue({
+        contactId: 'contact-a',
+        contact: { name: 'Ana' },
+      });
+    });
+
+    it('crea la oportunidad ANTES de avisar, para que el aviso tenga destinatario', async () => {
+      // Era el agujero de fondo: WhatsApp funcionaba, el mensaje se guardaba,
+      // y el tablero seguia vacio porque nadie llamaba nunca a lead.create.
+      leadIntake.ensureLeadForConversation.mockResolvedValue({
+        leadId: 'lead-1',
+        creado: true,
+        assignedTo: 'agente-1',
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+573001112233',
+        null,
+      );
+
+      expect(leadIntake.ensureLeadForConversation).toHaveBeenCalledWith(
+        expect.objectContaining({
+          companyId: 'company-a',
+          contactId: 'contact-a',
+          conversationId: 'conv-1',
+        }),
+      );
+      expect(notifications.emit).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'agente-1' }),
+      );
+    });
+
+    it('la conversacion se busca acotada por companyId', async () => {
+      // Aunque el trabajo venga de nuestra propia cola, no se confia en su
+      // contenido para saltarse el aislamiento.
+      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+
+      expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'conv-1', companyId: 'company-a' },
+        }),
+      );
+    });
+
+    it('un asesor ya asignado a mano gana al reparto automatico', async () => {
+      leadIntake.ensureLeadForConversation.mockResolvedValue({
+        leadId: 'lead-1',
+        creado: false,
+        assignedTo: 'agente-del-reparto',
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-que-la-tomo',
+      );
+
+      expect(notifications.emit).toHaveBeenCalledWith(
+        expect.objectContaining({ recipientUserId: 'agente-que-la-tomo' }),
+      );
+    });
+
+    it('si la entrada al tablero falla, las automatizaciones siguen corriendo', async () => {
+      // Preferimos un tablero incompleto a un mensaje sin procesar.
+      leadIntake.ensureLeadForConversation.mockRejectedValue(
+        new Error('base caida'),
+      );
+
+      await expect(
+        service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null),
+      ).resolves.toBeUndefined();
+      expect(automationsService.processMessage).toHaveBeenCalled();
+    });
+
+    it('sin conversacion no intenta crear oportunidad', async () => {
+      prisma.conversation.findFirst.mockResolvedValue(null);
+
+      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+
+      expect(leadIntake.ensureLeadForConversation).not.toHaveBeenCalled();
     });
   });
 });

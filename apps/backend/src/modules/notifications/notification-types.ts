@@ -7,6 +7,7 @@ export const NOTIFICATION_TYPES = [
   'NEW_CONVERSATION',
   'NEW_INBOUND_MESSAGE',
   'CONVERSATION_ASSIGNED',
+  'UNASSIGNED_CONVERSATION',
   'CONTACT_ASSIGNED',
   'LEAD_ASSIGNED',
   'LEAD_STAGE_CHANGED',
@@ -36,6 +37,8 @@ export const NOTIFICATION_TYPE_META: Record<NotificationType, TypeMeta> = {
   NEW_CONVERSATION: { category: 'CONVERSATION', priority: 'NORMAL' },
   NEW_INBOUND_MESSAGE: { category: 'MESSAGE', priority: 'NORMAL' },
   CONVERSATION_ASSIGNED: { category: 'CONVERSATION', priority: 'NORMAL' },
+  // Alta: significa que hay clientes escribiendo y nadie los está viendo.
+  UNASSIGNED_CONVERSATION: { category: 'CONVERSATION', priority: 'HIGH' },
   CONTACT_ASSIGNED: { category: 'CONTACT', priority: 'NORMAL' },
   LEAD_ASSIGNED: { category: 'LEAD', priority: 'NORMAL' },
   LEAD_STAGE_CHANGED: { category: 'LEAD', priority: 'LOW' },

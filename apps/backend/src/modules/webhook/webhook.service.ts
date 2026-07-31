@@ -8,6 +8,7 @@ import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-int
 import { NotificationsService } from '../notifications/notifications.service';
 import { maskPhone } from '../../common/logging/redact';
 import { InboundQueueService } from '../../common/queue/inbound-queue.service';
+import { LeadIntakeService } from '../leads/lead-intake.service';
 import {
   OutboxService,
   OUTBOX_TYPES,
@@ -27,6 +28,7 @@ export class WebhookService {
     private notifications: NotificationsService,
     private inboundQueue: InboundQueueService,
     private outbox: OutboxService,
+    private leadIntake: LeadIntakeService,
   ) {}
 
   // Walks the whole Meta payload — every entry, every change, every message —
@@ -301,11 +303,16 @@ export class WebhookService {
   }
 
   /**
-   * Efectos de un mensaje entrante: automatizaciones y aviso al asesor.
+   * Efectos de un mensaje entrante: oportunidad, automatizaciones y aviso.
    *
    * Publico para que el procesador de la cola lo reutilice: encolado y en
    * linea deben ejecutar EXACTAMENTE lo mismo, o el comportamiento cambiaria
    * segun si Redis esta levantado.
+   *
+   * El ORDEN importa. La oportunidad va primero porque es la que dispara el
+   * reparto: si el asesor se resolviera despues, el aviso saldria sin
+   * destinatario y el mensaje se quedaria sin nadie mirandolo hasta que
+   * alguien entrara a la bandeja comun.
    */
   async runInboundEffects(
     companyId: string,
@@ -314,6 +321,40 @@ export class WebhookService {
     contactPhone: string,
     assignedTo: string | null,
   ): Promise<void> {
+    // Entrada al tablero. Acotada por companyId aunque el trabajo venga de
+    // nuestra propia cola: no se confia en su contenido para saltarse el
+    // aislamiento.
+    const conversacion = await this.prisma.conversation.findFirst({
+      where: { id: conversationId, companyId },
+      select: {
+        contactId: true,
+        contact: { select: { name: true } },
+      },
+    });
+
+    let asignadoPorReparto: string | null = null;
+
+    if (conversacion) {
+      // Best-effort: si la entrada al tablero falla, el mensaje ya esta
+      // guardado y la conversacion se atiende igual. Preferimos un tablero
+      // incompleto a un mensaje perdido.
+      try {
+        const intake = await this.leadIntake.ensureLeadForConversation({
+          companyId,
+          contactId: conversacion.contactId,
+          conversationId,
+          contactName: conversacion.contact?.name,
+        });
+        asignadoPorReparto = intake.assignedTo;
+      } catch (error) {
+        this.logger.warn(
+          `No se pudo crear la oportunidad del mensaje entrante [${
+            error instanceof Error ? error.name : 'Error'
+          }]`,
+        );
+      }
+    }
+
     await this.automationsService.processMessage(
       companyId,
       conversationId,
@@ -325,12 +366,16 @@ export class WebhookService {
     // con una vista previa corta y saneada —nunca el cuerpo completo ni el
     // telefono entero— y deduplicado por conversacion en cubos de 5 minutos
     // para que una rafaga colapse en un solo aviso.
-    if (assignedTo) {
+    // Si la conversacion ya tenia asesor, manda ese: pudo tomarla alguien a
+    // mano y el reparto no debe pisar esa decision.
+    const destinatario = assignedTo ?? asignadoPorReparto;
+
+    if (destinatario) {
       const preview = text.replace(/\s+/g, ' ').trim().slice(0, 60);
       const bucket = Math.floor(Date.now() / 300_000);
       void this.notifications.emit({
         companyId,
-        recipientUserId: assignedTo,
+        recipientUserId: destinatario,
         type: 'NEW_INBOUND_MESSAGE',
         title: 'Nuevo mensaje de WhatsApp',
         bodyPreview: preview || undefined,

@@ -199,7 +199,15 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
 
 ### Bloque 7 — Capacidades funcionales
-- [ ] Conversación → oportunidad → asignación → tarea (flujo completo)
+- [x] **Conversación → oportunidad → asignación** — `LeadIntakeService`:
+      el webhook por fin llega al tablero. Regla de la decisión 2 (reutiliza
+      la abierta; si todas están cerradas, abre nueva), idempotente ante
+      ráfagas mediante `pg_advisory_xact_lock(companyId:contactId)` ·
+      round-robin por `User.lastAssignedAt` (sobrevive a reinicios y a dos
+      procesos) · oportunidad y conversación al MISMO asesor · sin elegibles
+      entra sin asignar y avisa a administradores ·
+      `20260731161636_add_auto_assignment_fields` · 12 unit + 17 e2e reales
+- [ ] Tarea desde la conversación (flujo completo)
 - [ ] Bandeja omnicanal
 - [ ] UI de pipelines y etapas
 - [ ] Oportunidades (vista detallada)
@@ -322,6 +330,8 @@ revisaron y no se duplicaron.
 | `20260730232007_add_message_media_and_delivery_status` | ✅ | ✅ | ❌ **no aplicada** | aditiva + `ALTER TYPE ADD VALUE` | columnas: `DROP`; enum: **no reversible en caliente** |
 | `20260730233500_backfill_contact_phones_to_e164` | ✅ | ✅ | ❌ **no aplicada** | solo datos (UPDATE) | restaurar desde backup si hiciera falta |
 | `20260730234117_add_whatsapp_multi_number_fields` | ✅ | ✅ | ❌ **no aplicada** | aditiva + backfill de principal | `DROP COLUMN` |
+| `20260731152150_add_outbox_events` | ✅ | ✅ | ❌ **no aplicada** | tabla nueva + enum | `DROP TABLE` / `DROP TYPE` |
+| `20260731161636_add_auto_assignment_fields` | ✅ | ✅ | ❌ **no aplicada** | aditiva pura (3 columnas con default + 1 índice) | `DROP COLUMN` / `DROP INDEX` |
 
 > **Importante para quien reanude:** staging sigue con **21** migraciones y en
 > el release `58dfb76`. La 22ª existe solo en la rama y en la base local. No
@@ -332,6 +342,8 @@ revisaron y no se duplicaron.
 | SHA | Descripción |
 |---|---|
 | _(ver `git log origin/main..HEAD`)_ | test(pipeline): caracterización pre-reforma |
+| `1598def` | feat(realtime): canal WebSocket aislado por empresa |
+| `32bbc7c` | style(backend): formato prettier que eslint ya exigía |
 
 ## Pruebas ejecutadas
 
@@ -370,7 +382,9 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras outbox durable | **1000 unit / 233 e2e verdes** |
 | 2026-07-31 | **CI** `f640106` (outbox) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras WebSockets | **1047 unit / 247 e2e verdes** (backend) |
-| 2026-07-31 | frontend tras WebSockets | **138 verdes / 27 suites**, lint y build limpios |
+| 2026-07-31 | frontend tras WebSockets | **130 verdes / 26 suites**, lint y build limpios |
+| 2026-07-31 | **CI** `32bbc7c` (WebSockets) | **success** en ambos jobs, `head_sha` verificado |
+| 2026-07-31 | tras entrada de oportunidades + reparto | **1064 unit / 264 e2e verdes** |
 
 ## Despliegues
 

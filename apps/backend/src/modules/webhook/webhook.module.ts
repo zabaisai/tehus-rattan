@@ -9,6 +9,7 @@ import { ContactsModule } from '../contacts/contacts.module';
 import { AutomationsModule } from '../automations/automations.module';
 import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-integration.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LeadsModule } from '../leads/leads.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
     AutomationsModule,
     WhatsAppIntegrationModule,
     NotificationsModule,
+    LeadsModule,
   ],
   controllers: [WebhookController],
   // InboundProcessor vive aqui y no en QueueModule porque necesita
