@@ -656,6 +656,14 @@ revisaron y no se duplicaron.
 | 2026-07-31 | **CI** `7e24cc0` (bloque 8) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras bloque 9 (seguridad y cumplimiento) | **1238 unit / 388 e2e verdes** |
 | 2026-07-31 | **CI** `655efa8` (bloque 9) | **success**, `head_sha` verificado |
+| 2026-07-31 | eliminación completa + rotación de clave | **CI** `5f6bee2` **success**, `head_sha` verificado |
+| 2026-07-31 | historial de WhatsApp (sync + CSV) | **CI** `e255e8c` **success**, `head_sha` verificado |
+| 2026-07-31 | barrido de `stone` | 1407 usos → `neutral-*`; **mismo conjunto de colores** en el CSS compilado |
+| 2026-07-31 | pantallas que faltaban + auditoría de las existentes | **304 frontend verdes / 45 suites** |
+| 2026-07-31 | varios números de punta a punta | **1268 unit / 457 e2e verdes** |
+| 2026-07-31 | lint del backend a cero y dentro del CI | 31 errores → 0; dos eran de comportamiento |
+| 2026-07-31 | ruta de migración staging → HEAD (20 migraciones) | **verificada con datos, sin pérdidas** |
+| 2026-07-31 | **CI** `f5487c3` (cierre de pendientes) | **success** en ambos jobs, `head_sha` verificado, **incluye el nuevo paso de lint** |
 | 2026-07-31 | QA visual 6 viewports + accesibilidad | 36 capturas, **0 problemas** |
 | 2026-07-31 | ruta de migración staging → HEAD con datos | **verificada, sin pérdidas** |
 | 2026-07-31 | carga (20 concurrentes) | p95 25–50 ms; limitador de tasa comprobado |
