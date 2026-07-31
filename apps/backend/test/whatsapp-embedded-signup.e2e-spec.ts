@@ -142,16 +142,14 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
       configId: () => 'config-id',
       graphVersion: () => 'v25.0',
       exchangeCode: jest.fn().mockResolvedValue('SECRET-TOKEN'),
-      listPhoneNumbers: jest
-        .fn()
-        .mockResolvedValue([
-          {
-            id: PHONE,
-            displayPhoneNumber: '+57 300 555 4521',
-            verifiedName: 'Tehus QA',
-            platformType: 'CLOUD_API',
-          },
-        ]),
+      listPhoneNumbers: jest.fn().mockResolvedValue([
+        {
+          id: PHONE,
+          displayPhoneNumber: '+57 300 555 4521',
+          verifiedName: 'Tehus QA',
+          platformType: 'CLOUD_API',
+        },
+      ]),
       subscribeAppToWaba: jest.fn().mockResolvedValue(undefined),
       sendText: jest.fn().mockResolvedValue(undefined),
     };

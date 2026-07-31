@@ -8,7 +8,14 @@ import * as path from 'path';
 // fails at the source-of-truth level, independent of anything the service
 // layer does or doesn't select.
 describe('UserSession/LoginEvent schema privacy', () => {
-  const schemaPath = path.join(__dirname, '..', '..', '..', 'prisma', 'schema.prisma');
+  const schemaPath = path.join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'prisma',
+    'schema.prisma',
+  );
   const migrationPath = path.join(
     __dirname,
     '..',
@@ -24,7 +31,9 @@ describe('UserSession/LoginEvent schema privacy', () => {
   const migration = fs.readFileSync(migrationPath, 'utf8');
 
   function extractModelBlock(source: string, modelName: string): string {
-    const match = source.match(new RegExp(`model ${modelName} \\{[\\s\\S]*?\\n\\}`));
+    const match = source.match(
+      new RegExp(`model ${modelName} \\{[\\s\\S]*?\\n\\}`),
+    );
     if (!match) throw new Error(`model ${modelName} not found in schema`);
     return match[0];
   }
@@ -48,8 +57,12 @@ describe('UserSession/LoginEvent schema privacy', () => {
   });
 
   it('neither UserSession nor LoginEvent stores a raw userAgent column', () => {
-    expect(extractModelBlock(schema, 'UserSession')).not.toMatch(/\buserAgent\b/);
-    expect(extractModelBlock(schema, 'LoginEvent')).not.toMatch(/\buserAgent\b/);
+    expect(extractModelBlock(schema, 'UserSession')).not.toMatch(
+      /\buserAgent\b/,
+    );
+    expect(extractModelBlock(schema, 'LoginEvent')).not.toMatch(
+      /\buserAgent\b/,
+    );
   });
 
   it('the migration that created these tables never creates an ipAddress or raw deviceId/userAgent column', () => {

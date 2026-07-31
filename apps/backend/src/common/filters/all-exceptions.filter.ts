@@ -30,8 +30,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     // Non-HttpException errors from the Express layer (e.g. body-parser's
     // PayloadTooLargeError) carry their own 4xx status/statusCode — honor it
     // rather than masking a client error as a 500.
-    const rawStatus = (exception as { status?: unknown; statusCode?: unknown })
-      ?.status ?? (exception as { statusCode?: unknown })?.statusCode;
+    const rawStatus =
+      (exception as { status?: unknown; statusCode?: unknown })?.status ??
+      (exception as { statusCode?: unknown })?.statusCode;
     const status = isHttp
       ? exception.getStatus()
       : typeof rawStatus === 'number' && rawStatus >= 400 && rawStatus < 500
@@ -63,7 +64,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     } else if (status < 500) {
       // A non-HttpException client error (e.g. 413 entity.too.large): return
       // only the standard reason phrase, never the raw error message.
-      body = { statusCode: status, message: STATUS_CODES[status] ?? 'Request error' };
+      body = {
+        statusCode: status,
+        message: STATUS_CODES[status] ?? 'Request error',
+      };
     } else {
       body = { statusCode: status, message: 'Internal server error' };
     }

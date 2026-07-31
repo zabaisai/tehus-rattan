@@ -25,7 +25,10 @@ export class AppService {
   // Never returns the raw DB error, versions, or env — only a status.
   async getReadiness(): Promise<{ status: 'ok' }> {
     try {
-      await this.withTimeout(this.prisma.$queryRaw`SELECT 1`, READINESS_TIMEOUT_MS);
+      await this.withTimeout(
+        this.prisma.$queryRaw`SELECT 1`,
+        READINESS_TIMEOUT_MS,
+      );
     } catch {
       throw new ServiceUnavailableException('Service unavailable');
     }

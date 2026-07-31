@@ -21,9 +21,15 @@ describe('validateEnv', () => {
     // Enabled but missing both → clear errors for each.
     expect(() =>
       validateEnv({ ...base, WHATSAPP_WEBHOOK_ENABLED: 'true' }),
-    ).toThrow(/WHATSAPP_APP_SECRET is required when WHATSAPP_WEBHOOK_ENABLED=true/);
+    ).toThrow(
+      /WHATSAPP_APP_SECRET is required when WHATSAPP_WEBHOOK_ENABLED=true/,
+    );
     expect(() =>
-      validateEnv({ ...base, WHATSAPP_WEBHOOK_ENABLED: 'true', WHATSAPP_APP_SECRET: 's' }),
+      validateEnv({
+        ...base,
+        WHATSAPP_WEBHOOK_ENABLED: 'true',
+        WHATSAPP_APP_SECRET: 's',
+      }),
     ).toThrow(/WHATSAPP_VERIFY_TOKEN is required/);
 
     // Enabled and fully configured → ok.
@@ -51,7 +57,11 @@ describe('validateEnv', () => {
 
   it('never echoes a secret value in the error message', () => {
     try {
-      validateEnv({ ...base, WHATSAPP_WEBHOOK_ENABLED: 'true', WHATSAPP_APP_SECRET: 'super-secret-value' });
+      validateEnv({
+        ...base,
+        WHATSAPP_WEBHOOK_ENABLED: 'true',
+        WHATSAPP_APP_SECRET: 'super-secret-value',
+      });
     } catch (e) {
       // The only failure here is the missing verify token; the provided secret
       // must not appear in the message.

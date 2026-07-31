@@ -15,7 +15,9 @@ jest.mock('fs', () => ({
 const PNG_BUFFER = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
 ]);
-const JPEG_BUFFER = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46]);
+const JPEG_BUFFER = Buffer.from([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46,
+]);
 const WEBP_BUFFER = Buffer.concat([
   Buffer.from('RIFF', 'ascii'),
   Buffer.from([0x24, 0x00, 0x00, 0x00]),
@@ -121,7 +123,9 @@ describe('CompanyBrandingService', () => {
         mimetype: 'image/svg+xml',
         size: SVG_BUFFER.length,
       });
-      expect(() => service.assertValidLogoFile(file)).toThrow(BadRequestException);
+      expect(() => service.assertValidLogoFile(file)).toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws on a spoofed PNG (SVG bytes, .png extension)', () => {
@@ -131,11 +135,15 @@ describe('CompanyBrandingService', () => {
         mimetype: 'image/png',
         size: SVG_BUFFER.length,
       });
-      expect(() => service.assertValidLogoFile(file)).toThrow(BadRequestException);
+      expect(() => service.assertValidLogoFile(file)).toThrow(
+        BadRequestException,
+      );
     });
 
     it('throws when no file is provided', () => {
-      expect(() => service.assertValidLogoFile(undefined)).toThrow(BadRequestException);
+      expect(() => service.assertValidLogoFile(undefined)).toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -186,7 +194,11 @@ describe('CompanyBrandingService', () => {
     expect(prisma.company.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'company-a' },
-        data: { logoUrl: expect.stringMatching(/^\/uploads\/branding\/company-a\/.+\.png$/) },
+        data: {
+          logoUrl: expect.stringMatching(
+            /^\/uploads\/branding\/company-a\/.+\.png$/,
+          ),
+        },
       }),
     );
     expect(result.message).toBe('Logo actualizado correctamente');
@@ -232,7 +244,11 @@ describe('CompanyBrandingService', () => {
 
     expect(prisma.company.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: { secondaryLogoUrl: expect.stringMatching(/^\/uploads\/branding\/company-a\//) },
+        data: {
+          secondaryLogoUrl: expect.stringMatching(
+            /^\/uploads\/branding\/company-a\//,
+          ),
+        },
       }),
     );
   });

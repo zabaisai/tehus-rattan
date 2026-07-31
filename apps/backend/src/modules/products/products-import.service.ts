@@ -53,15 +53,56 @@ interface RawRow {
   extras: Array<{ label: string; value: string }>;
 }
 
-const FIELD_ALIASES: Array<{ field: keyof Omit<RawRow, 'extras'>; aliases: string[] }> = [
-  { field: 'name', aliases: ['nombre', 'producto', 'referencia', 'item', 'articulo', 'descripcion corta'] },
-  { field: 'category', aliases: ['categoria', 'linea', 'tipo', 'familia', 'coleccion'] },
-  { field: 'price', aliases: ['precio', 'valor', 'precio base', 'valor unitario', 'precio unitario', 'precio venta', 'venta'] },
-  { field: 'imageUrl', aliases: ['imagen', 'foto', 'url imagen', 'image', 'imageurl', 'link imagen', 'fotografia'] },
+const FIELD_ALIASES: Array<{
+  field: keyof Omit<RawRow, 'extras'>;
+  aliases: string[];
+}> = [
+  {
+    field: 'name',
+    aliases: [
+      'nombre',
+      'producto',
+      'referencia',
+      'item',
+      'articulo',
+      'descripcion corta',
+    ],
+  },
+  {
+    field: 'category',
+    aliases: ['categoria', 'linea', 'tipo', 'familia', 'coleccion'],
+  },
+  {
+    field: 'price',
+    aliases: [
+      'precio',
+      'valor',
+      'precio base',
+      'valor unitario',
+      'precio unitario',
+      'precio venta',
+      'venta',
+    ],
+  },
+  {
+    field: 'imageUrl',
+    aliases: [
+      'imagen',
+      'foto',
+      'url imagen',
+      'image',
+      'imageurl',
+      'link imagen',
+      'fotografia',
+    ],
+  },
   { field: 'code', aliases: ['codigo', 'code', 'referencia', 'ref'] },
   { field: 'sku', aliases: ['sku', 'referencia interna', 'sku interno'] },
   { field: 'stock', aliases: ['stock', 'cantidad', 'inventario', 'unidades'] },
-  { field: 'description', aliases: ['descripcion', 'detalle', 'observaciones', 'notas'] },
+  {
+    field: 'description',
+    aliases: ['descripcion', 'detalle', 'observaciones', 'notas'],
+  },
 ];
 
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xlsm'];
@@ -116,7 +157,9 @@ export class ProductsImportService {
 
     const worksheet = workbook.worksheets[0];
     if (!worksheet) {
-      throw new BadRequestException('El Excel no tiene ninguna hoja con datos.');
+      throw new BadRequestException(
+        'El Excel no tiene ninguna hoja con datos.',
+      );
     }
 
     const columnMap = this.mapColumns(worksheet.getRow(1));
@@ -136,7 +179,10 @@ export class ProductsImportService {
       throw new BadRequestException(TOO_MANY_ROWS_MESSAGE);
     }
 
-    const { images, imagesTruncated } = this.indexEmbeddedImages(workbook, worksheet);
+    const { images, imagesTruncated } = this.indexEmbeddedImages(
+      workbook,
+      worksheet,
+    );
     const existing = await this.prisma.product.findMany({
       where: { companyId },
       select: { sku: true, code: true, name: true, category: true },
@@ -150,7 +196,8 @@ export class ProductsImportService {
     );
     const seenNameCategory = new Set(
       existing.map(
-        (p) => `${p.name.trim().toLowerCase()}|${(p.category ?? '').trim().toLowerCase()}`,
+        (p) =>
+          `${p.name.trim().toLowerCase()}|${(p.category ?? '').trim().toLowerCase()}`,
       ),
     );
 
@@ -171,7 +218,12 @@ export class ProductsImportService {
       });
     }
 
-    const uploadsDir = path.join(process.cwd(), 'uploads', 'products', companyId);
+    const uploadsDir = path.join(
+      process.cwd(),
+      'uploads',
+      'products',
+      companyId,
+    );
 
     // Rows are validated and deduplicated here (cheap, synchronous, in
     // memory) and queued; the actual product.create() calls are flushed in
@@ -194,9 +246,15 @@ export class ProductsImportService {
       }
 
       const category = raw.category?.trim() || 'Sin categoría';
-      const { value: price, warning: priceWarning } = this.parsePrice(raw.price);
+      const { value: price, warning: priceWarning } = this.parsePrice(
+        raw.price,
+      );
       if (priceWarning) {
-        summary.warnings.push({ rowNumber, reason: priceWarning, rawName: name });
+        summary.warnings.push({
+          rowNumber,
+          reason: priceWarning,
+          rawName: name,
+        });
       }
 
       const stock = this.parseStock(raw.stock);
@@ -211,7 +269,11 @@ export class ProductsImportService {
 
       if (isDuplicate) {
         summary.skipped++;
-        summary.warnings.push({ rowNumber, reason: 'Producto duplicado', rawName: name });
+        summary.warnings.push({
+          rowNumber,
+          reason: 'Producto duplicado',
+          rawName: name,
+        });
         continue;
       }
 
@@ -238,7 +300,12 @@ export class ProductsImportService {
             });
           } else {
             try {
-              imageUrl = this.saveEmbeddedImage(embedded, uploadsDir, companyId, baseUrl);
+              imageUrl = this.saveEmbeddedImage(
+                embedded,
+                uploadsDir,
+                companyId,
+                baseUrl,
+              );
             } catch {
               summary.warnings.push({
                 rowNumber,
@@ -326,7 +393,9 @@ export class ProductsImportService {
       );
     }
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      throw new BadRequestException('Formato de archivo no permitido. Usa un archivo .xlsx');
+      throw new BadRequestException(
+        'Formato de archivo no permitido. Usa un archivo .xlsx',
+      );
     }
     if (file.size > MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES) {
       throw new BadRequestException(FILE_TOO_LARGE_MESSAGE);
@@ -345,7 +414,11 @@ export class ProductsImportService {
   }
 
   private mapColumns(headerRow: ExcelJS.Row): ColumnMap {
-    const headers: Array<{ col: number; normalized: string; original: string }> = [];
+    const headers: Array<{
+      col: number;
+      normalized: string;
+      original: string;
+    }> = [];
     headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
       const original = this.cellToString(cell).trim();
       const normalized = this.normalizeHeader(original);
@@ -396,14 +469,20 @@ export class ProductsImportService {
     const raw: RawRow = { extras: [] };
     const { fields, unclaimed } = columnMap;
 
-    if (fields.name !== undefined) raw.name = this.cellToString(row.getCell(fields.name));
-    if (fields.category !== undefined) raw.category = this.cellToString(row.getCell(fields.category));
+    if (fields.name !== undefined)
+      raw.name = this.cellToString(row.getCell(fields.name));
+    if (fields.category !== undefined)
+      raw.category = this.cellToString(row.getCell(fields.category));
     if (fields.price !== undefined) raw.price = row.getCell(fields.price).value;
-    if (fields.imageUrl !== undefined) raw.imageUrl = this.cellToString(row.getCell(fields.imageUrl));
-    if (fields.code !== undefined) raw.code = this.cellToString(row.getCell(fields.code));
-    if (fields.sku !== undefined) raw.sku = this.cellToString(row.getCell(fields.sku));
+    if (fields.imageUrl !== undefined)
+      raw.imageUrl = this.cellToString(row.getCell(fields.imageUrl));
+    if (fields.code !== undefined)
+      raw.code = this.cellToString(row.getCell(fields.code));
+    if (fields.sku !== undefined)
+      raw.sku = this.cellToString(row.getCell(fields.sku));
     if (fields.stock !== undefined) raw.stock = row.getCell(fields.stock).value;
-    if (fields.description !== undefined) raw.description = this.cellToString(row.getCell(fields.description));
+    if (fields.description !== undefined)
+      raw.description = this.cellToString(row.getCell(fields.description));
 
     for (const { col, label } of unclaimed) {
       const value = this.cellToString(row.getCell(col));
@@ -470,7 +549,8 @@ export class ProductsImportService {
 
   private parseStock(raw: unknown): number {
     if (raw === null || raw === undefined || raw === '') return 0;
-    if (typeof raw === 'number') return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
+    if (typeof raw === 'number')
+      return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
     const num = Number(String(raw).replace(/[^\d.-]/g, ''));
     return Number.isFinite(num) && num >= 0 ? Math.floor(num) : 0;
   }
@@ -479,7 +559,8 @@ export class ProductsImportService {
     const parts: string[] = [];
     if (raw.description?.trim()) parts.push(raw.description.trim());
     for (const extra of raw.extras) {
-      if (extra.value.trim()) parts.push(`${extra.label}: ${extra.value.trim()}`);
+      if (extra.value.trim())
+        parts.push(`${extra.label}: ${extra.value.trim()}`);
     }
     return parts.join('\n');
   }

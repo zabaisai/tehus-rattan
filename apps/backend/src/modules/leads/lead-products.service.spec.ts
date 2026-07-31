@@ -62,9 +62,9 @@ describe('LeadProductsService', () => {
     it('rejects listing products for a lead outside the authenticated company', async () => {
       prisma.lead.findFirst.mockResolvedValue(null);
 
-      await expect(service.findAllForLead('lead-b', companyId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findAllForLead('lead-b', companyId),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.leadProduct.findMany).not.toHaveBeenCalled();
     });
   });
@@ -78,7 +78,9 @@ describe('LeadProductsService', () => {
       prisma.product.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.addProduct(leadId, companyId, { productId: 'product-other-company' }),
+        service.addProduct(leadId, companyId, {
+          productId: 'product-other-company',
+        }),
       ).rejects.toBeInstanceOf(NotFoundException);
 
       expect(prisma.product.findFirst).toHaveBeenCalledWith({
@@ -108,11 +110,21 @@ describe('LeadProductsService', () => {
         Promise.resolve({
           id: 'lp-1',
           ...args.data,
-          product: { id: 'product-a', name: 'Sala Primavera', category: null, imageUrl: null, price: 11700000, sku: null, code: null },
+          product: {
+            id: 'product-a',
+            name: 'Sala Primavera',
+            category: null,
+            imageUrl: null,
+            price: 11700000,
+            sku: null,
+            code: null,
+          },
         }),
       );
 
-      const result = await service.addProduct(leadId, companyId, { productId: 'product-a' });
+      const result = await service.addProduct(leadId, companyId, {
+        productId: 'product-a',
+      });
 
       expect(prisma.leadProduct.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -124,13 +136,25 @@ describe('LeadProductsService', () => {
     });
 
     it('uses the explicit unitPrice instead of the product price when provided', async () => {
-      prisma.product.findFirst.mockResolvedValue({ id: 'product-a', price: 100, companyId });
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'product-a',
+        price: 100,
+        companyId,
+      });
       prisma.leadProduct.findUnique.mockResolvedValue(null);
       prisma.leadProduct.create.mockImplementation((args: any) =>
         Promise.resolve({
           id: 'lp-1',
           ...args.data,
-          product: { id: 'product-a', name: 'Sala Primavera', category: null, imageUrl: null, price: 100, sku: null, code: null },
+          product: {
+            id: 'product-a',
+            name: 'Sala Primavera',
+            category: null,
+            imageUrl: null,
+            price: 100,
+            sku: null,
+            code: null,
+          },
         }),
       );
 
@@ -143,7 +167,11 @@ describe('LeadProductsService', () => {
     });
 
     it('merges quantity into the existing row instead of duplicating when the product is already attached', async () => {
-      prisma.product.findFirst.mockResolvedValue({ id: 'product-a', price: 100, companyId });
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'product-a',
+        price: 100,
+        companyId,
+      });
       prisma.leadProduct.findUnique.mockResolvedValue({
         id: 'lp-1',
         leadId,
@@ -162,7 +190,15 @@ describe('LeadProductsService', () => {
           createdAt: new Date(),
           updatedAt: new Date(),
           ...args.data,
-          product: { id: 'product-a', name: 'Sala Primavera', category: null, imageUrl: null, price: 100, sku: null, code: null },
+          product: {
+            id: 'product-a',
+            name: 'Sala Primavera',
+            category: null,
+            imageUrl: null,
+            price: 100,
+            sku: null,
+            code: null,
+          },
         }),
       );
 
@@ -182,7 +218,11 @@ describe('LeadProductsService', () => {
     });
 
     it('overrides unitPrice on merge only when explicitly provided', async () => {
-      prisma.product.findFirst.mockResolvedValue({ id: 'product-a', price: 100, companyId });
+      prisma.product.findFirst.mockResolvedValue({
+        id: 'product-a',
+        price: 100,
+        companyId,
+      });
       prisma.leadProduct.findUnique.mockResolvedValue({
         id: 'lp-1',
         leadId,
@@ -191,20 +231,33 @@ describe('LeadProductsService', () => {
         unitPrice: 100,
         notes: null,
       });
-      prisma.leadProduct.update.mockImplementation((args: any) => Promise.resolve({
-        id: 'lp-1',
-        leadId,
-        productId: 'product-a',
-        notes: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        unitPrice: 100,
-        quantity: 1,
-        ...args.data,
-        product: { id: 'product-a', name: 'X', category: null, imageUrl: null, price: 100, sku: null, code: null },
-      }));
+      prisma.leadProduct.update.mockImplementation((args: any) =>
+        Promise.resolve({
+          id: 'lp-1',
+          leadId,
+          productId: 'product-a',
+          notes: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          unitPrice: 100,
+          quantity: 1,
+          ...args.data,
+          product: {
+            id: 'product-a',
+            name: 'X',
+            category: null,
+            imageUrl: null,
+            price: 100,
+            sku: null,
+            code: null,
+          },
+        }),
+      );
 
-      await service.addProduct(leadId, companyId, { productId: 'product-a', quantity: 1 });
+      await service.addProduct(leadId, companyId, {
+        productId: 'product-a',
+        quantity: 1,
+      });
       expect(prisma.leadProduct.update).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.not.objectContaining({ unitPrice: expect.anything() }),
@@ -226,13 +279,26 @@ describe('LeadProductsService', () => {
         notes: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        product: { id: 'product-a', name: 'X', category: null, imageUrl: null, price: 100, sku: null, code: null },
+        product: {
+          id: 'product-a',
+          name: 'X',
+          category: null,
+          imageUrl: null,
+          price: 100,
+          sku: null,
+          code: null,
+        },
       });
 
-      const result = await service.update(leadId, 'lp-1', companyId, { quantity: 4 });
+      const result = await service.update(leadId, 'lp-1', companyId, {
+        quantity: 4,
+      });
 
       expect(prisma.leadProduct.update).toHaveBeenCalledWith(
-        expect.objectContaining({ where: { id: 'lp-1' }, data: { quantity: 4 } }),
+        expect.objectContaining({
+          where: { id: 'lp-1' },
+          data: { quantity: 4 },
+        }),
       );
       expect(result.quantity).toBe(4);
       expect(result.subtotal).toBe(400);
@@ -250,10 +316,20 @@ describe('LeadProductsService', () => {
         notes: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        product: { id: 'product-a', name: 'X', category: null, imageUrl: null, price: 100, sku: null, code: null },
+        product: {
+          id: 'product-a',
+          name: 'X',
+          category: null,
+          imageUrl: null,
+          price: 100,
+          sku: null,
+          code: null,
+        },
       });
 
-      const result = await service.update(leadId, 'lp-1', companyId, { unitPrice: 80 });
+      const result = await service.update(leadId, 'lp-1', companyId, {
+        unitPrice: 80,
+      });
 
       expect(result.unitPrice).toBe(80);
       expect(result.subtotal).toBe(160);
@@ -287,16 +363,18 @@ describe('LeadProductsService', () => {
 
       const result = await service.remove(leadId, 'lp-1', companyId);
 
-      expect(prisma.leadProduct.delete).toHaveBeenCalledWith({ where: { id: 'lp-1' } });
+      expect(prisma.leadProduct.delete).toHaveBeenCalledWith({
+        where: { id: 'lp-1' },
+      });
       expect(result).toEqual({ id: 'lp-1' });
     });
 
     it('rejects deleting a lead product for a lead outside the authenticated company', async () => {
       prisma.lead.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove('lead-b', 'lp-1', companyId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.remove('lead-b', 'lp-1', companyId),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.leadProduct.delete).not.toHaveBeenCalled();
     });
 
@@ -304,9 +382,9 @@ describe('LeadProductsService', () => {
       prisma.lead.findFirst.mockResolvedValue({ id: leadId });
       prisma.leadProduct.findFirst.mockResolvedValue(null);
 
-      await expect(service.remove(leadId, 'lp-other', companyId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.remove(leadId, 'lp-other', companyId),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.leadProduct.delete).not.toHaveBeenCalled();
     });
   });

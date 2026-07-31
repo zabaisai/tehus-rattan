@@ -77,7 +77,11 @@ export class PasswordResetTokenService {
   // could not be sent, so no unusable-but-live token is left behind.
   async revokeByPlainToken(plainToken: string): Promise<void> {
     await this.prisma.passwordResetToken.updateMany({
-      where: { tokenHash: hashToken(plainToken), usedAt: null, revokedAt: null },
+      where: {
+        tokenHash: hashToken(plainToken),
+        usedAt: null,
+        revokedAt: null,
+      },
       data: { revokedAt: new Date() },
     });
   }

@@ -38,11 +38,9 @@ describe('ConversationsController', () => {
     it('creates an OUTBOUND SENT message with the wamid when WhatsApp accepts the message', async () => {
       whatsappService.sendMessage.mockResolvedValue('wamid.123');
 
-      const result = await controller.sendWhatsApp(
-        'conv-1',
-        buildRequest(),
-        { message: 'Hola, ya tenemos tu pedido listo' },
-      );
+      const result = await controller.sendWhatsApp('conv-1', buildRequest(), {
+        message: 'Hola, ya tenemos tu pedido listo',
+      });
 
       expect(whatsappService.sendMessage).toHaveBeenCalledWith(
         'company-a',
@@ -66,11 +64,9 @@ describe('ConversationsController', () => {
         new Error('No se pudo enviar el mensaje de WhatsApp'),
       );
 
-      const result = await controller.sendWhatsApp(
-        'conv-1',
-        buildRequest(),
-        { message: 'Mensaje que el asesor intento enviar' },
-      );
+      const result = await controller.sendWhatsApp('conv-1', buildRequest(), {
+        message: 'Mensaje que el asesor intento enviar',
+      });
 
       expect(messagesService.create).toHaveBeenCalledWith({
         companyId: 'company-a',

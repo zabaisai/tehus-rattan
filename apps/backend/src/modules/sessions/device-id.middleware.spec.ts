@@ -30,7 +30,9 @@ describe('DeviceIdMiddleware', () => {
   });
 
   it('reuses the existing deviceId cookie — recognizes the same browser on a later request', () => {
-    const { req, res, next } = buildReqRes({ [DEVICE_ID_COOKIE]: 'already-known-device' });
+    const { req, res, next } = buildReqRes({
+      [DEVICE_ID_COOKIE]: 'already-known-device',
+    });
 
     middleware.use(req, res, next);
 

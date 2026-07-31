@@ -21,7 +21,9 @@ class ProbeController {
   @Get('boom')
   boom() {
     // An UNEXPECTED (non-HttpException) error → must become a generic 500.
-    throw new Error('internal detail: secret-connection-string password=hunter2');
+    throw new Error(
+      'internal detail: secret-connection-string password=hunter2',
+    );
   }
 }
 
@@ -53,7 +55,9 @@ describe('Security headers + error shaping (e2e)', () => {
     expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
     expect(res.headers['cross-origin-opener-policy']).toBe('same-origin');
     expect(res.headers['permissions-policy']).toContain('camera=()');
-    expect(res.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(res.headers['content-security-policy']).toContain(
+      "default-src 'none'",
+    );
   });
 
   it('removes the X-Powered-By header', async () => {
@@ -75,7 +79,10 @@ describe('Security headers + error shaping (e2e)', () => {
 
   it('returns a generic 500 with NO stack/detail leak for an unhandled error', async () => {
     const res = await request(app.getHttpServer()).get('/boom').expect(500);
-    expect(res.body).toEqual({ statusCode: 500, message: 'Internal server error' });
+    expect(res.body).toEqual({
+      statusCode: 500,
+      message: 'Internal server error',
+    });
     const raw = JSON.stringify(res.body);
     expect(raw).not.toContain('hunter2');
     expect(raw).not.toContain('secret-connection-string');

@@ -38,7 +38,11 @@ describe('Quote company identity (e2e, real database)', () => {
   }) {
     const company = await prisma.company.create({ data: fiscal });
     const contact = await prisma.contact.create({
-      data: { companyId: company.id, phone: `+1000${stamp}${company.id.slice(-3)}`, name: 'E2E Cliente' },
+      data: {
+        companyId: company.id,
+        phone: `+1000${stamp}${company.id.slice(-3)}`,
+        name: 'E2E Cliente',
+      },
     });
     const pipeline = await prisma.pipeline.create({
       data: { companyId: company.id, name: 'E2E Pipeline' },
@@ -65,7 +69,14 @@ describe('Quote company identity (e2e, real database)', () => {
         total: 100,
         items: {
           create: [
-            { name: 'Item', description: null, category: null, quantity: 1, unitPrice: 100, subtotal: 100 },
+            {
+              name: 'Item',
+              description: null,
+              category: null,
+              quantity: 1,
+              unitPrice: 100,
+              subtotal: 100,
+            },
           ],
         },
       },
@@ -114,11 +125,18 @@ describe('Quote company identity (e2e, real database)', () => {
   });
 
   afterAll(async () => {
-    for (const companyId of [ids.companyA, ids.companyB].filter(Boolean) as string[]) {
+    for (const companyId of [ids.companyA, ids.companyB].filter(
+      Boolean,
+    ) as string[]) {
       await prisma.quote.deleteMany({ where: { companyId } }); // quote_items cascade
       await prisma.lead.deleteMany({ where: { companyId } });
-      const pipelines = await prisma.pipeline.findMany({ where: { companyId }, select: { id: true } });
-      await prisma.pipelineStage.deleteMany({ where: { pipelineId: { in: pipelines.map((p) => p.id) } } });
+      const pipelines = await prisma.pipeline.findMany({
+        where: { companyId },
+        select: { id: true },
+      });
+      await prisma.pipelineStage.deleteMany({
+        where: { pipelineId: { in: pipelines.map((p) => p.id) } },
+      });
       await prisma.pipeline.deleteMany({ where: { companyId } });
       await prisma.contact.deleteMany({ where: { companyId } });
       await prisma.company.delete({ where: { id: companyId } });
@@ -156,7 +174,14 @@ describe('Quote company identity (e2e, real database)', () => {
         'website',
       ].sort(),
     );
-    for (const forbidden of ['settings', 'status', 'slug', 'createdAt', 'updatedAt', 'secondaryLogoUrl']) {
+    for (const forbidden of [
+      'settings',
+      'status',
+      'slug',
+      'createdAt',
+      'updatedAt',
+      'secondaryLogoUrl',
+    ]) {
       expect(quote.company).not.toHaveProperty(forbidden);
     }
   });
@@ -172,8 +197,8 @@ describe('Quote company identity (e2e, real database)', () => {
   });
 
   it("rejects a user of Empresa A reading Empresa B's quote (tenant isolation)", async () => {
-    await expect(service.findById(ids.quoteB!, ids.companyA!)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.findById(ids.quoteB!, ids.companyA!),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

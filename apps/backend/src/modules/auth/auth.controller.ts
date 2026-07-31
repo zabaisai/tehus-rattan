@@ -42,7 +42,9 @@ export class AuthController {
   // outright (see jwt.strategy.ts) — so the token this endpoint returns
   // authenticates nothing against any guarded route. It is fully inert,
   // not merely "legacy"; this is intentional rather than an oversight.
-  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding } })
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding },
+  })
   @UseGuards(OnboardingInviteGuard)
   @Post('register')
   register(@Body() body: RegisterDto) {
@@ -71,7 +73,9 @@ export class AuthController {
   // never be reachable from JS given it's httpOnly), rotates it, and mints
   // a fresh access JWT. A missing/invalid/revoked/expired session all fail
   // the same generic way (see AuthService.refresh).
-  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.refresh } })
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.refresh },
+  })
   @UseGuards(CookieOriginGuard)
   @Post('refresh')
   async refresh(

@@ -32,7 +32,8 @@ export class AnalyticsService {
     const wonValue = wonLeads.reduce((sum, l) => sum + (l.value || 0), 0);
     const lostValue = lostLeads.reduce((sum, l) => sum + (l.value || 0), 0);
     const closedCount = wonLeads.length + lostLeads.length;
-    const conversionRate = closedCount > 0 ? (wonLeads.length / closedCount) * 100 : 0;
+    const conversionRate =
+      closedCount > 0 ? (wonLeads.length / closedCount) * 100 : 0;
 
     return {
       leadsThisMonth,

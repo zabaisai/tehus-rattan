@@ -113,7 +113,9 @@ export class ConversationsService {
     if (offset !== undefined) {
       const skip = Number(offset);
       if (!Number.isInteger(skip) || skip < 0) {
-        throw new BadRequestException('offset debe ser un entero mayor o igual a 0');
+        throw new BadRequestException(
+          'offset debe ser un entero mayor o igual a 0',
+        );
       }
       pagination.skip = skip;
     }

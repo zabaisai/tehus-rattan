@@ -51,7 +51,12 @@ export class SessionsService {
     const { user, context } = params;
 
     const session = await writer.userSession.upsert({
-      where: { userId_deviceIdHash: { userId: user.id, deviceIdHash: context.deviceIdHash } },
+      where: {
+        userId_deviceIdHash: {
+          userId: user.id,
+          deviceIdHash: context.deviceIdHash,
+        },
+      },
       create: {
         userId: user.id,
         companyId: user.companyId,
@@ -138,7 +143,11 @@ export class SessionsService {
   async rotateRefreshToken(
     plainToken: string,
     context: SessionRequestContext,
-  ): Promise<{ sessionId: string; refreshToken: string; user: SessionUser } | null> {
+  ): Promise<{
+    sessionId: string;
+    refreshToken: string;
+    user: SessionUser;
+  } | null> {
     const hash = hashToken(plainToken);
     const session = await this.prisma.userSession.findUnique({
       where: { refreshTokenHash: hash },
@@ -146,7 +155,10 @@ export class SessionsService {
     });
     if (!session) return null;
 
-    if (session.status === 'ACTIVE' && isSessionInactiveExpired(session.lastSeenAt)) {
+    if (
+      session.status === 'ACTIVE' &&
+      isSessionInactiveExpired(session.lastSeenAt)
+    ) {
       await this.prisma.userSession.update({
         where: { id: session.id },
         data: { status: 'EXPIRED' },

@@ -3,7 +3,9 @@ import { MailService } from './mail.service';
 
 const sendMailMock = jest.fn();
 jest.mock('nodemailer', () => ({
-  createTransport: jest.fn(() => ({ sendMail: (...args: unknown[]) => sendMailMock(...args) })),
+  createTransport: jest.fn(() => ({
+    sendMail: (...args: unknown[]) => sendMailMock(...args),
+  })),
 }));
 
 function makeConfig(values: Record<string, string | undefined>): ConfigService {
@@ -30,8 +32,12 @@ describe('MailService', () => {
   });
 
   it('is a controlled no-op when disabled (never sends, never logs the token)', async () => {
-    const logSpy = jest.spyOn(require('@nestjs/common').Logger.prototype, 'log').mockImplementation(() => undefined);
-    const svc = new MailService(makeConfig({ PASSWORD_RESET_ENABLED: undefined }));
+    const logSpy = jest
+      .spyOn(require('@nestjs/common').Logger.prototype, 'log')
+      .mockImplementation(() => undefined);
+    const svc = new MailService(
+      makeConfig({ PASSWORD_RESET_ENABLED: undefined }),
+    );
 
     await svc.sendPasswordResetEmail(input);
 
@@ -81,6 +87,8 @@ describe('MailService', () => {
       }),
     );
 
-    await expect(svc.sendPasswordResetEmail(input)).rejects.toThrow('smtp down');
+    await expect(svc.sendPasswordResetEmail(input)).rejects.toThrow(
+      'smtp down',
+    );
   });
 });

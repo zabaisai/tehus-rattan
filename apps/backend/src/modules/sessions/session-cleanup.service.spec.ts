@@ -1,5 +1,8 @@
 import { SessionCleanupService } from './session-cleanup.service';
-import { CLOSED_SESSION_RETENTION_DAYS, LOGIN_EVENT_RETENTION_DAYS } from './sessions.constants';
+import {
+  CLOSED_SESSION_RETENTION_DAYS,
+  LOGIN_EVENT_RETENTION_DAYS,
+} from './sessions.constants';
 
 describe('SessionCleanupService', () => {
   let prisma: any;
@@ -19,7 +22,8 @@ describe('SessionCleanupService', () => {
 
       const call = prisma.loginEvent.deleteMany.mock.calls[0][0];
       const cutoff = call.where.createdAt.lt as Date;
-      const expectedCutoff = Date.now() - LOGIN_EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      const expectedCutoff =
+        Date.now() - LOGIN_EVENT_RETENTION_DAYS * 24 * 60 * 60 * 1000;
       expect(Math.abs(cutoff.getTime() - expectedCutoff)).toBeLessThan(5000);
     });
 
@@ -34,7 +38,11 @@ describe('SessionCleanupService', () => {
       await service.cleanupClosedSessions();
 
       const call = prisma.userSession.deleteMany.mock.calls[0][0];
-      expect(call.where.status.in).toEqual(['LOGGED_OUT', 'REVOKED', 'EXPIRED']);
+      expect(call.where.status.in).toEqual([
+        'LOGGED_OUT',
+        'REVOKED',
+        'EXPIRED',
+      ]);
       expect(call.where.status.in).not.toContain('ACTIVE');
     });
 
@@ -43,7 +51,8 @@ describe('SessionCleanupService', () => {
 
       const call = prisma.userSession.deleteMany.mock.calls[0][0];
       const cutoff = call.where.OR[0].loggedOutAt.lt as Date;
-      const expectedCutoff = Date.now() - CLOSED_SESSION_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+      const expectedCutoff =
+        Date.now() - CLOSED_SESSION_RETENTION_DAYS * 24 * 60 * 60 * 1000;
       expect(Math.abs(cutoff.getTime() - expectedCutoff)).toBeLessThan(5000);
     });
   });

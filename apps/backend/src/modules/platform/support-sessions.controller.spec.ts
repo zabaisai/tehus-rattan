@@ -28,7 +28,7 @@ describe('SupportSessionsController', () => {
       service.createSession.mockResolvedValue({ id: 'session-1' });
       const dto = { companyId: 'company-a', reason: 'Motivo' };
 
-      await controller.create(dto as any, req as any);
+      await controller.create(dto, req as any);
 
       expect(service.createSession).toHaveBeenCalledWith(
         dto,
@@ -44,7 +44,10 @@ describe('SupportSessionsController', () => {
 
   describe('POST /platform/support-sessions/:id/end', () => {
     it('delegates to endSession with the session id and actor', async () => {
-      service.endSession.mockResolvedValue({ id: 'session-1', status: 'ENDED' });
+      service.endSession.mockResolvedValue({
+        id: 'session-1',
+        status: 'ENDED',
+      });
 
       await controller.end('session-1', req as any);
 

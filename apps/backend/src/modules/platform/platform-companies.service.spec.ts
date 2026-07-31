@@ -217,7 +217,7 @@ describe('PlatformCompaniesService', () => {
         ],
       }));
 
-      const result = await service.createCompany(validDto as any, actor);
+      const result = await service.createCompany(validDto, actor);
 
       const createCall = prisma.company.create.mock.calls[0][0];
       expect(createCall.data.status).toBe('ACTIVE');
@@ -256,7 +256,7 @@ describe('PlatformCompaniesService', () => {
         ],
       });
 
-      const result = await service.createCompany(validDto as any, actor);
+      const result = await service.createCompany(validDto, actor);
 
       expect(result).not.toHaveProperty('password');
       expect(result.admin).not.toHaveProperty('password');
@@ -305,7 +305,7 @@ describe('PlatformCompaniesService', () => {
         ],
       });
 
-      await service.createCompany(validDto as any, actor);
+      await service.createCompany(validDto, actor);
 
       expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
       const auditCall = prisma.auditLog.create.mock.calls[0][0].data;
@@ -380,7 +380,7 @@ describe('PlatformCompaniesService', () => {
 
       const result = await service.updateCompanyStatus(
         'company-a',
-        'SUSPENDED' as any,
+        'SUSPENDED',
         actor,
         'Falta de pago reportada',
       );
@@ -420,7 +420,7 @@ describe('PlatformCompaniesService', () => {
 
       const result = await service.updateCompanyStatus(
         'company-a',
-        'ACTIVE' as any,
+        'ACTIVE',
         actor,
       );
 
@@ -441,7 +441,7 @@ describe('PlatformCompaniesService', () => {
 
       const result = await service.updateCompanyStatus(
         'company-a',
-        'DELETED' as any,
+        'DELETED',
         actor,
       );
 

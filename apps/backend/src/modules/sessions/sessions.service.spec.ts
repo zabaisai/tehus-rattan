@@ -10,7 +10,9 @@ const baseUser: SessionUser = {
   companyId: 'company-a',
 };
 
-function buildContext(overrides: Partial<SessionRequestContext> = {}): SessionRequestContext {
+function buildContext(
+  overrides: Partial<SessionRequestContext> = {},
+): SessionRequestContext {
   return {
     deviceIdHash: 'device-1-hash',
     ipPreview: '181.60.12.0',
@@ -66,7 +68,9 @@ describe('SessionsService', () => {
           return null;
         }),
         update: jest.fn(async ({ where, data }: any) => {
-          const entry = Array.from(sessionsStore.entries()).find(([, s]) => s.id === where.id);
+          const entry = Array.from(sessionsStore.entries()).find(
+            ([, s]) => s.id === where.id,
+          );
           if (entry) sessionsStore.set(entry[0], { ...entry[1], ...data });
           return entry?.[1];
         }),
@@ -74,7 +78,11 @@ describe('SessionsService', () => {
           let count = 0;
           for (const [key, s] of sessionsStore.entries()) {
             if (where.id && s.id !== where.id) continue;
-            if (where.refreshTokenHash && s.refreshTokenHash !== where.refreshTokenHash) continue;
+            if (
+              where.refreshTokenHash &&
+              s.refreshTokenHash !== where.refreshTokenHash
+            )
+              continue;
             if (where.status && s.status !== where.status) continue;
             sessionsStore.set(key, { ...s, ...data });
             count++;
@@ -94,19 +102,27 @@ describe('SessionsService', () => {
     it('creates a new ACTIVE UserSession and a SUCCESS LoginEvent', async () => {
       const context = buildContext();
 
-      const result = await service.recordLoginSuccess({ user: baseUser, context });
+      const result = await service.recordLoginSuccess({
+        user: baseUser,
+        context,
+      });
 
       expect(result.sessionId).toBeDefined();
       expect(result.refreshToken).toMatch(/^[0-9a-f]{64}$/);
       expect(prisma.loginEvent.create).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: 'SUCCESS' }) }),
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'SUCCESS' }),
+        }),
       );
     });
 
     it('never stores the plaintext refresh token — only its hash', async () => {
       const context = buildContext();
 
-      const result = await service.recordLoginSuccess({ user: baseUser, context });
+      const result = await service.recordLoginSuccess({
+        user: baseUser,
+        context,
+      });
 
       const stored = sessionsStore.get('user-1:device-1-hash');
       expect(stored.refreshTokenHash).toBe(hashToken(result.refreshToken));
@@ -115,11 +131,15 @@ describe('SessionsService', () => {
     });
 
     it('never persists a raw deviceId, only the hash it was given', async () => {
-      const context = buildContext({ deviceIdHash: hashToken('raw-cookie-value') });
+      const context = buildContext({
+        deviceIdHash: hashToken('raw-cookie-value'),
+      });
 
       await service.recordLoginSuccess({ user: baseUser, context });
 
-      const stored = sessionsStore.get(`user-1:${hashToken('raw-cookie-value')}`);
+      const stored = sessionsStore.get(
+        `user-1:${hashToken('raw-cookie-value')}`,
+      );
       expect(stored.deviceIdHash).toBe(hashToken('raw-cookie-value'));
       expect(JSON.stringify(stored)).not.toContain('raw-cookie-value');
     });
@@ -138,8 +158,14 @@ describe('SessionsService', () => {
     it('recognizes the same browser: logging in again from the same deviceIdHash updates the same session row, not a new one', async () => {
       const context = buildContext();
 
-      const first = await service.recordLoginSuccess({ user: baseUser, context });
-      const second = await service.recordLoginSuccess({ user: baseUser, context });
+      const first = await service.recordLoginSuccess({
+        user: baseUser,
+        context,
+      });
+      const second = await service.recordLoginSuccess({
+        user: baseUser,
+        context,
+      });
 
       expect(second.sessionId).toBe(first.sessionId);
       expect(sessionsStore.size).toBe(1);
@@ -156,18 +182,26 @@ describe('SessionsService', () => {
       });
 
       expect(sessionsStore.size).toBe(2);
-      const deviceHashes = Array.from(sessionsStore.values()).map((s) => s.deviceIdHash);
+      const deviceHashes = Array.from(sessionsStore.values()).map(
+        (s) => s.deviceIdHash,
+      );
       expect(new Set(deviceHashes).size).toBe(2);
     });
 
     it('keeps the same device as one session even when its IP changes between logins', async () => {
       await service.recordLoginSuccess({
         user: baseUser,
-        context: buildContext({ deviceIdHash: 'device-1-hash', ipPreview: '181.60.12.0' }),
+        context: buildContext({
+          deviceIdHash: 'device-1-hash',
+          ipPreview: '181.60.12.0',
+        }),
       });
       await service.recordLoginSuccess({
         user: baseUser,
-        context: buildContext({ deviceIdHash: 'device-1-hash', ipPreview: '200.10.5.0' }),
+        context: buildContext({
+          deviceIdHash: 'device-1-hash',
+          ipPreview: '200.10.5.0',
+        }),
       });
 
       expect(sessionsStore.size).toBe(1);
@@ -176,15 +210,25 @@ describe('SessionsService', () => {
     });
 
     it('does not count two different users behind the same IP as one device', async () => {
-      const userTwo: SessionUser = { ...baseUser, id: 'user-2', email: 'agent@company-a.test' };
+      const userTwo: SessionUser = {
+        ...baseUser,
+        id: 'user-2',
+        email: 'agent@company-a.test',
+      };
 
       await service.recordLoginSuccess({
         user: baseUser,
-        context: buildContext({ deviceIdHash: 'device-shared-ip-1', ipPreview: '190.1.1.0' }),
+        context: buildContext({
+          deviceIdHash: 'device-shared-ip-1',
+          ipPreview: '190.1.1.0',
+        }),
       });
       await service.recordLoginSuccess({
         user: userTwo,
-        context: buildContext({ deviceIdHash: 'device-shared-ip-2', ipPreview: '190.1.1.0' }),
+        context: buildContext({
+          deviceIdHash: 'device-shared-ip-2',
+          ipPreview: '190.1.1.0',
+        }),
       });
 
       expect(sessionsStore.size).toBe(2);
@@ -195,11 +239,17 @@ describe('SessionsService', () => {
     it('the same deviceIdHash from a different IP is still recognized as the same device', async () => {
       const first = await service.recordLoginSuccess({
         user: baseUser,
-        context: buildContext({ deviceIdHash: 'stable-device-hash', ipPreview: '181.60.12.0' }),
+        context: buildContext({
+          deviceIdHash: 'stable-device-hash',
+          ipPreview: '181.60.12.0',
+        }),
       });
       const second = await service.recordLoginSuccess({
         user: baseUser,
-        context: buildContext({ deviceIdHash: 'stable-device-hash', ipPreview: '9.9.9.0' }),
+        context: buildContext({
+          deviceIdHash: 'stable-device-hash',
+          ipPreview: '9.9.9.0',
+        }),
       });
 
       expect(second.sessionId).toBe(first.sessionId);
@@ -209,35 +259,59 @@ describe('SessionsService', () => {
 
   describe('rotateRefreshToken', () => {
     it('returns null and never rotates a REVOKED session — it cannot be renewed', async () => {
-      const { refreshToken } = await service.recordLoginSuccess({ user: baseUser, context: buildContext() });
+      const { refreshToken } = await service.recordLoginSuccess({
+        user: baseUser,
+        context: buildContext(),
+      });
       const stored = sessionsStore.get('user-1:device-1-hash');
-      sessionsStore.set('user-1:device-1-hash', { ...stored, status: 'REVOKED' });
+      sessionsStore.set('user-1:device-1-hash', {
+        ...stored,
+        status: 'REVOKED',
+      });
 
-      const result = await service.rotateRefreshToken(refreshToken, buildContext());
+      const result = await service.rotateRefreshToken(
+        refreshToken,
+        buildContext(),
+      );
 
       expect(result).toBeNull();
     });
 
     it('rotates an ACTIVE session and invalidates the previous refresh token', async () => {
-      const { refreshToken } = await service.recordLoginSuccess({ user: baseUser, context: buildContext() });
+      const { refreshToken } = await service.recordLoginSuccess({
+        user: baseUser,
+        context: buildContext(),
+      });
 
-      const rotated = await service.rotateRefreshToken(refreshToken, buildContext());
+      const rotated = await service.rotateRefreshToken(
+        refreshToken,
+        buildContext(),
+      );
 
       expect(rotated).not.toBeNull();
       expect(rotated!.refreshToken).not.toBe(refreshToken);
 
       // The old plaintext token no longer matches anything.
-      const reuseAttempt = await service.rotateRefreshToken(refreshToken, buildContext());
+      const reuseAttempt = await service.rotateRefreshToken(
+        refreshToken,
+        buildContext(),
+      );
       expect(reuseAttempt).toBeNull();
     });
 
     it('returns null for a completely unknown token', async () => {
-      const result = await service.rotateRefreshToken('never-issued-token', buildContext());
+      const result = await service.rotateRefreshToken(
+        'never-issued-token',
+        buildContext(),
+      );
       expect(result).toBeNull();
     });
 
     it('lets exactly one of two concurrent rotations with the same token win (compare-and-swap)', async () => {
-      const { refreshToken } = await service.recordLoginSuccess({ user: baseUser, context: buildContext() });
+      const { refreshToken } = await service.recordLoginSuccess({
+        user: baseUser,
+        context: buildContext(),
+      });
       const originalHash = hashToken(refreshToken);
 
       // Force the race window: both rotations must READ the session (findUnique)
@@ -275,13 +349,16 @@ describe('SessionsService', () => {
       expect(stored.status).toBe('ACTIVE');
 
       // The original token is now invalid for any further rotation.
-      const reuse = await service.rotateRefreshToken(refreshToken, buildContext());
+      const reuse = await service.rotateRefreshToken(
+        refreshToken,
+        buildContext(),
+      );
       expect(reuse).toBeNull();
     });
   });
 
   describe('closeSessionByRefreshToken (logout)', () => {
-    it('closes only the one session matching the given refresh token, not the user\'s other devices', async () => {
+    it("closes only the one session matching the given refresh token, not the user's other devices", async () => {
       const sessionA = await service.recordLoginSuccess({
         user: baseUser,
         context: buildContext({ deviceIdHash: 'device-A-hash' }),
@@ -293,12 +370,16 @@ describe('SessionsService', () => {
 
       await service.closeSessionByRefreshToken(sessionA.refreshToken);
 
-      expect(sessionsStore.get('user-1:device-A-hash').status).toBe('LOGGED_OUT');
+      expect(sessionsStore.get('user-1:device-A-hash').status).toBe(
+        'LOGGED_OUT',
+      );
       expect(sessionsStore.get('user-1:device-B-hash').status).toBe('ACTIVE');
     });
 
     it('is a silent no-op for an unknown token', async () => {
-      await expect(service.closeSessionByRefreshToken('unknown')).resolves.not.toThrow();
+      await expect(
+        service.closeSessionByRefreshToken('unknown'),
+      ).resolves.not.toThrow();
     });
   });
 });

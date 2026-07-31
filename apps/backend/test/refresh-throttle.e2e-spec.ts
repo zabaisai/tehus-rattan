@@ -32,7 +32,9 @@ describe('Refresh throttling (device vs IP) (e2e)', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       imports: [
-        ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 1000 }]),
+        ThrottlerModule.forRoot([
+          { name: 'default', ttl: 60_000, limit: 1000 },
+        ]),
       ],
       controllers: [ThrottleTestController],
       providers: [{ provide: APP_GUARD, useClass: AppThrottlerGuard }],
@@ -57,7 +59,7 @@ describe('Refresh throttling (device vs IP) (e2e)', () => {
     await post('/api/auth/refresh', dev('solo-device')).expect(429);
   });
 
-  it('does NOT let one device consume another device\'s budget on the same IP', async () => {
+  it("does NOT let one device consume another device's budget on the same IP", async () => {
     // Exhaust device A.
     await post('/api/auth/refresh', dev('office-A')).expect(201);
     await post('/api/auth/refresh', dev('office-A')).expect(201);

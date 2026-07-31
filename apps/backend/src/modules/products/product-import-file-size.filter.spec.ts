@@ -17,7 +17,10 @@ describe('ProductImportFileSizeFilter', () => {
 
     expect(status).toHaveBeenCalledWith(413);
     expect(json).toHaveBeenCalledWith(
-      expect.objectContaining({ statusCode: 413, message: FILE_TOO_LARGE_MESSAGE }),
+      expect.objectContaining({
+        statusCode: 413,
+        message: FILE_TOO_LARGE_MESSAGE,
+      }),
     );
     // Never leak Multer's raw technical string to the client.
     expect(json.mock.calls[0][0].message).not.toMatch(/File too large/i);

@@ -90,7 +90,7 @@ function build(overrides: any = {}) {
       accessTokenEncrypted: 'iv:tag:cipher',
     }),
     ...overrides.integrationService,
-  } as any;
+  };
   const management = {
     disconnectForCompany: jest
       .fn()

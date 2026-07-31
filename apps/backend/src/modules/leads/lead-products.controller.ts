@@ -31,7 +31,11 @@ export class LeadProductsController {
     @Request() req: any,
     @Body() body: CreateLeadProductDto,
   ) {
-    return this.leadProductsService.addProduct(leadId, req.user.companyId, body);
+    return this.leadProductsService.addProduct(
+      leadId,
+      req.user.companyId,
+      body,
+    );
   }
 
   @Patch(':leadProductId')
@@ -55,6 +59,10 @@ export class LeadProductsController {
     @Param('leadProductId') leadProductId: string,
     @Request() req: any,
   ) {
-    return this.leadProductsService.remove(leadId, leadProductId, req.user.companyId);
+    return this.leadProductsService.remove(
+      leadId,
+      leadProductId,
+      req.user.companyId,
+    );
   }
 }

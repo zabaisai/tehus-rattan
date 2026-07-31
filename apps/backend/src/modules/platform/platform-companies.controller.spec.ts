@@ -68,7 +68,7 @@ describe('PlatformCompaniesController', () => {
       };
       service.createCompany.mockResolvedValue({ id: 'company-new' });
 
-      await controller.create(dto as any, buildRequest());
+      await controller.create(dto, buildRequest());
 
       expect(service.createCompany).toHaveBeenCalledWith(dto, {
         actorUserId: 'super-admin-1',
@@ -118,7 +118,9 @@ describe('PlatformCompaniesController', () => {
 
   describe('GET /platform/companies/:id/support-overview', () => {
     it('delegates to getSupportOverview with the id and the actor from the JWT', async () => {
-      service.getSupportOverview.mockResolvedValue({ company: { id: 'company-a' } });
+      service.getSupportOverview.mockResolvedValue({
+        company: { id: 'company-a' },
+      });
 
       await controller.supportOverview('company-a', buildRequest());
 

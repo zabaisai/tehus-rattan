@@ -355,9 +355,12 @@ describe('WhatsAppIntegrationController (e2e)', () => {
   describe('POST /api/whatsapp-integrations/me/disconnect', () => {
     it('allows ADMIN, routes through local-disconnect with the companyId from the JWT, and never returns accessTokenEncrypted', async () => {
       const embeddedSignupServiceMock = app.get(WhatsAppEmbeddedSignupService);
-      (embeddedSignupServiceMock.disconnectLocal as jest.Mock).mockResolvedValue(
-        { ...safeIntegrationResponse, status: 'DISCONNECTED' },
-      );
+      (
+        embeddedSignupServiceMock.disconnectLocal as jest.Mock
+      ).mockResolvedValue({
+        ...safeIntegrationResponse,
+        status: 'DISCONNECTED',
+      });
       const token = signToken('ADMIN', 'company-admin');
 
       const res = await request(app.getHttpServer())

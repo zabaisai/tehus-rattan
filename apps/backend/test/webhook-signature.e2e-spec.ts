@@ -15,7 +15,10 @@ const VERIFY_TOKEN = 'e2e-test-only-verify-token';
 const webhookServiceMock = { processWebhook: jest.fn() };
 
 function sign(raw: string): string {
-  return 'sha256=' + createHmac('sha256', APP_SECRET).update(raw, 'utf8').digest('hex');
+  return (
+    'sha256=' +
+    createHmac('sha256', APP_SECRET).update(raw, 'utf8').digest('hex')
+  );
 }
 
 describe('WhatsApp webhook signature (e2e, no real Meta calls)', () => {
@@ -58,7 +61,11 @@ describe('WhatsApp webhook signature (e2e, no real Meta calls)', () => {
     it('echoes the challenge when the verify token matches', async () => {
       await request(app.getHttpServer())
         .get('/api/webhook')
-        .query({ 'hub.mode': 'subscribe', 'hub.verify_token': VERIFY_TOKEN, 'hub.challenge': '12345' })
+        .query({
+          'hub.mode': 'subscribe',
+          'hub.verify_token': VERIFY_TOKEN,
+          'hub.challenge': '12345',
+        })
         .expect(200)
         .expect('12345');
     });
@@ -66,7 +73,11 @@ describe('WhatsApp webhook signature (e2e, no real Meta calls)', () => {
     it('rejects a wrong verify token with 403', async () => {
       await request(app.getHttpServer())
         .get('/api/webhook')
-        .query({ 'hub.mode': 'subscribe', 'hub.verify_token': 'wrong', 'hub.challenge': '12345' })
+        .query({
+          'hub.mode': 'subscribe',
+          'hub.verify_token': 'wrong',
+          'hub.challenge': '12345',
+        })
         .expect(403);
     });
   });

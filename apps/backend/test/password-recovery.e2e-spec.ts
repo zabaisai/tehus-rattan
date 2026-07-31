@@ -63,7 +63,11 @@ describe('Password recovery (e2e)', () => {
     app.setGlobalPrefix('api');
     app.use(cookieParser());
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+      }),
     );
     await app.init();
     server = app.getHttpServer();
@@ -80,9 +84,22 @@ describe('Password recovery (e2e)', () => {
     ids.coA = coA.id;
     ids.coB = coB.id;
 
-    const mk = async (key: string, email: string, role: string, companyId: string | null, isActive = true) => {
+    const mk = async (
+      key: string,
+      email: string,
+      role: string,
+      companyId: string | null,
+      isActive = true,
+    ) => {
       const u = await prisma.user.create({
-        data: { email, password: hash, name: email, role: role as any, isActive, companyId },
+        data: {
+          email,
+          password: hash,
+          name: email,
+          role: role as any,
+          isActive,
+          companyId,
+        },
       });
       ids[key] = u.id;
     };
@@ -108,27 +125,42 @@ describe('Password recovery (e2e)', () => {
     });
     const uids = users.map((u) => u.id);
     if (uids.length) {
-      await prisma.passwordResetToken.deleteMany({ where: { userId: { in: uids } } });
+      await prisma.passwordResetToken.deleteMany({
+        where: { userId: { in: uids } },
+      });
       await prisma.userSession.deleteMany({ where: { userId: { in: uids } } });
-      await prisma.loginEvent.deleteMany({ where: { userId: { in: uids } } }).catch(() => undefined);
-      await prisma.auditLog.deleteMany({ where: { actorUserId: { in: uids } } }).catch(() => undefined);
+      await prisma.loginEvent
+        .deleteMany({ where: { userId: { in: uids } } })
+        .catch(() => undefined);
+      await prisma.auditLog
+        .deleteMany({ where: { actorUserId: { in: uids } } })
+        .catch(() => undefined);
       await prisma.user.deleteMany({ where: { id: { in: uids } } });
     }
-    await prisma.company.deleteMany({ where: { name: { startsWith: 'PR_E2E_' } } });
+    await prisma.company.deleteMany({
+      where: { name: { startsWith: 'PR_E2E_' } },
+    });
   }
 
   const forgot = (email: string, origin: string | null = ORIGIN) => {
-    const r = request(server).post('/api/auth/forgot-password').set('Content-Type', 'application/json');
+    const r = request(server)
+      .post('/api/auth/forgot-password')
+      .set('Content-Type', 'application/json');
     if (origin) r.set('Origin', origin);
     return r.send({ email });
   };
   const reset = (body: object, origin: string | null = ORIGIN) => {
-    const r = request(server).post('/api/auth/reset-password').set('Content-Type', 'application/json');
+    const r = request(server)
+      .post('/api/auth/reset-password')
+      .set('Content-Type', 'application/json');
     if (origin) r.set('Origin', origin);
     return r.send(body);
   };
   const login = (email: string, password: string) =>
-    request(server).post('/api/auth/login').set('Origin', ORIGIN).send({ email, password });
+    request(server)
+      .post('/api/auth/login')
+      .set('Origin', ORIGIN)
+      .send({ email, password });
 
   const GENERIC = 'Si existe una cuenta';
 
@@ -174,7 +206,11 @@ describe('Password recovery (e2e)', () => {
       const token = mail.tokenFor('pr.adminb@e2e.local')!;
       await login('pr.adminb@e2e.local', STRONG).expect(201); // creates a session to revoke
 
-      const res = await reset({ token, password: NEW_STRONG, passwordConfirmation: NEW_STRONG }).expect(200);
+      const res = await reset({
+        token,
+        password: NEW_STRONG,
+        passwordConfirmation: NEW_STRONG,
+      }).expect(200);
       expect(res.body.message).toContain('actualizada');
 
       await login('pr.adminb@e2e.local', STRONG).expect(401);
@@ -184,8 +220,16 @@ describe('Password recovery (e2e)', () => {
     it('is single-use: reusing a consumed token → 400', async () => {
       await forgot('pr.agentb@e2e.local').expect(200);
       const token = mail.tokenFor('pr.agentb@e2e.local')!;
-      await reset({ token, password: 'FirstNew!2027', passwordConfirmation: 'FirstNew!2027' }).expect(200);
-      await reset({ token, password: 'SecondNew!2027', passwordConfirmation: 'SecondNew!2027' }).expect(400);
+      await reset({
+        token,
+        password: 'FirstNew!2027',
+        passwordConfirmation: 'FirstNew!2027',
+      }).expect(200);
+      await reset({
+        token,
+        password: 'SecondNew!2027',
+        passwordConfirmation: 'SecondNew!2027',
+      }).expect(400);
     });
 
     it('rejects an expired token → 400', async () => {
@@ -196,7 +240,11 @@ describe('Password recovery (e2e)', () => {
         where: { tokenHash: sha256(token) },
         data: { expiresAt: new Date(Date.now() - 1000) },
       });
-      await reset({ token, password: NEW_STRONG, passwordConfirmation: NEW_STRONG }).expect(400);
+      await reset({
+        token,
+        password: NEW_STRONG,
+        passwordConfirmation: NEW_STRONG,
+      }).expect(400);
     });
 
     it('issuing a new token revokes the prior one → old token 400', async () => {
@@ -211,25 +259,60 @@ describe('Password recovery (e2e)', () => {
       const second = mail.tokenFor('pr.agenta@e2e.local')!;
       expect(second).not.toBe(first);
       // the FIRST (now revoked) token must fail
-      await reset({ token: first, password: NEW_STRONG, passwordConfirmation: NEW_STRONG }).expect(400);
+      await reset({
+        token: first,
+        password: NEW_STRONG,
+        passwordConfirmation: NEW_STRONG,
+      }).expect(400);
       // the SECOND still works
-      await reset({ token: second, password: NEW_STRONG, passwordConfirmation: NEW_STRONG }).expect(200);
+      await reset({
+        token: second,
+        password: NEW_STRONG,
+        passwordConfirmation: NEW_STRONG,
+      }).expect(200);
     });
 
     it.each([
-      ['tampered/nonexistent token', { token: 'deadbeef'.repeat(8), password: NEW_STRONG, passwordConfirmation: NEW_STRONG }],
-      ['password mismatch', { token: 'x'.repeat(64), password: NEW_STRONG, passwordConfirmation: 'Different!2027' }],
-      ['weak password', { token: 'x'.repeat(64), password: 'weak', passwordConfirmation: 'weak' }],
+      [
+        'tampered/nonexistent token',
+        {
+          token: 'deadbeef'.repeat(8),
+          password: NEW_STRONG,
+          passwordConfirmation: NEW_STRONG,
+        },
+      ],
+      [
+        'password mismatch',
+        {
+          token: 'x'.repeat(64),
+          password: NEW_STRONG,
+          passwordConfirmation: 'Different!2027',
+        },
+      ],
+      [
+        'weak password',
+        {
+          token: 'x'.repeat(64),
+          password: 'weak',
+          passwordConfirmation: 'weak',
+        },
+      ],
     ])('rejects %s → 400', async (_label, body) => {
       await reset(body).expect(400);
     });
 
     it('rejects a new password equal to the current one → 400', async () => {
       // adminA still has STRONG (never reset). Issue a token and try to set STRONG again.
-      await prisma.passwordResetToken.deleteMany({ where: { userId: ids.adminA } });
+      await prisma.passwordResetToken.deleteMany({
+        where: { userId: ids.adminA },
+      });
       await forgot('pr.admina@e2e.local').expect(200);
       const token = mail.tokenFor('pr.admina@e2e.local')!;
-      await reset({ token, password: STRONG, passwordConfirmation: STRONG }).expect(400);
+      await reset({
+        token,
+        password: STRONG,
+        passwordConfirmation: STRONG,
+      }).expect(400);
     });
   });
 
@@ -237,13 +320,19 @@ describe('Password recovery (e2e)', () => {
   describe('session revocation after reset', () => {
     it('revokes ALL active sessions; old refresh cookie can no longer refresh', async () => {
       // two logins → two sessions (distinct device cookies)
-      const l1 = await login('pr.agentb@e2e.local', 'FirstNew!2027').expect(201);
+      const l1 = await login('pr.agentb@e2e.local', 'FirstNew!2027').expect(
+        201,
+      );
       const cookies1 = (l1.headers['set-cookie'] as unknown as string[]) || [];
 
       await forgot('pr.agentb@e2e.local').expect(200);
       // backdate to bypass cooldown already-used? new forgot issues (prior consumed)
       const token = mail.tokenFor('pr.agentb@e2e.local')!;
-      await reset({ token, password: 'Third!Pass2027', passwordConfirmation: 'Third!Pass2027' }).expect(200);
+      await reset({
+        token,
+        password: 'Third!Pass2027',
+        passwordConfirmation: 'Third!Pass2027',
+      }).expect(200);
 
       // the pre-reset refresh cookie must now fail to refresh (session revoked)
       const refreshRes = await request(server)
@@ -269,7 +358,9 @@ describe('Password recovery (e2e)', () => {
 
     it('SUPER_ADMIN can send for any active user (no token in response)', async () => {
       const token = await bearer('pr.super@e2e.local', STRONG);
-      await prisma.passwordResetToken.deleteMany({ where: { userId: ids.adminA } }); // clear cooldown
+      await prisma.passwordResetToken.deleteMany({
+        where: { userId: ids.adminA },
+      }); // clear cooldown
       const before = mail.sent.length;
       const res = await request(server)
         .post(`/api/platform/users/${ids.adminA}/send-password-reset`)
@@ -282,7 +373,9 @@ describe('Password recovery (e2e)', () => {
 
     it('ADMIN can send for an AGENT of the SAME company', async () => {
       const token = await bearer('pr.admina@e2e.local', STRONG);
-      await prisma.passwordResetToken.deleteMany({ where: { userId: ids.agentA } }); // clear cooldown
+      await prisma.passwordResetToken.deleteMany({
+        where: { userId: ids.agentA },
+      }); // clear cooldown
       const before = mail.sent.length;
       await request(server)
         .post(`/api/users/${ids.agentA}/send-password-reset`)
@@ -339,11 +432,17 @@ describe('Password recovery (e2e)', () => {
   // ---- Origin / CSRF -------------------------------------------------------
   describe('Origin/CSRF', () => {
     it('rejects a foreign Origin on forgot-password → 403', async () => {
-      await forgot('pr.admina@e2e.local', 'https://evil.example.com').expect(403);
+      await forgot('pr.admina@e2e.local', 'https://evil.example.com').expect(
+        403,
+      );
     });
     it('rejects a foreign Origin on reset-password → 403', async () => {
       await reset(
-        { token: 'x'.repeat(64), password: NEW_STRONG, passwordConfirmation: NEW_STRONG },
+        {
+          token: 'x'.repeat(64),
+          password: NEW_STRONG,
+          passwordConfirmation: NEW_STRONG,
+        },
         'https://evil.example.com',
       ).expect(403);
     });
@@ -352,14 +451,21 @@ describe('Password recovery (e2e)', () => {
   // ---- SMTP failure compensation ------------------------------------------
   describe('SMTP failure', () => {
     it('keeps a generic 200 but revokes the just-issued token (unusable)', async () => {
-      await prisma.passwordResetToken.deleteMany({ where: { userId: ids.adminA } });
+      await prisma.passwordResetToken.deleteMany({
+        where: { userId: ids.adminA },
+      });
       mail.failNext = true;
       const before = mail.sent.length;
       await forgot('pr.admina@e2e.local').expect(200);
       expect(mail.sent.length).toBe(before); // send failed → not captured
       // a token row was created then revoked → no ACTIVE token remains
       const usable = await prisma.passwordResetToken.count({
-        where: { userId: ids.adminA, usedAt: null, revokedAt: null, expiresAt: { gt: new Date() } },
+        where: {
+          userId: ids.adminA,
+          usedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
       });
       expect(usable).toBe(0);
     });

@@ -31,17 +31,26 @@ describe('CreateLeadProductDto', () => {
   });
 
   it('rejects a quantity below 1', async () => {
-    const errors = await validatePayload({ productId: 'product-a', quantity: 0 });
+    const errors = await validatePayload({
+      productId: 'product-a',
+      quantity: 0,
+    });
     expect(errors.some((e) => e.property === 'quantity')).toBe(true);
   });
 
   it('rejects a non-integer quantity', async () => {
-    const errors = await validatePayload({ productId: 'product-a', quantity: 1.5 });
+    const errors = await validatePayload({
+      productId: 'product-a',
+      quantity: 1.5,
+    });
     expect(errors.some((e) => e.property === 'quantity')).toBe(true);
   });
 
   it('rejects a negative unitPrice', async () => {
-    const errors = await validatePayload({ productId: 'product-a', unitPrice: -1 });
+    const errors = await validatePayload({
+      productId: 'product-a',
+      unitPrice: -1,
+    });
     expect(errors.some((e) => e.property === 'unitPrice')).toBe(true);
   });
 });

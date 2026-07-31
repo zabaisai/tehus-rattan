@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InvitationCodeStatus, Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
@@ -49,7 +53,9 @@ export class InvitationCodesService {
   async create(dto: CreateInvitationCodeDto, actor: InvitationCodeActor) {
     const companyName = dto.intendedCompanyName.trim();
     if (!companyName) {
-      throw new BadRequestException('El nombre de la empresa invitada es requerido');
+      throw new BadRequestException(
+        'El nombre de la empresa invitada es requerido',
+      );
     }
 
     const expiresAt = dto.expiresAt ? new Date(dto.expiresAt) : undefined;
@@ -68,7 +74,8 @@ export class InvitationCodesService {
           codeHash,
           codePreview,
           intendedCompanyName: companyName,
-          intendedContactEmail: dto.intendedContactEmail?.trim().toLowerCase() || undefined,
+          intendedContactEmail:
+            dto.intendedContactEmail?.trim().toLowerCase() || undefined,
           expiresAt,
           createdByUserId: actor.actorUserId,
         },
@@ -126,7 +133,12 @@ export class InvitationCodesService {
 
     const invitation = await this.prisma.invitationCode.findUnique({
       where: { id: trimmedId },
-      select: { id: true, status: true, intendedCompanyName: true, codePreview: true },
+      select: {
+        id: true,
+        status: true,
+        intendedCompanyName: true,
+        codePreview: true,
+      },
     });
     if (!invitation) {
       throw new NotFoundException('Invitación no encontrada');

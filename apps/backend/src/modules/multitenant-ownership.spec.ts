@@ -134,7 +134,10 @@ describe('multi-tenant ownership validations', () => {
 
       expect(prisma.message.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { conversationId: 'conversation-b', conversation: { companyId } },
+          where: {
+            conversationId: 'conversation-b',
+            conversation: { companyId },
+          },
         }),
       );
       expect(result).toEqual([]);
@@ -229,7 +232,9 @@ describe('multi-tenant ownership validations', () => {
   describe('LeadsService', () => {
     const buildPrisma = (assignedUser: any = null) => {
       const prisma: any = {
-        contact: { findFirst: jest.fn().mockResolvedValue({ id: 'contact-a' }) },
+        contact: {
+          findFirst: jest.fn().mockResolvedValue({ id: 'contact-a' }),
+        },
         pipelineStage: {
           findFirst: jest.fn().mockResolvedValue({ id: 'stage-a' }),
         },
@@ -237,7 +242,11 @@ describe('multi-tenant ownership validations', () => {
           findFirst: jest.fn().mockResolvedValue({ id: 'pipeline-a' }),
         },
         user: { findFirst: jest.fn().mockResolvedValue(assignedUser) },
-        lead: { create: jest.fn(), findFirst: jest.fn(), findUniqueOrThrow: jest.fn() },
+        lead: {
+          create: jest.fn(),
+          findFirst: jest.fn(),
+          findUniqueOrThrow: jest.fn(),
+        },
         leadStageHistory: { create: jest.fn() },
       };
       prisma.$transaction = jest.fn((arg: any) =>
@@ -248,7 +257,7 @@ describe('multi-tenant ownership validations', () => {
 
     it('rejects assigning a lead to a user outside the authenticated company', async () => {
       const prisma = buildPrisma(null);
-      const service = new LeadsService(prisma as any);
+      const service = new LeadsService(prisma);
 
       await expect(
         service.create(companyId, 'user-creator', {
@@ -270,7 +279,7 @@ describe('multi-tenant ownership validations', () => {
 
     it('rejects assigning a lead to an inactive user in the same company', async () => {
       const prisma = buildPrisma(null);
-      const service = new LeadsService(prisma as any);
+      const service = new LeadsService(prisma);
 
       await expect(
         service.create(companyId, 'user-creator', {
@@ -292,7 +301,7 @@ describe('multi-tenant ownership validations', () => {
 
     it('rejects blank assignedTo before creating a lead', async () => {
       const prisma = buildPrisma(null);
-      const service = new LeadsService(prisma as any);
+      const service = new LeadsService(prisma);
 
       await expect(
         service.create(companyId, 'user-creator', {
@@ -311,7 +320,7 @@ describe('multi-tenant ownership validations', () => {
     it('rejects reading a lead belonging to another company', async () => {
       const prisma = buildPrisma(null);
       prisma.lead.findFirst.mockResolvedValue(null);
-      const service = new LeadsService(prisma as any);
+      const service = new LeadsService(prisma);
 
       await expect(
         service.findById('lead-b', companyId),
@@ -346,9 +355,9 @@ describe('multi-tenant ownership validations', () => {
     });
 
     it('rejects listing lead products for a lead outside the authenticated company', async () => {
-      await expect(service.findAllForLead('lead-b', companyId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findAllForLead('lead-b', companyId),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.leadProduct.findMany).not.toHaveBeenCalled();
     });
 
@@ -416,9 +425,9 @@ describe('multi-tenant ownership validations', () => {
     });
 
     it('rejects reading a quote belonging to another company', async () => {
-      await expect(service.findById('quote-b', companyId)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.findById('quote-b', companyId),
+      ).rejects.toBeInstanceOf(NotFoundException);
     });
 
     it('rejects updating a quote belonging to another company', async () => {

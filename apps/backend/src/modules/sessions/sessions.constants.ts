@@ -11,7 +11,8 @@ export const DEVICE_ID_COOKIE_MAX_AGE_MS = 2 * 365 * 24 * 60 * 60 * 1000; // ~2 
 // carries the same max age so the browser stops presenting it around the
 // same time the server would reject it anyway.
 export const SESSION_INACTIVITY_EXPIRY_DAYS = 90;
-export const SESSION_INACTIVITY_EXPIRY_MS = SESSION_INACTIVITY_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
+export const SESSION_INACTIVITY_EXPIRY_MS =
+  SESSION_INACTIVITY_EXPIRY_DAYS * 24 * 60 * 60 * 1000;
 
 // Shared by SessionsService.rotateRefreshToken and JwtStrategy.validate —
 // a single definition of "this session has been inactive long enough to

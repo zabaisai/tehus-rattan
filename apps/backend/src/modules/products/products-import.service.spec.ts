@@ -98,9 +98,15 @@ describe('ProductsImportService', () => {
       ],
     );
 
-    await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
-    const prices = prisma.product.create.mock.calls.map((c: any) => c[0].data.price);
+    const prices = prisma.product.create.mock.calls.map(
+      (c: any) => c[0].data.price,
+    );
     expect(prices).toEqual([11700000, 11700000, 6800000]);
   });
 
@@ -113,7 +119,11 @@ describe('ProductsImportService', () => {
       ],
     );
 
-    const summary = await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    const summary = await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
     expect(summary.totalRows).toBe(2);
     expect(summary.created).toBe(1);
@@ -129,13 +139,21 @@ describe('ProductsImportService', () => {
       [['Capsula Nido', '', '']],
     );
 
-    const summary = await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    const summary = await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
     expect(prisma.product.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ category: 'Sin categoría', price: 0 }),
     });
     expect(summary.warnings).toEqual([
-      expect.objectContaining({ rowNumber: 2, reason: 'Precio vacío', rawName: 'Capsula Nido' }),
+      expect.objectContaining({
+        rowNumber: 2,
+        reason: 'Precio vacío',
+        rawName: 'Capsula Nido',
+      }),
     ]);
   });
 
@@ -148,7 +166,11 @@ describe('ProductsImportService', () => {
       [['Sala Primavera', 'Salas', 11700000]],
     );
 
-    const summary = await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    const summary = await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
     expect(summary.created).toBe(0);
     expect(summary.skipped).toBe(1);
@@ -167,7 +189,11 @@ describe('ProductsImportService', () => {
       ],
     );
 
-    const summary = await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    const summary = await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
     expect(summary.created).toBe(1);
     expect(summary.skipped).toBe(1);
@@ -182,7 +208,11 @@ describe('ProductsImportService', () => {
       [['Sala Primavera', 11700000, 'Ratán natural', 'Sofá 230x93x63']],
     );
 
-    await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
     expect(prisma.product.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -203,7 +233,10 @@ describe('ProductsImportService', () => {
     worksheet.addRow(['Sala Primavera', 11700000]);
 
     const imageBuffer = Buffer.from(TINY_PNG_BASE64, 'base64');
-    const imageId = workbook.addImage({ buffer: imageBuffer, extension: 'png' });
+    const imageId = workbook.addImage({
+      buffer: imageBuffer,
+      extension: 'png',
+    });
     worksheet.addImage(imageId, {
       tl: { col: 2, row: 1 },
       ext: { width: 50, height: 50 },
@@ -212,7 +245,11 @@ describe('ProductsImportService', () => {
     const arrayBuffer = await workbook.xlsx.writeBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
     expect(mkdirMock).toHaveBeenCalled();
     expect(writeFileMock).toHaveBeenCalled();
@@ -229,7 +266,10 @@ describe('ProductsImportService', () => {
   });
 
   it('rejects a .xls file with a clear message instead of failing silently', async () => {
-    const buffer = await buildWorkbookBuffer(['Nombre', 'Precio'], [['Sala', 100]]);
+    const buffer = await buildWorkbookBuffer(
+      ['Nombre', 'Precio'],
+      [['Sala', 100]],
+    );
 
     await expect(
       service.importFromExcel(
@@ -247,17 +287,27 @@ describe('ProductsImportService', () => {
   });
 
   it('accepts a file at the 50MB size limit', async () => {
-    const buffer = await buildWorkbookBuffer(['Nombre', 'Precio'], [['Sala', 100]]);
+    const buffer = await buildWorkbookBuffer(
+      ['Nombre', 'Precio'],
+      [['Sala', 100]],
+    );
     const file = fakeExcelFile(buffer);
     // Report the file as exactly at the limit without allocating a real 50MB buffer.
     (file as any).size = MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES;
 
-    const summary = await service.importFromExcel('company-a', file, 'http://localhost:3001');
+    const summary = await service.importFromExcel(
+      'company-a',
+      file,
+      'http://localhost:3001',
+    );
     expect(summary.created).toBe(1);
   });
 
   it('rejects a file larger than 50MB with a clear MB-aware message', async () => {
-    const buffer = await buildWorkbookBuffer(['Nombre', 'Precio'], [['Sala', 100]]);
+    const buffer = await buildWorkbookBuffer(
+      ['Nombre', 'Precio'],
+      [['Sala', 100]],
+    );
     const file = fakeExcelFile(buffer);
     (file as any).size = MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES + 1;
 
@@ -270,7 +320,11 @@ describe('ProductsImportService', () => {
     const buffer = await buildWorkbookWithRowCount(MAX_PRODUCT_IMPORT_ROWS + 1);
 
     await expect(
-      service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001'),
+      service.importFromExcel(
+        'company-a',
+        fakeExcelFile(buffer),
+        'http://localhost:3001',
+      ),
     ).rejects.toThrow(
       `El archivo tiene demasiadas filas. Máximo permitido: ${MAX_PRODUCT_IMPORT_ROWS.toLocaleString('es-CO')} productos por importación.`,
     );
@@ -330,20 +384,33 @@ describe('ProductsImportService', () => {
     expect(summary.created).toBe(2);
     expect(summary.skipped).toBe(1);
     expect(summary.errors).toEqual([
-      expect.objectContaining({ rowNumber: 3, reason: 'No se pudo guardar el producto', rawName: 'Sala B' }),
+      expect.objectContaining({
+        rowNumber: 3,
+        reason: 'No se pudo guardar el producto',
+        rawName: 'Sala B',
+      }),
     ]);
   });
 
   it('only reads and writes products scoped to the authenticated company', async () => {
-    const buffer = await buildWorkbookBuffer(['Nombre', 'Precio'], [['Sala', 100]]);
+    const buffer = await buildWorkbookBuffer(
+      ['Nombre', 'Precio'],
+      [['Sala', 100]],
+    );
 
-    await service.importFromExcel('company-a', fakeExcelFile(buffer), 'http://localhost:3001');
+    await service.importFromExcel(
+      'company-a',
+      fakeExcelFile(buffer),
+      'http://localhost:3001',
+    );
 
     expect(prisma.product.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { companyId: 'company-a' } }),
     );
     expect(prisma.product.create).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ companyId: 'company-a' }) }),
+      expect.objectContaining({
+        data: expect.objectContaining({ companyId: 'company-a' }),
+      }),
     );
   });
 });

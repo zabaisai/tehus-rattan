@@ -84,7 +84,8 @@ describe('Rate limiting (e2e)', () => {
     for (let i = 0; i < 3; i++) await request(server).post('/login');
     await request(server).post('/login').expect(429);
     // Refresh has its own bucket and higher limit — still available.
-    for (let i = 0; i < 5; i++) await request(server).post('/refresh').expect(201);
+    for (let i = 0; i < 5; i++)
+      await request(server).post('/refresh').expect(201);
     await request(server).post('/refresh').expect(429);
   });
 
@@ -106,10 +107,19 @@ describe('Rate limiting (e2e)', () => {
     const server = app.getHttpServer();
     // Client A exhausts its login budget.
     for (let i = 0; i < 3; i++) {
-      await request(server).post('/login').set('X-Forwarded-For', '1.1.1.1').expect(201);
+      await request(server)
+        .post('/login')
+        .set('X-Forwarded-For', '1.1.1.1')
+        .expect(201);
     }
-    await request(server).post('/login').set('X-Forwarded-For', '1.1.1.1').expect(429);
+    await request(server)
+      .post('/login')
+      .set('X-Forwarded-For', '1.1.1.1')
+      .expect(429);
     // A different client IP is unaffected.
-    await request(server).post('/login').set('X-Forwarded-For', '2.2.2.2').expect(201);
+    await request(server)
+      .post('/login')
+      .set('X-Forwarded-For', '2.2.2.2')
+      .expect(201);
   });
 });

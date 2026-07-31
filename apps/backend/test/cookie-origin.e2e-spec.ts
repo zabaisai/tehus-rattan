@@ -29,7 +29,12 @@ async function buildApp(nodeEnv: string): Promise<INestApplication> {
         provide: ConfigService,
         useValue: {
           get: (key: string) =>
-            ({ FRONTEND_URL: ALLOWED_ORIGIN, NODE_ENV: nodeEnv } as Record<string, string>)[key],
+            (
+              ({ FRONTEND_URL: ALLOWED_ORIGIN, NODE_ENV: nodeEnv }) as Record<
+                string,
+                string
+              >
+            )[key],
         },
       },
     ],
@@ -37,7 +42,13 @@ async function buildApp(nodeEnv: string): Promise<INestApplication> {
 
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
   await app.init();
   return app;
 }
