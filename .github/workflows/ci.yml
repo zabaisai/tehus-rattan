@@ -5,9 +5,13 @@ name: CI
 # pass. All values below are dummy/fictitious and safe to commit.
 on:
   push:
-    # develop/main plus any feature/** branch, so a branch is verified remotely
-    # before it is ever merged (there may be no PR yet).
-    branches: [develop, main, "feature/**"]
+    # develop/main plus any feature/** or hotfix/** branch, so a branch is
+    # verified remotely before it is ever merged (there may be no PR yet).
+    #
+    # `hotfix/**` se anadio despues de que una rama de correccion urgente se
+    # quedara SIN verificar por no encajar en el patron: precisamente la clase
+    # de rama que mas prisa lleva y que menos conviene fusionar a ciegas.
+    branches: [develop, main, "feature/**", "hotfix/**"]
   pull_request:
 
 # Cancel superseded runs on the same ref to save CI minutes.
