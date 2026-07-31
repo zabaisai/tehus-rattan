@@ -60,13 +60,19 @@ export function InboxFilters({
 
   return (
     <div className="border-b border-stone-200 bg-white">
-      <div className="flex gap-1 overflow-x-auto px-2 pt-2">
+      {/* Las pestanas SE ENVUELVEN, no se desplazan.
+          La columna de la bandeja mide 288 px y las cuatro no caben en una
+          linea: con `overflow-x-auto` quedaban recortadas y con flechas, es
+          decir, dos de los cuatro filtros principales invisibles hasta que
+          alguien descubriera que la barra se desplaza. Dos filas de pestanas
+          en una columna estrecha no molestan; un filtro que no se ve, si. */}
+      <div className="flex flex-wrap gap-1 px-2 pt-2">
         {pestanas.map((p) => (
           <button
             key={p.clave}
             onClick={() => elegirPestana(p.clave)}
             aria-current={activa === p.clave ? 'true' : undefined}
-            className={`flex shrink-0 items-center gap-1.5 rounded-t-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
               activa === p.clave
                 ? 'bg-stone-100 text-stone-900'
                 : 'text-stone-500 hover:bg-stone-50'

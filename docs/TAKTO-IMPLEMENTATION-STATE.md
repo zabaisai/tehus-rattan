@@ -349,18 +349,35 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       grises originales (`#78716c`, `#1c1917`, `#f5f5f4`, `#a8a29e`).
       Es un puente: las pantallas nuevas usan `neutral-*`, y cuando no quede
       ningún `stone-*` el bloque se borra sin que cambie nada
-- [ ] Aplicar el naranja de acento a superficies concretas (hoy solo vive en
-      el logotipo; el token existe y las reglas de contraste ya están fijadas)
+- [x] **Sistema visual aplicado al producto** — `Button` y `Badge` codifican
+      las reglas de marca para que no dependan de que alguien las recuerde
+      (un botón naranja lleva texto navy; `type="button"` por defecto). 48
+      botones primarios pasados al navy de marca. El acento aparece donde
+      aporta —contador de no leídos, «Sin asignar», barra a la izquierda del
+      menú activo—, como borde y no como fondo: el naranja a pantalla completa
+      compite con el contenido y taparía el color propio de cada empresa
+- [x] **Foco visible en todo lo interactivo** — el producto usa `outline-none`
+      en casi todos sus campos y no reponía nada. Regla global, **sin
+      `:where()`**: eso la dejaría con especificidad cero y cualquier
+      `.outline-none` la anularía, que es justo el caso que cubre
+- [x] **`docs/DESIGN-SYSTEM.md`** — dónde vive cada cosa, las tres reglas
+      irrompibles, y qué NO hay (tema oscuro, logo en el PDF) con su motivo
 - [x] **QA visual del login** (escritorio 1440×900, Chrome headless) — el
       lockup TAKTO, la división TAK/TO, Archivo en el titular, IBM Plex Sans
       en el cuerpo y los neutrales de marca se ven correctos. La captura
       móvil se tomó sin emulación de dispositivo, así que **no es
       concluyente** sobre el diseño responsive; el `<meta viewport>` sí se
       verificó presente
-- [ ] QA visual del resto de pantallas (requiere sesión iniciada)
-- [ ] Design system con tokens semánticos + documentación
-- [ ] Favicon, manifest/PWA, Open Graph, metadatos
-- [ ] Fuentes Archivo / IBM Plex Sans / IBM Plex Mono
+- [x] **QA visual con sesión iniciada, 6 pantallas × 3 viewports** (390, 768,
+      1440) vía CDP: login real, emulación de dispositivo y captura. 18
+      capturas, **0 desbordes horizontales**. La revisión a ojo encontró lo
+      que la comprobación automática no ve: **las pestañas de la bandeja
+      salían recortadas** con flechas de desplazamiento —dos de los cuatro
+      filtros invisibles— porque el desborde era interno al contenedor y no de
+      la página. Corregido envolviéndolas
+- [x] Design system con tokens semánticos + documentación
+- [x] Favicon, manifest/PWA, Open Graph, metadatos
+- [x] Fuentes Archivo / IBM Plex Sans / IBM Plex Mono
 - [ ] Todas las superficies del §4 del encargo
 - [ ] Separación identidad plataforma vs empresa cliente
 - [ ] `prefers-reduced-motion`
