@@ -20,7 +20,7 @@ bad()  { printf '\033[1;31mFAIL: %s\033[0m\n' "$1"; failures=$((failures + 1)); 
 echo "== Container status =="
 docker compose -f "$COMPOSE_FILE" ps
 
-for svc in postgres backend frontend caddy; do
+for svc in postgres redis backend worker frontend caddy; do
   state="$(docker compose -f "$COMPOSE_FILE" ps -q "$svc" | xargs -r docker inspect -f '{{.State.Status}}' 2>/dev/null)"
   if [ "$state" = "running" ]; then
     ok "$svc container is running"
@@ -28,6 +28,19 @@ for svc in postgres backend frontend caddy; do
     bad "$svc container is not running (state: ${state:-not found})"
   fi
 done
+
+echo ""
+echo "== Durable queue (informational, NEVER fails the deploy) =="
+# La cola caida degrada el procesamiento diferido, no el CRM: por eso este
+# bloque informa y no marca el despliegue como fallido. El endpoint devuelve
+# 200 siempre, con state=up|down|disabled.
+queue_json="$(docker compose -f "$COMPOSE_FILE" exec -T backend wget -qO- http://127.0.0.1:3001/api/health/queue 2>/dev/null || true)"
+case "$queue_json" in
+  *'"state":"up"'*)       ok "queue reachable (state: up)" ;;
+  *'"state":"disabled"'*) ok "queue disabled by configuration (QUEUE_ENABLED=false)" ;;
+  *'"state":"down"'*)     warn "queue unreachable (state: down) - deferred processing degraded, CRM still serving" ;;
+  *)                      warn "could not read queue state" ;;
+esac
 
 echo ""
 echo "== Backend health (internal, container-to-container) =="
