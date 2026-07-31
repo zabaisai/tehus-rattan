@@ -100,8 +100,13 @@ export class SystemHealthService {
     }
   }
 
-  private async comprobarCola(env: NodeJS.ProcessEnv): Promise<ComponenteSalud> {
-    const salud = await this.queueHealth.check(() => this.queuePing.ping(), env);
+  private async comprobarCola(
+    env: NodeJS.ProcessEnv,
+  ): Promise<ComponenteSalud> {
+    const salud = await this.queueHealth.check(
+      () => this.queuePing.ping(),
+      env,
+    );
     return { ...salud };
   }
 
@@ -128,7 +133,11 @@ export class SystemHealthService {
 
       const antiguedadMs = Date.now() - latido.seenAt.getTime();
       if (antiguedadMs > MARGEN_LATIDO_MS) {
-        return { state: 'stale', ageMs: antiguedadMs, reason: 'latido-vencido' };
+        return {
+          state: 'stale',
+          ageMs: antiguedadMs,
+          reason: 'latido-vencido',
+        };
       }
       return { state: 'up', ageMs: antiguedadMs };
     } catch (error) {
@@ -170,7 +179,11 @@ export class SystemHealthService {
         };
       }
 
-      return { state: 'up', pending: pendientes, oldestPendingMs: antiguedadMs };
+      return {
+        state: 'up',
+        pending: pendientes,
+        oldestPendingMs: antiguedadMs,
+      };
     } catch (error) {
       return {
         state: 'unknown',
@@ -192,9 +205,7 @@ export class SystemHealthService {
         };
   }
 
-  private agregar(
-    components: SaludDelSistema['components'],
-  ): EstadoGlobal {
+  private agregar(components: SaludDelSistema['components']): EstadoGlobal {
     // Sin base no se atiende: es lo único que hace caer el sistema entero.
     if (components.database.state === 'down') return 'down';
 

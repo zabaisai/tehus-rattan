@@ -78,9 +78,11 @@ describe('WebhookService', () => {
       isEnabled: jest.fn().mockReturnValue(false),
     };
     leadIntake = {
-      ensureLeadForConversation: jest
-        .fn()
-        .mockResolvedValue({ leadId: 'lead-1', creado: true, assignedTo: null }),
+      ensureLeadForConversation: jest.fn().mockResolvedValue({
+        leadId: 'lead-1',
+        creado: true,
+        assignedTo: null,
+      }),
     };
     service = new WebhookService(
       prisma,
@@ -654,7 +656,13 @@ describe('WebhookService', () => {
     it('la conversacion se busca acotada por companyId', async () => {
       // Aunque el trabajo venga de nuestra propia cola, no se confia en su
       // contenido para saltarse el aislamiento.
-      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        null,
+      );
 
       expect(prisma.conversation.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -690,7 +698,13 @@ describe('WebhookService', () => {
       );
 
       await expect(
-        service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null),
+        service.runInboundEffects(
+          'company-a',
+          'conv-1',
+          'hola',
+          '+57300',
+          null,
+        ),
       ).resolves.toBeUndefined();
       expect(automationsService.processMessage).toHaveBeenCalled();
     });
@@ -698,7 +712,13 @@ describe('WebhookService', () => {
     it('sin conversacion no intenta crear oportunidad', async () => {
       prisma.conversation.findFirst.mockResolvedValue(null);
 
-      await service.runInboundEffects('company-a', 'conv-1', 'hola', '+57300', null);
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        null,
+      );
 
       expect(leadIntake.ensureLeadForConversation).not.toHaveBeenCalled();
     });

@@ -63,7 +63,11 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
     empresaId = empresa.id;
 
     const pipeline = await prisma.pipeline.create({
-      data: { companyId: empresaId, name: 'E2E Intake Pipeline', isDefault: true },
+      data: {
+        companyId: empresaId,
+        name: 'E2E Intake Pipeline',
+        isDefault: true,
+      },
     });
     pipelineId = pipeline.id;
 
@@ -90,7 +94,9 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
   });
 
   afterAll(async () => {
-    await prisma.leadStageHistory.deleteMany({ where: { leadId: { in: creados } } });
+    await prisma.leadStageHistory.deleteMany({
+      where: { leadId: { in: creados } },
+    });
     await prisma.conversation.deleteMany({ where: { companyId: empresaId } });
     await prisma.lead.deleteMany({ where: { companyId: empresaId } });
     await prisma.contact.deleteMany({ where: { companyId: empresaId } });
@@ -120,7 +126,9 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
       });
       creados.push(r.leadId!);
 
-      const lead = await prisma.lead.findUniqueOrThrow({ where: { id: r.leadId! } });
+      const lead = await prisma.lead.findUniqueOrThrow({
+        where: { id: r.leadId! },
+      });
       expect(r.creado).toBe(true);
       expect(lead.stageId).toBe(etapaInicialId);
       expect(lead.pipelineId).toBe(pipelineId);
@@ -180,7 +188,9 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
       });
       creados.push(r.leadId!);
 
-      const lead = await prisma.lead.findUniqueOrThrow({ where: { id: r.leadId! } });
+      const lead = await prisma.lead.findUniqueOrThrow({
+        where: { id: r.leadId! },
+      });
       expect(lead.title).toContain('Ana Pérez');
       expect(lead.title).not.toMatch(/\d{6,}/);
     });
@@ -367,7 +377,9 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
       });
       creados.push(r.leadId!);
 
-      const lead = await prisma.lead.findUniqueOrThrow({ where: { id: r.leadId! } });
+      const lead = await prisma.lead.findUniqueOrThrow({
+        where: { id: r.leadId! },
+      });
       const conv = await prisma.conversation.findUniqueOrThrow({
         where: { id: conversationId },
       });
@@ -406,7 +418,9 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
       });
       creados.push(r.leadId!);
 
-      const lead = await prisma.lead.findUniqueOrThrow({ where: { id: r.leadId! } });
+      const lead = await prisma.lead.findUniqueOrThrow({
+        where: { id: r.leadId! },
+      });
       expect(lead.assignedTo).toBeNull();
       expect(notificaciones.emitToCompanyRoles).toHaveBeenCalled();
 
@@ -450,7 +464,11 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
         data: { name: 'E2E Intake Sin Pipeline' },
       });
       const contacto = await prisma.contact.create({
-        data: { companyId: otra.id, phone: '+19998887777', name: 'Sin pipeline' },
+        data: {
+          companyId: otra.id,
+          phone: '+19998887777',
+          name: 'Sin pipeline',
+        },
       });
       const conv = await prisma.conversation.create({
         data: { companyId: otra.id, contactId: contacto.id },

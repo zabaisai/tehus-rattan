@@ -126,7 +126,8 @@ describe('SLA de primera respuesta (e2e, base real)', () => {
     notifications.emitToCompanyRoles.mockClear();
   });
 
-  const detectados = async () => (await sla.detectar()).map((c) => c.conversationId);
+  const detectados = async () =>
+    (await sla.detectar()).map((c) => c.conversationId);
 
   describe('qué cuenta como incumplido', () => {
     it('un entrante sin responder por encima del umbral', async () => {

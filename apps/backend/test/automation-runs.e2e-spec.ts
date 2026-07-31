@@ -241,7 +241,11 @@ describe('Automatizaciones: historial y versiones (e2e, base real)', () => {
         idempotencyKey: `retry-${Math.random()}`,
       });
 
-      const veredicto = await runs.registrarFallo(prisma, run!.id, 'TimeoutError');
+      const veredicto = await runs.registrarFallo(
+        prisma,
+        run!.id,
+        'TimeoutError',
+      );
 
       expect(veredicto).toBe('reintentara');
       const fila = await prisma.automationRun.findUniqueOrThrow({

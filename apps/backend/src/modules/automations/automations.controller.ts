@@ -55,7 +55,10 @@ export class AutomationsController {
     // automatizacion ajena no debe devolver nada, ni siquiera un 404 que
     // confirme que existe.
     return this.prisma.automationVersion.findMany({
-      where: { automationId: id, automation: { companyId: req.user.companyId } },
+      where: {
+        automationId: id,
+        automation: { companyId: req.user.companyId },
+      },
       orderBy: { version: 'desc' },
       take: 20,
     });
@@ -68,7 +71,11 @@ export class AutomationsController {
 
   @Post()
   create(@Request() req: any, @Body() body: CreateAutomationDto) {
-    return this.automationsService.create(req.user.companyId, body, req.user.sub);
+    return this.automationsService.create(
+      req.user.companyId,
+      body,
+      req.user.sub,
+    );
   }
 
   @Patch(':id')

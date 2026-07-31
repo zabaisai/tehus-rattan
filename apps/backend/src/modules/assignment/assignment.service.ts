@@ -61,7 +61,10 @@ export class AssignmentService {
       },
       // Nulls first: quien nunca ha recibido nada entra el primero, para que
       // un asesor recién incorporado no espere una vuelta entera.
-      orderBy: [{ lastAssignedAt: { sort: 'asc', nulls: 'first' } }, { id: 'asc' }],
+      orderBy: [
+        { lastAssignedAt: { sort: 'asc', nulls: 'first' } },
+        { id: 'asc' },
+      ],
       select: { id: true },
     });
 

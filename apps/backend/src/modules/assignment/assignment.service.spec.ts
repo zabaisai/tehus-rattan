@@ -16,7 +16,9 @@ describe('AssignmentService', () => {
         update: jest.fn().mockResolvedValue({}),
       },
     };
-    notifications = { emitToCompanyRoles: jest.fn().mockResolvedValue(undefined) };
+    notifications = {
+      emitToCompanyRoles: jest.fn().mockResolvedValue(undefined),
+    };
     service = new AssignmentService(prisma, notifications as never);
   });
 
@@ -55,14 +57,18 @@ describe('AssignmentService', () => {
     it('usa el writer que se le pasa, para ir dentro de la transacción', async () => {
       // Si la operación que lo envuelve se revierte, el turno no se consume.
       const tx = {
-        company: { findUnique: jest.fn().mockResolvedValue({ autoAssignEnabled: true }) },
+        company: {
+          findUnique: jest.fn().mockResolvedValue({ autoAssignEnabled: true }),
+        },
         user: {
           findFirst: jest.fn().mockResolvedValue({ id: 'agente-tx' }),
           update: jest.fn().mockResolvedValue({}),
         },
       };
 
-      expect(await service.pickNextAgent(companyId, tx as never)).toBe('agente-tx');
+      expect(await service.pickNextAgent(companyId, tx as never)).toBe(
+        'agente-tx',
+      );
       expect(prisma.user.findFirst).not.toHaveBeenCalled();
       expect(tx.user.update).toHaveBeenCalled();
     });
@@ -141,7 +147,9 @@ describe('AssignmentService', () => {
     it('el aviso no lleva datos del contacto ni del mensaje', async () => {
       await service.warnNobodyAvailable(companyId);
 
-      const enviado = JSON.stringify(notifications.emitToCompanyRoles.mock.calls);
+      const enviado = JSON.stringify(
+        notifications.emitToCompanyRoles.mock.calls,
+      );
       expect(enviado).not.toMatch(/\+?\d{7,}/);
     });
   });

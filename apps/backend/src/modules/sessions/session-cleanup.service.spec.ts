@@ -17,7 +17,6 @@ afterAll(() => {
   else process.env.QUEUE_ENABLED = colaOriginal;
 });
 
-
 describe('SessionCleanupService', () => {
   let prisma: any;
   let service: SessionCleanupService;

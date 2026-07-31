@@ -134,7 +134,7 @@ describe('SystemHealthService', () => {
       queueHealth.isEnabled.mockReturnValue(false);
       queueHealth.check.mockResolvedValue({ state: 'disabled' });
 
-      const r = await service.check({ QUEUE_ENABLED: 'false' } as never);
+      const r = await service.check({ QUEUE_ENABLED: 'false' });
 
       expect(r.components.worker.state).toBe('disabled');
       expect(r.status).toBe('ok');
@@ -156,7 +156,7 @@ describe('SystemHealthService', () => {
     });
 
     it('sin puente configurado es disabled, no un fallo', async () => {
-      const r = await service.check({ QUEUE_ENABLED: 'false' } as never);
+      const r = await service.check({ QUEUE_ENABLED: 'false' });
 
       expect(r.components.realtime.state).toBe('disabled');
     });

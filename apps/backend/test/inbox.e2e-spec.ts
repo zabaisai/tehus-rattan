@@ -22,12 +22,14 @@ describe('Bandeja de conversaciones (e2e, base real)', () => {
   let asesorB: string;
   let contactoId: string;
 
-  const nuevaConversacion = async (opciones: {
-    companyId?: string;
-    assignedTo?: string | null;
-    status?: string;
-    contactId?: string;
-  } = {}) => {
+  const nuevaConversacion = async (
+    opciones: {
+      companyId?: string;
+      assignedTo?: string | null;
+      status?: string;
+      contactId?: string;
+    } = {},
+  ) => {
     const companyId = opciones.companyId ?? empresaId;
     const contactId =
       opciones.contactId ??
@@ -240,7 +242,11 @@ describe('Bandeja de conversaciones (e2e, base real)', () => {
     it('los mensajes SALIENTES no cuentan como sin leer', async () => {
       const conv = await nuevaConversacion();
       await prisma.message.create({
-        data: { conversationId: conv, body: 'respuesta', direction: 'OUTBOUND' },
+        data: {
+          conversationId: conv,
+          body: 'respuesta',
+          direction: 'OUTBOUND',
+        },
       });
 
       const r = await inbox.list(empresaId, asesorA, {

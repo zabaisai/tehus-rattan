@@ -13,7 +13,6 @@ afterAll(() => {
   else process.env.QUEUE_ENABLED = colaOriginal;
 });
 
-
 function build() {
   const prisma = {
     task: { findMany: jest.fn().mockResolvedValue([]) },

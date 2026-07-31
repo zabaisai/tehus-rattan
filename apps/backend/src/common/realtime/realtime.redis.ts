@@ -82,7 +82,7 @@ export async function conTiempoLimite(
         temporizador = setTimeout(
           () => rechazar(new Error('timeout')),
           ms,
-        ).unref?.() as never;
+        ).unref?.();
       }),
     ]);
     return true;

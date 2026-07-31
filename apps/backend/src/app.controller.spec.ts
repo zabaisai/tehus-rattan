@@ -130,7 +130,9 @@ describe('AppController', () => {
         { getHealth: jest.fn() } as never,
         new QueueHealthService(),
         { ping: jest.fn() } as never,
-        { check: jest.fn().mockResolvedValue({ status, components: {} }) } as never,
+        {
+          check: jest.fn().mockResolvedValue({ status, components: {} }),
+        } as never,
       );
 
     const respuesta = () => ({ status: jest.fn() });
