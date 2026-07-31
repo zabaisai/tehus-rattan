@@ -274,7 +274,7 @@ function DisconnectedView({
             type="button"
             onClick={onConnect}
             disabled={busy}
-            className="inline-flex items-center gap-2 rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-900 disabled:opacity-50"
           >
             <MessageCircle className="h-4 w-4" aria-hidden />
             Conectar con Meta
@@ -388,7 +388,7 @@ function ConnectedView({
             type="button"
             onClick={runTest}
             disabled={testing || !testTo.trim()}
-            className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+            className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
           >
             {testing ? 'Enviando…' : 'Enviar prueba'}
           </button>

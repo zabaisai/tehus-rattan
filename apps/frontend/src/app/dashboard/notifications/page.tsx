@@ -93,7 +93,7 @@ export default function NotificationsPage() {
               role="tab"
               aria-selected={filter === f}
               onClick={() => setFilter(f)}
-              className={`rounded px-3 py-1 text-sm ${filter === f ? 'bg-stone-900 text-white' : 'text-stone-600 hover:bg-stone-100'}`}
+              className={`rounded px-3 py-1 text-sm ${filter === f ? 'bg-brand-primary text-white' : 'text-stone-600 hover:bg-stone-100'}`}
             >
               {f === 'all' ? 'Todas' : 'No leídas'}
             </button>

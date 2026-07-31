@@ -138,7 +138,7 @@ export function SupportConversationDetailModal({
                         <div
                           className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
                             isOutbound
-                              ? 'bg-stone-900 text-white'
+                              ? 'bg-brand-primary text-white'
                               : 'border border-stone-200 bg-white text-stone-800'
                           }`}
                         >

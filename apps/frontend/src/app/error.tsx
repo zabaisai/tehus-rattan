@@ -14,7 +14,7 @@ export default function Error({ reset }: { error: Error; reset: () => void }) {
       <button
         type="button"
         onClick={reset}
-        className="mt-6 rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800"
+        className="mt-6 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900"
       >
         Reintentar
       </button>

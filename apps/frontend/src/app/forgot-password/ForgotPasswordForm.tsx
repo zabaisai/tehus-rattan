@@ -79,7 +79,7 @@ export function ForgotPasswordForm() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-md bg-stone-900 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800 disabled:opacity-50"
+              className="w-full rounded-md bg-brand-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900 disabled:opacity-50"
             >
               {loading ? 'Enviando...' : 'Enviar instrucciones'}
             </button>

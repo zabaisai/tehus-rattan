@@ -115,7 +115,7 @@ export default function ProductsPage() {
           </button>
           <button
             onClick={openCreateModal}
-            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800 sm:flex-none"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900 sm:flex-none"
           >
             <Plus size={16} />
             Nuevo producto

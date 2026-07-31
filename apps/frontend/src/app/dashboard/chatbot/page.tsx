@@ -81,7 +81,7 @@ export default function ChatbotPage() {
         </div>
         <button
           onClick={() => void crear()}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
         >
           <Plus size={16} />
           Nuevo flujo
@@ -295,7 +295,7 @@ function PanelDeFlujo({
         <button
           onClick={() => void publicar()}
           disabled={guardando}
-          className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-900 disabled:opacity-50"
         >
           <Rocket size={13} />
           Publicar

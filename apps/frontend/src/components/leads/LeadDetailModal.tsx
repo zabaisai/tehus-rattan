@@ -509,7 +509,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                     type="button"
                     onClick={() => setCreateQuoteModalOpen(true)}
                     disabled={(leadProducts?.length ?? 0) === 0}
-                    className="flex items-center gap-1.5 rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     <FileText size={14} />
                     Crear cotización
@@ -682,7 +682,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
               >
                 {saving ? 'Guardando...' : 'Guardar'}
               </button>

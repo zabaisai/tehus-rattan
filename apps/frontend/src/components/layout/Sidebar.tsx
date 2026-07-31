@@ -144,10 +144,15 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               href={item.href}
               onClick={onNavigate}
               style={isActive && activeColor ? { backgroundColor: activeColor } : undefined}
-              className={`flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
+              // El acento naranja marca DONDE ESTAS: una barra a la
+              // izquierda del elemento activo. Va como borde y no como fondo
+              // porque el naranja de marca a pantalla completa compite con el
+              // contenido, y porque asi convive con el color propio de cada
+              // empresa sin taparlo.
+              className={`flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
                 isActive
-                  ? `text-white ${activeColor ? '' : 'bg-stone-900'}`
-                  : 'text-stone-600 hover:bg-stone-100'
+                  ? `border-brand-secondary text-white ${activeColor ? '' : 'bg-brand-primary'}`
+                  : 'border-transparent text-stone-600 hover:bg-stone-100'
               }`}
             >
               <Icon size={16} strokeWidth={2} />
@@ -170,7 +175,7 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                   onClick={onNavigate}
                   className={`flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
                     pathname.startsWith(item.href)
-                      ? 'bg-stone-900 text-white'
+                      ? 'bg-brand-primary text-white'
                       : 'text-stone-600 hover:bg-stone-100'
                   }`}
                 >

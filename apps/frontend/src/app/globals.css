@@ -178,6 +178,26 @@ h3 {
   letter-spacing: -0.02em;
 }
 
+/* Foco visible en TODO lo interactivo.
+   Los navegadores traen uno propio, pero cada `outline-none` que se escribe
+   para quitar el contorno azul por defecto lo elimina sin poner nada en su
+   lugar, y quien navega con teclado se queda sin saber donde esta. El
+   producto usa `outline-none` en practicamente todos sus campos.
+
+   NO va envuelto en `:where()`: eso lo dejaria con especificidad cero y
+   cualquier `.outline-none` lo anularia, que es exactamente el caso que
+   intenta cubrir. Con el selector desnudo -elemento + pseudoclase, 0-1-1-
+   gana a la clase de utilidad (0-1-0). */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-line-focus);
+  outline-offset: 1px;
+}
+
 /* iOS Safari zooms the page in on focus when a form field's computed font
    size is under 16px. Every form in this app uses text-sm (14px), so this
    forces 16px only up to the sm breakpoint instead of bumping every input. */

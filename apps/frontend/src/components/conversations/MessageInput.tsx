@@ -45,7 +45,7 @@ export function MessageInput({
         <button
           type="submit"
           disabled={sending || !value.trim()}
-          className="flex items-center justify-center rounded-md bg-stone-900 p-2 text-white hover:bg-stone-800 disabled:opacity-50"
+          className="flex items-center justify-center rounded-md bg-brand-primary p-2 text-white hover:bg-primary-900 disabled:opacity-50"
         >
           <Send size={16} />
         </button>

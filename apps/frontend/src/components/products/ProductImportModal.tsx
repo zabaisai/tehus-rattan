@@ -115,7 +115,7 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
                 type="button"
                 onClick={handleImport}
                 disabled={!file || importing}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
               >
                 {importing ? 'Importando...' : 'Importar'}
               </button>
@@ -182,7 +182,7 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900"
               >
                 Cerrar
               </button>

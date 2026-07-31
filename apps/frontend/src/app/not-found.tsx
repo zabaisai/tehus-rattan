@@ -12,7 +12,7 @@ export default function NotFound() {
       </p>
       <Link
         href="/dashboard"
-        className="mt-6 rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-stone-800"
+        className="mt-6 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900"
       >
         Volver al inicio
       </Link>

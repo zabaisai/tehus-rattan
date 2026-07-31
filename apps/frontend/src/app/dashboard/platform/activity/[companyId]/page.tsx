@@ -91,12 +91,12 @@ function DailyLoginsChart({ data }: { data: { date: string; count: number }[] })
             >
               <div className="absolute bottom-0 flex w-full flex-col items-center justify-end" style={{ height: '100%' }}>
                 {hoverIndex === i && (
-                  <div className="mb-1 whitespace-nowrap rounded bg-stone-900 px-1.5 py-0.5 text-[10px] text-white">
+                  <div className="mb-1 whitespace-nowrap rounded bg-brand-primary px-1.5 py-0.5 text-[10px] text-white">
                     {d.count} {d.count === 1 ? 'acceso' : 'accesos'}
                   </div>
                 )}
                 <div
-                  className="w-full rounded-t bg-stone-700 transition-colors group-hover:bg-stone-900"
+                  className="w-full rounded-t bg-stone-700 transition-colors group-hover:bg-brand-primary"
                   style={{ height: `${Math.max(heightPct, d.count > 0 ? 4 : 1)}%` }}
                 />
               </div>

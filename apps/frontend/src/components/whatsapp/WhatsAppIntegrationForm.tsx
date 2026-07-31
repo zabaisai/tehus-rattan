@@ -154,7 +154,7 @@ export function WhatsAppIntegrationForm({
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+          className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
         >
           {isSubmitting
             ? 'Guardando...'

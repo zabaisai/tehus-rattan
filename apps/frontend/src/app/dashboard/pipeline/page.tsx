@@ -60,7 +60,7 @@ export default function PipelinePage() {
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
+          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
         >
           <Plus size={16} />
           Nuevo lead

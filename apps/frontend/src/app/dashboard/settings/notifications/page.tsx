@@ -134,7 +134,7 @@ export default function NotificationPreferencesPage() {
           type="button"
           onClick={save}
           disabled={saving || isLoading || isError}
-          className="rounded-md bg-stone-900 px-4 py-2 text-sm font-medium text-white hover:bg-stone-800 disabled:opacity-50"
+          className="rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-900 disabled:opacity-50"
         >
           {saving ? 'Guardando…' : 'Guardar preferencias'}
         </button>

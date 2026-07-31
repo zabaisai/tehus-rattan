@@ -35,7 +35,7 @@ export function MessageThread({ messages }: { messages: Message[] }) {
                   isFailed
                     ? 'border border-red-300 bg-red-50 text-red-700'
                     : isOutbound
-                      ? 'bg-stone-900 text-white'
+                      ? 'bg-brand-primary text-white'
                       : 'bg-white text-stone-800 border border-stone-200'
                 }`}
               >

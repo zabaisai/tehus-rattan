@@ -145,7 +145,7 @@ export function CreateInvitationCodeModal({
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:opacity-50"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
               >
                 {saving ? 'Generando...' : 'Generar código'}
               </button>
@@ -172,7 +172,7 @@ export function CreateInvitationCodeModal({
               <button
                 type="button"
                 onClick={handleCopy}
-                className="flex shrink-0 items-center gap-1 rounded-md bg-stone-900 px-2.5 py-1.5 text-xs text-white hover:bg-stone-800"
+                className="flex shrink-0 items-center gap-1 rounded-md bg-brand-primary px-2.5 py-1.5 text-xs text-white hover:bg-primary-900"
               >
                 {copied ? <Check size={13} /> : <Copy size={13} />}
                 {copied ? 'Copiado' : 'Copiar'}
@@ -196,7 +196,7 @@ export function CreateInvitationCodeModal({
                 type="button"
                 onClick={handleClose}
                 disabled={!confirmedCopy}
-                className="rounded-md bg-stone-900 px-3 py-1.5 text-sm text-white hover:bg-stone-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 Cerrar
               </button>
