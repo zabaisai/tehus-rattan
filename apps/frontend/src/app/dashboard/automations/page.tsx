@@ -18,13 +18,21 @@ import {
   type BorradorAutomatizacion,
 } from '@/components/automations/AutomationEditor';
 import { AutomationRuns } from '@/components/automations/AutomationRuns';
+import { ListState, mensajeDeError } from '@/components/ui/ListState';
 
 export default function AutomationsPage() {
   const queryClient = useQueryClient();
   const [editando, setEditando] = useState<Automatizacion | null>(null);
   const [creando, setCreando] = useState(false);
+  const [errorAccion, setErrorAccion] = useState<string | null>(null);
 
-  const { data: automatizaciones, isLoading } = useQuery({
+  const {
+    data: automatizaciones,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
     queryKey: ['automations'],
     queryFn: getAutomations,
   });
@@ -46,25 +54,48 @@ export default function AutomationsPage() {
     await queryClient.invalidateQueries({ queryKey: ['automations'] });
   }
 
-  async function guardar(borrador: BorradorAutomatizacion) {
-    if (editando) {
-      await updateAutomation(editando.id, borrador);
-    } else {
-      await createAutomation(borrador);
+  /**
+   * Sin esto, un fallo al guardar o al pausar no producía NADA visible: la
+   * promesa se rechazaba, la lista no cambiaba y quedaba la impresión de que
+   * la regla estaba pausada cuando seguía mandando mensajes.
+   */
+  async function conAviso(accion: () => Promise<unknown>, respaldo: string) {
+    setErrorAccion(null);
+    try {
+      await accion();
+      await refrescar();
+      return true;
+    } catch (e) {
+      setErrorAccion(mensajeDeError(e) || respaldo);
+      return false;
     }
+  }
+
+  async function guardar(borrador: BorradorAutomatizacion) {
+    const ok = await conAviso(
+      () =>
+        editando
+          ? updateAutomation(editando.id, borrador)
+          : createAutomation(borrador),
+      'No se pudo guardar la automatización.',
+    );
+    if (!ok) return;
     setEditando(null);
     setCreando(false);
-    await refrescar();
   }
 
   async function alternarActiva(a: Automatizacion) {
-    await updateAutomation(a.id, { isActive: !a.isActive });
-    await refrescar();
+    await conAviso(
+      () => updateAutomation(a.id, { isActive: !a.isActive }),
+      'No se pudo cambiar el estado.',
+    );
   }
 
   async function eliminar(a: Automatizacion) {
-    await deleteAutomation(a.id);
-    await refrescar();
+    await conAviso(
+      () => deleteAutomation(a.id),
+      'No se pudo eliminar la automatización.',
+    );
   }
 
   const enEdicion = creando || editando !== null;
@@ -108,19 +139,28 @@ export default function AutomationsPage() {
         </div>
       )}
 
-      {isLoading && <p className="text-sm text-neutral-500">Cargando…</p>}
+      {!enEdicion && (
+        <ListState
+          isLoading={isLoading}
+          isError={isError}
+          isEmpty={!automatizaciones?.length}
+          error={error}
+          onRetry={() => void refetch()}
+          icon={Zap}
+          emptyMessage="Todavía no hay automatizaciones"
+          emptyAction={
+            <p className="max-w-xs text-center text-xs text-neutral-500">
+              Una regla típica: saludar automáticamente a quien escribe por
+              primera vez.
+            </p>
+          }
+        />
+      )}
 
-      {!isLoading && !automatizaciones?.length && !enEdicion && (
-        <div className="rounded-lg border border-dashed border-neutral-300 px-4 py-10 text-center">
-          <Zap size={20} className="mx-auto mb-2 text-neutral-400" />
-          <p className="text-sm font-medium text-neutral-700">
-            Todavía no hay automatizaciones
-          </p>
-          <p className="mt-1 text-xs text-neutral-500">
-            Una regla típica: saludar automáticamente a quien escribe por
-            primera vez.
-          </p>
-        </div>
+      {errorAccion && (
+        <p role="alert" className="text-sm text-red-700">
+          {errorAccion}
+        </p>
       )}
 
       {!!automatizaciones?.length && (

@@ -2,19 +2,20 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus } from 'lucide-react';
+import { KanbanSquare, Plus } from 'lucide-react';
 import { getPipelines } from '@/lib/pipeline';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
 import { useRealtime } from '@/lib/use-realtime';
 import { PipelineSelector } from '@/components/kanban/PipelineSelector';
+import { ListState } from '@/components/ui/ListState';
 
 export default function PipelinePage() {
   const queryClient = useQueryClient();
   // Una oportunidad que entra por WhatsApp aparece sola en el tablero.
   useRealtime();
-  const { data: pipelines, isLoading } = useQuery({
+  const { data: pipelines, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['pipelines'],
     queryFn: getPipelines,
   });
@@ -26,15 +27,17 @@ export default function PipelinePage() {
   // renderizado extra sin ganar nada.
   const [pipelineElegido, setPipelineElegido] = useState<string | null>(null);
 
-  if (isLoading) {
-    return <p className="text-sm text-neutral-500">Cargando...</p>;
-  }
-
-  if (!pipelines || pipelines.length === 0) {
+  if (isLoading || isError || !pipelines?.length) {
     return (
-      <p className="text-sm text-neutral-500">
-        No hay pipelines creados todavía.
-      </p>
+      <ListState
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={!pipelines?.length}
+        error={error}
+        onRetry={() => void refetch()}
+        icon={KanbanSquare}
+        emptyMessage="No hay pipelines creados todavía."
+      />
     );
   }
 

@@ -15,6 +15,7 @@ import {
   type FlujoResumen,
 } from '@/lib/chatbot';
 import { ChatbotFlowEditor } from '@/components/chatbot/ChatbotFlowEditor';
+import { ListState } from '@/components/ui/ListState';
 
 const ESTADO_SESION: Record<string, string> = {
   ACTIVE: 'En curso',
@@ -28,7 +29,12 @@ export default function ChatbotPage() {
   const [seleccionado, setSeleccionado] = useState<string | null>(null);
   const [errorLista, setErrorLista] = useState<string | null>(null);
 
-  const { data: flujos } = useQuery({
+  const {
+    data: flujos,
+    isLoading: cargando,
+    error: errorCarga,
+    refetch,
+  } = useQuery({
     queryKey: ['chatbot', 'flows'],
     queryFn: getFlows,
   });
@@ -98,8 +104,19 @@ export default function ChatbotPage() {
             {errorLista}
           </p>
         )}
+        {(cargando || errorCarga) && (
+          <ListState
+            isLoading={cargando}
+            isError={!!errorCarga}
+            isEmpty={false}
+            error={errorCarga}
+            onRetry={() => void refetch()}
+            emptyMessage=""
+          />
+        )}
+
         <ul className="h-fit divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
-          {!flujos?.length && (
+          {!cargando && !errorCarga && !flujos?.length && (
             <li className="px-3 py-8 text-center">
               <Bot size={20} className="mx-auto mb-2 text-neutral-400" />
               <p className="text-xs text-neutral-500">

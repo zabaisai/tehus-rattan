@@ -9,7 +9,7 @@ import { getQuotes, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS,
 } from '@/lib/quotes';
 import { QuoteStatus } from '@/types';
 import { QuoteDetailModal } from '@/components/quotes/QuoteDetailModal';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { ListState } from '@/components/ui/ListState';
 
 type ApiError = {
   response?: {
@@ -44,7 +44,13 @@ function QuotesPageContent() {
   );
   const [error, setError] = useState('');
 
-  const { data: quotes, isLoading } = useQuery({
+  const {
+    data: quotes,
+    isLoading,
+    isError,
+    error: errorCarga,
+    refetch,
+  } = useQuery({
     queryKey: ['quotes', status, leadId],
     queryFn: () =>
       getQuotes({
@@ -107,15 +113,31 @@ function QuotesPageContent() {
         />
       </div>
 
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-
-      {isLoading && <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>}
-
-      {!isLoading && (quotes?.length ?? 0) === 0 && (
-        <EmptyState icon={FileText} message="No hay cotizaciones todavía." />
+      {error && (
+        <p role="alert" className="mb-3 text-sm text-red-600">
+          {error}
+        </p>
       )}
 
-      {!isLoading && (quotes?.length ?? 0) > 0 && (
+      <ListState
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={(quotes?.length ?? 0) === 0}
+        error={errorCarga}
+        onRetry={() => void refetch()}
+        icon={FileText}
+        // Con un filtro puesto, «no hay cotizaciones todavía» es falso: las
+        // hay, pero ninguna encaja. Decirlo mal manda a crear una que ya
+        // existe.
+        emptyMessage={
+          status || leadId
+            ? 'Ninguna cotización coincide con el filtro.'
+            : 'No hay cotizaciones todavía.'
+        }
+        loadingMessage="Cargando..."
+      />
+
+      {!isLoading && !isError && (quotes?.length ?? 0) > 0 && (
         <>
           {/* Móvil: tarjetas apiladas en vez de tabla */}
           <div className="flex flex-col gap-2 sm:hidden">

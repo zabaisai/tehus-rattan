@@ -95,4 +95,29 @@ describe('Sidebar', () => {
     expect(screen.getAllByText('Plataforma').length).toBeGreaterThan(0);
     expect(screen.queryByText('Pipeline')).not.toBeInTheDocument();
   });
+
+  it('un AGENT no ve Datos: exportar es una copia completa de los datos de los clientes', () => {
+    useAuthStore.setState({ user: { id: 'u1', name: 'Ana', email: 'a@co.test', role: 'AGENT', companyId: 'c1' } as never });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(screen.queryByText('Datos')).not.toBeInTheDocument();
+  });
+
+  it('un ADMIN sí ve Datos: tiene que poder llevarse su historial sin pedírselo a nadie', () => {
+    useAuthStore.setState({ user: { id: 'u1', name: 'Ana', email: 'a@co.test', role: 'ADMIN', companyId: 'c1' } as never });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(screen.getAllByRole('link', { name: /Datos/i }).length).toBeGreaterThan(0);
+    // Pedir la eliminación es suyo; aprobarla y ejecutarla no.
+    expect(screen.queryByText('Eliminaciones')).not.toBeInTheDocument();
+  });
+
+  it('solo la plataforma ve Eliminaciones', () => {
+    useAuthStore.setState({
+      user: { id: 'u2', name: 'Root', email: 'root@co.test', role: 'SUPER_ADMIN', companyId: null } as never,
+    });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(screen.getAllByRole('link', { name: /Eliminaciones/i }).length).toBeGreaterThan(0);
+  });
 });

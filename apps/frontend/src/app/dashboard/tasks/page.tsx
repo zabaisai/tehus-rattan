@@ -6,7 +6,7 @@ import { Plus, Check, Trash2, Pencil, CheckSquare } from 'lucide-react';
 import { getTasks, createTask, updateTask, completeTask, deleteTask } from '@/lib/tasks';
 import { Task } from '@/types';
 import { TaskModal, TaskFormData } from '@/components/tasks/TaskModal';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { ListState } from '@/components/ui/ListState';
 import { intervaloDeRefresco, useRealtime } from '@/lib/use-realtime';
 
 const priorityColors: Record<string, string> = {
@@ -166,7 +166,7 @@ export default function TasksPage() {
   const queryClient = useQueryClient();
   // Una tarea asignada por otro asesor aparece sola.
   const { enVivo } = useRealtime();
-  const { data: tasks, isLoading } = useQuery({
+  const { data: tasks, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tasks'],
     queryFn: getTasks,
     refetchInterval: intervaloDeRefresco(enVivo),
@@ -230,11 +230,16 @@ export default function TasksPage() {
         </button>
       </div>
 
-      {isLoading && <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>}
-
-      {!isLoading && (tasks?.length ?? 0) === 0 && (
-        <EmptyState icon={CheckSquare} message="No hay tareas." />
-      )}
+      <ListState
+        isLoading={isLoading}
+        isError={isError}
+        isEmpty={(tasks?.length ?? 0) === 0}
+        error={error}
+        onRetry={() => void refetch()}
+        icon={CheckSquare}
+        emptyMessage="No hay tareas."
+        loadingMessage="Cargando..."
+      />
 
       <TaskGroup title="Vencidas" tasks={groups.overdue} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} accent="text-red-600" />
       <TaskGroup title="Hoy" tasks={groups.today} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} />

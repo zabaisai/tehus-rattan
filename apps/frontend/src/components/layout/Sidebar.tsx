@@ -22,6 +22,8 @@ import {
   X,
   Zap,
   Bot,
+  Trash2,
+  Database,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
@@ -80,6 +82,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     },
     { href: '/dashboard/platform/audit-logs', label: 'Auditoría', icon: ScrollText },
     {
+      href: '/dashboard/platform/deletion-requests',
+      label: 'Eliminaciones',
+      icon: Trash2,
+    },
+    {
       href: '/dashboard/platform/activity',
       label: 'Actividad y seguridad',
       icon: ShieldCheck,
@@ -116,7 +123,13 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
           ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
           : []),
         ...(canManageCompany
-          ? [{ href: '/dashboard/settings/company', label: 'Empresa', icon: Settings }]
+          ? [
+              { href: '/dashboard/settings/company', label: 'Empresa', icon: Settings },
+              // Retención, exportación y solicitud de eliminación. Enlazado y
+              // no escondido: una empresa tiene que poder llevarse sus datos
+              // sin escribirle a nadie.
+              { href: '/dashboard/settings/data', label: 'Datos', icon: Database },
+            ]
           : []),
       ];
 
