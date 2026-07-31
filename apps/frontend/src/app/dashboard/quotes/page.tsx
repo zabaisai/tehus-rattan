@@ -84,6 +84,7 @@ function QuotesPageContent() {
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
+          aria-label="Filtrar por estado"
           className="rounded-md border border-stone-300 px-2 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
         >
           <option value="">Todos los estados</option>
@@ -99,6 +100,9 @@ function QuotesPageContent() {
           value={leadId}
           onChange={(e) => setLeadId(e.target.value)}
           placeholder="Filtrar por ID de lead"
+          // El marcador de posicion desaparece al escribir: quien usa lector
+          // de pantalla se queda sin saber que campo es en cuanto empieza.
+          aria-label="Filtrar por ID de oportunidad"
           className="rounded-md border border-stone-300 px-3 py-2 text-sm outline-none focus:border-stone-500 focus:ring-1 focus:ring-stone-500"
         />
       </div>

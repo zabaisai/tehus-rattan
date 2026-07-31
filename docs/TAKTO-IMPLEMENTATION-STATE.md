@@ -427,13 +427,30 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [ ] Fijar throttling y límites de body en `.env.staging`
 
 ### Bloque 10 — QA y entrega
-- [ ] Suites unitarias/E2E/frontend nuevas y existentes verdes
-- [ ] QA visual en 6 viewports
-- [ ] QA E2E de extremo a extremo en staging
-- [ ] CI verde de rama y de `main`
+- [x] **Suites verdes** — 1238 unit / 388 e2e / 229 frontend, typecheck sin
+      errores en ambos proyectos, lint y build limpios
+- [x] **QA visual en 6 viewports** (320/390/430/768/1280/1920) con sesión
+      iniciada real vía CDP · 36 capturas, 0 desbordes · **más accesibilidad**:
+      0 controles sin nombre, 0 campos sin etiqueta, 0 imágenes sin `alt`.
+      Dos defectos los encontró mirar las capturas, no el umbral automático
+- [x] **Ruta de actualización de la base verificada** —
+      `scripts/verificar-ruta-de-migracion.sh`: base llevada al estado exacto
+      de staging (21 migraciones), datos insertados, y **solo entonces** las
+      18 restantes. No es lo mismo que el CI, que aplica desde cero sobre
+      tablas vacías: una columna `NOT NULL` sin default pasaría allí y
+      fallaría en el despliegue
+- [x] **Pruebas de carga** — 20 concurrentes: p95 entre 25 y 50 ms. La primera
+      pasada agotó el límite de 300 pet./min por IP y midió el 429; el
+      limitador funciona y quedó comprobado de paso
+- [x] **Degradación y recuperación** — con la configuración de staging y Redis
+      caído, `/health/status` responde `degraded` (nunca `ok`) con la causa
+      por componente, y HTTP 200 para que el orquestador no reinicie una
+      instancia sana. `/health/ready` y el negocio siguen sirviendo
+- [x] **`docs/TAKTO-IMPLEMENTATION-REPORT.md`** — informe de preparación con
+      riesgos, lo que NO incluye y la secuencia de despliegue
+- [ ] QA E2E de extremo a extremo **en staging** — requiere desplegar
+- [ ] CI verde de `main` — requiere fusionar
 - [ ] Despliegue con etiquetas por SHA + release anterior recuperable
-- [ ] Runbooks de despliegue y rollback actualizados
-- [ ] `docs/TAKTO-IMPLEMENTATION-REPORT.md`
 
 ## Cambios terminados
 
@@ -608,6 +625,11 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras cotizaciones con PDF | **1167 unit / 347 e2e / 215 frontend verdes** |
 | 2026-07-31 | **CI** `7e24cc0` (bloque 8) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras bloque 9 (seguridad y cumplimiento) | **1238 unit / 388 e2e verdes** |
+| 2026-07-31 | **CI** `655efa8` (bloque 9) | **success**, `head_sha` verificado |
+| 2026-07-31 | QA visual 6 viewports + accesibilidad | 36 capturas, **0 problemas** |
+| 2026-07-31 | ruta de migración staging → HEAD con datos | **verificada, sin pérdidas** |
+| 2026-07-31 | carga (20 concurrentes) | p95 25–50 ms; limitador de tasa comprobado |
+| 2026-07-31 | degradación con Redis caído | `degraded`, nunca `ok`; negocio sirviendo |
 | 2026-07-31 | tras cerrar la deuda de tipos | **typecheck sin errores en ambos proyectos** |
 | 2026-07-31 | tras recuperación | **1106 unit / 324 e2e / 200 frontend verdes**, typecheck sin errores propios, lint y build limpios |
 | 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
