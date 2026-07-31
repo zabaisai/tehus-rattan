@@ -281,6 +281,64 @@ Verificado además que webhook/firma/idempotencia, Embedded Signup, permisos,
 sesión de soporte y origin/refresh **ya tenían cobertura suficiente**; se
 revisaron y no se duplicaron.
 
+## ⚠️ TRABAJO EN CURSO SIN COMITEAR — leer antes que nada
+
+**Hay cambios en el working tree que NO están comiteados a propósito: dejan
+11 pruebas en rojo.** No se comitearon para no meter un commit rojo en la
+historia ni romper el CI de la rama. El último commit (`96bb0fa`) sí está
+verde y publicado.
+
+### Qué hay en el working tree
+
+Dos migraciones nuevas, **ya aplicadas en la base local**:
+
+| Migración | Qué hace |
+|---|---|
+| `20260730235500_enforce_one_primary_whatsapp_per_company` | Normaliza principales + índice parcial `whatsapp_one_primary_per_company`. **Verificado**: índice creado, 0 empresas con >1 principal, 0 sin principal |
+| `20260730*_drop_whatsapp_company_unique_for_multi_number` | `DROP INDEX whatsapp_integrations_companyId_key` — **el cambio destructivo** |
+
+Y la adaptación de código que exige quitar ese UNIQUE:
+
+- `schema.prisma`: `Company.whatsappIntegration` (1:1) → `whatsappIntegrations`
+  (1:N); `WhatsAppIntegration.companyId` deja de ser `@unique`.
+- `whatsapp-integration-management.service.ts` y
+  `whatsapp-embedded-signup.service.ts`: los `upsert`/`findUnique` que
+  usaban `where: { companyId }` pasan a **`phoneNumberId`** (único global) o a
+  `findFirst` con desempate por principal. Esa es la semántica correcta:
+  reconectar el mismo número lo actualiza, conectar otro añade una segunda
+  integración.
+- `platform-companies.service.ts`: lee la lista y toma la principal.
+
+**Compila sin errores.** Lo que falta son los **mocks de 3 specs**, que aún
+devuelven la forma antigua.
+
+### Las 11 pruebas en rojo y por qué
+
+Todas son mocks desactualizados, **ningún fallo de lógica**:
+
+- `WhatsAppIntegrationManagementService` (7): el mock define
+  `whatsAppIntegration.findUnique`; el servicio ahora llama `findFirst`.
+  → añadir `findFirst: jest.fn()` al mock y ajustar las aserciones que
+  esperaban `where: { companyId }` en el `upsert` (ahora es `phoneNumberId`).
+- `WhatsAppEmbeddedSignupService › getConnectionStatus` (4): mismo motivo.
+- `platform-companies.service.spec.ts`: una suite no arranca — revisar que
+  todos los fixtures usen `whatsappIntegrations: [...]` en plural.
+
+### Cómo continuar (primer comando)
+
+```
+cd apps/backend
+npx jest src/modules/whatsapp-integration/whatsapp-integration-management.service.spec.ts
+# arreglar mocks -> repetir con embedded-signup -> platform-companies
+# luego: npx jest --runInBand && npm run build && npx jest --config ./test/jest-e2e.json
+# SOLO con todo verde: commit + push + verificar CI del SHA exacto
+```
+
+**Falta además, antes de dar el bloque 4 por cerrado:** una prueba con DOS
+números en una empresa y DOS empresas distintas que verifique que ningún
+mensaje se enruta a la empresa equivocada. Ahora ya es posible crearla,
+porque el UNIQUE ya no lo impide.
+
 ## Cambios en curso
 
 - Bloque 1: quedan `conversations` (servicio) y el aislamiento explícito de
