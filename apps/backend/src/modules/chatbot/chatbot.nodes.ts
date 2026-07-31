@@ -167,7 +167,11 @@ export function elegirOpcion(
   if (!limpia) return null;
 
   const porNumero = Number(limpia);
-  if (Number.isInteger(porNumero) && porNumero >= 1 && porNumero <= opciones.length) {
+  if (
+    Number.isInteger(porNumero) &&
+    porNumero >= 1 &&
+    porNumero <= opciones.length
+  ) {
     return opciones[porNumero - 1];
   }
 
@@ -189,10 +193,22 @@ export function interpolar(
   texto: string,
   contexto: Record<string, unknown>,
 ): string {
-  return texto.replace(/\{\{\s*([\w.-]+)\s*\}\}/g, (completo, clave: string) => {
-    const valor = contexto?.[clave];
-    // Sin valor se deja el texto tal cual en vez de escribir "undefined" al
-    // cliente, que es lo que hace un replace ingenuo.
-    return valor === undefined || valor === null ? completo : String(valor);
-  });
+  return texto.replace(
+    /\{\{\s*([\w.-]+)\s*\}\}/g,
+    (completo, clave: string) => {
+      const valor = contexto?.[clave];
+      // Sin valor se deja el texto tal cual en vez de escribir "undefined" al
+      // cliente, que es lo que hace un replace ingenuo.
+      //
+      // Un objeto recibe el mismo trato: `String({})` es "[object Object]", y
+      // mandarle eso a un cliente por WhatsApp es peor que dejar el hueco.
+      // Las respuestas guardadas son texto, asi que el caso solo aparece si
+      // algo escribio en el contexto lo que no debia.
+      if (typeof valor === 'string') return valor;
+      if (typeof valor === 'number' || typeof valor === 'boolean') {
+        return String(valor);
+      }
+      return completo;
+    },
+  );
 }

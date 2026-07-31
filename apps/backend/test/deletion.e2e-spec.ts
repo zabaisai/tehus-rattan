@@ -69,7 +69,11 @@ describe('Eliminacion de datos: aprobacion y ejecucion (e2e, base real)', () => 
         actions: [] as never,
       },
     });
-    return { contactoId: contacto.id, conversationId: conv.id, leadId: lead.id };
+    return {
+      contactoId: contacto.id,
+      conversationId: conv.id,
+      leadId: lead.id,
+    };
   };
 
   const cuentaDe = async (companyId: string) => ({
@@ -202,7 +206,11 @@ describe('Eliminacion de datos: aprobacion y ejecucion (e2e, base real)', () => 
       const s = await nuevaSolicitud();
       const motivo = 'Faltan los datos de contacto del solicitante';
 
-      const rechazada = await deletion.reject(s.id, motivo, actor(QUIEN_APRUEBA));
+      const rechazada = await deletion.reject(
+        s.id,
+        motivo,
+        actor(QUIEN_APRUEBA),
+      );
 
       expect(rechazada.status).toBe('REJECTED');
       expect(rechazada.rejectionReason).toBe(motivo);
@@ -214,7 +222,11 @@ describe('Eliminacion de datos: aprobacion y ejecucion (e2e, base real)', () => 
 
     it('una rechazada ya no se puede ejecutar', async () => {
       const s = await nuevaSolicitud();
-      await deletion.reject(s.id, 'No procede en este caso', actor(QUIEN_APRUEBA));
+      await deletion.reject(
+        s.id,
+        'No procede en este caso',
+        actor(QUIEN_APRUEBA),
+      );
 
       await expect(
         deletion.execute(s.id, nombreEmpresa, actor(QUIEN_EJECUTA)),
@@ -257,7 +269,11 @@ describe('Eliminacion de datos: aprobacion y ejecucion (e2e, base real)', () => 
       await deletion.approve(s.id, actor(QUIEN_APRUEBA));
 
       await expect(
-        deletion.execute(s.id, nombreEmpresa.toUpperCase(), actor(QUIEN_EJECUTA)),
+        deletion.execute(
+          s.id,
+          nombreEmpresa.toUpperCase(),
+          actor(QUIEN_EJECUTA),
+        ),
       ).rejects.toThrow();
     });
 

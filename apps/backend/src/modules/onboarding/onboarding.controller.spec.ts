@@ -31,7 +31,7 @@ describe('OnboardingController', () => {
   it('applies OnboardingInviteGuard to POST /onboarding/company', () => {
     const guards = Reflect.getMetadata(
       GUARDS_METADATA,
-      // eslint-disable-next-line @typescript-eslint/unbound-method -- reflection only, never invoked
+
       controller.createCompany,
     );
     expect(guards).toContain(OnboardingInviteGuard);

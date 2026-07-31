@@ -296,9 +296,9 @@ describe('Historial de WhatsApp (e2e, base real)', () => {
     });
 
     it('un CSV sin las columnas obligatorias se rechaza entero', async () => {
-      await expect(
-        importacion.importar(empresaId, 'a,b\n1,2'),
-      ).rejects.toThrow(/columnas obligatorias/i);
+      await expect(importacion.importar(empresaId, 'a,b\n1,2')).rejects.toThrow(
+        /columnas obligatorias/i,
+      );
     });
 
     it('el analisis previo NO importa nada', async () => {

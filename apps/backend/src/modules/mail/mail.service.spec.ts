@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MailService } from './mail.service';
 
@@ -33,7 +34,7 @@ describe('MailService', () => {
 
   it('is a controlled no-op when disabled (never sends, never logs the token)', async () => {
     const logSpy = jest
-      .spyOn(require('@nestjs/common').Logger.prototype, 'log')
+      .spyOn(Logger.prototype, 'log')
       .mockImplementation(() => undefined);
     const svc = new MailService(
       makeConfig({ PASSWORD_RESET_ENABLED: undefined }),

@@ -29,7 +29,7 @@ describe('CompaniesController', () => {
   describe('GET /me', () => {
     it('resolves the company from req.user.companyId', () => {
       companiesService.findById.mockReturnValue({ id: 'company-a' });
-      controller.getMyCompany(buildRequest('company-a'));
+      void controller.getMyCompany(buildRequest('company-a'));
       expect(companiesService.findById).toHaveBeenCalledWith('company-a');
     });
 
@@ -45,7 +45,7 @@ describe('CompaniesController', () => {
   describe('PATCH /me', () => {
     it('updates using req.user.companyId and the dto body', () => {
       const dto = { legalName: 'Empresa A S.A.S', taxId: '900-1' };
-      controller.updateMyCompany(buildRequest('company-a'), dto);
+      void controller.updateMyCompany(buildRequest('company-a'), dto);
       expect(companiesService.update).toHaveBeenCalledWith('company-a', dto);
     });
 
@@ -54,7 +54,10 @@ describe('CompaniesController', () => {
         legalName: 'Attacker',
         companyId: 'company-b',
       };
-      controller.updateMyCompany(buildRequest('company-a'), dtoWithCompanyId);
+      void controller.updateMyCompany(
+        buildRequest('company-a'),
+        dtoWithCompanyId,
+      );
       const [calledCompanyId] = companiesService.update.mock.calls[0];
       expect(calledCompanyId).toBe('company-a');
       expect(calledCompanyId).not.toBe('company-b');

@@ -232,7 +232,9 @@ describe('Matriz de permisos (e2e, SUPER_ADMIN / ADMIN / AGENT)', () => {
 
   describe('SUPER_ADMIN de plataforma (sin empresa)', () => {
     it('SI alcanza el panel de plataforma', async () => {
-      await pedir('/api/platform/companies', superAdminPlataforma()).expect(200);
+      await pedir('/api/platform/companies', superAdminPlataforma()).expect(
+        200,
+      );
 
       expect(platformCompanies.listCompanies).toHaveBeenCalled();
     });

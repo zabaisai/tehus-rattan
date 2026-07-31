@@ -162,7 +162,13 @@ describe('construirDocumento', () => {
       const d = construirDocumento({
         ...base,
         items: [
-          { name: 'A', description: '  ', quantity: 1, unitPrice: 1, subtotal: 1 },
+          {
+            name: 'A',
+            description: '  ',
+            quantity: 1,
+            unitPrice: 1,
+            subtotal: 1,
+          },
         ],
       });
 
@@ -199,7 +205,9 @@ describe('construirDocumento', () => {
     });
 
     it('sin fecha de validez no se inventa una', () => {
-      expect(construirDocumento({ ...base, validUntil: null }).validez).toBeNull();
+      expect(
+        construirDocumento({ ...base, validUntil: null }).validez,
+      ).toBeNull();
     });
   });
 

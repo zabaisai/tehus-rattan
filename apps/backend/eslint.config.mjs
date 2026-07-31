@@ -38,7 +38,28 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/require-await': 'off',
+      // El guion bajo delante ya es la forma en que este codigo dice "esto
+      // sobra a proposito": un parametro que exige el decorador, o el campo
+      // que se descarta al desestructurar para construir un cuerpo sin el.
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
+    },
+  },
+  {
+    // En las pruebas, `expect(mock.metodo)` es el modo normal de aserción de
+    // Jest y no pierde ningun `this`: el doble ES la funcion. La regla existe
+    // para codigo real, donde separar un metodo de su objeto si rompe; aqui
+    // solo obliga a envolver veinte aserciones en ruido que no aporta nada.
+    files: ['**/*.spec.ts', '**/*.e2e-spec.ts'],
+    rules: {
+      '@typescript-eslint/unbound-method': 'off',
     },
   },
 );

@@ -117,83 +117,98 @@ export class ComplianceService {
    * en la base y aquí ni siquiera se selecciona: exportar un secreto cifrado
    * sigue siendo exportar un secreto.
    */
-  async exportCompanyData(companyId: string, actor: { userId: string; role: string }) {
-    const [empresa, contactos, conversaciones, oportunidades, tareas, cotizaciones] =
-      await Promise.all([
-        this.prisma.company.findUnique({
-          where: { id: companyId },
-          select: {
-            id: true,
-            name: true,
-            legalName: true,
-            taxId: true,
-            email: true,
-            phone: true,
-            address: true,
-            city: true,
-            country: true,
-            createdAt: true,
-          },
-        }),
-        this.prisma.contact.findMany({
-          where: { companyId },
-          select: { id: true, name: true, phone: true, email: true, createdAt: true },
-        }),
-        this.prisma.conversation.findMany({
-          where: { companyId },
-          select: {
-            id: true,
-            status: true,
-            channel: true,
-            createdAt: true,
-            lastMessageAt: true,
-            contactId: true,
-            messages: {
-              select: {
-                id: true,
-                body: true,
-                direction: true,
-                type: true,
-                status: true,
-                createdAt: true,
-              },
-              orderBy: { createdAt: 'asc' },
+  async exportCompanyData(
+    companyId: string,
+    actor: { userId: string; role: string },
+  ) {
+    const [
+      empresa,
+      contactos,
+      conversaciones,
+      oportunidades,
+      tareas,
+      cotizaciones,
+    ] = await Promise.all([
+      this.prisma.company.findUnique({
+        where: { id: companyId },
+        select: {
+          id: true,
+          name: true,
+          legalName: true,
+          taxId: true,
+          email: true,
+          phone: true,
+          address: true,
+          city: true,
+          country: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.contact.findMany({
+        where: { companyId },
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          email: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.conversation.findMany({
+        where: { companyId },
+        select: {
+          id: true,
+          status: true,
+          channel: true,
+          createdAt: true,
+          lastMessageAt: true,
+          contactId: true,
+          messages: {
+            select: {
+              id: true,
+              body: true,
+              direction: true,
+              type: true,
+              status: true,
+              createdAt: true,
             },
+            orderBy: { createdAt: 'asc' },
           },
-        }),
-        this.prisma.lead.findMany({
-          where: { companyId },
-          select: {
-            id: true,
-            title: true,
-            value: true,
-            status: true,
-            createdAt: true,
-            contactId: true,
-          },
-        }),
-        this.prisma.task.findMany({
-          where: { companyId },
-          select: {
-            id: true,
-            title: true,
-            status: true,
-            dueDate: true,
-            createdAt: true,
-          },
-        }),
-        this.prisma.quote.findMany({
-          where: { companyId },
-          select: {
-            id: true,
-            number: true,
-            status: true,
-            total: true,
-            createdAt: true,
-            items: { select: { name: true, quantity: true, unitPrice: true } },
-          },
-        }),
-      ]);
+        },
+      }),
+      this.prisma.lead.findMany({
+        where: { companyId },
+        select: {
+          id: true,
+          title: true,
+          value: true,
+          status: true,
+          createdAt: true,
+          contactId: true,
+        },
+      }),
+      this.prisma.task.findMany({
+        where: { companyId },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          dueDate: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.quote.findMany({
+        where: { companyId },
+        select: {
+          id: true,
+          number: true,
+          status: true,
+          total: true,
+          createdAt: true,
+          items: { select: { name: true, quantity: true, unitPrice: true } },
+        },
+      }),
+    ]);
 
     if (!empresa) throw new NotFoundException('Empresa no encontrada');
 
@@ -345,5 +360,3 @@ export class ComplianceService {
     return corte;
   }
 }
-
-

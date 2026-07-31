@@ -96,7 +96,10 @@ export class QuotePdfService {
       .fillColor('#131C4A')
       .fontSize(20)
       .font('Helvetica-Bold')
-      .text('COTIZACIÓN', MARGEN, MARGEN, { align: 'right', width: ANCHO_UTIL });
+      .text('COTIZACIÓN', MARGEN, MARGEN, {
+        align: 'right',
+        width: ANCHO_UTIL,
+      });
 
     pdf
       .fontSize(10)

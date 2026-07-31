@@ -91,7 +91,7 @@ function buscarPorSufijo(dir: string, sufijo: string): string[] {
 function trocear(ruta: string): Controlador[] {
   const fuente = readFileSync(ruta, 'utf8');
   const fichero = ruta.split(/[\\/]/).pop()!;
-  const cortes = [...fuente.matchAll(/@UseGuards\(/g)].map((m) => m.index!);
+  const cortes = [...fuente.matchAll(/@UseGuards\(/g)].map((m) => m.index);
 
   if (cortes.length <= 1) {
     const clase = /export class (\w+)/.exec(fuente)?.[1] ?? fichero;

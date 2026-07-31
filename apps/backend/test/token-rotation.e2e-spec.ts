@@ -30,7 +30,9 @@ describe('Rotacion de la clave de cifrado (e2e, base real)', () => {
 
   /** Servicios con la clave VIEJA como unica clave: el estado de partida. */
   const conClaveVieja = () => {
-    const crypto = new WhatsAppTokenCryptoService(configCon(CLAVE_VIEJA) as never);
+    const crypto = new WhatsAppTokenCryptoService(
+      configCon(CLAVE_VIEJA) as never,
+    );
     return { crypto, rotacion: new TokenRotationService(prisma, crypto) };
   };
 
@@ -44,7 +46,9 @@ describe('Rotacion de la clave de cifrado (e2e, base real)', () => {
 
   /** Despues de retirar la clave anterior. */
   const soloClaveNueva = () => {
-    const crypto = new WhatsAppTokenCryptoService(configCon(CLAVE_NUEVA) as never);
+    const crypto = new WhatsAppTokenCryptoService(
+      configCon(CLAVE_NUEVA) as never,
+    );
     return { crypto, rotacion: new TokenRotationService(prisma, crypto) };
   };
 
@@ -71,13 +75,17 @@ describe('Rotacion de la clave de cifrado (e2e, base real)', () => {
   });
 
   afterAll(async () => {
-    await prisma.whatsAppIntegration.deleteMany({ where: { companyId: empresaId } });
+    await prisma.whatsAppIntegration.deleteMany({
+      where: { companyId: empresaId },
+    });
     await prisma.company.delete({ where: { id: empresaId } });
     await prisma.$disconnect();
   });
 
   beforeEach(async () => {
-    await prisma.whatsAppIntegration.deleteMany({ where: { companyId: empresaId } });
+    await prisma.whatsAppIntegration.deleteMany({
+      where: { companyId: empresaId },
+    });
   });
 
   describe('el problema que resuelve', () => {

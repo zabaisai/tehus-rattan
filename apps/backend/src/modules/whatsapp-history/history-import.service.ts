@@ -73,9 +73,7 @@ export class HistoryImportService {
       throw new BadRequestException('El fichero está vacío.');
     }
 
-    const cabecera = this.separar(lineas[0]).map((c) =>
-      c.trim().toLowerCase(),
-    );
+    const cabecera = this.separar(lineas[0]).map((c) => c.trim().toLowerCase());
     const faltan = CABECERAS.filter((c) => !cabecera.includes(c));
     if (faltan.length) {
       throw new BadRequestException(
@@ -108,7 +106,10 @@ export class HistoryImportService {
         ? normalizePhone(telefonoBruto).e164
         : null;
       if (!telefono) {
-        rechazados.push({ fila: numero, motivo: 'Teléfono ausente o inválido' });
+        rechazados.push({
+          fila: numero,
+          motivo: 'Teléfono ausente o inválido',
+        });
         return;
       }
 
@@ -116,7 +117,8 @@ export class HistoryImportService {
       if (Number.isNaN(fecha.getTime())) {
         rechazados.push({
           fila: numero,
-          motivo: 'Fecha ilegible (se espera ISO 8601, p. ej. 2026-03-01T10:15:00Z)',
+          motivo:
+            'Fecha ilegible (se espera ISO 8601, p. ej. 2026-03-01T10:15:00Z)',
         });
         return;
       }

@@ -57,7 +57,11 @@ export class ChatbotFlowsService {
 
   async create(
     companyId: string,
-    data: { name: string; draftNodes?: FlujoChatbot; triggerKeywords?: string[] },
+    data: {
+      name: string;
+      draftNodes?: FlujoChatbot;
+      triggerKeywords?: string[];
+    },
   ) {
     return this.prisma.chatbotFlow.create({
       data: {
@@ -165,7 +169,10 @@ export class ChatbotFlowsService {
     return this.prisma.chatbotFlow.delete({ where: { id } });
   }
 
-  async sessions(companyId: string, filtros: { status?: string; limit?: number } = {}) {
+  async sessions(
+    companyId: string,
+    filtros: { status?: string; limit?: number } = {},
+  ) {
     return this.prisma.chatbotSession.findMany({
       where: {
         companyId,

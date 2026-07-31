@@ -107,6 +107,22 @@ const FIELD_ALIASES: Array<{
 
 const ALLOWED_EXTENSIONS = ['.xlsx', '.xlsm'];
 
+/**
+ * Convierte a texto SOLO lo que tiene una representacion legible.
+ *
+ * `String(valor)` sobre un objeto produce "[object Object]", y una celda de
+ * Excel puede traer objetos: una formula con error, un hipervinculo raro, un
+ * texto enriquecido con una forma que no esperabamos. Sin este filtro, esa
+ * cadena acababa siendo el NOMBRE de un producto en el catalogo del cliente.
+ */
+function textoPlano(valor: unknown): string {
+  if (typeof valor === 'string') return valor;
+  if (typeof valor === 'number' || typeof valor === 'boolean') {
+    return String(valor);
+  }
+  return '';
+}
+
 interface ColumnMap {
   fields: Partial<Record<keyof Omit<RawRow, 'extras'>, number>>;
   unclaimed: Array<{ col: number; label: string }>;
@@ -455,14 +471,16 @@ export class ProductsImportService {
         return (obj as any).richText.map((r: any) => r.text ?? '').join('');
       }
       if ('text' in obj || 'hyperlink' in obj) {
-        return String(obj.text ?? obj.hyperlink ?? '');
+        return textoPlano(obj.text ?? obj.hyperlink);
       }
       if ('result' in obj) {
-        return String(obj.result ?? '');
+        // Una formula puede devolver un objeto de error de Excel. Escribirlo
+        // como "[object Object]" lo convertiria en el nombre de un producto.
+        return textoPlano(obj.result);
       }
       return '';
     }
-    return String(value);
+    return textoPlano(value);
   }
 
   private extractRowValues(row: ExcelJS.Row, columnMap: ColumnMap): RawRow {
@@ -510,7 +528,7 @@ export class ProductsImportService {
         : { value: 0, warning: 'Precio vacío' };
     }
 
-    let str = String(raw).trim();
+    let str = textoPlano(raw).trim();
     str = str.replace(/[^\d.,-]/g, '');
     if (!str) return { value: 0, warning: 'Precio vacío' };
 
@@ -551,7 +569,7 @@ export class ProductsImportService {
     if (raw === null || raw === undefined || raw === '') return 0;
     if (typeof raw === 'number')
       return Number.isFinite(raw) && raw >= 0 ? Math.floor(raw) : 0;
-    const num = Number(String(raw).replace(/[^\d.-]/g, ''));
+    const num = Number(textoPlano(raw).replace(/[^\d.-]/g, ''));
     return Number.isFinite(num) && num >= 0 ? Math.floor(num) : 0;
   }
 
