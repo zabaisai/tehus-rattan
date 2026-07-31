@@ -515,6 +515,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras motor durable de automatizaciones | **1106 unit / 324 e2e verdes** |
 | 2026-07-31 | **CI** `e4d8c8a` (motor durable) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras constructor visual | **200 frontend verdes / 33 suites** |
+| 2026-07-31 | **CI** `efbcebe` | ❌ **failure** — E2E: `roles-guard` no arrancaba |
+| 2026-07-31 | tras recuperación | **1106 unit / 324 e2e / 200 frontend verdes**, typecheck sin errores propios, lint y build limpios |
 | 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras historial de automatizaciones | **1106 unit / 324 e2e verdes** |
 
@@ -542,6 +544,35 @@ Corregido con una espera máxima de 3 s (`ESPERA_MAXIMA_REDIS_MS`),
 
 **Lección para quien reanude:** las suites no lo detectaron porque en pruebas
 `QUEUE_ENABLED=false`. Levantar el producto de verdad es lo que lo encontró.
+
+## Incidente: CI rojo en `efbcebe` (recuperado)
+
+**Qué pasó.** `efbcebe` añadió `AutomationRunsService` y `PrismaService` al
+constructor de `AutomationsController`. `test/roles-guard.e2e-spec.ts` no usa
+el módulo de la aplicación: monta uno a mano y provee las dependencias una por
+una. Al aparecer una nueva, Nest no pudo resolverla y **la suite entera dejó
+de arrancar**, incluidas las pruebas de analytics que compartían módulo.
+
+**Por qué no se detectó antes de publicar.** Se ejecutaron los unitarios tras
+tocar el controlador, pero la última corrida de E2E era anterior al cambio.
+
+**Regla para quien reanude:** cambiar el constructor de un controlador obliga
+a **reejecutar E2E**, no solo unitarios. Son las suites que construyen módulos
+a mano las que se rompen, y ninguna otra señal lo avisa.
+
+**Hallazgo colateral, más grave que el fallo original.**
+`whatsapp-tenant-isolation.spec.ts` construía `WebhookService` con 8 de sus 10
+argumentos, y los que faltaban estaban **en medio**: la cola aterrizaba en la
+posición de las notificaciones y el outbox en la de la cola. Las pruebas
+pasaban porque no alcanzaban esos caminos. Corregido: los diez van nombrados
+y en orden.
+
+**Deuda de tipos registrada.** `npm run build` usa `tsconfig.build.json`, que
+**excluye los specs**, así que el CI nunca ve los errores de tipo de las
+pruebas. `npx tsc --noEmit -p tsconfig.json` sí. Tras la recuperación quedan
+**6 errores anteriores a esta rama** (un `Buffer` de exceljs y varios
+`possibly undefined` en mocks de fetch) que no se tocan para no mezclar deuda
+heredada con la introducida aquí.
 
 ## Aprendizaje operativo importante
 
