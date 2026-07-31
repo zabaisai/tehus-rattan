@@ -2,6 +2,7 @@ import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { QueueModule } from './common/queue/queue.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -10,7 +11,10 @@ import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { validateEnv } from './common/config/env.validation';
-import { THROTTLE_TTL_MS, THROTTLE_LIMITS } from './common/throttle/throttle.config';
+import {
+  THROTTLE_TTL_MS,
+  THROTTLE_LIMITS,
+} from './common/throttle/throttle.config';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
@@ -37,6 +41,7 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
 
 @Module({
   imports: [
+    QueueModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
