@@ -390,6 +390,9 @@ revisaron y no se duplicaron.
 | `337e33e` | feat(leads): oportunidad automática desde WhatsApp + round-robin |
 | `cef26f7` | feat(conversations): oportunidad y tarea desde el chat |
 | `f8efb71` | feat(pipeline): selector de pipelines en el tablero |
+| `3f7cb04` | feat(branding): identidad visual TAKTO (tokens, tipografía, iconos) |
+| `c1a4173` | feat(branding): escala `stone` reapuntada a los neutrales de marca |
+| `80d9590` | fix(realtime): el puente de Redis ya no cuelga el arranque |
 
 ## Pruebas ejecutadas
 
@@ -483,8 +486,22 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-**Bloque 6 CERRADO.** Bloques 0–6 completos: Redis, worker, cola, procesador,
-outbox durable y WebSockets. Siguiente: **bloque 7 (capacidades funcionales)**.
+**Bloques 0–6 CERRADOS.** Redis, worker, cola, procesador, outbox durable y
+WebSockets.
+
+**Bloque 7 EN CURSO.** Hecho: entrada automática de oportunidades desde
+WhatsApp (el agujero de fondo del producto), reparto round-robin, tarea desde
+la conversación, selector de pipelines y tiempo real en las pantallas.
+Pendiente: bandeja omnicanal, SLA de tareas, motor de automatizaciones durable
+con constructor visual, chatbot v1, salud de WhatsApp/medios/plantillas,
+cotizaciones con PDF en servidor y configuración de empresa.
+
+**Bloque 8 PARCIAL.** Fundamento visual completo y aplicado. Pendiente:
+aplicar el naranja de acento a superficies concretas y QA visual con sesión
+iniciada.
+
+**Bloques 9 y 10 SIN EMPEZAR.** Retención/exportación/eliminación, rotación de
+clave de cifrado, sesiones de soporte caducadas; y la campaña de QA final.
 
 ### Estrategia de ejecución, ya unificada
 
