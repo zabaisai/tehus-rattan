@@ -6,6 +6,7 @@ import { QueueModule } from './common/queue/queue.module';
 import { OutboxModule } from './common/outbox/outbox.module';
 import { RealtimeModule } from './common/realtime/realtime.module';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
+import { ComplianceModule } from './modules/compliance/compliance.module';
 import { HealthModule } from './common/health/health.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
@@ -50,6 +51,7 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     RealtimeModule,
     HealthModule,
     ChatbotModule,
+    ComplianceModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,

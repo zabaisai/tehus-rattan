@@ -383,6 +383,41 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [ ] `prefers-reduced-motion`
 
 ### Bloque 9 — Seguridad y cumplimiento
+- [x] **Política de acceso comprobada sobre TODO el árbol** —
+      `security-policy.spec.ts` recorre cada controlador y exige sesión,
+      aislamiento por empresa y rol donde toca. Va sobre el **código** y no
+      sobre peticiones porque el riesgo real no es el controlador de hoy: es
+      el que se añada en tres meses sin guardas, y ninguna prueba de
+      comportamiento existente fallará por él. Las excepciones llevan su
+      motivo escrito — una excepción sin motivo es indistinguible de un olvido
+      · 69 comprobaciones
+- [x] **HALLAZGO CORREGIDO: `/notifications` sin `BusinessTenantGuard`.** Un
+      SUPER_ADMIN de plataforma alcanzaba un endpoint de negocio. No filtraba
+      datos —ninguna notificación tiene `companyId` null— pero eso es una
+      casualidad de los datos, no una garantía del control de acceso
+- [x] **Matriz de permisos con peticiones reales** — SUPER_ADMIN de
+      plataforma, SUPER_ADMIN de empresa, ADMIN y AGENT contra las tres clases
+      de endpoint. Comprueba además que el servicio **no llega a ejecutarse**
+      cuando se rechaza: un 403 devuelto después de leer datos sigue siendo
+      una fuga · 20 e2e
+- [x] **Retención por empresa** — `retentionMonths` nulo por defecto =
+      **no se purga nada**. La purga exige **dos señales** (plazo Y
+      interruptor explícito): con una sola, un plazo puesto por error empieza
+      a borrar solo. Mínimo de 3 meses, previsualización antes de ejecutar, y
+      solo toca conversaciones cerradas o archivadas — una abierta es trabajo
+      en curso por antigua que sea
+- [x] **Exportación** de los datos de la empresa, sin credenciales de ningún
+      tipo: exportar un secreto cifrado sigue siendo exportar un secreto
+- [x] **Solicitud de eliminación que NO borra** — queda `PENDING` y exige
+      aprobación aparte, con motivo obligatorio. Un endpoint que borre el
+      historial completo en una llamada es justo lo que no debe existir
+- [x] **Auditoría** de cambio de política, exportación, purga y solicitud, con
+      actor obligatorio · `20260731…_add_retention_and_data_requests` ·
+      21 e2e reales, incluido que la purga **no toca nada de otra empresa**
+- [x] **Observabilidad** — `/api/health/status` agregado (bloque 6) + latido
+      del worker + typecheck en CI
+
+### Bloque 9 — Seguridad y cumplimiento (detalle heredado)
 - [ ] Corregir PII en logs de WhatsApp
 - [ ] Observabilidad de 4xx
 - [ ] Desconexión completa de WhatsApp
@@ -571,6 +606,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | **CI** `b1659bc` | ❌ **failure** — lint del frontend que publiqué a sabiendas |
 | 2026-07-31 | **CI** `dc5b26d`, `179cb54` | **success**, `head_sha` verificado |
 | 2026-07-31 | tras cotizaciones con PDF | **1167 unit / 347 e2e / 215 frontend verdes** |
+| 2026-07-31 | **CI** `7e24cc0` (bloque 8) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras bloque 9 (seguridad y cumplimiento) | **1238 unit / 388 e2e verdes** |
 | 2026-07-31 | tras cerrar la deuda de tipos | **typecheck sin errores en ambos proyectos** |
 | 2026-07-31 | tras recuperación | **1106 unit / 324 e2e / 200 frontend verdes**, typecheck sin errores propios, lint y build limpios |
 | 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |

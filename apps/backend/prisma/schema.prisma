@@ -63,6 +63,19 @@ model Company {
   /// por cada conversacion.
   responseSlaMinutes Int?
 
+  /// Meses que se conservan conversaciones y mensajes cerrados antes de
+  /// poder purgarlos. `null` = SIN PURGA, que es el valor por defecto a
+  /// proposito (decision 13): borrar el historial comercial de una empresa
+  /// sin que lo haya pedido es irreversible, y "por defecto no se borra nada"
+  /// es la unica postura defendible.
+  retentionMonths Int?
+
+  /// Confirmacion explicita de que la empresa acepta la purga. Sin esto, un
+  /// `retentionMonths` puesto por error empezaria a borrar solo.
+  retentionPurgeEnabled Boolean @default(false)
+
+  dataRequests DataRequest[]
+
   users                User[]
   contacts             Contact[]
   conversations        Conversation[]
@@ -1378,4 +1391,51 @@ model ChatbotSession {
   @@index([conversationId, status])
   @@index([companyId, status, lastInteractionAt])
   @@map("chatbot_sessions")
+}
+
+enum DataRequestType {
+  /// Copia de los datos de la empresa.
+  EXPORT
+  /// Solicitud de eliminacion. NO borra: registra y espera aprobacion.
+  DELETION
+}
+
+enum DataRequestStatus {
+  PENDING
+  APPROVED
+  COMPLETED
+  REJECTED
+}
+
+/// Solicitud de exportacion o eliminacion de datos.
+///
+/// LA ELIMINACION NO SE EJECUTA AL PEDIRLA. Se registra, queda PENDING y
+/// exige una aprobacion aparte. Un endpoint que borrase el historial completo
+/// de una empresa en una sola llamada es exactamente el tipo de accion que no
+/// deberia existir: irreversible, disparable por error y sin rastro de quien
+/// la pidio.
+model DataRequest {
+  id     String            @id @default(cuid())
+  type   DataRequestType
+  status DataRequestStatus @default(PENDING)
+
+  /// Por que se pide. Obligatorio: una solicitud sin motivo no se puede
+  /// revisar ni defender despues.
+  reason String
+
+  requestedBy String?
+  approvedBy  String?
+
+  /// Resumen de lo hecho: cuantas filas por tabla. Sin contenido.
+  result Json?
+
+  requestedAt DateTime  @default(now())
+  resolvedAt  DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId, status])
+  @@index([status, requestedAt])
+  @@map("data_requests")
 }
