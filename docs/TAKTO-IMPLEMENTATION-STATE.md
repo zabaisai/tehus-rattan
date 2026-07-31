@@ -183,8 +183,11 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       idempotencia por `messageId` y **marcha atrás en línea** si Redis falla
 - [x] **`queue.role.ts`**: el backend produce, el worker consume · prueba de
       que hay exactamente UN consumidor en un despliegue normal
-- [ ] **Procesador (consumidor) en el worker** — falta registrar el `Worker`
-      de BullMQ que ejecute `runInboundEffects`
+- [x] **Procesador en el worker** — `inbound.processor.ts` en `WebhookModule`
+      (evita el ciclo) · solo arranca si `shouldConsumeQueue()` · resuelve
+      `assignedTo` al procesar, no lo toma del job · 13 pruebas
+- [ ] Outbox durable (hoy: si Redis falla, se ejecuta en línea)
+- [ ] WebSockets con aislamiento por empresa
 - [ ] Outbox/eventos durables
 - [ ] WebSockets autenticados y aislados por empresa
 - [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
@@ -354,7 +357,9 @@ revisaron y no se duplicaron.
 | 2026-07-31 | **CI** `eebaa91` (Redis + worker) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras QueueModule | 931 unit / 233 e2e verdes |
 | 2026-07-31 | **CI** `53fac94` (QueueModule) | **success**, `head_sha` verificado |
-| 2026-07-31 | tras productor de cola | **958 unit / 233 e2e verdes** |
+| 2026-07-31 | tras productor de cola | 958 unit / 233 e2e verdes |
+| 2026-07-31 | **CI** `c344540` (productor) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras procesador (bloque 6 cerrado) | **971 unit / 233 e2e verdes** |
 
 ## Despliegues
 
@@ -384,49 +389,44 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-Bloques 0–4 completos. Bloque 5 en dual-write. Bloque 6 con Redis, worker,
-config, salud y **productor** listos. Falta el **consumidor**.
+Bloques 0–4 completos. Bloque 5 en dual-write. **Bloque 6 con el circuito de
+cola cerrado**: webhook encola → worker consume.
+
+### ⚠️ El runbook de despliegue está desactualizado
+
+Es lo primero que hay que arreglar antes de cualquier despliegue. `deploy.sh`
+y `docs/VPS_DEPLOYMENT.md` no conocen los **dos servicios nuevos**:
+
+- `redis` — debe levantarse **antes** que backend y worker (ya declarado con
+  `depends_on: service_healthy`).
+- `worker` — usa la **misma imagen** que el backend, así que debe construirse
+  después de ella y arrancar con `WORKER_ROLE=queue`.
+
+Además, `.env.staging` necesita `REDIS_HOST`, `REDIS_PORT` y `REDIS_PASSWORD`
+(vacía), ya documentadas en `deploy/env/staging.env.example`.
 
 ```
-# BLOQUE 6, FASE 4 — el procesador en el worker
+# SIGUIENTE PASO — actualizar el runbook, en este orden:
+# 1. deploy/scripts/deploy.sh: incluir redis y worker en el build y el up.
+#    Ojo: `up -d --no-deps backend frontend` YA NO BASTA.
+# 2. deploy/scripts/health-check.sh: comprobar /api/health/queue (que informa,
+#    no decide) y que el contenedor worker esté arriba.
+# 3. docs/VPS_DEPLOYMENT.md + DEPLOYMENT_RUNBOOK.md: documentar los dos
+#    servicios, el orden de arranque y el rollback (que ahora incluye worker).
+# 4. Solo entonces plantear el primer despliegue con Redis.
 #
-# Lo que YA existe y esta probado (958 unit verdes):
-#   - Redis en ambos compose; worker como proceso separado
-#   - queue.config.ts: 3 colas, backoff, removeOnFail:false (DLQ)
-#   - queue.role.ts: backend produce / worker consume, con prueba de que solo
-#     hay UN consumidor
-#   - InboundQueueService: encola con jobId = messageId (idempotente) y
-#     devuelve false en vez de lanzar si Redis falla
-#   - WebhookService.runInboundEffects(): publico, lo comparten el camino
-#     encolado y el camino en linea
-#
-# Lo que falta, en src/common/queue/inbound.processor.ts:
-# 1. Un provider que, SOLO si shouldConsumeQueue(), cree un `Worker` de BullMQ
-#    sobre QUEUE_NAMES.INBOUND con buildRedisConnection().
-# 2. Su handler recibe InboundMessageJob y llama a
-#    webhookService.runInboundEffects(companyId, conversationId, body,
-#    contactPhone, assignedTo). OJO: hay que resolver `assignedTo` leyendo la
-#    conversacion, porque el job no lo lleva (puede haber cambiado entre el
-#    encolado y el procesado).
-# 3. onApplicationShutdown: worker.close() para drenar en SIGTERM. El compose
-#    ya da 60s de gracia.
-# 4. Pruebas: el worker NO se crea cuando shouldConsumeQueue() es false; el
-#    handler ejecuta los efectos; un fallo deja el job en la cola.
-#
-# Cuidado con la dependencia circular: WebhookModule ya importa QueueModule.
-# Si el procesador vive en QueueModule e inyecta WebhookService, habra ciclo.
-# Opcion mas limpia: que el procesador viva en WebhookModule, que ya tiene
-# ambas piezas a mano.
+# Después: outbox durable y WebSockets con aislamiento por empresa.
 ```
 
 **Recordatorios de seguridad vigentes**
 
 - **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 29
-  migraciones. **Nada desplegado.** El despliegue exigirá levantar Redis y el
-  worker, no solo backend y frontend, y el runbook debe actualizarse antes.
+  migraciones. **Nada desplegado.**
 - Dos backups verificados: 2026-07-30 17:35 y 18:40.
 - Índices parciales (`pipelines_one_default_per_company`,
   `whatsapp_one_primary_per_company`) viven solo en el `migration.sql`. Si
   `prisma migrate dev` propone eliminarlos, **rechazar**.
 - El CI cancela runs anteriores del mismo ref: verificar siempre el **último**
   SHA publicado y que `head_sha` coincida.
+- `QUEUE_ENABLED=false` desactiva encolado y consumo: todo corre en línea.
+  Es la marcha atrás si Redis diera problemas en el primer despliegue.
