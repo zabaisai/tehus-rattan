@@ -8,6 +8,7 @@ import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
 import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
 import { useRealtime } from '@/lib/use-realtime';
+import { PipelineSelector } from '@/components/kanban/PipelineSelector';
 
 export default function PipelinePage() {
   const queryClient = useQueryClient();
@@ -20,6 +21,10 @@ export default function PipelinePage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  // `null` significa "aun no ha elegido": se resuelve al predeterminado. Fijar
+  // el id en cuanto cargan los pipelines obligaria a un efecto y a un
+  // renderizado extra sin ganar nada.
+  const [pipelineElegido, setPipelineElegido] = useState<string | null>(null);
 
   if (isLoading) {
     return <p className="text-sm text-stone-500">Cargando...</p>;
@@ -33,18 +38,26 @@ export default function PipelinePage() {
     );
   }
 
-  const defaultPipeline = pipelines.find((p) => p.isDefault) ?? pipelines[0];
+  const activo =
+    pipelines.find((p) => p.id === pipelineElegido) ??
+    pipelines.find((p) => p.isDefault) ??
+    pipelines[0];
 
   async function refreshKanban() {
-    await queryClient.invalidateQueries({ queryKey: ['kanban', defaultPipeline.id] });
+    await queryClient.invalidateQueries({ queryKey: ['kanban', activo.id] });
   }
 
   return (
     <div>
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-stone-900">
-          {defaultPipeline.name}
-        </h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-xl font-semibold text-stone-900">{activo.name}</h2>
+          <PipelineSelector
+            pipelines={pipelines}
+            value={activo.id}
+            onChange={setPipelineElegido}
+          />
+        </div>
         <button
           onClick={() => setCreateOpen(true)}
           className="flex items-center justify-center gap-1.5 rounded-md bg-stone-900 px-3 py-2 text-sm text-white hover:bg-stone-800"
@@ -53,12 +66,12 @@ export default function PipelinePage() {
           Nuevo lead
         </button>
       </div>
-      <KanbanBoard pipelineId={defaultPipeline.id} onLeadClick={setSelectedLeadId} />
+      <KanbanBoard pipelineId={activo.id} onLeadClick={setSelectedLeadId} />
 
       {createOpen && (
         <LeadFormModal
-          pipelineId={defaultPipeline.id}
-          stages={defaultPipeline.stages}
+          pipelineId={activo.id}
+          stages={activo.stages}
           onClose={() => setCreateOpen(false)}
           onCreated={async () => {
             await refreshKanban();
@@ -70,7 +83,7 @@ export default function PipelinePage() {
       {selectedLeadId && (
         <LeadDetailModal
           leadId={selectedLeadId}
-          stages={defaultPipeline.stages}
+          stages={activo.stages}
           onClose={() => setSelectedLeadId(null)}
           onChanged={refreshKanban}
         />
