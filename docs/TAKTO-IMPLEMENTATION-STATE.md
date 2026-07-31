@@ -186,8 +186,11 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
 - [x] **Procesador en el worker** — `inbound.processor.ts` en `WebhookModule`
       (evita el ciclo) · solo arranca si `shouldConsumeQueue()` · resuelve
       `assignedTo` al procesar, no lo toma del job · 13 pruebas
-- [ ] Outbox durable (hoy: si Redis falla, se ejecuta en línea)
-- [ ] WebSockets con aislamiento por empresa
+- [x] **Outbox durable** — `20260731152150_add_outbox_events` · evento en la
+      MISMA transacción que el mensaje · `FOR UPDATE SKIP LOCKED` ·
+      recuperación de colgados · backoff persistido en `availableAt` ·
+      42 pruebas · **la ejecución en línea se eliminó**: un solo camino
+- [ ] **WebSockets con aislamiento por empresa** — pendiente
 - [ ] Outbox/eventos durables
 - [ ] WebSockets autenticados y aislados por empresa
 - [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
@@ -359,7 +362,9 @@ revisaron y no se duplicaron.
 | 2026-07-31 | **CI** `53fac94` (QueueModule) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras productor de cola | 958 unit / 233 e2e verdes |
 | 2026-07-31 | **CI** `c344540` (productor) | **success**, `head_sha` verificado |
-| 2026-07-31 | tras procesador (bloque 6 cerrado) | **971 unit / 233 e2e verdes** |
+| 2026-07-31 | tras procesador | 971 unit / 233 e2e verdes |
+| 2026-07-31 | **CI** `e2c3254` y `b180055` (HEAD) | **success**, `head_sha` verificado en ambos |
+| 2026-07-31 | tras outbox durable | **1000 unit / 233 e2e verdes** |
 
 ## Despliegues
 
@@ -389,44 +394,60 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-Bloques 0–4 completos. Bloque 5 en dual-write. **Bloque 6 con el circuito de
-cola cerrado**: webhook encola → worker consume.
+Bloques 0–5 completos. Bloque 6: Redis, worker, cola, procesador y **outbox
+durable** listos. Falta **WebSockets**.
 
-### ⚠️ El runbook de despliegue está desactualizado
+### Estrategia de ejecución, ya unificada
 
-Es lo primero que hay que arreglar antes de cualquier despliegue. `deploy.sh`
-y `docs/VPS_DEPLOYMENT.md` no conocen los **dos servicios nuevos**:
-
-- `redis` — debe levantarse **antes** que backend y worker (ya declarado con
-  `depends_on: service_healthy`).
-- `worker` — usa la **misma imagen** que el backend, así que debe construirse
-  después de ella y arrancar con `WORKER_ROLE=queue`.
-
-Además, `.env.staging` necesita `REDIS_HOST`, `REDIS_PORT` y `REDIS_PASSWORD`
-(vacía), ya documentadas en `deploy/env/staging.env.example`.
+Había dos caminos (encolar / ejecutar en línea) mientras el outbox no existía.
+**Ya no.** El evento se escribe en la misma transacción que el mensaje, así
+que los efectos están garantizados aunque el proceso muera; si el enqueue
+inmediato falla, el evento queda `PENDING` y lo recoge el dispatcher. Ejecutar
+también en línea duplicaría efectos si el enqueue sí había llegado a Redis
+antes de fallar la respuesta.
 
 ```
-# SIGUIENTE PASO — actualizar el runbook, en este orden:
-# 1. deploy/scripts/deploy.sh: incluir redis y worker en el build y el up.
-#    Ojo: `up -d --no-deps backend frontend` YA NO BASTA.
-# 2. deploy/scripts/health-check.sh: comprobar /api/health/queue (que informa,
-#    no decide) y que el contenedor worker esté arriba.
-# 3. docs/VPS_DEPLOYMENT.md + DEPLOYMENT_RUNBOOK.md: documentar los dos
-#    servicios, el orden de arranque y el rollback (que ahora incluye worker).
-# 4. Solo entonces plantear el primer despliegue con Redis.
+# BLOQUE 6, ULTIMA FASE — WebSockets
 #
-# Después: outbox durable y WebSockets con aislamiento por empresa.
+# Requisitos del encargo, todos obligatorios:
+#   - autenticacion (mismo JWT que la API)
+#   - autorizacion por companyId: NINGUN cliente puede suscribirse a otra
+#     empresa. Es el requisito critico; el resto es ergonomia.
+#   - rooms de empresa, usuario y conversacion
+#   - eventos versionados
+#   - reconexion y heartbeat
+#   - pruebas con DOS empresas verificando cero fuga
+#   - fallback de refetch/polling (el frontend ya hace polling: conservarlo)
+#   - actualizar conversaciones, mensajes, oportunidades, tareas y avisos
+#
+# 1. npm i @nestjs/websockets @nestjs/platform-socket.io socket.io
+# 2. src/common/realtime/realtime.gateway.ts
+#    - handleConnection: validar el JWT y RESOLVER companyId DEL TOKEN,
+#      nunca de un parametro del cliente. Ese es el punto donde se filtra o no.
+#    - join automatico a `company:<id>` y `user:<id>`; la conversacion se une
+#      bajo demanda PREVIA comprobacion de que pertenece a la empresa.
+#    - rechazar el handshake si el token no valida.
+# 3. Emitir desde el procesador del worker, no desde el webhook: el efecto y
+#    su notificacion en tiempo real deben ir juntos.
+#    OJO: el worker es OTRO proceso. Para que sus emisiones lleguen a los
+#    clientes conectados al backend hace falta el adaptador de Redis de
+#    socket.io (@socket.io/redis-adapter). Sin el, el worker emitiria al
+#    vacio. Redis ya esta disponible.
+# 4. Pruebas: dos empresas, un cliente de cada una, y verificar que un evento
+#    de A nunca llega a B.
 ```
 
 **Recordatorios de seguridad vigentes**
 
-- **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 29
-  migraciones. **Nada desplegado.**
+- **Staging sigue en 21 migraciones y release `58dfb76`.** La rama va por 30
+  migraciones. **Nada desplegado, nada fusionado a main.**
+- No desplegar ni fusionar mientras las capacidades funcionales (bloques 7–10)
+  y el branding sigan incompletos.
+- **No retirar `Conversation.stage` todavía**: el dual-write sigue vigente
+  hasta que frontend, automatizaciones, backfill y pruebas usen `Lead.stageId`
+  de forma estable.
 - Dos backups verificados: 2026-07-30 17:35 y 18:40.
-- Índices parciales (`pipelines_one_default_per_company`,
-  `whatsapp_one_primary_per_company`) viven solo en el `migration.sql`. Si
-  `prisma migrate dev` propone eliminarlos, **rechazar**.
+- Índices parciales viven solo en el `migration.sql`. Si `prisma migrate dev`
+  propone eliminarlos, **rechazar**.
 - El CI cancela runs anteriores del mismo ref: verificar siempre el **último**
   SHA publicado y que `head_sha` coincida.
-- `QUEUE_ENABLED=false` desactiva encolado y consumo: todo corre en línea.
-  Es la marcha atrás si Redis diera problemas en el primer despliegue.
