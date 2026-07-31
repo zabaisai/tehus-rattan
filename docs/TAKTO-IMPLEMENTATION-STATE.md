@@ -270,7 +270,15 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       WhatsApp al cliente. `DEAD` tras 3 intentos, en la base y no en Redis
       para que sobreviva a un reinicio ·
       `20260731…_add_automation_versions_and_runs` · 14 e2e reales
-- [ ] Automatizaciones: constructor visual
+- [x] **Automatizaciones: constructor visual** — pantalla propia (solo
+      administradores: mandan mensajes reales a clientes reales) con editor de
+      **lista ordenada**, no lienzo de nodos: el motor ejecuta "cuando pase X,
+      haz A, luego B", y un lienzo con flechas prometería ramificaciones que
+      no existen. Validación en cliente además del servidor, historial de
+      ejecuciones con el resultado de cada acción y la versión que corrió ·
+      **la prueba encontró un fallo real**: el campo de palabras clave se
+      comía las comas, así que era imposible configurar más de una · 17
+      pruebas
 - [ ] Chatbot (motor + constructor visual)
 - [ ] Notificaciones (productores completos)
 - [ ] WhatsApp: salud, medios, plantillas, estados
@@ -505,6 +513,8 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras SLA de respuesta | **1106 unit / 310 e2e verdes** |
 | 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras motor durable de automatizaciones | **1106 unit / 324 e2e verdes** |
+| 2026-07-31 | **CI** `e4d8c8a` (motor durable) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras constructor visual | **200 frontend verdes / 33 suites** |
 | 2026-07-31 | **CI** `eaa5503` (SLA) | **success**, `head_sha` verificado |
 | 2026-07-31 | tras historial de automatizaciones | **1106 unit / 324 e2e verdes** |
 

@@ -20,6 +20,7 @@ import {
   KeyRound,
   ShieldCheck,
   X,
+  Zap,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
@@ -97,6 +98,12 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         { href: '/dashboard/products', label: 'Productos', icon: Package },
         { href: '/dashboard/quotes', label: 'Cotizaciones', icon: FileText },
         { href: '/dashboard/documents/calculator', label: 'Documentos', icon: Calculator },
+        // Las automatizaciones mandan mensajes reales a clientes reales:
+        // solo quien administra la empresa deberia poder tocarlas, igual que
+        // la conexion de WhatsApp.
+        ...(canManageCompany
+          ? [{ href: '/dashboard/automations', label: 'Automatizaciones', icon: Zap }]
+          : []),
         ...(canManageWhatsApp
           ? [{ href: '/dashboard/settings/whatsapp', label: 'WhatsApp', icon: MessageCircle }]
           : []),
