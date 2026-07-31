@@ -31,6 +31,43 @@ services:
     # Intentionally no `ports:` — Postgres is reachable only from the
     # `internal` network (backend), never published to the host/internet.
 
+  # Cola durable para automatizaciones diferidas, reintentos y esperas.
+  #
+  # Redis NO es fuente de verdad: el estado durable vive en PostgreSQL. Redis
+  # solo transporta trabajos, de modo que perderlo degrada el procesamiento
+  # asíncrono pero nunca los datos comerciales.
+  #
+  # Sin `ports:` — igual que PostgreSQL, solo alcanzable desde la red
+  # `internal`, nunca publicado al host ni a Internet. Por eso no lleva
+  # contraseña: añadir un secreto que solo viaja por una red privada de Docker
+  # da una falsa sensación de seguridad sin cerrar ningún vector real. Si
+  # algún día Redis se expone, la contraseña pasa a ser obligatoria.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # appendonly: los trabajos en vuelo sobreviven a un reinicio del contenedor.
+    # maxmemory-policy noeviction: una cola NUNCA debe descartar trabajos en
+    # silencio por presión de memoria; es preferible que falle de forma visible.
+    command: >-
+      redis-server
+      --appendonly yes
+      --maxmemory-policy noeviction
+    volumes:
+      - redis_data:/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
   backend:
     build:
       context: ./apps/backend
@@ -47,6 +84,8 @@ services:
       - .env.staging
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - backend_uploads:/app/uploads
@@ -97,6 +136,47 @@ services:
         max-file: "3"
     # Intentionally no `ports:` — reachable only through Caddy.
 
+  # Worker de la cola durable. Proceso SEPARADO del backend a proposito:
+  #
+  #  - un job pesado (descargar un medio, ejecutar una automatizacion larga)
+  #    no puede robarle CPU al hilo que atiende webhooks de Meta, que exigen
+  #    un ack rapido;
+  #  - se puede reiniciar o escalar sin cortar la API;
+  #  - un fallo del worker degrada el procesamiento diferido, no el CRM.
+  #
+  # Comparte imagen con el backend (mismo codigo, distinto arranque) para que
+  # no puedan divergir de version.
+  worker:
+    image: tehus-crm-staging-backend
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 60s
+    # Mas margen que el backend: un job en vuelo debe poder terminar antes de
+    # que lo maten, o se reintentara y podria duplicar efectos.
+    command: ["node", "dist/src/worker"]
+    env_file:
+      - .env.staging
+    environment:
+      WORKER_ROLE: "queue"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_started
+    volumes:
+      - backend_uploads:/app/uploads
+    networks:
+      - internal
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Sin healthcheck HTTP: no expone puerto. Su salud se observa por la cola
+    # (jobs atascados) y por el log, no por un endpoint inventado.
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -128,6 +208,7 @@ networks:
 
 volumes:
   postgres_data:
+  redis_data:
   backend_uploads:
   caddy_data:
   caddy_config:
