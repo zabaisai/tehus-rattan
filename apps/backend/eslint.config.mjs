@@ -6,7 +6,11 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    // `src/generated` es el cliente de Prisma: codigo generado. Analizarlo
+    // solo produce ruido —sus errores no se pueden arreglar en el origen— y,
+    // peor, `lint --fix` lo REESCRIBE entero, ensuciando cualquier commit con
+    // miles de lineas ajenas al cambio.
+    ignores: ['eslint.config.mjs', 'src/generated/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

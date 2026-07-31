@@ -10,6 +10,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { MailService } from '../src/modules/mail/mail.service';
 import { NotificationsController } from '../src/modules/notifications/notifications.controller';
 import { NotificationsService } from '../src/modules/notifications/notifications.service';
+import { RealtimeEmitter } from '../src/common/realtime/realtime.emitter';
 import {
   buildFakeSessionPrisma,
   encodeSid,
@@ -127,6 +128,10 @@ describe('Notifications (e2e)', () => {
         {
           provide: MailService,
           useValue: { sendNotificationEmail: jest.fn() },
+        },
+        {
+          provide: RealtimeEmitter,
+          useValue: { notificationCreated: jest.fn() },
         },
         NotificationsService,
       ],

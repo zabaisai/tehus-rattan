@@ -4,10 +4,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 
 @Injectable()
 export class TasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeEmitter,
+  ) {}
 
   async findAll(
     companyId: string,
@@ -92,7 +96,7 @@ export class TasksService {
     await this.validateContact(data.contactId, companyId);
     await this.validateConversation(data.conversationId, companyId);
 
-    return this.prisma.task.create({
+    const creada = await this.prisma.task.create({
       data: {
         ...data,
         companyId,
@@ -101,6 +105,15 @@ export class TasksService {
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       },
     });
+
+    // Al responsable le llega ademas por su sala personal: una tarea nueva
+    // asignada es justo lo que no puede esperar al siguiente refresco.
+    this.realtime.taskUpdated(
+      companyId,
+      creada.id,
+      creada.assignedTo ?? undefined,
+    );
+    return creada;
   }
 
   async update(
@@ -118,7 +131,7 @@ export class TasksService {
     await this.findById(id, companyId);
     await this.validateAssignedUser(data.assignedTo, companyId);
 
-    return this.prisma.task.update({
+    const actualizada = await this.prisma.task.update({
       where: { id },
       data: {
         ...data,
@@ -127,14 +140,28 @@ export class TasksService {
         dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
       },
     });
+
+    this.realtime.taskUpdated(
+      companyId,
+      actualizada.id,
+      actualizada.assignedTo ?? undefined,
+    );
+    return actualizada;
   }
 
   async complete(id: string, companyId: string) {
     await this.findById(id, companyId);
-    return this.prisma.task.update({
+    const completada = await this.prisma.task.update({
       where: { id },
       data: { status: 'COMPLETED' },
     });
+
+    this.realtime.taskUpdated(
+      companyId,
+      completada.id,
+      completada.assignedTo ?? undefined,
+    );
+    return completada;
   }
 
   async remove(id: string, companyId: string) {

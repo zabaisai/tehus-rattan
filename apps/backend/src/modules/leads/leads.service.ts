@@ -4,10 +4,14 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 
 @Injectable()
 export class LeadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeEmitter,
+  ) {}
 
   async findAll(
     companyId: string,
@@ -147,7 +151,7 @@ export class LeadsService {
     await this.findById(id, companyId);
     await this.validateAssignedUser(data.assignedTo, companyId);
 
-    return this.prisma.lead.update({
+    const actualizado = await this.prisma.lead.update({
       where: { id },
       data: {
         ...data,
@@ -156,6 +160,11 @@ export class LeadsService {
           : undefined,
       },
     });
+
+    // El tablero es compartido: si un asesor mueve o reasigna una
+    // oportunidad, el resto debe verlo sin recargar.
+    this.realtime.leadUpdated(companyId, actualizado.id, actualizado.stageId);
+    return actualizado;
   }
 
   async remove(id: string, companyId: string) {
@@ -180,7 +189,9 @@ export class LeadsService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    // La emision va DESPUES del commit: avisar antes haria que el cliente
+    // recargara y viera todavia la etapa anterior.
+    const movido = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.lead.update({
         where: { id },
         data: { stageId },
@@ -197,6 +208,9 @@ export class LeadsService {
 
       return updated;
     });
+
+    this.realtime.leadUpdated(companyId, movido.id, movido.stageId);
+    return movido;
   }
 
   async changeStatus(
@@ -206,13 +220,16 @@ export class LeadsService {
     lostReason?: string,
   ) {
     await this.findById(id, companyId);
-    return this.prisma.lead.update({
+    const cerrado = await this.prisma.lead.update({
       where: { id },
       data: {
         status,
         lostReason: status === 'LOST' ? lostReason : null,
       },
     });
+
+    this.realtime.leadUpdated(companyId, cerrado.id, cerrado.stageId);
+    return cerrado;
   }
 
   async getHistory(id: string, companyId: string) {
@@ -265,7 +282,9 @@ export class LeadsService {
     if (offset !== undefined) {
       const skip = Number(offset);
       if (!Number.isInteger(skip) || skip < 0) {
-        throw new BadRequestException('offset debe ser un entero mayor o igual a 0');
+        throw new BadRequestException(
+          'offset debe ser un entero mayor o igual a 0',
+        );
       }
       pagination.skip = skip;
     }

@@ -190,9 +190,12 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       MISMA transacción que el mensaje · `FOR UPDATE SKIP LOCKED` ·
       recuperación de colgados · backoff persistido en `availableAt` ·
       42 pruebas · **la ejecución en línea se eliminó**: un solo camino
-- [ ] **WebSockets con aislamiento por empresa** — pendiente
-- [ ] Outbox/eventos durables
-- [ ] WebSockets autenticados y aislados por empresa
+- [x] **WebSockets con aislamiento por empresa** — namespace `/realtime`,
+      autenticación en el **middleware del handshake** (el cliente rechazado
+      recibe `connect_error` y nunca se cree en vivo), salas de empresa,
+      usuario y conversación, eventos versionados `v1:`, puente de Redis para
+      el worker, polling conservado como respaldo · **47 pruebas unitarias +
+      14 e2e con sockets reales y dos empresas**
 - [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
 
 ### Bloque 7 — Capacidades funcionales
@@ -365,6 +368,9 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras procesador | 971 unit / 233 e2e verdes |
 | 2026-07-31 | **CI** `e2c3254` y `b180055` (HEAD) | **success**, `head_sha` verificado en ambos |
 | 2026-07-31 | tras outbox durable | **1000 unit / 233 e2e verdes** |
+| 2026-07-31 | **CI** `f640106` (outbox) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras WebSockets | **1047 unit / 247 e2e verdes** (backend) |
+| 2026-07-31 | frontend tras WebSockets | **138 verdes / 27 suites**, lint y build limpios |
 
 ## Despliegues
 
@@ -394,8 +400,8 @@ verde de un SHA anterior no cubre el código nuevo.
 
 ## Próximo comando seguro
 
-Bloques 0–5 completos. Bloque 6: Redis, worker, cola, procesador y **outbox
-durable** listos. Falta **WebSockets**.
+**Bloque 6 CERRADO.** Bloques 0–6 completos: Redis, worker, cola, procesador,
+outbox durable y WebSockets. Siguiente: **bloque 7 (capacidades funcionales)**.
 
 ### Estrategia de ejecución, ya unificada
 
@@ -406,35 +412,44 @@ inmediato falla, el evento queda `PENDING` y lo recoge el dispatcher. Ejecutar
 también en línea duplicaría efectos si el enqueue sí había llegado a Redis
 antes de fallar la respuesta.
 
+### Tiempo real: cómo quedó (ver `docs/REALTIME.md`)
+
+- Namespace `/realtime`. **La autenticación va en el middleware del
+  handshake**, no en `handleConnection`: así el rechazado recibe
+  `connect_error` y nunca llega a creerse conectado, que es de lo que depende
+  el respaldo por polling para saber cuándo actuar.
+- **El `companyId` sale SIEMPRE del token.** Un `companyId` en el handshake se
+  ignora; hay prueba unitaria y prueba e2e con sockets reales que lo fijan.
+- La suscripción a un hilo se comprueba **contra la base** filtrando por el
+  `companyId` del token, y el nombre de la sala lleva la empresa dentro como
+  segunda barrera.
+- **El worker emite por Redis** (`RealtimeTransport` crea un servidor de
+  socket.io sin HTTP; el backend monta `RedisIoAdapter`). Sin ese puente, todo
+  lo que procesa el worker se emitiría al vacío: no rompe nada, simplemente no
+  llega, y solo se ve en producción.
+- **El polling NO se quitó.** Con canal vivo pasa de 5 s a 30 s. Quitarlo
+  convertiría el WebSocket en punto único de fallo y su caída se vería como
+  "el CRM no actualiza".
+- Emisores enganchados: mensajes (alta y estado de entrega), conversaciones,
+  oportunidades, tareas y notificaciones.
+
 ```
-# BLOQUE 6, ULTIMA FASE — WebSockets
+# BLOQUE 7 — CAPACIDADES FUNCIONALES
 #
-# Requisitos del encargo, todos obligatorios:
-#   - autenticacion (mismo JWT que la API)
-#   - autorizacion por companyId: NINGUN cliente puede suscribirse a otra
-#     empresa. Es el requisito critico; el resto es ergonomia.
-#   - rooms de empresa, usuario y conversacion
-#   - eventos versionados
-#   - reconexion y heartbeat
-#   - pruebas con DOS empresas verificando cero fuga
-#   - fallback de refetch/polling (el frontend ya hace polling: conservarlo)
-#   - actualizar conversaciones, mensajes, oportunidades, tareas y avisos
+# Orden sugerido (el flujo comercial completo primero, que es lo que hoy
+# esta roto de cara al usuario):
+#   1. Conversacion -> oportunidad: hoy `lead.create` solo se invoca desde
+#      LeadsService.create y el webhook NUNCA lo llama. Por eso "WhatsApp
+#      funciona pero no aparece nada en el pipeline".
+#   2. Asignacion automatica round-robin.
+#   3. Bandeja omnicanal + UI de pipelines y oportunidades.
+#   4. Tareas y SLA.
+#   5. Motor de automatizaciones durable + constructor visual.
+#   6. Chatbot v1, plantillas, salud de WhatsApp, medios.
+#   7. Cotizaciones + PDF en servidor.
 #
-# 1. npm i @nestjs/websockets @nestjs/platform-socket.io socket.io
-# 2. src/common/realtime/realtime.gateway.ts
-#    - handleConnection: validar el JWT y RESOLVER companyId DEL TOKEN,
-#      nunca de un parametro del cliente. Ese es el punto donde se filtra o no.
-#    - join automatico a `company:<id>` y `user:<id>`; la conversacion se une
-#      bajo demanda PREVIA comprobacion de que pertenece a la empresa.
-#    - rechazar el handshake si el token no valida.
-# 3. Emitir desde el procesador del worker, no desde el webhook: el efecto y
-#    su notificacion en tiempo real deben ir juntos.
-#    OJO: el worker es OTRO proceso. Para que sus emisiones lleguen a los
-#    clientes conectados al backend hace falta el adaptador de Redis de
-#    socket.io (@socket.io/redis-adapter). Sin el, el worker emitiria al
-#    vacio. Redis ya esta disponible.
-# 4. Pruebas: dos empresas, un cliente de cada una, y verificar que un evento
-#    de A nunca llega a B.
+# Recordar: emitir por RealtimeEmitter en cada punto que cambie estado
+# visible, y respetar el dual-write de Conversation.stage / Lead.stageId.
 ```
 
 **Recordatorios de seguridad vigentes**

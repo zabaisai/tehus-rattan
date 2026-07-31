@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 
 @Injectable()
 export class MessagesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private realtime: RealtimeEmitter,
+  ) {}
 
   async findByConversation(conversationId: string, companyId: string) {
     return this.prisma.message.findMany({
@@ -59,7 +63,7 @@ export class MessagesService {
       mensaje: { id: string },
     ) => Promise<void>,
   ) {
-    return this.prisma.$transaction(async (tx) => {
+    const mensaje = await this.prisma.$transaction(async (tx) => {
       const { companyId, ...messageData } = data;
       const conversation = await tx.conversation.findFirst({
         where: { id: data.conversationId, companyId },
@@ -81,6 +85,13 @@ export class MessagesService {
 
       return message;
     });
+
+    // Fuera de la transaccion a proposito: avisar antes del commit haria que
+    // el cliente recargara el hilo y no encontrara todavia el mensaje. Aqui
+    // ya esta confirmado. Cubre entrante y saliente por igual, porque ambos
+    // caminos pasan por este metodo.
+    this.realtime.messageCreated(data.companyId, data.conversationId, mensaje);
+    return mensaje;
   }
 
   async findByWamid(wamid: string) {
@@ -105,7 +116,14 @@ export class MessagesService {
   }): Promise<'updated' | 'ignored' | 'unknown'> {
     const existing = await this.prisma.message.findUnique({
       where: { wamid: input.wamid },
-      select: { id: true, status: true },
+      select: {
+        id: true,
+        status: true,
+        conversationId: true,
+        // La empresa sale de la conversacion, no del payload de Meta: la sala
+        // a la que se emite jamas se deriva de datos externos.
+        conversation: { select: { companyId: true } },
+      },
     });
 
     if (!existing) return 'unknown';
@@ -149,6 +167,13 @@ export class MessagesService {
           : {}),
       },
     });
+
+    this.realtime.messageStatusChanged(
+      existing.conversation.companyId,
+      existing.conversationId,
+      existing.id,
+      input.status,
+    );
 
     return 'updated';
   }

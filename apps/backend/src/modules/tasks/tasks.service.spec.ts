@@ -1,6 +1,15 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { TasksService } from './tasks.service';
 
+const realtimeStub = () =>
+  ({
+    messageCreated: jest.fn(),
+    messageStatusChanged: jest.fn(),
+    leadUpdated: jest.fn(),
+    taskUpdated: jest.fn(),
+    notificationCreated: jest.fn(),
+  }) as never;
+
 /**
  * CARACTERIZACIÓN — puerta de `Task.conversationId`.
  *
@@ -49,7 +58,7 @@ describe('TasksService (vínculos y aislamiento)', () => {
         findFirst: jest.fn().mockResolvedValue({ id: 'conv-1' }),
       },
     };
-    service = new TasksService(prisma);
+    service = new TasksService(prisma, realtimeStub());
   });
 
   describe('aislamiento multiempresa', () => {

@@ -13,23 +13,29 @@ import {
 import { ConversationList } from "@/components/conversations/ConversationList";
 import { MessageThread } from "@/components/conversations/MessageThread";
 import { MessageInput } from "@/components/conversations/MessageInput";
+import { intervaloDeRefresco, useRealtime } from "@/lib/use-realtime";
 
 export default function ConversationsPage() {
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [sendNotice, setSendNotice] = useState<string | null>(null);
 
+  // Con canal abierto los mensajes llegan solos; el polling se relaja pero no
+  // desaparece, por si se pierde algun evento.
+  const { enVivo } = useRealtime(selectedId);
+  const refetchInterval = intervaloDeRefresco(enVivo);
+
   const { data: conversations } = useQuery({
     queryKey: ["conversations"],
     queryFn: getConversations,
-    refetchInterval: 5000,
+    refetchInterval,
   });
 
   const { data: messages } = useQuery({
     queryKey: ["messages", selectedId],
     queryFn: () => getMessages(selectedId as string),
     enabled: !!selectedId,
-    refetchInterval: 5000,
+    refetchInterval,
   });
 
   const selectedConversation =
