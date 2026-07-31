@@ -33,6 +33,20 @@ export function usaPuenteRedis(env: NodeJS.ProcessEnv = process.env): boolean {
  */
 export const ESPERA_MAXIMA_REDIS_MS = 3_000;
 
+/**
+ * Estado del puente entre procesos, para que la monitorizacion lo vea.
+ *
+ * El tiempo real PUEDE degradarse a polling sin romper nada, pero esa
+ * degradacion no debe ser invisible: si el puente lleva semanas caido, el
+ * producto funciona "raro pero funciona" y nadie lo mira. Se publica aqui, en
+ * el mismo modulo que lo abre, para que no haya dos verdades.
+ */
+export const estadoDelPuente: {
+  conectado: boolean;
+  /** Por que no esta conectado, ya clasificado. Nunca la cadena de conexion. */
+  motivo?: string;
+} = { conectado: false };
+
 /** Crea el par de conexiones que exige el adaptador (publicar y escuchar). */
 export function crearClientesRedis(env: NodeJS.ProcessEnv = process.env): {
   pub: Redis;
@@ -127,11 +141,15 @@ export class RedisIoAdapter extends IoAdapter {
       this.logger.warn(
         'Sin puente de Redis para tiempo real: los eventos del worker no llegarán en vivo (el polling los cubre)',
       );
+      estadoDelPuente.conectado = false;
+      estadoDelPuente.motivo = 'redis-inalcanzable';
       await this.cerrar();
       return false;
     }
 
     this.adaptador = createAdapter(pub, sub);
+    estadoDelPuente.conectado = true;
+    delete estadoDelPuente.motivo;
     return true;
   }
 

@@ -196,7 +196,16 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       usuario y conversación, eventos versionados `v1:`, puente de Redis para
       el worker, polling conservado como respaldo · **47 pruebas unitarias +
       14 e2e con sockets reales y dos empresas**
-- [ ] Observabilidad: 4xx visibles, logs sin PII, métricas, health/live/ready
+- [x] **Salud agregada `/api/health/status`** — db + cola + worker + outbox +
+      tiempo real. **Con Redis o el worker caídos NUNCA reporta `ok`**: las
+      conversaciones se siguen guardando y la interfaz responde, así que las
+      sondas clásicas daban verde mientras los efectos de cada mensaje se
+      acumulaban sin procesar. Latido del worker en PostgreSQL (no en Redis:
+      si viviera allí, una caída de Redis borraría la prueba de la caída del
+      worker) · `20260731172240_add_system_heartbeats` · 24 pruebas
+      · **`degraded` responde 200 a propósito**, no 503: el CRM atiende y
+      tumbar la instancia empeoraría las cosas; manda el campo `status`
+- [ ] Observabilidad: 4xx visibles, logs sin PII, métricas
 
 ### Bloque 7 — Capacidades funcionales
 - [x] **Conversación → oportunidad → asignación** — `LeadIntakeService`:

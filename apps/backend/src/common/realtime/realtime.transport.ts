@@ -11,6 +11,7 @@ import { isQueueWorker } from '../queue/queue.role';
 import {
   conTiempoLimite,
   crearClientesRedis,
+  estadoDelPuente,
   usaPuenteRedis,
 } from './realtime.redis';
 
@@ -66,8 +67,12 @@ export class RealtimeTransport implements OnModuleInit, OnModuleDestroy {
       server.adapter(createAdapter(pub, sub));
       this.headless = server;
 
+      estadoDelPuente.conectado = true;
+      delete estadoDelPuente.motivo;
       this.logger.log('Puente de tiempo real del worker conectado a Redis');
     } catch {
+      estadoDelPuente.conectado = false;
+      estadoDelPuente.motivo = 'redis-inalcanzable';
       this.logger.warn(
         'El worker no pudo abrir el puente de tiempo real: sus eventos no llegarán en vivo (el polling los cubre)',
       );

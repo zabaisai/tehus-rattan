@@ -43,6 +43,31 @@ case "$queue_json" in
 esac
 
 echo ""
+echo "== System health (aggregate: db + queue + worker + outbox + realtime) =="
+# Responde una pregunta distinta de /api/health: no es "¿atiende?" sino
+# "¿esta el sistema haciendo TODO su trabajo?". Con Redis o el worker caidos
+# las conversaciones se guardan y la interfaz responde, asi que las sondas
+# clasicas dan verde mientras los efectos de cada mensaje entrante se acumulan
+# sin procesar. Aqui eso sale como "degraded".
+sys_json="$(docker compose -f "$COMPOSE_FILE" exec -T backend wget -qO- http://127.0.0.1:3001/api/health/status 2>/dev/null || true)"
+case "$sys_json" in
+  *'"status":"ok"'*)       ok "system fully healthy (status: ok)" ;;
+  *'"status":"degraded"'*) warn "system DEGRADED - the CRM serves, but something is not being processed. Detail:" ;;
+  *'"status":"down"'*)     bad "system down (status: down)" ;;
+  *)                       warn "could not read aggregate system status" ;;
+esac
+# Con degradacion se imprime el detalle por componente: sin el, "degraded" no
+# dice a quien llamar.
+case "$sys_json" in
+  *'"status":"degraded"'*)
+    for comp in queue worker outbox realtime; do
+      estado="$(printf '%s' "$sys_json" | sed -n "s/.*\"$comp\":{\"state\":\"\([a-z]*\)\".*/\1/p")"
+      [ -n "$estado" ] && echo "     - $comp: $estado"
+    done
+    ;;
+esac
+
+echo ""
 echo "== Backend health (internal, container-to-container) =="
 if docker compose -f "$COMPOSE_FILE" exec -T backend wget -qO- http://127.0.0.1:3001/api/health | grep -q '"status":"ok"'; then
   ok "backend /api/health responds ok (internal)"

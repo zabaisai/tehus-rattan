@@ -1105,3 +1105,28 @@ enum OutboxStatus {
   COMPLETED
   FAILED
 }
+
+// ─────────────────────────────────────────────
+// LATIDO DE COMPONENTES
+// ─────────────────────────────────────────────
+
+/// Ultima senal de vida de cada proceso de fondo.
+///
+/// EXISTE PORQUE EL WORKER NO EXPONE PUERTO. No tiene endpoint que sondear, y
+/// preguntarle a Redis si el worker vive no sirve: Redis puede estar
+/// perfectamente y el worker muerto, que es justo el caso peor —los eventos
+/// se encolan, nadie los consume y todo parece sano—.
+///
+/// Vive en PostgreSQL y no en Redis a proposito: si el latido dependiera de
+/// Redis, una caida de Redis borraria la evidencia de la caida del worker.
+model SystemHeartbeat {
+  /// Nombre del componente: `queue-worker`, y los que vengan.
+  component String @id
+
+  seenAt DateTime @updatedAt
+
+  /// Datos no sensibles para diagnostico: release y pid. Nunca secretos.
+  detail Json?
+
+  @@map("system_heartbeats")
+}

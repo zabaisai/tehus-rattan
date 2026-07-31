@@ -5,6 +5,7 @@ import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { QueueModule } from './common/queue/queue.module';
 import { OutboxModule } from './common/outbox/outbox.module';
 import { RealtimeModule } from './common/realtime/realtime.module';
+import { HealthModule } from './common/health/health.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -46,6 +47,7 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     QueueModule,
     OutboxModule,
     RealtimeModule,
+    HealthModule,
     ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnv,
