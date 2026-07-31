@@ -248,8 +248,17 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       notificación y de recuperación; mensaje de prueba de WhatsApp. Dentro
       del espacio de trabajo sigue mandando la identidad de la empresa: es su
       casa, y mezclarlas es justo lo que prohíbe el manual
-- [ ] Recolorear pantalla a pantalla la escala `stone` heredada a los
-      neutrales de marca (los tokens ya están; falta el barrido)
+- [x] **Recoloreado global** — la escala `stone` (929 usos en 76 ficheros)
+      se reasigna a los neutrales de marca en `@theme`. Un barrido manual
+      habría sido enorme, propenso a erratas e imposible de revisar; así toda
+      la interfaz cambia de una vez, sin tocar componentes y con vuelta atrás
+      inmediata. **Verificado en el CSS compilado**: 0 apariciones de los
+      grises originales (`#78716c`, `#1c1917`, `#f5f5f4`, `#a8a29e`).
+      Es un puente: las pantallas nuevas usan `neutral-*`, y cuando no quede
+      ningún `stone-*` el bloque se borra sin que cambie nada
+- [ ] Aplicar el naranja de acento a superficies concretas (hoy solo vive en
+      el logotipo; el token existe y las reglas de contraste ya están fijadas)
+- [ ] QA visual en 6 viewports con el navegador
 - [ ] Design system con tokens semánticos + documentación
 - [ ] Favicon, manifest/PWA, Open Graph, metadatos
 - [ ] Fuentes Archivo / IBM Plex Sans / IBM Plex Mono

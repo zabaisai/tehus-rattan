@@ -63,6 +63,27 @@
   --color-neutral-900: #171b24;
   --color-neutral-950: #0d1017;
 
+  /* PUENTE: la escala `stone` heredada apunta a los neutrales de marca.
+     El producto usa `stone-*` en 929 sitios repartidos por 76 ficheros.
+     Reescribirlos a mano seria un barrido enorme, propenso a erratas y
+     dificil de revisar; redefinir la escala aqui rebautiza toda la interfaz
+     de una vez, sin tocar un solo componente y con vuelta atras inmediata.
+
+     Es deliberadamente un puente, no el destino: las pantallas nuevas deben
+     usar `neutral-*`. Cuando no quede ningun `stone-*`, este bloque se borra
+     y no cambia nada, porque los valores ya son los mismos. */
+  --color-stone-50: #f7f8fa;
+  --color-stone-100: #eff1f5;
+  --color-stone-200: #e2e5ec;
+  --color-stone-300: #cbd0db;
+  --color-stone-400: #9aa1b2;
+  --color-stone-500: #6e7688;
+  --color-stone-600: #525a6b;
+  --color-stone-700: #3b4252;
+  --color-stone-800: #272c38;
+  --color-stone-900: #171b24;
+  --color-stone-950: #0d1017;
+
   /* Semánticos */
   --color-surface-default: #ffffff;
   --color-surface-subtle: #f7f8fa;
