@@ -4,10 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 
 @Injectable()
 export class ConversationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationsService,
+    private realtime: RealtimeEmitter,
+  ) {}
 
   async findAll(
     companyId: string,
@@ -91,10 +97,34 @@ export class ConversationsService {
       if (!user) throw new NotFoundException('Usuario no encontrado');
     }
 
-    return this.prisma.conversation.update({
+    const actualizada = await this.prisma.conversation.update({
       where: { id },
       data,
     });
+
+    // Reasignar a mano era silencioso: el nuevo responsable no se enteraba
+    // hasta que abria la bandeja por su cuenta, y mientras tanto el cliente
+    // esperaba. El reparto automatico si avisa; esto lo iguala.
+    if (data.assignedTo) {
+      await this.notifications.emit({
+        companyId,
+        recipientUserId: data.assignedTo,
+        type: 'CONVERSATION_ASSIGNED',
+        title: 'Te asignaron una conversacion',
+        entityType: 'Conversation',
+        entityId: id,
+        actionUrl: '/dashboard/conversations',
+        // Sin cubo temporal: cada reasignacion es un hecho distinto que su
+        // destinatario debe ver, aunque la conversacion vaya y venga.
+        dedupeKey: `CONVERSATION_ASSIGNED:${id}:${data.assignedTo}`,
+      });
+    }
+
+    this.realtime.toCompany(companyId, 'v1:conversation.updated', {
+      conversationId: id,
+    });
+
+    return actualizada;
   }
 
   async pause(id: string, companyId: string) {

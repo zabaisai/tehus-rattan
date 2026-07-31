@@ -214,6 +214,10 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       momento exacto en que se pierde el seguimiento · 7 pruebas
 - [x] **Tiempo real en tablero, tareas y avisos** — la oportunidad entrante
       aparece sola; polling relajado a 30 s, nunca eliminado
+- [x] **Aviso al reasignar a mano** — reasignar era silencioso: el nuevo
+      responsable no se enteraba hasta abrir la bandeja por su cuenta, y
+      mientras tanto el cliente esperaba. El reparto automático sí avisaba;
+      esto lo iguala · 6 pruebas
 - [ ] Bandeja omnicanal
 - [ ] UI de pipelines y etapas
 - [ ] Oportunidades (vista detallada)
@@ -440,6 +444,9 @@ revisaron y no se duplicaron.
 | 2026-07-31 | tras fundamento de marca TAKTO | **1064 unit / 264 e2e / 150 frontend verdes** |
 | 2026-07-31 | **CI** `3f7cb04` (branding) y `c1a4173` (neutrales) | **success**, `head_sha` verificado en ambos |
 | 2026-07-31 | tras arreglo del arranque sin Redis | **1071 unit / 264 e2e verdes** |
+| 2026-07-31 | **CI** `cbdbc18` (incluye el arreglo) | **success**, `head_sha` verificado |
+| 2026-07-31 | **CI** `80d9590` | **cancelled** por el push siguiente — cubierto por `cbdbc18` |
+| 2026-07-31 | tras aviso de reasignación | **1077 unit / 264 e2e verdes** |
 
 ## Despliegues
 
