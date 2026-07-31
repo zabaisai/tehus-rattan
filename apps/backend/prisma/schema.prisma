@@ -128,6 +128,7 @@ model User {
   notifications           Notification[]           @relation("NotificationRecipient")
   notificationsAuthored   Notification[]           @relation("NotificationActor")
   notificationPreferences NotificationPreference[]
+  conversationReads       ConversationRead[]
 
   // Elegir a quién le toca es una consulta caliente: ocurre en cada mensaje
   // entrante de un contacto nuevo. Con este índice sale directa, sin recorrer
@@ -185,6 +186,7 @@ model Conversation {
   messages Message[]
   notes    Note[]
   tasks    Task[]
+  reads    ConversationRead[]
 
   @@index([companyId, status, lastMessageAt])
   @@index([companyId, assignedTo])
@@ -1129,4 +1131,29 @@ model SystemHeartbeat {
   detail Json?
 
   @@map("system_heartbeats")
+}
+
+/// Hasta donde ha leido CADA usuario en una conversacion.
+///
+/// Es por usuario y no un booleano en la conversacion porque la bandeja es
+/// compartida: que un supervisor abra un hilo no significa que el asesor
+/// asignado ya lo haya visto, y un unico `isRead` haria desaparecer el aviso
+/// de la persona equivocada.
+///
+/// Se guarda una MARCA DE TIEMPO y no un contador: los mensajes nuevos llegan
+/// despues, asi que "no leidos" se deriva comparando `lastReadAt` con la fecha
+/// de los mensajes entrantes. Un contador habria que mantenerlo sincronizado
+/// en cada alta y se desincroniza en cuanto algo falla a medias.
+model ConversationRead {
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  lastReadAt DateTime @default(now())
+
+  @@id([conversationId, userId])
+  @@index([userId, lastReadAt])
+  @@map("conversation_reads")
 }

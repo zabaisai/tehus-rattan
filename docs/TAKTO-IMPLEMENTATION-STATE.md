@@ -227,7 +227,16 @@ Leyenda: `[ ]` pendiente · `[~]` en curso · `[x]` terminado y verificado.
       responsable no se enteraba hasta abrir la bandeja por su cuenta, y
       mientras tanto el cliente esperaba. El reparto automático sí avisaba;
       esto lo iguala · 6 pruebas
-- [ ] Bandeja omnicanal
+- [x] **Bandeja omnicanal (backend)** — `InboxService` aparte del servicio de
+      conversación: aquel gestiona UNA, este la LISTA. Filtros por estado,
+      asignación (`me`/`unassigned`/id), no leídos, canal y oportunidad;
+      búsqueda por nombre y teléfono; contadores; acciones masivas (asignar,
+      desasignar, estado, leer/no leer) con tope de 100 y verificación de
+      pertenencia **antes** de tocar nada. No leídos **por usuario** derivados
+      de `lastReadAt` —sin contador que desincronizar— resueltos en SQL porque
+      la correlación entre mensaje y marca no se puede expresar en Prisma ·
+      `20260731…_add_conversation_reads` · 29 e2e contra base real
+- [ ] Bandeja omnicanal (interfaz)
 - [ ] UI de pipelines y etapas
 - [ ] Oportunidades (vista detallada)
 - [ ] Tareas y SLA
@@ -457,6 +466,10 @@ revisaron y no se duplicaron.
 | 2026-07-31 | **CI** `cbdbc18` (incluye el arreglo) | **success**, `head_sha` verificado |
 | 2026-07-31 | **CI** `80d9590` | **cancelled** por el push siguiente — cubierto por `cbdbc18` |
 | 2026-07-31 | tras aviso de reasignación | **1077 unit / 264 e2e verdes** |
+| 2026-07-31 | **CI** `437cfbd` y `c8036fa` | **success**, `head_sha` verificado |
+| 2026-07-31 | tras salud agregada | **1101 unit / 264 e2e verdes** |
+| 2026-07-31 | **CI** `4dbc8d4` (salud agregada) | **success**, `head_sha` verificado |
+| 2026-07-31 | tras bandeja omnicanal (backend) | **1101 unit / 293 e2e verdes** |
 
 ## Despliegues
 

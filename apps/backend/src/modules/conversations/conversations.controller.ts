@@ -17,6 +17,8 @@ import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
+import { BulkConversationsDto } from './dto/bulk-conversations.dto';
+import { InboxService } from './inbox.service';
 
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
 @Controller('conversations')
@@ -25,7 +27,68 @@ export class ConversationsController {
     private conversationsService: ConversationsService,
     private messagesService: MessagesService,
     private whatsappService: WhatsappService,
+    private inbox: InboxService,
   ) {}
+
+  /**
+   * Bandeja con filtros. Va en una ruta aparte de `GET /conversations` para
+   * no romper a quien ya consume aquella: devuelve otra forma -paginada y con
+   * contador de no leidos- y mezclarlas obligaria a adivinar cual toca.
+   */
+  @Get('inbox')
+  inboxList(
+    @Request() req: any,
+    @Query('search') search?: string,
+    @Query('status') status?: string,
+    @Query('assigned') assigned?: string,
+    @Query('unread') unread?: string,
+    @Query('withLead') withLead?: string,
+    @Query('channel') channel?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.inbox.list(req.user.companyId, req.user.sub, {
+      search,
+      status,
+      assigned,
+      unread: unread === 'true',
+      withLead:
+        withLead === 'true' ? true : withLead === 'false' ? false : undefined,
+      channel,
+      limit,
+      offset,
+    });
+  }
+
+  /** Contadores de la cabecera de la bandeja. */
+  @Get('inbox/counters')
+  inboxCounters(@Request() req: any) {
+    return this.inbox.counters(req.user.companyId, req.user.sub);
+  }
+
+  @Post('bulk')
+  bulk(@Request() req: any, @Body() body: BulkConversationsDto) {
+    return this.inbox.bulk(
+      req.user.companyId,
+      req.user.sub,
+      body.conversationIds,
+      {
+        type: body.type,
+        assignedTo: body.assignedTo,
+        status: body.status,
+      } as never,
+    );
+  }
+
+  @Post(':id/read')
+  markRead(@Param('id') id: string, @Request() req: any) {
+    return this.inbox.markRead(id, req.user.companyId, req.user.sub);
+  }
+
+  @Post(':id/unread')
+  markUnread(@Param('id') id: string, @Request() req: any) {
+    return this.inbox.markUnread(id, req.user.companyId, req.user.sub);
+  }
 
   @Get()
   findAll(
