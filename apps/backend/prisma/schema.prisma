@@ -1426,6 +1426,20 @@ model DataRequest {
   requestedBy String?
   approvedBy  String?
 
+  /// Quien la ejecuto, que puede no ser quien la aprobo. Separar los tres
+  /// papeles -pedir, aprobar, ejecutar- es lo que permite exigir que no sean
+  /// la misma persona.
+  executedBy String?
+
+  /// Confirmacion escrita a mano por quien ejecuta. Se compara con el nombre
+  /// de la empresa: teclear el nombre completo es la ultima barrera antes de
+  /// un borrado irreversible, y la unica que no se pasa por accidente.
+  confirmationText String?
+
+  /// Motivo del rechazo, si se rechaza. Obligatorio: rechazar sin explicar
+  /// deja a quien lo pidio sin saber que corregir.
+  rejectionReason String?
+
   /// Resumen de lo hecho: cuantas filas por tabla. Sin contenido.
   result Json?
 
