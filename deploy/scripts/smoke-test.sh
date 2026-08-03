@@ -80,6 +80,30 @@ if [ -n "$EXPECTED_RELEASE" ]; then
     || bad "deployed release mismatch (expected $EXPECTED_RELEASE): $vb"
 fi
 
+# 11. El bundle servido apunta REALMENTE a la API.
+#
+# EXISTE PORQUE ESTE SMOKE TEST PASO 17/17 CON LA APLICACION INSERVIBLE.
+# `NEXT_PUBLIC_API_URL` se incrusta al construir; construido sin
+# `--env-file`, quedo vacia y todas las llamadas del navegador salieron
+# contra el propio frontend (404 en cada pantalla). Nada de lo que este
+# script comprobaba lo notaba: el backend estaba perfecto y el frontend
+# servia HTML con normalidad. Lo unico que lo delata es mirar el JavaScript
+# que de verdad se entrega al navegador.
+api_host=$(printf '%s' "$API_URL" | sed -E 's#^[a-z]+://([^/]+).*#\1#')
+html=$(body "$FRONTEND_URL/login")
+chunks=$(printf '%s' "$html" | grep -oE '/_next/static/chunks/[A-Za-z0-9_.-]+\.js' | sort -u | head -25)
+if [ -z "$chunks" ]; then
+  bad "no se pudo listar el JavaScript del frontend para comprobar la URL de la API"
+else
+  encontrado=0
+  for ch in $chunks; do
+    if body "$FRONTEND_URL$ch" | grep -q "$api_host"; then encontrado=1; break; fi
+  done
+  [ "$encontrado" = 1 ] \
+    && ok "el bundle del frontend apunta a $api_host" \
+    || bad "NINGUN chunk del frontend contiene $api_host — se construyo sin NEXT_PUBLIC_API_URL"
+fi
+
 echo ""
 echo "Smoke test: $pass passed, $fail failed."
 exit "$fail"
