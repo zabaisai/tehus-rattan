@@ -37,7 +37,7 @@ en `6be9756`.
 | Motor durable de automatizaciones | `modules/automations/` |
 | Auditoría de plataforma | `modules/platform/platform-audit-log.service.ts` |
 
-### Chatbot v1 existente — punto de partida a EVOLUCIONAR
+### Chatbot v1 existente — referencia (ver decisión del bloque 1)
 
 Modelos ya en el esquema: `ChatbotFlow` (DRAFT/PUBLISHED, `draftNodes` JSON,
 `publishedVersion`, `triggerKeywords`), `ChatbotFlowVersion` (versiones
@@ -48,10 +48,10 @@ Motor en `modules/chatbot/`: 5 tipos de nodo (`message`, `question`, `menu`,
 `elegirOpcion`, `interpolar`, tope `MAXIMO_PASOS = 30`, ejecución **síncrona**
 dentro del webhook.
 
-**Decisión de arquitectura:** FlowBot **evoluciona** estos modelos; no se crea
-un segundo motor ni modelos paralelos. Los nombres `Chatbot*` se conservan
-donde ya existen para no romper datos ni migraciones aplicadas, y lo nuevo se
-añade de forma aditiva.
+**Decisión revisada en el bloque 1:** se crean modelos `FlowBot*` nuevos en
+vez de ampliar estos. El motivo está documentado abajo. Lo que NO se duplica es
+la infraestructura: cola, outbox, tiempo real, WhatsApp y auditoría se
+reutilizan tal cual.
 
 ---
 
@@ -83,11 +83,88 @@ lint 0 errores, build limpio.
 
 ---
 
+## Bloque 1 — Modelo de datos
+
+- [x] **8 modelos nuevos** en `prisma/schema.prisma`: `FlowBot`,
+      `FlowBotVersion`, `FlowBotTrigger`, `FlowBotExecution`,
+      `FlowBotExecutionStep`, `FlowBotWait`, `FlowBotMetric`, `FlowBotTestRun`,
+      con 5 enums. Todos aislados por `companyId`, directamente o por una
+      relación inequívoca.
+- [x] **Migración `20260803183745_flowbot_modelo_inicial`**, creada con
+      `--create-only` y revisada a mano: 8 `CREATE TABLE`, 5 `CREATE TYPE`,
+      25 índices y las claves ajenas. **Cero** `DROP TABLE`, `DROP COLUMN`,
+      `TRUNCATE`, `DELETE FROM` ni `SET NOT NULL`. Aplicada **solo en local**.
+- [x] Relaciones inversas añadidas a `Company`, `User`, `Conversation`,
+      `Contact`, `Lead` y `WhatsAppIntegration`.
+
+### Decisión registrada: modelos nuevos, no ampliar `ChatbotFlow`
+
+El fichero de estado anterior decía «FlowBot evoluciona el chatbot v1». Al
+llegar al modelo concreto, esa vía resultó peor y se cambió — queda anotado
+porque contradice lo escrito antes:
+
+El chatbot v1 está desplegado y con datos en staging. Su grafo es lineal
+(`next` más opciones de menú) y su ejecución es síncrona dentro del webhook.
+FlowBot necesita puertos tipados, ejecución durable, esperas que sobreviven a
+un reinicio y disparadores que no son solo «mensaje entrante». Forzar ambas
+semánticas sobre las mismas tablas dejaría filas que significan una cosa u otra
+según una bandera. El v1 se conserva intacto y funcionando; FlowBot lo
+sustituye cuando cubra su superficie.
+
+### Rollback de la migración
+
+Es puramente aditiva: nada que revertir en datos. Para deshacerla bastaría
+`DROP TABLE` de las ocho tablas y `DROP TYPE` de los cinco enums, en orden
+inverso a las claves ajenas. **No se ha aplicado en staging** y no se aplicará
+hasta el despliegue final autorizado.
+
+---
+
+## Bloque 2 — Grafo, variables, validador y compilador
+
+- [x] **`flowbot.graph.ts`** — catálogo tipado de **48 tipos de nodo** en seis
+      categorías. Cada tipo declara categoría, puertos, configuración con tipos
+      y obligatoriedad, variables que produce, si espera, si tiene efecto
+      externo, si requiere IA y el rol mínimo. **Puertos, no `next`**: una rama
+      sin conectar es detectable antes de publicar en vez de ser un `undefined`
+      en ejecución. Límites duros de nodos, conexiones, pasos y profundidad.
+- [x] **`flowbot.variables.ts`** — sustitución `{{ruta}}` con valor por
+      defecto, **sin `eval`, sin `new Function`, sin intérprete**. Solo lee
+      propiedades propias: `{{constructor.name}}` y `{{__proto__.x}}` no
+      resuelven. No pinta objetos como `[object Object]`. Operadores de
+      condición como funciones concretas, insensibles a mayúsculas y acentos,
+      con formato de miles colombiano. Escapado de HTML para lo que se muestra
+      en el panel del asesor.
+- [x] **`flowbot.validator.ts`** — errores frente a avisos: un error impide
+      publicar, un aviso no. Comprueba forma, inicio único y disparador,
+      conexiones rotas, puertos inexistentes o duplicados, salidas obligatorias
+      sin conectar, alcanzabilidad, **ciclos sin espera** (un bucle que pasa por
+      una pregunta es legítimo; uno que gira solo no), configuración por tipo,
+      referencias a pipeline/etapa/usuario/plantilla/credencial contra la
+      empresa, secretos incrustados, y nodos de IA sin proveedor.
+- [x] **SSRF en el validador** — solo HTTPS; bloquea localhost, loopback,
+      10/172.16-31/192.168, `169.254` (metadata de nube), `.internal` y
+      `.local`; rechaza credenciales en la URL. Si **solo la ruta** lleva
+      variables, el host **sí** se valida al publicar; solo se difiere cuando
+      la variable está en el host.
+- [x] **`flowbot.compiler.ts`** — compila a `nodo → puerto → destino` con
+      huella SHA-256 estable (claves ordenadas). Solo compila si no hay
+      errores.
+- [x] **75 pruebas** del núcleo.
+
+**Verificación:** backend **1377 unit / 457 e2e** verdes, typecheck 0, lint 0,
+build limpio.
+
+---
+
 ## Próximo paso
 
-Modelo de datos de FlowBot: migración **aditiva** que amplía el chatbot v1 con
-disparadores, ejecuciones durables, esperas y métricas, conservando lo
-existente. Revisar el SQL a mano antes de aplicarlo y documentar el rollback.
+**Bloque 3 — motor durable.** Servicio de ejecución sobre la cola y el outbox
+existentes: arranque idempotente por evento, bloqueo por conversación, paso a
+paso con `FlowBotExecutionStep`, esperas durables en `FlowBotWait`, reanudación
+por mensaje entrante y por tiempo, reintentos con backoff y tope de pasos.
+Adaptadores de efectos (WhatsApp, CRM) con implementación falsa para pruebas y
+simulador.
 
 ### Comando seguro para reanudar
 
