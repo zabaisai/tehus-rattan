@@ -1,10 +1,17 @@
 import type { NextConfig } from "next";
 import { buildContentSecurityPolicy, resolveApiOrigin } from "./src/lib/csp";
+import { verificarUrlDeApi } from "./src/lib/build-guard";
 
 // Security headers set on every response. HSTS is intentionally NOT set here —
 // the Caddy TLS edge owns it, so it is never duplicated or sent over plain HTTP.
 // The CSP is a static header (no per-request nonce; see src/lib/csp.ts for why).
 const isDev = process.env.NODE_ENV !== "production";
+
+// Falla la construcción de producción si la URL de la API no está. Sin esto,
+// el bundle sale sin baseURL y TODAS las llamadas van contra el propio
+// frontend: 404 en cada pantalla, con la imagen construida, el contenedor
+// healthy, el health en `ok` y el smoke test en verde. Ver src/lib/build-guard.ts.
+verificarUrlDeApi(process.env.NEXT_PUBLIC_API_URL, !isDev);
 const contentSecurityPolicy = buildContentSecurityPolicy({
   apiOrigin: resolveApiOrigin(process.env.NEXT_PUBLIC_API_URL),
   isDev,
