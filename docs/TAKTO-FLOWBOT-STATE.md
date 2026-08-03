@@ -263,7 +263,55 @@ build limpio.
 
 ---
 
+## Bloque 3b (en curso) — Cola y selección de bots
+
+- [x] **`QUEUE_NAMES.FLOWBOT`** — cola propia sobre el mismo Redis y la misma
+      configuración. Separada de `INBOUND` porque un atasco de ejecuciones de
+      bots no debe frenar el procesamiento de mensajes entrantes, ni al revés.
+- [x] **`FlowBotQueueService`** — `jobId` **determinista**:
+      `avanzar:<ejecución>:<paso>:<intento>` y `despertar:<espera>`. BullMQ
+      descarta un `add` con un `jobId` existente, así que dos productores
+      concurrentes producen **un** solo trabajo. El número de paso es
+      imprescindible: sin él, el segundo avance de la misma ejecución se
+      descartaría como duplicado y la ejecución quedaría parada para siempre.
+- [x] **Retirada del despertar** cuando la espera se reanuda por otra vía, para
+      que un vencimiento no saque por el puerto de tiempo agotado una ejecución
+      que ya siguió. El consumidor lo revalida contra PostgreSQL: esta es la
+      primera barrera, no la única.
+- [x] **`FlowBotSelectorService`** — selección **determinista**. Filtra por
+      empresa **dentro de la consulta**, solo bots `ACTIVE` con versión
+      publicada y que no sean plantillas, y desempata por prioridad → más
+      reciente → id. Sin el último criterio, dos bots con la misma prioridad
+      creados en el mismo instante volverían a depender del orden de la base.
+- [x] **Exclusividad**: en cuanto entra un bot exclusivo, ninguno más arranca.
+      Dos bots contestando a la vez al mismo cliente es el fallo más visible y
+      más difícil de explicar.
+- [x] **Trazabilidad**: cada descarte lleva su motivo, para que «el bot no
+      contestó» tenga respuesta.
+- [x] Filtros por palabra clave (insensible a acentos), pipeline, etapa,
+      etiqueta, primera conversación y horario —con rangos que cruzan la
+      medianoche—. Un filtro desconocido **no** silencia el bot: descartar por
+      una clave que no entendemos dejaría bots mudos sin explicación.
+- [x] **16 pruebas** de cola y selección.
+
+**Verificación:** backend **1445 unit / 457 e2e** verdes, typecheck 0, lint 0,
+build limpio.
+
+---
+
 ## Próximo paso
+
+**Bloque 3c — el runner.** Servicio que persiste lo que el intérprete decide:
+creación idempotente de `FlowBotExecution` por `idempotencyKey`, escritura de
+pasos y esperas en una transacción, bloqueo por conversación con expiración,
+consumidor en el worker, reanudación por mensaje y por vencimiento, reintentos
+con backoff y `NEEDS_ATTENTION`, y reconciliador de esperas vencidas sin job.
+
+Después: adaptadores reales de CRM y WhatsApp, handoff conectado a la
+conversación, panel lateral del contacto, archivado seguro, pipeline en tiempo
+real, API, permisos y QA.
+
+### Referencia del bloque 3b completo
 
 **Bloque 3b — persistencia y cola.** Servicio que envuelve al intérprete:
 selección de bots por disparador con prioridad y exclusividad, creación
