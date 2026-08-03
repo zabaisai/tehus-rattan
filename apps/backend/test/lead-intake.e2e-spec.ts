@@ -1,5 +1,6 @@
 import { PrismaService } from '../src/prisma/prisma.service';
 import { LeadIntakeService } from '../src/modules/leads/lead-intake.service';
+import { LeadSettingsService } from '../src/modules/leads/lead-settings.service';
 import { AssignmentService } from '../src/modules/assignment/assignment.service';
 
 /**
@@ -50,11 +51,15 @@ describe('Entrada de oportunidades (e2e, base real)', () => {
     await prisma.$connect();
 
     const assignment = new AssignmentService(prisma, notificaciones as never);
+    // El servicio REAL de configuracion, no un doble: estas pruebas corren
+    // contra la base y deben ejercitar la resolucion de pipeline y etapa tal
+    // como ocurre en produccion.
     intake = new LeadIntakeService(
       prisma,
       assignment,
       notificaciones as never,
       realtime as never,
+      new LeadSettingsService(prisma),
     );
 
     const empresa = await prisma.company.create({

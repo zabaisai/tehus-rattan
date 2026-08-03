@@ -207,6 +207,62 @@ build limpio.
 
 ---
 
+## Bloque 4 — Entrada de oportunidades configurable
+
+**Hallazgo del preflight:** la Parte 5 del encargo («mensaje entrante → Nuevo
+lead») **ya estaba resuelta en su mayor parte** por `LeadIntakeService`, del
+bloque 7 del proyecto anterior. Crea el contacto, la conversación y la
+oportunidad, la reutiliza si ya hay una abierta, y **serializa con un bloqueo
+consultivo de PostgreSQL** por `(empresa, contacto)` para que dos mensajes
+simultáneos no abran dos oportunidades. No se reescribió nada de eso.
+
+Los huecos reales eran dos, y son los que se han cerrado:
+
+- [x] **`PipelineStage.isInitial`** — antes se usaba «la primera etapa por
+      orden», que cambia sola en cuanto alguien reordena el tablero: las
+      oportunidades nuevas empezarían a caer en otra etapa sin que nadie lo
+      pidiera. Ahora la entrada se ata a una marca explícita. **El nombre no
+      decide nada**: puede llamarse «Nuevo lead» o cualquier otra cosa, y hay
+      una prueba que verifica que ninguna consulta filtra por texto.
+- [x] **`CompanyLeadSettings`** — configuración por empresa: crear oportunidad
+      sí/no, pipeline y etapa de entrada, reutilizar la abierta, tarea inicial
+      con título y vencimiento, estrategia de asignación (ninguna / turnos /
+      fija) y qué hacer con un contacto archivado que vuelve a escribir.
+- [x] **`LeadSettingsService`** — resuelve la configuración comprobando
+      **toda** referencia contra la empresa. Una configuración caduca o
+      manipulada no puede meter la oportunidad de una empresa en el tablero de
+      otra; y cuando una referencia no vale, se cae al valor por defecto en vez
+      de fallar, porque el mensaje del cliente no puede perderse por un ajuste
+      obsoleto. **13 pruebas**, la mitad de aislamiento.
+- [x] `LeadIntakeService` conectado a la configuración, sin reescribir su
+      transacción ni su bloqueo.
+
+### Migración `entrada_oportunidades_configurable`
+
+Aditiva y revisada a mano: 1 tabla, 1 enum, 1 columna con `DEFAULT false`,
+1 índice único. **Cero** sentencias destructivas. Aplicada **solo en local**.
+
+Incluye un **backfill** que marca como inicial la etapa de menor orden de cada
+pipeline. Sin él, ninguna quedaría marcada y las empresas existentes dejarían
+de recibir oportunidades: una migración aditiva habría roto el comportamiento
+en silencio, que es peor que un error visible. Verificado en local: exactamente
+una etapa inicial por pipeline.
+
+**Rollback:** `UPDATE "pipeline_stages" SET "isInitial" = false;` y
+`DROP TABLE "company_lead_settings"; DROP TYPE "EstrategiaAsignacion";`
+
+### Lo que el typecheck de specs volvió a atrapar
+
+Añadir `LeadSettingsService` al constructor de `LeadIntakeService` rompió
+`test/lead-intake.e2e-spec.ts`, que lo construye a mano. El paso «typecheck
+incluye specs» del CI lo detectó antes de publicar — es la tercera vez que ese
+paso paga su coste.
+
+**Verificación:** backend **1429 unit / 457 e2e** verdes, typecheck 0, lint 0,
+build limpio.
+
+---
+
 ## Próximo paso
 
 **Bloque 3b — persistencia y cola.** Servicio que envuelve al intérprete:

@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 import { AssignmentService } from '../assignment/assignment.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LeadSettingsService } from './lead-settings.service';
 
 export interface ResultadoIntake {
   leadId: string | null;
@@ -11,7 +12,12 @@ export interface ResultadoIntake {
   /** Asesor asignado por el reparto, si lo hubo. */
   assignedTo: string | null;
   /** Por qué no se creó nada, cuando no se creó. */
-  motivo?: 'sin-pipeline' | 'sin-etapas' | 'ya-existia';
+  motivo?:
+    | 'sin-pipeline'
+    | 'sin-etapas'
+    | 'ya-existia'
+    | 'desactivado'
+    | 'sin-etapa-inicial';
 }
 
 /**
@@ -51,6 +57,7 @@ export class LeadIntakeService {
     private readonly assignment: AssignmentService,
     private readonly notifications: NotificationsService,
     private readonly realtime: RealtimeEmitter,
+    private readonly settings: LeadSettingsService,
   ) {}
 
   async ensureLeadForConversation(input: {
@@ -68,39 +75,46 @@ export class LeadIntakeService {
       // el bloqueo colgado. No bloquea a otros contactos ni a otras empresas.
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`${companyId}:${contactId}`}))`;
 
-      const pipeline = await tx.pipeline.findFirst({
-        where: { companyId, isDefault: true, isArchived: false },
-        select: {
-          id: true,
-          stages: {
-            orderBy: { order: 'asc' },
-            take: 1,
-            select: { id: true },
-          },
-        },
-      });
+      // La empresa decide dónde entra y con qué reglas. Sin configuración se
+      // aplican los valores por defecto, que son los que el producto ya venía
+      // usando: nadie tiene que configurar nada para que siga funcionando.
+      const config = await this.settings.resolver(companyId, tx);
 
-      // Sin pipeline predeterminado no hay dónde colocar la oportunidad. No es
-      // un error del mensaje: la conversación ya está guardada y se atiende
-      // igual. Se registra y se sigue.
-      if (!pipeline) {
+      if (!config.autoCreateLead) {
+        // Apagar la creación automática deja el CRM como una bandeja. Es una
+        // decisión legítima y no un fallo.
+        return { leadId: null, creado: false, motivo: 'desactivado' as const };
+      }
+
+      // Sin sitio donde colocarla no se inventa uno. No es un error del
+      // mensaje: la conversación ya está guardada y se atiende igual.
+      if (!config.pipelineId) {
         return { leadId: null, creado: false, motivo: 'sin-pipeline' as const };
       }
-      const primeraEtapa = pipeline.stages[0];
-      if (!primeraEtapa) {
-        return { leadId: null, creado: false, motivo: 'sin-etapas' as const };
+      if (!config.stageId) {
+        return {
+          leadId: null,
+          creado: false,
+          motivo: 'sin-etapa-inicial' as const,
+        };
       }
+      const pipeline = { id: config.pipelineId };
+      const primeraEtapa = { id: config.stageId };
 
-      const abierta = await tx.lead.findFirst({
-        where: {
-          companyId,
-          contactId,
-          pipelineId: pipeline.id,
-          status: 'OPEN',
-        },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true, assignedTo: true },
-      });
+      // Reutilizar la oportunidad abierta es configurable: hay negocios donde
+      // cada conversación es una venta distinta.
+      const abierta = config.reuseOpenLead
+        ? await tx.lead.findFirst({
+            where: {
+              companyId,
+              contactId,
+              pipelineId: pipeline.id,
+              status: 'OPEN',
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, assignedTo: true },
+          })
+        : null;
 
       if (abierta) {
         // Se reutiliza y se ata la conversación a ella, que es justo el
@@ -120,7 +134,14 @@ export class LeadIntakeService {
       // Reparto: la oportunidad y la conversación van al MISMO asesor. Que la
       // ficha esté en una bandeja y el chat en otra es la forma más rápida de
       // que nadie responda.
-      const asesor = await this.assignment.pickNextAgent(companyId, tx);
+      // La estrategia la decide la empresa: repartir por turnos, siempre a la
+      // misma persona, o dejar sin asignar para que alguien la tome.
+      const asesor =
+        config.assignmentStrategy === 'FIJA'
+          ? config.assignedUserId
+          : config.assignmentStrategy === 'ROUND_ROBIN'
+            ? await this.assignment.pickNextAgent(companyId, tx)
+            : null;
 
       const lead = await tx.lead.create({
         data: {

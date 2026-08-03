@@ -104,6 +104,7 @@ model Company {
   flowBotWaits         FlowBotWait[]
   flowBotMetrics       FlowBotMetric[]
   flowBotTestRuns      FlowBotTestRun[]
+  leadSettings         CompanyLeadSettings?
 
   @@map("companies")
 }
@@ -166,6 +167,8 @@ model User {
   // Elegir a quién le toca es una consulta caliente: ocurre en cada mensaje
   // entrante de un contacto nuevo. Con este índice sale directa, sin recorrer
   // los usuarios de la empresa.
+  leadSettingsAssigned CompanyLeadSettings[] @relation("LeadSettingsUser")
+
   @@index([companyId, isActive, autoAssignEnabled, lastAssignedAt])
   @@map("users")
 }
@@ -454,14 +457,27 @@ model Pipeline {
   // Prisma no soporta índices parciales. Se crea como SQL en la migración
   // (`pipelines_one_default_per_company`) y se refuerza en el servicio dentro
   // de una transacción. Ver la nota en el propio migration.sql.
+  leadSettingsUsing CompanyLeadSettings[] @relation("LeadSettingsPipeline")
+
   @@index([companyId, isArchived, order])
   @@map("pipelines")
 }
 
 model PipelineStage {
-  id        String   @id @default(cuid())
-  name      String
-  order     Int      @default(0)
+  id    String @id @default(cuid())
+  name  String
+  order Int    @default(0)
+
+  /// Etapa por la que ENTRAN las oportunidades automaticas.
+  ///
+  /// Antes se usaba "la primera por orden", que funciona hasta que alguien
+  /// reordena el tablero y las oportunidades nuevas empiezan a caer en otra
+  /// etapa sin que nadie lo haya pedido. Marcarla explicitamente separa "donde
+  /// esta dibujada" de "por donde se entra".
+  ///
+  /// El nombre puede ser "Nuevo lead" o cualquier otro: el comportamiento se
+  /// ata a esta bandera, nunca al texto.
+  isInitial Boolean  @default(false)
   color     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -478,9 +494,10 @@ model PipelineStage {
   // sigue siendo la fuente de verdad hasta que la transición se complete.
   type StageType @default(OPEN)
 
-  pipelineId String
-  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
-  leads      Lead[]
+  pipelineId        String
+  pipeline          Pipeline              @relation(fields: [pipelineId], references: [id])
+  leads             Lead[]
+  leadSettingsUsing CompanyLeadSettings[] @relation("LeadSettingsStage")
 
   @@index([pipelineId, order])
   @@map("pipeline_stages")
@@ -1929,4 +1946,74 @@ model FlowBotTestRun {
   @@index([companyId, createdAt])
   @@index([flowBotId, createdAt])
   @@map("flowbot_test_runs")
+}
+
+// ─────────────────────────────────────────────
+// ENTRADA AUTOMATICA DE OPORTUNIDADES
+// ─────────────────────────────────────────────
+
+enum EstrategiaAsignacion {
+  /// Nadie: la oportunidad queda sin responsable hasta que alguien la tome.
+  NINGUNA
+  /// Reparto por turnos entre quienes estan disponibles.
+  ROUND_ROBIN
+  /// Siempre a la misma persona.
+  FIJA
+}
+
+/// Que hace el CRM cuando entra un mensaje de alguien nuevo.
+///
+/// VIVE EN SU PROPIA TABLA y no como columnas de `Company` por dos razones:
+/// `Company` ya tiene mas de treinta campos y sigue creciendo, y esto es una
+/// unidad de configuracion que se consulta entera o no se consulta — cada
+/// mensaje entrante la lee de una vez.
+///
+/// Una empresa SIN fila aqui usa los valores por defecto documentados, que son
+/// los que el producto ya venia aplicando. Nadie tiene que configurar nada
+/// para que el CRM siga funcionando igual que antes.
+model CompanyLeadSettings {
+  id String @id @default(cuid())
+
+  /// Crear oportunidad al recibir un mensaje. Apagarlo deja el CRM como una
+  /// bandeja: contacto y conversacion si, pipeline no.
+  autoCreateLead Boolean @default(true)
+
+  /// Pipeline donde entra. Nulo = el predeterminado de la empresa.
+  defaultPipelineId String?
+  defaultPipeline   Pipeline? @relation("LeadSettingsPipeline", fields: [defaultPipelineId], references: [id], onDelete: SetNull)
+
+  /// Etapa de entrada. Nula = la marcada como inicial en ese pipeline.
+  ///
+  /// Se guarda el ID y no el nombre a proposito: llamarla "Nuevo lead" es una
+  /// decision de cada empresa, y atar el comportamiento a un texto lo rompe en
+  /// cuanto alguien la renombra o trabaja en otro idioma.
+  initialStageId String?
+  initialStage   PipelineStage? @relation("LeadSettingsStage", fields: [initialStageId], references: [id], onDelete: SetNull)
+
+  /// Reutilizar la oportunidad abierta del contacto en vez de abrir otra.
+  /// Apagarlo hace que cada conversacion nueva abra su propia oportunidad.
+  reuseOpenLead Boolean @default(true)
+
+  /// Crear una tarea de primer contacto junto con la oportunidad.
+  createInitialTask   Boolean @default(false)
+  initialTaskTitle    String?
+  /// Horas hasta el vencimiento de esa tarea.
+  initialTaskDueHours Int     @default(24)
+
+  assignmentStrategy EstrategiaAsignacion @default(ROUND_ROBIN)
+  /// Para `FIJA`: a quien.
+  assignedUserId     String?
+  assignedUser       User?                @relation("LeadSettingsUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  /// Que hacer cuando vuelve a escribir un contacto archivado.
+  /// `true` lo reactiva solo; `false` lo deja archivado y registra el evento.
+  reactivateArchived Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_lead_settings")
 }
