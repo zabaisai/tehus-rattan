@@ -46,6 +46,10 @@ export interface PayloadFlowBot {
   /** Reanudación por mensaje: el ID, nunca el texto. */
   messageId?: string;
   paso?: number;
+  /** Nº de intento, cuando el evento es el reintento de un fallo. */
+  intento?: number;
+  /** Espera del backoff antes de volver a intentarlo. */
+  delayMs?: number;
   wakeAt?: string;
 }
 
@@ -145,6 +149,9 @@ export class FlowBotOutboxPublisher implements OnModuleInit {
       companyId: ejecucion.companyId,
       executionId: ejecucion.id,
       correlationId: ejecucion.correlationId,
+      // Entra en el `jobId`: sin él, el reintento se descartaría como
+      // duplicado del avance que acaba de fallar.
+      ...(payload.intento ? { intento: payload.intento } : {}),
     };
 
     // Una reanudación por mensaje se identifica por el mensaje, no por el
@@ -164,7 +171,12 @@ export class FlowBotOutboxPublisher implements OnModuleInit {
     // avance de la misma ejecución se descartaría como duplicado del primero y
     // la ejecución se quedaría parada para siempre.
     return this.publicado(
-      await this.cola.encolarAvance(job, payload.paso ?? ejecucion.steps),
+      await this.cola.encolarAvance(job, payload.paso ?? ejecucion.steps, {
+        // El backoff se calculó al persistir el fallo. Si el evento tardó en
+        // despacharse, el trabajo saldrá algo más tarde de lo previsto; eso es
+        // preferible a recalcularlo aquí y perder la progresión.
+        ...(payload.delayMs ? { delayMs: payload.delayMs } : {}),
+      }),
     );
   }
 

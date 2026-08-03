@@ -185,7 +185,13 @@ export class FlowBotRunnerService {
     executionId: string,
     efectos: Efectos,
     compiladoDe: (versionId: string) => Promise<GrafoCompilado | null>,
-    opciones: { entrada?: string; waitId?: string; ahora?: Date } = {},
+    opciones: {
+      entrada?: string;
+      waitId?: string;
+      ahora?: Date;
+      /** Nº de intento, cuando este trabajo es el reintento de un fallo. */
+      intento?: number;
+    } = {},
   ): Promise<{ estado: EstadoEjecucion | 'omitido'; motivo?: string }> {
     const ahora = opciones.ahora ?? new Date();
     const owner = `${process.pid}:${Math.random().toString(36).slice(2, 8)}`;
@@ -245,15 +251,26 @@ export class FlowBotRunnerService {
           steps: ejecucion.steps,
           entrada: opciones.entrada,
           porTimeout,
+          intento: opciones.intento,
         },
         efectos,
         { maxPasos: LIMITES.MAX_PASOS_EJECUCION },
       );
 
-      await this.persistirAvance(ejecucion, resultado, ahora);
-      await this.encolarSiguiente(ejecucion, resultado);
+      // UN FALLO REINTENTABLE NO ES UN ESTADO TERMINAL. Si se persistiera
+      // FAILED, el trabajo del reintento llegaría y `tomarLease` lo rechazaría
+      // —solo acepta estados vivos— así que el reintento no se ejecutaría
+      // nunca. La ejecución sigue RUNNING con el `errorCode` anotado, y solo
+      // pasa a FAILED cuando se agotan los intentos.
+      const reintento = this.planDeReintento(resultado, opciones.intento ?? 1);
 
-      return { estado: resultado.estado, motivo: resultado.motivo };
+      await this.persistirAvance(ejecucion, resultado, ahora, reintento);
+      await this.encolarSiguiente(ejecucion, resultado, reintento);
+
+      return {
+        estado: reintento ? 'RUNNING' : resultado.estado,
+        motivo: resultado.motivo,
+      };
     } finally {
       await this.liberarLease(executionId, owner);
     }
@@ -360,11 +377,35 @@ export class FlowBotRunnerService {
    * Todo junto o nada: si se guardara el estado pero no la espera, la
    * ejecución quedaría dormida sin nada que la despierte.
    */
+  /**
+   * ¿Este fallo se reintenta, y cuándo?
+   *
+   * `null` si no hay reintento: o no falló, o el error no lo admite, o ya se
+   * agotaron los intentos. En ese último caso la ejecución sí queda FAILED,
+   * que es lo correcto: se probó y no salió.
+   */
+  private planDeReintento(
+    resultado: ResultadoAvance,
+    intentoActual: number,
+  ): { siguiente: number; delayMs: number } | null {
+    if (resultado.estado !== 'FAILED' || !resultado.reintentable) return null;
+    if (intentoActual >= MAX_INTENTOS) return null;
+    return {
+      siguiente: intentoActual + 1,
+      delayMs: esperaDeReintento(intentoActual),
+    };
+  }
+
   private async persistirAvance(
     ejecucion: { id: string; companyId: string; correlationId: string },
     resultado: ResultadoAvance,
     ahora: Date,
+    reintento: { siguiente: number; delayMs: number } | null = null,
   ): Promise<void> {
+    // Con reintento por delante la ejecución sigue viva: es la única forma de
+    // que el trabajo del reintento pueda tomar el lease cuando llegue.
+    const estado = reintento ? 'RUNNING' : resultado.estado;
+
     await this.prisma.$transaction(async (tx) => {
       for (const paso of resultado.pasos) {
         await this.guardarPaso(tx, ejecucion.id, paso, ahora);
@@ -373,16 +414,38 @@ export class FlowBotRunnerService {
       await tx.flowBotExecution.update({
         where: { id: ejecucion.id },
         data: {
-          status: resultado.estado,
+          status: estado,
           currentNodeId: resultado.currentNodeId,
           variables: resultado.variables as Prisma.InputJsonValue,
           steps: resultado.steps,
           lastStepAt: ahora,
+          // El clasificador se anota aunque vaya a reintentarse: si el
+          // reintento acaba saliendo, queda constancia de que costó.
           errorCode: resultado.errorCode ?? null,
-          endedReason: resultado.motivo ?? null,
-          ...(esFinal(resultado.estado) ? { endedAt: ahora } : {}),
+          endedReason: reintento ? null : (resultado.motivo ?? null),
+          ...(esFinal(estado) ? { endedAt: ahora } : {}),
         },
       });
+
+      // El reintento va por outbox, como todo lo demás. Sin él, morir entre el
+      // commit y el encolado dejaría la ejecución RUNNING sin nada que la
+      // moviera — y aunque el reconciliador acabaría viéndola atascada, sería
+      // cinco minutos después en vez de los segundos del backoff.
+      if (reintento) {
+        await this.outbox.record(tx, {
+          type: OUTBOX_FLOWBOT.AVANZAR,
+          companyId: ejecucion.companyId,
+          idempotencyKey: `${OUTBOX_FLOWBOT.AVANZAR}:${ejecucion.id}:${resultado.steps}:reintento:${reintento.siguiente}`,
+          payload: {
+            executionId: ejecucion.id,
+            companyId: ejecucion.companyId,
+            correlationId: ejecucion.correlationId,
+            paso: resultado.steps,
+            intento: reintento.siguiente,
+            delayMs: reintento.delayMs,
+          },
+        });
+      }
 
       if (resultado.espera) {
         const espera = await tx.flowBotWait.create({
@@ -482,6 +545,7 @@ export class FlowBotRunnerService {
   private async encolarSiguiente(
     ejecucion: { id: string; companyId: string; correlationId: string },
     resultado: ResultadoAvance,
+    reintento: { siguiente: number; delayMs: number } | null = null,
   ): Promise<void> {
     const base: FlowBotJob = {
       tipo: 'avanzar',
@@ -490,20 +554,19 @@ export class FlowBotRunnerService {
       correlationId: ejecucion.correlationId,
     };
 
-    if (resultado.estado === 'RUNNING') {
-      await this.cola.encolarAvance(base, resultado.steps);
+    if (reintento) {
+      // El nº de intento entra en el `jobId`: sin él, el reintento se
+      // descartaría como duplicado del avance que acaba de fallar.
+      await this.cola.encolarAvance(
+        { ...base, intento: reintento.siguiente },
+        resultado.steps,
+        { delayMs: reintento.delayMs },
+      );
       return;
     }
 
-    if (resultado.estado === 'FAILED' && resultado.reintentable) {
-      const intento = 1;
-      if (intento <= MAX_INTENTOS) {
-        await this.cola.encolarAvance(
-          { ...base, intento: intento + 1 },
-          resultado.steps,
-          { delayMs: esperaDeReintento(intento) },
-        );
-      }
+    if (resultado.estado === 'RUNNING') {
+      await this.cola.encolarAvance(base, resultado.steps);
     }
   }
 

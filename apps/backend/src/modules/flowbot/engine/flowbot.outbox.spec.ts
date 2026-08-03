@@ -87,6 +87,7 @@ describe('FlowBotOutboxPublisher', () => {
           correlationId: 'corr-1',
         },
         3,
+        {},
       );
     });
 
@@ -169,7 +170,63 @@ describe('FlowBotOutboxPublisher', () => {
 
       await despachar(OUTBOX_FLOWBOT.AVANZAR, { executionId: 'exec-1' });
 
-      expect(cola.encolarAvance).toHaveBeenCalledWith(expect.anything(), 3);
+      expect(cola.encolarAvance).toHaveBeenCalledWith(expect.anything(), 3, {});
+    });
+  });
+
+  describe('reintentos', () => {
+    const ejecucionViva = {
+      id: 'exec-1',
+      companyId: 'emp-1',
+      correlationId: 'corr-1',
+      steps: 3,
+      status: 'RUNNING',
+    };
+
+    it('el nº de intento entra en el trabajo', async () => {
+      prisma.flowBotExecution.findFirst.mockResolvedValue(ejecucionViva);
+
+      await despachar(OUTBOX_FLOWBOT.AVANZAR, {
+        executionId: 'exec-1',
+        paso: 3,
+        intento: 2,
+        delayMs: 2000,
+      });
+
+      // Sin él, el reintento compartiría `jobId` con el avance que acaba de
+      // fallar y BullMQ lo descartaría como duplicado.
+      expect(cola.encolarAvance).toHaveBeenCalledWith(
+        expect.objectContaining({ intento: 2 }),
+        3,
+        { delayMs: 2000 },
+      );
+    });
+
+    it('sin intento no se ensucia el trabajo con claves vacías', async () => {
+      prisma.flowBotExecution.findFirst.mockResolvedValue(ejecucionViva);
+
+      await despachar(OUTBOX_FLOWBOT.AVANZAR, {
+        executionId: 'exec-1',
+        paso: 3,
+      });
+
+      const job = cola.encolarAvance.mock.calls[0][0];
+      expect(job).not.toHaveProperty('intento');
+    });
+
+    it('una ejecución RUNNING con reintento pendiente sí se publica', async () => {
+      // Es la razón de que un fallo reintentable NO persista como FAILED: si
+      // lo hiciera, esto lo descartaría y el reintento no llegaría nunca.
+      prisma.flowBotExecution.findFirst.mockResolvedValue(ejecucionViva);
+
+      const ok = await despachar(OUTBOX_FLOWBOT.AVANZAR, {
+        executionId: 'exec-1',
+        paso: 3,
+        intento: 3,
+      });
+
+      expect(ok).toBe(true);
+      expect(cola.encolarAvance).toHaveBeenCalled();
     });
   });
 

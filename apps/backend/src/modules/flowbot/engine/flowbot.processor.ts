@@ -95,8 +95,15 @@ export class FlowBotProcessor implements OnModuleInit, OnApplicationShutdown {
   }
 
   private async procesar(job: Job<FlowBotJob>): Promise<void> {
-    const { companyId, executionId, waitId, messageId, correlationId, tipo } =
-      job.data;
+    const {
+      companyId,
+      executionId,
+      waitId,
+      messageId,
+      correlationId,
+      tipo,
+      intento,
+    } = job.data;
 
     if (!companyId || !executionId) {
       // Un payload sin identificadores no se puede procesar y reintentarlo no
@@ -128,8 +135,13 @@ export class FlowBotProcessor implements OnModuleInit, OnApplicationShutdown {
     // decide cuál de las dos cosas es, mirando `wakeAt`, es el runner — y lo
     // hace con una escritura condicional, así que si ambos trabajos llegan a
     // la vez solo uno se la lleva.
-    const opciones: { waitId?: string; entrada?: string } = {};
+    const opciones: { waitId?: string; entrada?: string; intento?: number } =
+      {};
     if (waitId) opciones.waitId = waitId;
+    // El nº de intento viaja en el trabajo porque no hay dónde guardarlo en la
+    // ejecución. Si se perdiera, cada reintento se creería el primero y el
+    // backoff no crecería nunca.
+    if (intento) opciones.intento = intento;
 
     if (messageId) {
       // El texto se relee de PostgreSQL, no viaja en el trabajo. Si el mensaje

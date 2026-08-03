@@ -12,6 +12,7 @@ import { FlowBotOutboxPublisher } from '../src/modules/flowbot/engine/flowbot.ou
 import { FlowBotIntakeService } from '../src/modules/flowbot/engine/flowbot.intake';
 import { FlowBotSelectorService } from '../src/modules/flowbot/engine/flowbot.selector';
 import { FlowBotReconcilerService } from '../src/modules/flowbot/engine/flowbot.reconciler';
+import { MAX_INTENTOS } from '../src/modules/flowbot/engine/flowbot.interpreter';
 import { EfectosFalsos } from '../src/modules/flowbot/engine/flowbot.fake-effects';
 import { compilar } from '../src/modules/flowbot/graph/flowbot.compiler';
 import {
@@ -913,6 +914,188 @@ describe('transporte y recuperación durable de FlowBot (e2e, base real)', () =>
       expect(informe.degradado).toBe(true);
       // Publicar desde aquí duplicaría el camino del despachador.
       expect(informe.reparado['outbox-fallido']).toBeUndefined();
+    });
+  });
+
+  // ── 4b. Reintentos ────────────────────────────────
+
+  describe('reintentos durables', () => {
+    /**
+     * Un envío cuyo puerto de error NO está conectado: cuando el efecto
+     * revienta, el intérprete lo clasifica como interno —y por tanto
+     * reintentable— en vez de desviarlo por una rama.
+     */
+    const FLUJO_FALLA: GrafoFlow = {
+      schemaVersion: 1,
+      startNodeId: 'inicio',
+      nodes: [
+        nodo('inicio', 'trigger.inbound_message'),
+        nodo('rompe', 'send.text', { text: 'esto va a reventar' }),
+        nodo('fin', 'control.end'),
+      ],
+      edges: [con('inicio', 'next', 'rompe'), con('rompe', 'next', 'fin')],
+    };
+
+    /**
+     * Efectos con la mensajería rota. No sale nada a ningún sitio: revienta
+     * antes de llegar al adaptador falso, que es lo que simula un corte de red
+     * o un tiempo agotado hablando con el proveedor.
+     */
+    const efectosRotos = () => {
+      const e = new EfectosFalsos({ dentroDeVentana: true });
+      e.reloj.fijar(new Date());
+      return {
+        crm: e.crm,
+        http: e.http,
+        ia: e.ia,
+        reloj: e.reloj,
+        auditoria: e.auditoria,
+        mensajeria: {
+          ...e.mensajeria,
+          enviarTexto: async () => {
+            throw new Error('ECONNRESET');
+          },
+        },
+      } as never;
+    };
+
+    let botFalla: string;
+    let versionFalla: string;
+
+    beforeAll(async () => {
+      const compilacion = compilar(FLUJO_FALLA);
+      expect(compilacion.ok).toBe(true);
+
+      const b = await prisma.flowBot.create({
+        data: {
+          companyId: empresa,
+          name: `${PREFIJO}-falla`,
+          status: 'ACTIVE',
+          draftGraph: FLUJO_FALLA as never,
+        },
+      });
+      botFalla = b.id;
+      const v = await prisma.flowBotVersion.create({
+        data: {
+          flowBotId: botFalla,
+          version: 1,
+          graph: FLUJO_FALLA as never,
+          compiled: compilacion.compilado as never,
+          compiledHash: compilacion.hash!,
+        },
+      });
+      versionFalla = v.id;
+      await prisma.flowBot.update({
+        where: { id: botFalla },
+        data: { publishedVersionId: versionFalla, lastVersionNumber: 1 },
+      });
+    });
+
+    const arrancarQueFalla = async () => {
+      n += 1;
+      const { executionId } = await runner.arrancar({
+        companyId: empresa,
+        flowBotId: botFalla,
+        versionId: versionFalla,
+        eventKey: `${PREFIJO}-falla-${n}-${Date.now()}`,
+        conversationId: conversacion,
+        correlationId: `corr-falla-${n}`,
+      });
+      return executionId;
+    };
+
+    it('31. un fallo reintentable NO deja la ejecución en FAILED', async () => {
+      const executionId = await arrancarQueFalla();
+
+      await runner.avanzarEjecucion(executionId, efectosRotos(), compiladoDe);
+
+      const e = await prisma.flowBotExecution.findUnique({
+        where: { id: executionId },
+      });
+      // Si quedara FAILED, `tomarLease` rechazaría el trabajo del reintento
+      // —solo acepta estados vivos— y el reintento no se ejecutaría nunca.
+      expect(e?.status).toBe('RUNNING');
+      expect(e?.errorCode).not.toBeNull();
+    });
+
+    it('32. el reintento se persiste como evento de outbox propio', async () => {
+      const executionId = await arrancarQueFalla();
+
+      await runner.avanzarEjecucion(executionId, efectosRotos(), compiladoDe);
+
+      const eventos = await eventosDe(executionId);
+      const reintento = eventos.find((e) =>
+        e.idempotencyKey.includes(':reintento:'),
+      );
+      // Sin el evento, morir entre el commit y el encolado dejaría la
+      // ejecución RUNNING sin nada que la moviera hasta el reconciliador.
+      expect(reintento).toBeDefined();
+      expect((reintento!.payload as { intento?: number }).intento).toBe(2);
+    });
+
+    it('33. el trabajo del reintento sale con backoff y con su propio jobId', async () => {
+      const executionId = await arrancarQueFalla();
+      cola.limpiar();
+
+      await runner.avanzarEjecucion(executionId, efectosRotos(), compiladoDe);
+
+      const trabajo = cola
+        .de('avanzar')
+        .find((t) => t.job.executionId === executionId);
+      expect(trabajo).toBeDefined();
+      expect(trabajo!.job.intento).toBe(2);
+      expect(trabajo!.delayMs).toBeGreaterThan(0);
+      // Sin el nº de intento en el id, se descartaría como duplicado del
+      // avance que acaba de fallar.
+      expect(trabajo!.jobId.endsWith('-2')).toBe(true);
+    });
+
+    it('34. agotados los intentos SÍ queda FAILED', async () => {
+      const executionId = await arrancarQueFalla();
+
+      await runner.avanzarEjecucion(executionId, efectosRotos(), compiladoDe, {
+        intento: MAX_INTENTOS,
+      });
+
+      const e = await prisma.flowBotExecution.findUnique({
+        where: { id: executionId },
+      });
+      // Se probó y no salió: eso sí es terminal.
+      expect(e?.status).toBe('FAILED');
+      expect(e?.endedAt).not.toBeNull();
+    });
+
+    it('35. el reintento avanza de verdad: toma el lease sin problema', async () => {
+      const executionId = await arrancarQueFalla();
+      await runner.avanzarEjecucion(executionId, efectosRotos(), compiladoDe);
+
+      const segundo = await runner.avanzarEjecucion(
+        executionId,
+        efectosRotos(),
+        compiladoDe,
+        { intento: 2 },
+      );
+
+      // Lo que estaba roto antes: con la ejecución en FAILED esto devolvía
+      // "omitido" y el reintento no llegaba a ejecutarse nunca.
+      expect(segundo.estado).not.toBe('omitido');
+    });
+
+    it('36. si el efecto acaba saliendo, el error queda anotado igual', async () => {
+      const executionId = await arrancarQueFalla();
+      await runner.avanzarEjecucion(executionId, efectosRotos(), compiladoDe);
+
+      // Segundo intento con el HTTP ya sano.
+      await runner.avanzarEjecucion(executionId, efectos(), compiladoDe, {
+        intento: 2,
+      });
+
+      const pasos = await prisma.flowBotExecutionStep.findMany({
+        where: { executionId },
+      });
+      // Queda constancia de que costó: un flujo que solo funciona al segundo
+      // intento es un flujo con un problema, y borrar el rastro lo esconde.
+      expect(pasos.some((p) => p.status === 'FAILED')).toBe(true);
     });
   });
 
