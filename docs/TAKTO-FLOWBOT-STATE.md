@@ -494,6 +494,23 @@ paso `system.reconcile`, **no** a `AuditLog`: ese registra lo que hace una
 PERSONA y exige un rol de actor. Meter ahí al reconciliador con un rol
 inventado convertiría la auditoría en algo que miente sobre quién hizo qué.
 
+### Los reintentos no llegaban a ejecutarse nunca
+
+Un fallo reintentable persistía la ejecución como `FAILED` y encolaba el
+reintento. Cuando el trabajo llegaba, `tomarLease` lo rechazaba —solo acepta
+estados vivos— y devolvía «omitido». El reintento no se ejecutaba jamás.
+
+**Un fallo reintentable no es un estado terminal.** Con reintento por delante
+la ejecución sigue `RUNNING` con el `errorCode` anotado; solo pasa a `FAILED`
+al agotar los intentos, que es cuando de verdad se probó y no salió. Como
+efecto secundario, el reconciliador cubre el caso sin tocarlo: una ejecución
+`RUNNING` sin lease y sin avanzar es justo lo que ya detecta como atascada.
+
+El reintento va por outbox como todo lo demás, y el nº de intento viaja en el
+trabajo: en el `jobId` para que no se descarte como duplicado del avance que
+acaba de fallar, y en el payload para que el backoff crezca en vez de creerse
+siempre el primero.
+
 ### Salud: degradado, nunca enfermo
 
 `/api/health/status` gana el componente `flowbot`, que consulta la base
@@ -559,7 +576,7 @@ van bajo `/api`, y `buildRedisConnection` lee `REDIS_HOST` y `REDIS_PORT` —no
 una URL— con `redis` por defecto, que es el nombre del servicio en la red de
 Docker y no resuelve fuera de ella.
 
-**Verificación:** backend **1548 unit / 505 e2e** verdes, typecheck 0, lint 0,
+**Verificación:** backend **1551 unit / 511 e2e** verdes, typecheck 0, lint 0,
 build limpio, demostración autónoma completa.
 
 ---
