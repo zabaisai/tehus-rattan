@@ -68,6 +68,19 @@ export class FlowBotQueueService implements OnApplicationShutdown {
   }
 
   /**
+   * NINGUN `jobId` PUEDE LLEVAR DOS PUNTOS.
+   *
+   * BullMQ los rechaza —`Custom Id cannot contain :`— porque usa ese caracter
+   * como separador de sus propias claves de Redis. Deja pasar los que tienen
+   * exactamente tres partes por compatibilidad con los trabajos repetibles,
+   * pero su propio codigo dice que esa excepcion desaparece en la siguiente
+   * version mayor, asi que no se apoya nada en ella.
+   *
+   * NO LO VE NINGUNA PRUEBA CON DOBLES. Un doble de la cola guarda la cadena y
+   * tan contento; el fallo solo aparece contra BullMQ de verdad, y aparece
+   * como un warning de "no se pudo encolar" mientras la ejecucion se queda
+   * quieta para siempre. Lo detecto la demostracion autonoma.
+   *
    * `jobId` DETERMINISTA.
    *
    * Se construye con la ejecución, el paso y el intento. BullMQ descarta un
@@ -81,13 +94,13 @@ export class FlowBotQueueService implements OnApplicationShutdown {
    * un efecto lleve el paso.
    */
   static jobIdAvance(executionId: string, paso: number, intento = 1): string {
-    return `avanzar:${executionId}:${paso}:${intento}`;
+    return `avanzar-${executionId}-${paso}-${intento}`;
   }
 
   static jobIdDespertar(waitId: string): string {
     // Una espera se consume UNA vez: su id basta y garantiza que dos
     // reconciliadores no encolen dos despertares para la misma.
-    return `despertar:${waitId}`;
+    return `despertar-${waitId}`;
   }
 
   /**
@@ -100,7 +113,7 @@ export class FlowBotQueueService implements OnApplicationShutdown {
    * espera ya consumida y se retirará sin hacer nada.
    */
   static jobIdMensaje(executionId: string, messageId: string): string {
-    return `mensaje:${executionId}:${messageId}`;
+    return `mensaje-${executionId}-${messageId}`;
   }
 
   /** Encola un avance. `false` si no se pudo: el llamador decide qué hacer. */
@@ -169,6 +182,21 @@ export class FlowBotQueueService implements OnApplicationShutdown {
     delayMs?: number,
   ): Promise<boolean> {
     if (!this.isEnabled()) return false;
+
+    // Se comprueba ANTES de llamar a BullMQ, y se grita.
+    //
+    // Si se deja que lo rechace BullMQ, el fallo llega aquí como un `Error`
+    // genérico, se registra como "no se pudo encolar" —igual que un Redis
+    // caído, que es transitorio— y la ejecución se queda quieta para siempre
+    // sin que nadie sepa por qué. Un id mal construido es un error de
+    // programación permanente y tiene que leerse como tal.
+    if (jobId.includes(':')) {
+      this.logger.error(
+        `jobId invalido para BullMQ (lleva ":"): ${jobId.split(':')[0]}…`,
+      );
+      return false;
+    }
+
     try {
       await this.obtenerCola().add(QUEUE_NAMES.FLOWBOT, job, {
         jobId,
