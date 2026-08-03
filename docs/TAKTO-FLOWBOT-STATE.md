@@ -346,7 +346,64 @@ build limpio.
 
 ---
 
+## Bloque 3d (parcial) — Consumidor y adaptador real de CRM
+
+- [x] **`FlowBotProcessor`** — consumidor de `takto.flowbot` siguiendo el mismo
+      patrón que `InboundProcessor`. Se registra **solo en el worker**
+      (`shouldConsumeQueue()`); en los dos procesos, cada trabajo se
+      procesaría dos veces. Concurrencia configurable —más baja que la de
+      entrantes, porque aquí el cuello de botella es PostgreSQL, no Meta—,
+      cierre limpio esperando a los trabajos en vuelo, y contadores para el
+      health.
+- [x] **No confía en el contenido del trabajo.** El job lleva identificadores;
+      la ejecución y la versión se releen con el `companyId` acotado. Un
+      `versionId` de otra empresa no ejecuta su flujo con los datos de esta.
+- [x] **`FlowBotEffectsFactory`** — la mezcla real/falso vive en **un solo
+      sitio**. Si «enviar de verdad» fuese una bandera dentro de cada nodo,
+      activarla por error en uno bastaría para escribirle a un cliente.
+- [x] **`CrmAdapter` real** — contacto, etiquetas, oportunidad, etapa con
+      historial, valor, asignación, reparto por carga, cierre, tareas, notas,
+      cerrar/reabrir conversación y transferencia. El `companyId` se fija en el
+      **constructor**: un nodo no puede pedir datos de otra empresa porque no
+      tiene forma de indicar cuál. Toda escritura usa `updateMany` filtrando
+      por empresa, nunca `update` por id.
+- [x] Mensajería, HTTP e IA siguen siendo **falsos**: no se envía nada.
+- [x] `FlowBotModule` registrado en `AppModule`.
+
+### Dos fallos que atraparon las herramientas
+
+- **`String(normalizePhone(x))`** habría escrito `[object Object]` como
+  teléfono del contacto: `NormalizedPhone` es un objeto con `.e164`. Lo
+  detectó la regla `no-base-to-string` — el mismo fallo que ya costó dos
+  correcciones antes en este repositorio.
+- **Campos inventados**: asumí `Contact.customFields` y una relación
+  `assignedLeads` que no existen. El typecheck los rechazó antes de ejecutar
+  nada.
+
+### Limitación real anotada
+
+`crm.contact_field` guarda el valor como etiqueta `campo:valor` porque
+`Contact` **no tiene** un almacén de campos libres en el esquema. Cuando exista
+la columna, cambia el adaptador sin tocar el nodo ni el grafo — que es
+exactamente para lo que sirve el puerto.
+
+**Verificación:** backend **1445 unit / 475 e2e** verdes, typecheck 0, lint 0,
+build limpio.
+
+---
+
 ## Próximo paso
+
+**Cerrar el 3d.** Falta, y sin ello el motor todavía no se mueve solo:
+
+1. **Despachador de outbox** que reconozca `flowbot.advance` y `flowbot.wake`
+   y los publique en BullMQ, marcando el evento **después** de encolar.
+2. **Reconciliador**: leases vencidos, esperas vencidas sin trabajo, outbox
+   pendiente, ejecuciones canceladas con trabajos vivos.
+3. **Orquestador** conectado al webhook tras `LeadIntakeService`.
+4. Pruebas de recuperación con worker reiniciado y Redis vacío.
+
+### Referencia del bloque 3d completo
 
 **Bloque 3d — consumidor y reconciliador.** Registrar el consumidor de la cola
 `takto.flowbot` en el arranque del worker, despachar los eventos de outbox
