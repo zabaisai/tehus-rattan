@@ -157,7 +157,69 @@ build limpio.
 
 ---
 
+## Bloque 3a — Intérprete, puertos de efecto y ejecutores
+
+- [x] **`flowbot.ports.ts`** — el motor NO toca nada directamente. Todo efecto
+      (WhatsApp, CRM, HTTP, IA, reloj, auditoría) pasa por una interfaz. Es lo
+      que hace inocuo al simulador **por construcción**: no es una bandera
+      repartida por el código que alguien pueda olvidar en un sitio, es otro
+      juego de implementaciones. El `ContextoNodo` es deliberadamente estrecho:
+      un ejecutor no recibe Prisma ni la petición, así que no puede consultar
+      otra empresa porque no tiene con qué.
+- [x] **`flowbot.executors.ts`** — 36 ejecutores. Un nodo devuelve el **puerto**
+      por el que sale, nunca el nodo destino: así una conexión mal hecha se
+      detecta al publicar. Incluye validación de correo, teléfono a E.164,
+      número con rango y fecha en formato colombiano.
+- [x] **Ventana de WhatsApp aplicada en el motor**, no en cada nodo: fuera de
+      las 24 h el texto libre sale por la rama de error en vez de intentar un
+      envío que Meta rechazaría dejando al cliente sin respuesta.
+- [x] **`flowbot.interpreter.ts`** — avanza hasta esperar, terminar, fallar o
+      alcanzar un tope. **No toca la base**: recibe estado y devuelve estado,
+      lo que permite que el simulador ejecute EL MISMO código y que las pruebas
+      de bucles y reanudaciones corran en milisegundos.
+- [x] **`flowbot.fake-effects.ts`** — efectos falsos con registro, reloj
+      manejable e identificadores con prefijo `sim-`, reconocibles de un
+      vistazo si alguno acabara donde no debe.
+- [x] **114 pruebas** del núcleo y el motor.
+
+### Decisiones del motor
+
+| Decisión | Por qué |
+|---|---|
+| La entrada la consume **un solo** nodo | Si no, la siguiente pregunta se autorrespondería con el mismo mensaje |
+| Al vencer se sale por `timeout` **sin reejecutar** el nodo | Reejecutarlo reenviaría la pregunta al cliente |
+| Sin rama de `timeout`, vencer **termina** | Es una decisión legítima del autor, no un fallo |
+| El reparto por porcentaje es **determinista por ejecución** | Con azar real, un reintento mandaría al cliente por la otra rama |
+| Superar el tope de pasos es **FAILED**, no fin normal | Terminar en silencio escondería el bucle |
+| La clave de idempotencia lleva el **número de paso** | Sin él, la segunda vuelta de un bucle legítimo se tomaría por un reintento |
+| El error guarda solo el **nombre**, no el mensaje | El mensaje del proveedor arrastra teléfonos y cuerpos de petición |
+| El reintento lleva **dispersión** | Cien fallos por una caída de Meta reintentarían al unísono y repetirían la avalancha |
+
+### Semántica real de entrega
+
+**No es «exactly once»** y no se promete. Es *at-least-once* con efectos
+idempotentes: cada efecto lleva una clave `ejecución:nodo:paso`, y el adaptador
+la usa para no repetirlo. Un reintento tras un fallo de red puede volver a
+llamar al adaptador; lo que no puede es producir dos mensajes o dos tareas.
+
+**Verificación:** backend **1416 unit / 457 e2e** verdes, typecheck 0, lint 0,
+build limpio.
+
+---
+
 ## Próximo paso
+
+**Bloque 3b — persistencia y cola.** Servicio que envuelve al intérprete:
+selección de bots por disparador con prioridad y exclusividad, creación
+idempotente de la ejecución, persistencia de pasos y esperas en una
+transacción, encolado en BullMQ, reanudación por mensaje entrante y por
+tiempo, bloqueo por conversación y reconciliador de esperas vencidas.
+
+Después: adaptadores reales de CRM, nodo HTTP con SSRF en ejecución, IA
+desacoplada, API y permisos, editor visual, simulador, plantillas, métricas,
+seguridad, QA y despliegue.
+
+### Lo que era el bloque 3 completo
 
 **Bloque 3 — motor durable.** Servicio de ejecución sobre la cola y el outbox
 existentes: arranque idempotente por evento, bloqueo por conversación, paso a
