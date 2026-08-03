@@ -6,6 +6,7 @@ import { FlowBotRunnerService } from './engine/flowbot.runner';
 import { FlowBotProcessor } from './engine/flowbot.processor';
 import { FlowBotEffectsFactory } from './engine/flowbot.effects.factory';
 import { FlowBotOutboxPublisher } from './engine/flowbot.outbox';
+import { FlowBotIntakeService } from './engine/flowbot.intake';
 
 /**
  * Modulo de FlowBot.
@@ -27,6 +28,7 @@ import { FlowBotOutboxPublisher } from './engine/flowbot.outbox';
     FlowBotRunnerService,
     FlowBotEffectsFactory,
     FlowBotOutboxPublisher,
+    FlowBotIntakeService,
     FlowBotProcessor,
   ],
   exports: [
@@ -35,6 +37,7 @@ import { FlowBotOutboxPublisher } from './engine/flowbot.outbox';
     FlowBotRunnerService,
     FlowBotEffectsFactory,
     FlowBotOutboxPublisher,
+    FlowBotIntakeService,
   ],
 })
 export class FlowBotModule {}

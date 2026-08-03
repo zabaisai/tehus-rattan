@@ -10,6 +10,7 @@ import { maskPhone } from '../../common/logging/redact';
 import { InboundQueueService } from '../../common/queue/inbound-queue.service';
 import { LeadIntakeService } from '../leads/lead-intake.service';
 import { ChatbotService } from '../chatbot/chatbot.service';
+import { FlowBotIntakeService } from '../flowbot/engine/flowbot.intake';
 import { HistorySyncService } from '../whatsapp-history/history-sync.service';
 import {
   OutboxService,
@@ -32,6 +33,7 @@ export class WebhookService {
     private outbox: OutboxService,
     private leadIntake: LeadIntakeService,
     private chatbot: ChatbotService,
+    private flowbot: FlowBotIntakeService,
     private historySync: HistorySyncService,
   ) {}
 
@@ -387,6 +389,7 @@ export class WebhookService {
     });
 
     let asignadoPorReparto: string | null = null;
+    let leadId: string | null = null;
 
     if (conversacion) {
       // Best-effort: si la entrada al tablero falla, el mensaje ya esta
@@ -400,12 +403,47 @@ export class WebhookService {
           contactName: conversacion.contact?.name,
         });
         asignadoPorReparto = intake.assignedTo;
+        leadId = intake.leadId;
       } catch (error) {
         this.logger.warn(
           `No se pudo crear la oportunidad del mensaje entrante [${
             error instanceof Error ? error.name : 'Error'
           }]`,
         );
+      }
+    }
+
+    // FLOWBOT VA DESPUES DE LA OPORTUNIDAD Y ANTES QUE TODO LO DEMAS.
+    //
+    // Despues de la oportunidad porque un bot que consulta la etapa o el
+    // asesor necesita que existan; si se ejecutara antes, sus condiciones
+    // mirarian un tablero vacio.
+    //
+    // Antes del chatbot heredado y de las automatizaciones por la MISMA razon
+    // que el chatbot va antes que las automatizaciones: si dos motores
+    // responden al mismo mensaje, el cliente recibe dos WhatsApp y deja de
+    // contestar. Aqui la regla es la de siempre — el primero que atiende, se
+    // lo queda — solo que ahora FlowBot es el primero de la fila.
+    //
+    // Sin `messageId` no se llama: sin el no hay llave de idempotencia, y un
+    // reintento del job arrancaria una segunda ejecucion del mismo bot.
+    if (messageId) {
+      const flowbot = await this.flowbot.atenderMensaje({
+        companyId,
+        conversationId,
+        messageId,
+        contactId: conversacion?.contactId,
+        leadId,
+        texto: text,
+        correlationId: messageId,
+      });
+
+      if (flowbot.atendido) {
+        // Igual que con el chatbot: tambien se salta el aviso al asesor.
+        // Mientras el bot conversa, un "nuevo mensaje" por intercambio seria
+        // ruido puro. El asesor recibe SU aviso cuando el bot entrega.
+        this.logger.log(`Mensaje atendido por FlowBot (${flowbot.motivo})`);
+        return;
       }
     }
 

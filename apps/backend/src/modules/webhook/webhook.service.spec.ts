@@ -8,6 +8,7 @@ describe('WebhookService', () => {
   let outbox: any;
   let leadIntake: any;
   let chatbot: any;
+  let flowbot: any;
   let historySync: any;
   let contactsService: any;
   let automationsService: any;
@@ -93,6 +94,13 @@ describe('WebhookService', () => {
         .fn()
         .mockResolvedValue({ atendido: false, motivo: 'sin-flujo' }),
     };
+    // Mismo criterio que el chatbot: por defecto FlowBot NO atiende, para que
+    // estas pruebas sigan cubriendo el camino completo.
+    flowbot = {
+      atenderMensaje: jest
+        .fn()
+        .mockResolvedValue({ atendido: false, motivo: 'sin-bot' }),
+    };
     historySync = {
       procesarHistorial: jest.fn().mockResolvedValue({
         recibidos: 0,
@@ -113,6 +121,7 @@ describe('WebhookService', () => {
       outbox,
       leadIntake,
       chatbot,
+      flowbot,
       historySync,
     );
   });
@@ -744,6 +753,152 @@ describe('WebhookService', () => {
       );
 
       expect(leadIntake.ensureLeadForConversation).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('FlowBot: primero de la fila, y solo uno responde', () => {
+    beforeEach(() => {
+      prisma.conversation.findFirst.mockResolvedValue({
+        contactId: 'contact-a',
+        contact: { name: 'Ana' },
+      });
+      leadIntake.ensureLeadForConversation.mockResolvedValue({
+        leadId: 'lead-1',
+        creado: true,
+        assignedTo: 'agente-1',
+      });
+    });
+
+    it('se le llama DESPUES de la oportunidad', async () => {
+      const orden: string[] = [];
+      leadIntake.ensureLeadForConversation.mockImplementation(async () => {
+        orden.push('oportunidad');
+        return { leadId: 'lead-1', creado: true, assignedTo: null };
+      });
+      flowbot.atenderMensaje.mockImplementation(async () => {
+        orden.push('flowbot');
+        return { atendido: false, motivo: 'sin-bot' };
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        null,
+        'msg-1',
+      );
+
+      // Un bot que consulta la etapa o el asesor necesita que existan. Al
+      // reves, sus condiciones mirarian un tablero vacio.
+      expect(orden).toEqual(['oportunidad', 'flowbot']);
+    });
+
+    it('recibe la oportunidad recien creada', async () => {
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        null,
+        'msg-1',
+      );
+
+      expect(flowbot.atenderMensaje).toHaveBeenCalledWith(
+        expect.objectContaining({
+          companyId: 'company-a',
+          conversationId: 'conv-1',
+          messageId: 'msg-1',
+          contactId: 'contact-a',
+          leadId: 'lead-1',
+          texto: 'hola',
+        }),
+      );
+    });
+
+    it('si FlowBot atiende, el chatbot heredado NO corre', async () => {
+      flowbot.atenderMensaje.mockResolvedValue({
+        atendido: true,
+        motivo: 'arrancada',
+        executionId: 'exec-1',
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-1',
+        'msg-1',
+      );
+
+      // Dos motores respondiendo al mismo mensaje = dos WhatsApp al cliente.
+      expect(chatbot.handleInbound).not.toHaveBeenCalled();
+    });
+
+    it('si FlowBot atiende, las automatizaciones tampoco', async () => {
+      flowbot.atenderMensaje.mockResolvedValue({
+        atendido: true,
+        motivo: 'reanudada',
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-1',
+        'msg-1',
+      );
+
+      expect(automationsService.processMessage).not.toHaveBeenCalled();
+    });
+
+    it('si FlowBot atiende, no se avisa al asesor de cada intercambio', async () => {
+      flowbot.atenderMensaje.mockResolvedValue({
+        atendido: true,
+        motivo: 'reanudada',
+      });
+
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-1',
+        'msg-1',
+      );
+
+      expect(notifications.emit).not.toHaveBeenCalled();
+    });
+
+    it('si FlowBot no atiende, el flujo sigue exactamente igual que antes', async () => {
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-1',
+        'msg-1',
+      );
+
+      expect(chatbot.handleInbound).toHaveBeenCalledTimes(1);
+      expect(automationsService.processMessage).toHaveBeenCalledTimes(1);
+    });
+
+    it('sin messageId NO se le llama: no habria llave de idempotencia', async () => {
+      await service.runInboundEffects(
+        'company-a',
+        'conv-1',
+        'hola',
+        '+57300',
+        'agente-1',
+      );
+
+      // Sin ella, un reintento del job arrancaria una segunda ejecucion del
+      // mismo bot y el cliente recibiria la bienvenida dos veces.
+      expect(flowbot.atenderMensaje).not.toHaveBeenCalled();
+      expect(chatbot.handleInbound).toHaveBeenCalledTimes(1);
     });
   });
 

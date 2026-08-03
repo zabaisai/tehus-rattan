@@ -21,6 +21,15 @@ export interface FlowBotJob {
   executionId: string;
   /** Para `despertar`: qué espera venció. */
   waitId?: string;
+  /**
+   * Para una reanudación por mensaje: cuál lo provocó.
+   *
+   * Viaja el ID, NUNCA el texto. El consumidor relee el cuerpo de PostgreSQL
+   * acotado por empresa: así el contenido del cliente no vive en Redis, donde
+   * ni se cifra ni se borra con el mensaje, y un payload manipulado no puede
+   * meterle palabras en la boca al cliente.
+   */
+  messageId?: string;
   /** Para correlacionar toda la cadena en los logs. */
   correlationId: string;
   /** Nº de reintento, para el backoff propio del motor. */
@@ -81,6 +90,19 @@ export class FlowBotQueueService implements OnApplicationShutdown {
     return `despertar:${waitId}`;
   }
 
+  /**
+   * `jobId` de una reanudación por mensaje.
+   *
+   * Lleva el MENSAJE y no el paso. Si llevara el paso, dos mensajes que el
+   * cliente manda seguidos —«hola» y luego «¿hay alguien?»— compartirían id y
+   * BullMQ descartaría el segundo como duplicado del primero. Con el id del
+   * mensaje cada uno tiene su trabajo; el que llegue tarde se encontrará la
+   * espera ya consumida y se retirará sin hacer nada.
+   */
+  static jobIdMensaje(executionId: string, messageId: string): string {
+    return `mensaje:${executionId}:${messageId}`;
+  }
+
   /** Encola un avance. `false` si no se pudo: el llamador decide qué hacer. */
   async encolarAvance(
     job: FlowBotJob,
@@ -91,6 +113,15 @@ export class FlowBotQueueService implements OnApplicationShutdown {
       job,
       FlowBotQueueService.jobIdAvance(job.executionId, paso, job.intento ?? 1),
       opciones.delayMs,
+    );
+  }
+
+  /** Encola la reanudación que provoca un mensaje del cliente. */
+  async encolarMensaje(job: FlowBotJob): Promise<boolean> {
+    if (!job.messageId) return false;
+    return this.encolar(
+      job,
+      FlowBotQueueService.jobIdMensaje(job.executionId, job.messageId),
     );
   }
 

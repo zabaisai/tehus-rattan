@@ -43,6 +43,8 @@ export interface PayloadFlowBot {
   companyId?: string;
   correlationId?: string;
   waitId?: string;
+  /** Reanudación por mensaje: el ID, nunca el texto. */
+  messageId?: string;
   paso?: number;
   wakeAt?: string;
 }
@@ -138,19 +140,31 @@ export class FlowBotOutboxPublisher implements OnModuleInit {
       return this.descartar(`ejecución en ${ejecucion.status}`);
     }
 
+    const job = {
+      tipo: 'avanzar' as const,
+      companyId: ejecucion.companyId,
+      executionId: ejecucion.id,
+      correlationId: ejecucion.correlationId,
+    };
+
+    // Una reanudación por mensaje se identifica por el mensaje, no por el
+    // paso: dos mensajes seguidos del mismo cliente están en el mismo paso y
+    // compartirían `jobId`.
+    if (payload.messageId) {
+      return this.publicado(
+        await this.cola.encolarMensaje({
+          ...job,
+          messageId: payload.messageId,
+          waitId: payload.waitId,
+        }),
+      );
+    }
+
     // El paso viene del payload y forma parte del `jobId`. Sin él, el segundo
     // avance de la misma ejecución se descartaría como duplicado del primero y
     // la ejecución se quedaría parada para siempre.
     return this.publicado(
-      await this.cola.encolarAvance(
-        {
-          tipo: 'avanzar',
-          companyId: ejecucion.companyId,
-          executionId: ejecucion.id,
-          correlationId: ejecucion.correlationId,
-        },
-        payload.paso ?? ejecucion.steps,
-      ),
+      await this.cola.encolarAvance(job, payload.paso ?? ejecucion.steps),
     );
   }
 

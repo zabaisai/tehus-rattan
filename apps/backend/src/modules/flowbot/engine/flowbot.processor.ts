@@ -95,7 +95,8 @@ export class FlowBotProcessor implements OnModuleInit, OnApplicationShutdown {
   }
 
   private async procesar(job: Job<FlowBotJob>): Promise<void> {
-    const { companyId, executionId, waitId, correlationId, tipo } = job.data;
+    const { companyId, executionId, waitId, messageId, correlationId, tipo } =
+      job.data;
 
     if (!companyId || !executionId) {
       // Un payload sin identificadores no se puede procesar y reintentarlo no
@@ -122,11 +123,27 @@ export class FlowBotProcessor implements OnModuleInit, OnApplicationShutdown {
       return;
     }
 
+    // La espera se pasa siempre que el trabajo la traiga: un despertar la
+    // consume por vencimiento, un mensaje la consume como respuesta. Quien
+    // decide cuál de las dos cosas es, mirando `wakeAt`, es el runner — y lo
+    // hace con una escritura condicional, así que si ambos trabajos llegan a
+    // la vez solo uno se la lleva.
+    const opciones: { waitId?: string; entrada?: string } = {};
+    if (waitId) opciones.waitId = waitId;
+
+    if (messageId) {
+      // El texto se relee de PostgreSQL, no viaja en el trabajo. Si el mensaje
+      // ya no está —borrado por retención, por ejemplo— se avanza sin entrada
+      // en vez de fallar: la ejecución debe poder salir de su espera igual.
+      const texto = await this.textoDelMensaje(messageId, companyId);
+      if (texto !== null) opciones.entrada = texto;
+    }
+
     const resultado = await this.runner.avanzarEjecucion(
       executionId,
       this.efectos.paraEmpresa(companyId),
       (versionId) => this.compiladoDe(versionId, companyId),
-      tipo === 'despertar' && waitId ? { waitId } : {},
+      opciones,
     );
 
     this.metricas.ultimoEn = new Date();
@@ -139,6 +156,24 @@ export class FlowBotProcessor implements OnModuleInit, OnApplicationShutdown {
     this.logger.debug(
       `FlowBot ${tipo} → ${resultado.estado} [corr=${correlationId}]`,
     );
+  }
+
+  /**
+   * Lee el texto del mensaje que reanuda la ejecución.
+   *
+   * ACOTADO POR EMPRESA a través de la conversación. Un `messageId` de otra
+   * empresa no puede convertirse en la entrada de este bot: es la misma razón
+   * por la que el trabajo lleva el id y no el texto.
+   */
+  private async textoDelMensaje(
+    messageId: string,
+    companyId: string,
+  ): Promise<string | null> {
+    const mensaje = await this.prisma.message.findFirst({
+      where: { id: messageId, conversation: { companyId } },
+      select: { body: true },
+    });
+    return mensaje?.body ?? null;
   }
 
   /**
