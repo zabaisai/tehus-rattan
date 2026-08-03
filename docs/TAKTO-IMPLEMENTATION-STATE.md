@@ -816,6 +816,94 @@ verde de un SHA anterior no cubre el código nuevo.
 - El `.tar.gz` de uploads queda `root:root`; el `chmod` del script de backup
   falla. Revisar `backup-postgres.sh` cuando se toque el runbook.
 
+## DESPLEGADO EN STAGING — 2026-08-03
+
+**Release `b9f3662a535c64f8f633c30ace96d168b2a9ea19`**, desplegado el
+**3 de agosto de 2026, 10:56 hora de Colombia** (15:56 UTC). Release anterior:
+`58dfb76`, conservado y recuperable.
+
+### Verificación
+
+| Gate | Resultado |
+|---|---|
+| CI del SHA exacto | **success** en ambos trabajos, `head_sha` verificado |
+| Migraciones | **21 → 41**, **0 fallidas**, solo `migrate deploy` |
+| Redis | `healthy`, **PONG** real, reinicios 0 |
+| Puente de tiempo real | **conectado** — «Puente de tiempo real del worker conectado a Redis» |
+| `Stream isn't writeable` | **0 apariciones** en worker y backend |
+| Worker | `running`, release correcto, latido fresco, reinicios 0 |
+| Backend / frontend | `healthy`, release correcto, reinicios 0 |
+| `/api/health/status` | **`ok`** — 12 sondeos en 2 min, sin intermitencias |
+| `health-check.sh` | **All checks passed** |
+| Smoke test | **17/17**, `EXPECTED_RELEASE` = SHA desplegado |
+| Rutas del frontend | 13/13 sirven 200, incluidas Datos y Eliminaciones |
+| API sin sesión | 401 en las 8 rutas protegidas comprobadas |
+
+### Datos: idénticos antes y después
+
+`companies 2 · users 4 · contacts 4 · conversations 4 · messages 7 ·
+whatsapp CONNECTED 1`
+
+### No recreados (id + StartedAt sin cambio)
+
+```
+postgres   db9487a56ba30a90  2026-07-29T14:40:41.529565451Z
+caddy      7fc1da12b135516a  2026-07-29T14:40:41.536617591Z
+takto-web  6072de2d372501da  2026-07-29T20:29:09.207992211Z
+```
+
+5 volúmenes intactos. Ningún `down`, ningún `-v`, ningún volumen eliminado.
+
+### SMTP
+
+Rotada el 2026-08-03 y **verificada con `verify()` — PASS, sin enviar ningún
+correo**. Credencial anterior revocada por el operador en Hostinger. Se
+comprobó por huellas SHA-256, sin imprimir ningún valor, que la nueva difiere
+de la comprometida y que compose entrega al contenedor exactamente el valor
+del fichero. El respaldo temporal con la clave comprometida y los scripts de
+rotación se eliminaron con `shred`; los 50 backups restantes, intactos.
+
+### Backups del despliegue
+
+```
+backups/tehus-crm-staging-20260803-105214.sql.gz
+  sha256 14450084f7d5b2bd6ba4897436213bb61648667dd2346d43e361dbe6e03267ca
+backups/tehus-crm-staging-uploads-20260803-105214.tar.gz
+  sha256 913d5beeff9cf81afa2fa1cb575de9240284b3bef14ec2029fd46aaf588db1e9
+```
+
+Ambos `600 deploy:deploy`, checksum y gzip verificados, y **restore drill**
+superado en base temporal `drill_20260803` con conteos idénticos; la temporal
+se eliminó. Imágenes del release anterior conservadas como
+`tehus-crm-staging-backend:58dfb76` y `…-frontend:58dfb76`.
+
+### Rollback disponible
+
+Documentado en `docs/DEPLOYMENT_RUNBOOK.md` §6 y ya ejecutado con éxito una
+vez (incidente del 31 de julio): restaurar el dump pre-despliegue, devolver
+las imágenes `:58dfb76` y smoke test exigiendo ese release. Backend y worker
+se revierten **a la vez**: comparten imagen.
+
+### Deuda detectada en este despliegue
+
+1. **El worker figura `unhealthy` y no lo está.** Hereda el `HEALTHCHECK` de
+   la imagen del backend, que consulta `http://127.0.0.1:3001/api/health`, y
+   el worker no expone HTTP por diseño. La señal real —su latido en
+   `system_heartbeats`, y `worker: up` en `/api/health/status`— dice que
+   funciona. No afecta al servicio (`restart: unless-stopped` no actúa sobre
+   la salud), pero es una etiqueta que engaña a quien monitorice. Corregir con
+   un healthcheck propio sobre el latido, o desactivarlo para ese servicio.
+2. **Aviso transitorio de cola al arrancar.** `QueueHealthService` registró
+   una vez «Cola no disponible» a los pocos segundos del arranque, mientras
+   BullMQ aún conectaba. Se corrige solo en la siguiente consulta y los 12
+   sondeos posteriores dieron `ok`. Es el mismo patrón de «comprobar antes de
+   estar listo» que el puente, pero sin consecuencia porque el endpoint
+   reevalúa en cada petición.
+3. **QA autenticada no ejecutada.** `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD`
+   del entorno son credenciales de siembra inicial y ya no coinciden con la
+   cuenta real (401). No se insistió: reintentar habría activado el limitador.
+   Queda pendiente que una persona entre al CRM y recorra las pantallas.
+
 ## Próximo comando seguro
 
 **Bloques 0–10 CERRADOS en código.** Lo único que queda del plan es lo que
