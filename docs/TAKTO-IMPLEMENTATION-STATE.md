@@ -816,11 +816,60 @@ verde de un SHA anterior no cubre el código nuevo.
 - El `.tar.gz` de uploads queda `root:root`; el `chmod` del script de backup
   falla. Revisar `backup-postgres.sh` cuando se toque el runbook.
 
+## Incidente: el CRM quedó inservible tras el despliegue (resuelto)
+
+**Síntoma.** «No pudimos conectar con el servidor» en todas las pantallas,
+inmediatamente después de desplegar `b9f3662`.
+
+**La petición que fallaba**, capturada en el navegador:
+
+```
+POST https://crm-staging.tehusrattan.com/auth/refresh  ->  404
+```
+
+Salía contra el **origen del frontend**, sin el host de la API ni el prefijo
+`/api`. Ese 404 se clasifica como fallo transitorio (`classifyRefreshError`),
+y el arranque de sesión pasa a `unavailable`, que es justo esa pantalla. No es
+sesión expirada: un 401 habría llevado a `/login`.
+
+**Causa raíz — error de procedimiento, no del código.** `NEXT_PUBLIC_API_URL`
+se incrusta en el bundle al construir. Se construyó con
+`docker compose build` **sin `--env-file .env.staging`**, así que
+`${NEXT_PUBLIC_API_URL}` se interpoló como cadena vacía y el bundle salió sin
+`baseURL`. `deploy/scripts/deploy.sh` envuelve todas sus llamadas a compose con
+`--env-file`; construir a mano se saltó eso.
+
+Evidencia: ningún chunk de la imagen `b9f3662` contenía
+`api.crm-staging.tehusrattan.com`; la imagen anterior `58dfb76` lo tenía en
+tres.
+
+**Lo grave no fue el error, sino que nada lo vio.** La imagen se construyó sin
+fallo, el contenedor quedó `healthy`, `/api/health/status` respondió `ok` y el
+smoke test pasó **17/17** con la aplicación totalmente inservible. El único
+indicio era una línea de docker compose —«variable is not set»— que además
+quedó oculta porque los comandos filtraban `level=warning`.
+
+**Corrección (`f9369c9`), en dos capas:**
+
+1. `verificarUrlDeApi` detiene la construcción de producción si la variable
+   está vacía o no es absoluta, y el mensaje dice cómo construir bien. Se
+   comprobó en el propio VPS: el mismo comando que causó el incidente ahora
+   termina con `EXIT=1`.
+2. El smoke test descarga el JavaScript realmente servido y exige que algún
+   chunk contenga el host de la API. Es lo único que distingue un frontend
+   sano de uno que apunta a la nada, porque el backend estaba perfecto y el
+   frontend servía HTML con normalidad. Ahora **18/18**.
+
+**Lección para quien reanude:** construir a mano en vez de usar `deploy.sh`
+salta pasos que no se ven hasta que el producto está roto; y filtrar los
+avisos de una herramienta es filtrar justo lo que intentaba avisar.
+
 ## DESPLEGADO EN STAGING — 2026-08-03
 
-**Release `b9f3662a535c64f8f633c30ace96d168b2a9ea19`**, desplegado el
-**3 de agosto de 2026, 10:56 hora de Colombia** (15:56 UTC). Release anterior:
-`58dfb76`, conservado y recuperable.
+**Release en marcha: `f9369c97e30e22f0afaee8933e0f2c440c150246`** (11:40 hora
+de Colombia), que incorpora el guardia de construcción. El despliegue inicial
+fue `b9f3662` a las 10:56, corregido tras el incidente documentado arriba.
+Release anterior: `58dfb76`, conservado y recuperable.
 
 ### Verificación
 
@@ -835,7 +884,7 @@ verde de un SHA anterior no cubre el código nuevo.
 | Backend / frontend | `healthy`, release correcto, reinicios 0 |
 | `/api/health/status` | **`ok`** — 12 sondeos en 2 min, sin intermitencias |
 | `health-check.sh` | **All checks passed** |
-| Smoke test | **17/17**, `EXPECTED_RELEASE` = SHA desplegado |
+| Smoke test | **18/18**, `EXPECTED_RELEASE` = SHA desplegado, incluida la comprobación del bundle |
 | Rutas del frontend | 13/13 sirven 200, incluidas Datos y Eliminaciones |
 | API sin sesión | 401 en las 8 rutas protegidas comprobadas |
 
