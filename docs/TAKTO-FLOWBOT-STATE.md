@@ -299,7 +299,66 @@ build limpio.
 
 ---
 
+## Bloque 3c — Runner durable (persistencia)
+
+- [x] **`FlowBotRunnerService`** — el motor deja de vivir solo en memoria.
+- [x] **Creación idempotente** por índice único de `idempotencyKey`
+      (`empresa:bot:versión:evento`). **No** es «buscar y si no existe crear»:
+      con dos workers, ambos leerían «no existe» antes de que ninguno
+      escribiera. La versión va en la clave para que republicar el bot permita
+      arrancar de nuevo con el mismo mensaje.
+- [x] **Evento de outbox en la MISMA transacción** que la ejecución. Si el
+      proceso muere tras el commit y antes de encolar, el despachador publica
+      igual: el trabajo no puede perderse.
+- [x] **Lease con vencimiento** (`leaseOwner` / `leaseUntil`) tomado con
+      `updateMany` condicional — atómico. Un `findFirst` seguido de `update`
+      deja un hueco por el que otro worker se cuela. Con vencimiento porque, si
+      el proceso que lo tenía muere, nadie lo libera y la ejecución quedaría
+      bloqueada para siempre. Solo se libera el lease **propio**.
+- [x] **Solo avanza lo vivo.** El lease exige `RUNNING`/`WAITING_*`, así que un
+      trabajo antiguo no puede revivir una ejecución cancelada, pausada,
+      terminada o transferida.
+- [x] **Consumo atómico de esperas** con `updateMany` sobre `consumedAt: null`:
+      dos mensajes casi simultáneos no pueden consumir la misma espera ni hacer
+      que el bot conteste dos veces.
+- [x] **Pasos, estado, variables, espera y outbox en una transacción.** Guardar
+      el estado sin la espera dejaría la ejecución dormida sin nada que la
+      despierte.
+- [x] **Pausa, reanudación y cancelación** durables. Cancelar **consume** las
+      esperas pendientes: dejarlas vivas haría que un vencimiento intentara
+      despertar algo que ya no debe seguir.
+- [x] **Migración `flowbot_lease_de_ejecucion`**: 2 columnas nulables y 1
+      índice. Cero destructivas. Solo local.
+      **Rollback:** `ALTER TABLE "flowbot_executions" DROP COLUMN "leaseOwner", DROP COLUMN "leaseUntil";`
+- [x] **18 pruebas E2E contra la base real**, incluidas tres carreras
+      concurrentes de verdad.
+
+### Un fallo que solo aparece contra PostgreSQL
+
+La primera versión capturaba el choque de unicidad **dentro** de la transacción
+y consultaba allí mismo la fila existente. PostgreSQL aborta la transacción en
+cuanto una sentencia falla: la consulta de rescate fallaba también con
+`current transaction is aborted`. La recuperación pasó a ir **fuera**. En
+memoria no se ve; solo lo detecta una prueba contra la base.
+
+**Verificación:** backend **1445 unit / 475 e2e** verdes, typecheck 0, lint 0,
+build limpio.
+
+---
+
 ## Próximo paso
+
+**Bloque 3d — consumidor y reconciliador.** Registrar el consumidor de la cola
+`takto.flowbot` en el arranque del worker, despachar los eventos de outbox
+`flowbot.advance` y `flowbot.wake`, y añadir el reconciliador: ejecuciones con
+lease vencido, esperas vencidas sin trabajo, y ejecuciones canceladas con
+trabajos vivos.
+
+Después: adaptadores reales de CRM, orquestador conectado al webhook tras
+`LeadIntakeService`, handoff sobre la conversación, panel lateral, archivado
+seguro, pipeline en tiempo real, API, permisos y QA.
+
+### Referencia del bloque 3c original
 
 **Bloque 3c — el runner.** Servicio que persiste lo que el intérprete decide:
 creación idempotente de `FlowBotExecution` por `idempotencyKey`, escritura de

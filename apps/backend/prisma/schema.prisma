@@ -1748,6 +1748,19 @@ model FlowBotExecution {
   /// Por que termino: fin normal, cancelacion, transferencia, tope de pasos.
   endedReason String?
 
+  /// Quien esta avanzando esta ejecucion ahora mismo, y hasta cuando.
+  ///
+  /// Es el lease que impide que dos workers la avancen a la vez: un reintento
+  /// de BullMQ y una continuacion pueden coincidir, y el cliente recibiria dos
+  /// respuestas. Se toma con una escritura condicional, no con un `findFirst`
+  /// seguido de `update`, porque entre esas dos operaciones hay un hueco por
+  /// el que otro worker se cuela.
+  ///
+  /// Con vencimiento a proposito: si el proceso que lo tenia muere, nadie
+  /// libera el lease y la ejecucion quedaria bloqueada para siempre.
+  leaseOwner String?
+  leaseUntil DateTime?
+
   startedAt  DateTime  @default(now())
   lastStepAt DateTime  @default(now())
   endedAt    DateTime?
@@ -1787,6 +1800,7 @@ model FlowBotExecution {
   @@index([flowBotId, startedAt])
   @@index([versionId])
   @@index([companyId, startedAt])
+  @@index([status, leaseUntil])
   @@map("flowbot_executions")
 }
 
