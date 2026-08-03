@@ -1710,6 +1710,18 @@ enum FlowBotExecutionStatus {
   FAILED
   CANCELLED
   PAUSED
+
+  /// La ejecucion quedo en un estado que el sistema NO puede resolver solo.
+  ///
+  /// EXISTE PARA NO REPETIR UN EFECTO EXTERNO A CIEGAS. Cuando un lease vence
+  /// a mitad de un paso que ya pudo haber mandado un WhatsApp, cobrado algo o
+  /// llamado a un tercero, hay dos opciones malas: reintentar —y quiza
+  /// duplicarlo— o abandonar —y quiza dejarlo a medias—. Si el motor no puede
+  /// PROBAR que el efecto no ocurrio, no elige ninguna: para la ejecucion
+  /// aqui y deja que lo mire una persona.
+  ///
+  /// No es un estado final: desde aqui se puede reanudar o cancelar a mano.
+  NEEDS_ATTENTION
 }
 
 /// Una ejecucion del bot sobre una conversacion. Es el estado durable: si el
@@ -1744,6 +1756,19 @@ model FlowBotExecution {
   /// Clasificador de error ya redactado. Nunca el mensaje crudo del
   /// proveedor: ese arrastra telefonos y cuerpos de peticion.
   errorCode String?
+
+  /// Por que necesita revision humana. Clasificador corto, nunca texto libre
+  /// del cliente ni respuesta del proveedor.
+  attentionReason String?
+
+  /// Cuantas veces el reconciliador ha tenido que intervenir sobre esta
+  /// ejecucion. Un numero que sube sin parar es la senal de que algo esta
+  /// roto de verdad y no es un tropiezo aislado.
+  recoveries Int @default(0)
+
+  /// Cuando intervino por ultima vez. Con `recoveries` permite distinguir
+  /// "se recupero una vez hace un mes" de "lleva media hora en bucle".
+  lastRecoveryAt DateTime?
 
   /// Por que termino: fin normal, cancelacion, transferencia, tope de pasos.
   endedReason String?
@@ -1801,6 +1826,9 @@ model FlowBotExecution {
   @@index([versionId])
   @@index([companyId, startedAt])
   @@index([status, leaseUntil])
+  /// Para el reconciliador: barre por estado y por cuanto lleva sin avanzar.
+  /// Sin este indice, cada pase leeria la tabla entera de ejecuciones.
+  @@index([status, lastStepAt])
   @@map("flowbot_executions")
 }
 

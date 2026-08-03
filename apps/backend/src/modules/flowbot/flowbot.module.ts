@@ -7,6 +7,8 @@ import { FlowBotProcessor } from './engine/flowbot.processor';
 import { FlowBotEffectsFactory } from './engine/flowbot.effects.factory';
 import { FlowBotOutboxPublisher } from './engine/flowbot.outbox';
 import { FlowBotIntakeService } from './engine/flowbot.intake';
+import { FlowBotReconcilerService } from './engine/flowbot.reconciler';
+import { FlowBotAdminController } from './flowbot-admin.controller';
 
 /**
  * Modulo de FlowBot.
@@ -22,6 +24,7 @@ import { FlowBotIntakeService } from './engine/flowbot.intake';
  */
 @Module({
   imports: [OutboxModule],
+  controllers: [FlowBotAdminController],
   providers: [
     FlowBotQueueService,
     FlowBotSelectorService,
@@ -29,6 +32,7 @@ import { FlowBotIntakeService } from './engine/flowbot.intake';
     FlowBotEffectsFactory,
     FlowBotOutboxPublisher,
     FlowBotIntakeService,
+    FlowBotReconcilerService,
     FlowBotProcessor,
   ],
   exports: [
@@ -38,6 +42,7 @@ import { FlowBotIntakeService } from './engine/flowbot.intake';
     FlowBotEffectsFactory,
     FlowBotOutboxPublisher,
     FlowBotIntakeService,
+    FlowBotReconcilerService,
   ],
 })
 export class FlowBotModule {}
