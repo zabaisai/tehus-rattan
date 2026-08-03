@@ -17,8 +17,50 @@ export interface RecordOutboxInput {
   payload: Prisma.InputJsonValue;
 }
 
-/** Cuántos intentos antes de darse por vencido. */
+/** Cuántos intentos antes de darse por vencido, cuando el tipo no dice otra cosa. */
 export const OUTBOX_MAX_ATTEMPTS = 6;
+
+/**
+ * Política de reintento del despacho.
+ *
+ * POR TIPO Y NO UNA SOLA PARA TODOS, porque el coste de reintentar y el de
+ * rendirse no son iguales en todos los eventos. Insistir doce veces en algo que
+ * el reconciliador va a rehacer en un minuto solo gasta base de datos; rendirse
+ * a las seis en algo que nadie más va a rehacer pierde el trabajo de verdad.
+ */
+export interface PoliticaReintento {
+  maxIntentos: number;
+  /** Espera del primer reintento. Se duplica en cada uno. */
+  baseMs: number;
+  /** Tope, para que el backoff exponencial no se vaya a horas. */
+  topeMs: number;
+}
+
+export const POLITICA_POR_DEFECTO: PoliticaReintento = {
+  maxIntentos: OUTBOX_MAX_ATTEMPTS,
+  baseMs: 5_000,
+  topeMs: 160_000,
+};
+
+const POLITICAS: Record<string, PoliticaReintento> = {
+  // Un mensaje entrante sin despachar es un cliente sin atender: se insiste
+  // con la cadencia histórica, que ya está validada en producción.
+  'inbound.message': POLITICA_POR_DEFECTO,
+
+  // Un avance bloqueado deja al cliente esperando respuesta: se reintenta
+  // rápido. Y se abandona antes que el resto porque no se pierde nada: el
+  // reconciliador ve la ejecución parada y vuelve a encolarla.
+  'flowbot.advance': { maxIntentos: 8, baseMs: 2_000, topeMs: 60_000 },
+
+  // Un despertar es lo contrario: nadie está esperando ahora mismo, así que la
+  // prisa sobra, pero perderlo deja la ejecución dormida para siempre. Se
+  // insiste mucho más y con más calma.
+  'flowbot.wake': { maxIntentos: 12, baseMs: 5_000, topeMs: 300_000 },
+};
+
+export function politicaDe(type: string): PoliticaReintento {
+  return POLITICAS[type] ?? POLITICA_POR_DEFECTO;
+}
 
 /** Cuánto puede estar un evento reclamado antes de considerarlo colgado. */
 export const OUTBOX_STALE_CLAIM_MS = 5 * 60_000;
@@ -160,17 +202,24 @@ export class OutboxService {
     id: string,
     attempts: number,
     error: unknown,
+    type?: string,
   ): Promise<void> {
     // Solo el clasificador; nunca el mensaje crudo, que puede arrastrar PII o
     // fragmentos de la cadena de conexión.
     const clasificador =
       error instanceof Error ? error.name || 'Error' : 'DesconocidoError';
 
+    // Sin tipo se aplica la política por defecto: un llamador que no lo pasa no
+    // debe quedarse sin reintentos.
+    const politica = politicaDe(type ?? '');
     const intentos = attempts + 1;
-    const agotado = intentos >= OUTBOX_MAX_ATTEMPTS;
+    const agotado = intentos >= politica.maxIntentos;
 
-    // 5s, 10s, 20s, 40s, 80s…
-    const esperaMs = 5_000 * Math.pow(2, Math.min(intentos - 1, 5));
+    // Exponencial con tope: 5s, 10s, 20s, 40s… hasta `topeMs`.
+    const esperaMs = Math.min(
+      politica.baseMs * Math.pow(2, intentos - 1),
+      politica.topeMs,
+    );
 
     await this.prisma.outboxEvent.update({
       where: { id },
@@ -185,7 +234,9 @@ export class OutboxService {
 
     if (agotado) {
       this.logger.error(
-        `Evento de outbox agotó sus ${OUTBOX_MAX_ATTEMPTS} intentos [${clasificador}]; queda en FAILED para inspección`,
+        `Evento de outbox "${type ?? 'sin tipo'}" agotó sus ${
+          politica.maxIntentos
+        } intentos [${clasificador}]; queda en FAILED para inspección`,
       );
     }
   }
