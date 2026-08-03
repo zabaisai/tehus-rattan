@@ -867,7 +867,8 @@ avisos de una herramienta es filtrar justo lo que intentaba avisar.
 ## DESPLEGADO EN STAGING — 2026-08-03
 
 **Release en marcha: `f9369c97e30e22f0afaee8933e0f2c440c150246`** (11:40 hora
-de Colombia), que incorpora el guardia de construcción. El despliegue inicial
+de Colombia), que incorpora el guardia de construcción. **Despliegue aceptado**
+tras la QA autenticada del operador. El despliegue inicial
 fue `b9f3662` a las 10:56, corregido tras el incidente documentado arriba.
 Release anterior: `58dfb76`, conservado y recuperable.
 
@@ -948,10 +949,14 @@ se revierten **a la vez**: comparten imagen.
    sondeos posteriores dieron `ok`. Es el mismo patrón de «comprobar antes de
    estar listo» que el puente, pero sin consecuencia porque el endpoint
    reevalúa en cada petición.
-3. **QA autenticada no ejecutada.** `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD`
+3. **QA autenticada: COMPLETADA por el operador el 2026-08-03.** Todas las
+   secciones cargan correctamente y no reaparece «No pudimos conectar con el
+   servidor». No pudo automatizarse: `SUPER_ADMIN_EMAIL`/`SUPER_ADMIN_PASSWORD`
    del entorno son credenciales de siembra inicial y ya no coinciden con la
-   cuenta real (401). No se insistió: reintentar habría activado el limitador.
-   Queda pendiente que una persona entre al CRM y recorra las pantallas.
+   cuenta real (401). No se insistió, porque reintentar habría activado el
+   limitador. Si en el futuro se quiere automatizar, hace falta una cuenta de
+   QA dedicada cuyas credenciales viajen por variable de entorno, nunca por el
+   repositorio ni por el chat.
 
 ## Próximo comando seguro
 
