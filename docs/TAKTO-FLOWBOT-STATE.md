@@ -346,7 +346,7 @@ build limpio.
 
 ---
 
-## Bloque 3d (parcial) — Consumidor y adaptador real de CRM
+## Bloque 3d (primera mitad) — Consumidor y adaptador real de CRM
 
 - [x] **`FlowBotProcessor`** — consumidor de `takto.flowbot` siguiendo el mismo
       patrón que `InboundProcessor`. Se registra **solo en el worker**
@@ -392,16 +392,195 @@ build limpio.
 
 ---
 
+## Bloque 3d (cerrado) — Transporte y recuperación durable
+
+El motor **se mueve solo**. Demostrado levantando backend y worker de verdad y
+empujando un webhook firmado: nadie llama al runner.
+
+### Despacho del outbox → BullMQ
+
+- [x] **`OutboxHandlerRegistry`** (`common/outbox/outbox.handlers.ts`). El
+      despachador vive en `common/` y FlowBot en `modules/`; importar FlowBot
+      allí haría que la capa común dependiera de un módulo de negocio y cada
+      tipo nuevo obligaría a tocarla. Cada módulo declara qué sabe publicar. Un
+      tipo **sin manejador se sigue marcando fallido**, no ignorado: un evento
+      que nadie publica y que además desaparece del radar es exactamente cómo
+      se pierde trabajo sin que nadie se entere.
+- [x] **`FlowBotOutboxPublisher`** publica `flowbot.advance` y `flowbot.wake`.
+      Corre en **los dos procesos**: si solo corriera en el worker, un worker
+      caído dejaría los eventos acumulándose sin que nadie los despachara.
+- [x] **Orden inviolable**, con prueba que lo fija:
+      `persistir transición + outbox → commit → publicar → marcar outbox`.
+      El manejador **no marca nada**: devuelve si pudo publicar y decide el
+      despachador.
+- [x] **Distingue «no pude publicar» de «no había que publicar».** Relee el
+      estado antes de encolar; si la ejecución ya se canceló o pausó, lo da por
+      despachado. Devolver fallo lo haría girar hasta quedar `FAILED` por haber
+      funcionado bien.
+- [x] **Políticas de reintento por tipo**, no una sola para todos:
+      `flowbot.advance` reintenta rápido (2 s) y se rinde antes (8) porque el
+      reconciliador lo rehará; `flowbot.wake` va con más calma (5 s) e insiste
+      mucho más (12) porque perderlo deja la ejecución dormida para siempre.
+
+### Reanudación por mensaje
+
+- [x] **`FlowBotIntakeService`** conectado al webhook **después de
+      `LeadIntakeService`** —un bot que consulta la etapa o el asesor necesita
+      que existan— y **antes** del chatbot heredado y de las automatizaciones:
+      la regla de «el primero que atiende se lo queda» no cambia, solo que
+      FlowBot es ahora el primero de la fila. Dos motores respondiendo al mismo
+      mensaje son dos WhatsApp al cliente.
+- [x] **Reanudar antes que arrancar.** Al revés, un cliente que contesta a la
+      pregunta de un bot arrancaría un segundo bot.
+- [x] **La espera no se consume en el webhook.** La consume el runner al
+      avanzar, con escritura condicional. Consumirla antes y morir sin escribir
+      el evento dejaría la ejecución despierta sin nada que la despertara.
+- [x] **El texto no viaja.** Ni al outbox ni a Redis: solo el `messageId`. El
+      consumidor relee el cuerpo acotado por empresa.
+- [x] **El `jobId` de un mensaje lleva el mensaje, no el paso.** Dos mensajes
+      seguidos del mismo cliente están en el mismo paso y compartirían id.
+- [x] Respeta `isPaused` igual que el chatbot heredado. Ningún fallo propaga:
+      preferimos una conversación sin respuesta automática a un mensaje
+      perdido.
+
+### Reanudación por tiempo
+
+- [x] El despertar se programa con el retraso hasta `wakeAt`; al vencer sale
+      por el puerto de tiempo agotado y **no reejecuta** el nodo que esperaba,
+      que reenviaría la pregunta al cliente.
+- [x] Un despertar tardío, cuando el cliente ya contestó, es un **no-op**.
+- [x] Un mensaje que llega tras vencer el plazo **no reanuda**: si las dos
+      salidas compitieran por la misma espera, cuál gana dependería del orden
+      en que se procesaran los trabajos.
+
+### `FlowBotReconcilerService` — doce condiciones
+
+`esperas-vencidas`, `ejecuciones-atascadas`, `leases-vencidos`,
+`dormidas-sin-despertador`, `esperas-huerfanas`, `esperas-de-canceladas`,
+`version-desaparecida`, `abandonadas`, `outbox-atrasado`, `outbox-fallido`,
+`recuperaciones-en-bucle`, `atencion-pendiente`.
+
+Idempotente, acotado a 100 filas por condición, seguro con dos instancias (todo
+`updateMany` con el estado esperado en el `where` —incluidos el contador de
+recuperaciones y el `leaseUntil` leído—, todo encolado con `jobId`
+determinista). Pasa cada minuto y expone
+`GET`/`POST /api/platform/flowbot/reconciler` tras `PlatformGuard`: forzar un
+pase toca ejecuciones de todas las empresas.
+
+**No inventa.** Reparar es reencolar o cerrar lo que ya no puede seguir; nunca
+reejecuta un efecto externo. El outbox atrasado solo se **cuenta**, porque
+publicarlo desde aquí duplicaría el camino del despachador.
+
+### La decisión más importante del motor
+
+`leasesVencidos`. Un lease vencido significa que un worker murió **mientras**
+avanzaba: pudo morir antes del nodo, durante, o después de ejecutarlo y antes
+de persistir el paso. En el tercer caso **el efecto ya ocurrió** —el WhatsApp
+salió, la tarea se creó— y no hay rastro en la base.
+
+- Con paso registrado tras el inicio del lease → el efecto está probado y su
+  clave de idempotencia lo protege: se libera el lease y se reencola.
+- **Sin** paso registrado → no se sabe nada. Reintentar podría mandarle el
+  mismo mensaje otra vez al cliente; abandonar podría dejarlo a medias. Ninguna
+  de las dos es aceptable como decisión automática, así que la ejecución pasa a
+  **`NEEDS_ATTENTION`** con el motivo y decide una persona.
+
+Es más lento y más molesto que reintentar a ciegas. También es la diferencia
+entre un cliente que espera y un cliente que recibe la misma pregunta tres
+veces.
+
+El rastro de cada intervención va a la línea de tiempo de la ejecución como
+paso `system.reconcile`, **no** a `AuditLog`: ese registra lo que hace una
+PERSONA y exige un rol de actor. Meter ahí al reconciliador con un rol
+inventado convertiría la auditoría en algo que miente sobre quién hizo qué.
+
+### Salud: degradado, nunca enfermo
+
+`/api/health/status` gana el componente `flowbot`, que consulta la base
+directamente y no los servicios —viven en otra capa y solo corren en el
+worker—. Ejecuciones esperando revisión o despertares sin disparar lo ponen en
+`stale` y el sistema en `degraded`. **Nunca en `down`**: un motor de bots que
+necesita revisión no impide atender conversaciones a mano, y sacar el backend
+del balanceador por esto convertiría un problema de bots en una caída del
+producto.
+
+### Migración `20260803224322_flowbot_recuperacion_segura` (solo local)
+
+Puramente aditiva: valor de enum `NEEDS_ATTENTION`, columnas `attentionReason`
+(nulable), `recoveries` (defecto 0) y `lastRecoveryAt` (nulable), e índice
+`(status, lastStepAt)` sin el cual cada pase del reconciliador leería la tabla
+entera de ejecuciones.
+
+**Rollback:** basta con no desplegar el código; las columnas sobran pero no
+estorban. Revertir un valor de enum exige recrear el tipo en PostgreSQL, así
+que si hubiera que volver atrás se deja el valor y se ignora.
+
+### El fallo que ninguna prueba podía ver
+
+**BullMQ rechaza cualquier `jobId` que lleve `:`.** Con 1539 unitarias y 505
+e2e en verde, contra BullMQ de verdad no avanzaba ni una ejecución.
+
+Ninguna prueba lo vio porque un doble de la cola guarda la cadena tan contento:
+la propiedad que se estaba comprobando —«mismo id, un solo trabajo»— se cumplía
+perfectamente en el doble. Y se presentaba como un warning de «no se pudo
+encolar», indistinguible de un Redis caído, que es transitorio: la ejecución se
+quedaba quieta para siempre y el log no daba ninguna pista.
+
+Los tres constructores pasan a `-`, y el id se **valida antes** de llamar a
+BullMQ registrando **ERROR** y no warning: un id mal construido es un error de
+programación permanente y tiene que leerse distinto de una caída pasajera.
+
+Lo destapó la demostración autónoma. Es exactamente su razón de ser.
+
+### Demostración autónoma
+
+`apps/backend/scripts/flowbot-demo-autonoma.mjs`. No llama al runner, ni al
+intake, ni al reconciliador: prepara datos, levanta **backend y worker de
+verdad**, empuja un webhook firmado con HMAC-SHA256 —secreto generado al vuelo
+con `randomBytes`, en memoria, nunca escrito en ningún archivo— y **mira la
+base** cada segundo.
+
+```bash
+docker compose up -d redis
+cd apps/backend && npm run build
+node scripts/flowbot-demo-autonoma.mjs
+```
+
+Recorrido observado, sin que nadie empuje nada tras el webhook: arranque →
+`inicio → saluda → pide` → `WAITING_INPUT` → los tres eventos de outbox
+`COMPLETED` solos → segundo webhook → `pide → gracias → fin`; y una tercera
+conversación sin contestar que vence sola y sale por `pide → nadie → fin`.
+
+No manda nada a nadie: la mensajería es el adaptador falso y no hay token de
+Meta configurado. Lo que se observa es el recorrido del estado.
+
+Dos trampas de configuración local anotadas, que costaron un rato: las rutas
+van bajo `/api`, y `buildRedisConnection` lee `REDIS_HOST` y `REDIS_PORT` —no
+una URL— con `redis` por defecto, que es el nombre del servicio en la red de
+Docker y no resuelve fuera de ella.
+
+**Verificación:** backend **1548 unit / 505 e2e** verdes, typecheck 0, lint 0,
+build limpio, demostración autónoma completa.
+
+---
+
 ## Próximo paso
 
-**Cerrar el 3d.** Falta, y sin ello el motor todavía no se mueve solo:
+**Bloque 4 — nodos de WhatsApp sobre adaptador falso.** Después: ventana de 24
+horas y plantillas, handoff real sobre la conversación, panel lateral del
+contacto, archivado seguro, pipeline en tiempo real, API y permisos, editor
+visual y simulador.
 
-1. **Despachador de outbox** que reconozca `flowbot.advance` y `flowbot.wake`
-   y los publique en BullMQ, marcando el evento **después** de encolar.
-2. **Reconciliador**: leases vencidos, esperas vencidas sin trabajo, outbox
-   pendiente, ejecuciones canceladas con trabajos vivos.
-3. **Orquestador** conectado al webhook tras `LeadIntakeService`.
-4. Pruebas de recuperación con worker reiniciado y Redis vacío.
+### Limitación pendiente: campos personalizados
+
+`crm.contact_field` sigue guardando el valor como etiqueta `campo:valor` porque
+`Contact` no tiene almacén de campos libres en el esquema. **La interfaz no
+debe prometer campos personalizados mientras esto siga así**: se verían como
+una etiqueta más en el contacto, y quien configure el bot esperará otra cosa.
+
+Corresponde una migración aditiva `CustomFieldDefinition` /
+`CustomFieldValue`, que cambia el adaptador sin tocar el nodo ni el grafo —
+que es exactamente para lo que sirve el puerto.
 
 ### Referencia del bloque 3d completo
 
@@ -455,6 +634,11 @@ cd /c/Users/Usuario/Desktop/Tehus_Rattan
 git checkout feature/takto-flowbot-visual-builder
 git pull --ff-only origin feature/takto-flowbot-visual-builder
 cd apps/backend && npx jest && npx tsc --noEmit -p tsconfig.json
+npm run test:e2e -- --runInBand
+
+# Y lo que ninguna suite puede responder: comprobar que el motor se mueve solo.
+docker compose up -d redis
+cd apps/backend && npm run build && node scripts/flowbot-demo-autonoma.mjs
 ```
 
 ### Reglas que no se negocian
