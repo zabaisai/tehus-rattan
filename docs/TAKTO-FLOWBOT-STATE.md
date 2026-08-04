@@ -892,40 +892,178 @@ build limpio. Frontend **315** verdes.
 
 ---
 
+## Bloque 7 (cerrado) — API administrativa, simulador y plantillas
+
+Un administrador ya puede gobernar FlowBot entero sin escribir JSON en la
+base. **31 rutas** bajo `/api/flowbots`, demostradas por HTTP.
+
+### Rol MANAGER
+
+No existía. `ADMIN` y `AGENT` no cubrían el hueco real: quien diseña y publica
+bots necesita más que un asesor y menos que un administrador. Puede crear,
+editar, simular y publicar, y ver todas las ejecuciones, pero **no toca
+credenciales ni integraciones** — dar `ADMIN` a esa persona es entregarle
+también las claves de WhatsApp.
+
+Migración aditiva: `ADD VALUE IF NOT EXISTS 'MANAGER' BEFORE 'AGENT'`.
+
+### Versiones inmutables
+
+Publicar **congela el grafo tal como está** en una fila nueva. Guardar una
+referencia al borrador haría que editarlo cambiara la versión que está
+corriendo. Todo en una transacción: crear, apuntar y subir el contador;
+separarlo dejaría, al morir en medio, un bot apuntando a una versión a medio
+escribir.
+
+**Publicar y activar son decisiones distintas**: se puede tener la versión
+lista y encenderla el lunes. Y activar exige versión publicada, porque el
+selector solo mira los que la tienen.
+
+Restaurar crea un **borrador nuevo**; no republica ni toca la versión
+histórica. Quien restaure tiene que publicar otra vez, que es lo que deja
+constancia de la vuelta atrás.
+
+### Concurrencia optimista
+
+El cliente manda la revisión que editó y la comprobación va **dentro** del
+`updateMany`: entre un `findFirst` y la escritura hay un hueco por el que se
+cuela el otro guardado.
+
+El **409 devuelve el grafo actual**, no solo el número. Sin él la interfaz
+solo puede decir «alguien te pisó» y obligar a recargar perdiendo el trabajo.
+
+### Simulador
+
+Mismo catálogo, mismo validador, mismo compilador, mismo intérprete. Un
+simulador con su propia lógica prueba el simulador, no el bot.
+
+Lo que cambia es el juego de efectos, y cambia **por construcción**: el
+intérprete solo conoce los puertos y aquí recibe falsos. No hay un
+`if (simulacion)` que alguien pueda olvidar en un sitio. La prueba cuenta las
+filas de ejecuciones, contactos, oportunidades, tareas, mensajes y handoffs
+antes y después: ni una.
+
+Simula **varios turnos** —cada vuelta es «avanza hasta esperar» más «alguien
+responde»— y explica cada decisión en texto, porque quien simula quiere
+entender la rama, no clasificarla.
+
+### Paginación por cursor
+
+No por desplazamiento. Con `skip`, una ejecución nueva desplaza todo y la
+página 2 repite filas de la 1; y en la página 50 la base cuenta 5.000 filas
+para descartarlas. El cursor es `(startedAt, id)`, y el `id` desempata porque
+dos ejecuciones pueden empezar en el mismo milisegundo.
+
+### Reintentar no reenvía a ciegas
+
+Si el último paso quedó `OK` y aun así la ejecución falló, **el efecto ya
+ocurrió**: pasa a `NEEDS_ATTENTION` en vez de mandar el mismo WhatsApp dos
+veces. Misma regla que el reconciliador aplica a un lease vencido.
+
+### Permisos
+
+`ADMIN` completo · `MANAGER` diseña y publica · `AGENT` consulta **lo suyo**,
+con el filtro impuesto en el servidor y no confiado al cliente. Un `AGENT`
+**sí** puede reanudar su propia conversación: quien la atiende sabe cuándo
+devolvérsela al bot, y pedir permiso convierte una acción de treinta segundos
+en un ticket.
+
+### Contrato tipado con un solo catálogo
+
+El editor **no mantiene su lista**: la pide. Dos catálogos escritos a mano
+divergen el día que alguien añade un puerto en uno. `disponible` lo decide el
+servidor mirando si hay ejecutor, y el frontend **nunca lee el mensaje** para
+decidir: el código es estable, el mensaje es para la persona.
+
+### Ocho plantillas, y el contrato honesto de una plantilla
+
+Al escribirlas apareció una tensión real: un campo obligatorio vacío **no
+puede** pasar el validador, pero poner una referencia de ejemplo es peor
+—alguien publicaría sin cambiarla y le mandaría a su cliente el catálogo de
+otro—.
+
+Se resuelve con `camposPorCompletar`: una plantilla **o valida entera, o dice
+exactamente qué le falta**, y la prueba comprueba que sus únicos errores son
+esos. Cinco validan tal cual; tres declaran las referencias que nadie puede
+elegir por el cliente.
+
+Las pruebas fijan además que ninguna promete plazos ni descuentos —lo que diga
+se lo dice a un cliente de otra empresa— y que ninguna menciona nada de Tehus.
+
+**Dos fallos míos que encontraron esas pruebas:** un menú de botones no tiene
+salida `next` sino una por opción (`opcion:0`…), y había inventado
+`trigger.no_reply` y `{{conversation.withinWindow}}`, que no existen — lo
+segundo además sobraba, porque el motor ya comprueba la ventana de 24 h y saca
+el flujo por la rama de error.
+
+### Redacción
+
+Tokens, credenciales y cabeceras se ocultan por **nombre de clave
+normalizado** —`apiKey`, `api_key`, `API-KEY` son lo mismo para quien filtra—
+y el teléfono va enmascarado. Esta pantalla la abre soporte y se comparte en
+capturas.
+
+### Pruebas y demostración
+
+**64 E2E** contra PostgreSQL: dos administradores guardando a la vez con
+`Promise.allSettled`, inmutabilidad comprobada editando el borrador después de
+publicar, simulador que no escribe ni una fila, reintento con efecto incierto,
+aislamiento en seis caminos distintos, cursor sin repetir filas.
+
+**84 unitarias** de las plantillas, validadas con las mismas reglas que aplica
+la publicación.
+
+`scripts/flowbot-demo-admin.mjs` — **22 pasos, PASS con 0 fallos**. Habla por
+HTTP con el backend real: si algo solo funciona llamando al servicio por
+dentro, ahí falla. Crea sesiones de verdad porque un token sin `sid` se
+rechaza, y eso fue justo lo que falló al primer intento.
+
+```bash
+cd apps/backend && npm run build
+node scripts/flowbot-demo-admin.mjs
+```
+
+### Migración `20260804160000_rol_manager` (solo local)
+
+Un valor de enum. **Rollback:** no desplegar el código; nadie tiene el rol.
+Revertir el valor exige recrear el tipo, así que se deja y se ignora.
+
+**Verificación:** backend **1866 unit / 605 e2e** verdes, typecheck 0, lint 0,
+build limpio, Nest arranca y mapea las 31 rutas.
+
+---
+
 ## Próximo paso
 
-**API administrativa de FlowBot**, y después el constructor visual. Nada de
-esto está empezado.
+**El constructor visual.** Todo lo que necesita ya existe y está probado:
 
-### Lo que falta para que FlowBot sea usable sin escribir JSON
-
-| Bloque | Estado |
+| Lo que el lienzo va a consumir | Endpoint |
 |---|---|
-| API administrativa (CRUD, versiones, publicación, permisos) | **no empezado** |
-| Simulador con adaptadores falsos | **no empezado** |
-| Plantillas listas para usar | **no empezado** |
-| Constructor visual | **no empezado** |
-| Pantalla de FlowBot y de ejecuciones | **no empezado** |
-| Panel lateral en Conversaciones | **no empezado** |
-| Pipeline en tiempo real y CRUD de pipelines | **no empezado** |
+| Paleta de nodos, puertos y configuración | `GET /flowbots/catalog` |
+| Abrir y guardar con control de conflicto | `GET`/`POST /flowbots/:id/draft` |
+| Validación en vivo con `nodeId` para enfocar | `POST /flowbots/validate` |
+| Publicar, versiones, comparar y restaurar | `/flowbots/:id/versions*` |
+| Simular sin efectos | `POST /flowbots/simulate` |
+| Plantillas y lo que falta por completar | `GET /flowbots/templates` |
 
-El motor está completo y probado; lo que falta es toda la superficie.
+Falta añadir React Flow —no está en las dependencias— y construir las
+pantallas: FlowBot, ejecuciones, panel lateral de Conversaciones y el tiempo
+real del Pipeline.
 
 ### Limitaciones honestas que siguen abiertas
 
 - **No hay equipos.** El handoff asigna un usuario.
+- **`SUPER_ADMIN` de plataforma no está atado a sesión de soporte en esta
+  API.** Hoy entra como `ADMIN` de la empresa del token. El `PlatformGuard` y
+  `SupportSessionsService` existen y se usan en otros módulos; atarlo aquí es
+  trabajo pendiente y no está hecho.
+- **Sin OpenAPI generado.** El contrato tipado existe en TypeScript y lo sirve
+  `GET /flowbots/catalog`, pero no hay `@nestjs/swagger` en el proyecto y no se
+  añadió.
 - **`resumir` de IA devuelve vacío**: el puerto solo recibe el id de la
-  conversación, y darle Prisma al adaptador le daría acceso a las de todas las
-  empresas. Cuando exista un nodo que lo use, el texto tendrá que llegarle ya
-  resuelto por el motor.
-- **El rebinding de DNS no está cerrado del todo.** Entre la resolución y la
-  conexión el DNS puede cambiar. La ventana es de milisegundos frente a un
-  ataque trivial; cerrarla exige conectar a la IP ya validada con la cabecera
-  `Host` original, que es un cambio de agente HTTP.
-- **Los nombres de plantilla de WhatsApp no se validan**: exigiría llamar a
-  Meta al publicar.
-- **WhatsApp sigue sobre transporte falso.** Activarlo es cambiar
-  `FlowBotEffectsFactory`.
+  conversación.
+- **El rebinding de DNS no está cerrado del todo.**
+- **WhatsApp sigue sobre transporte falso.**
 
 ### Referencia del bloque 3d completo
 
@@ -983,7 +1121,9 @@ npm run test:e2e -- --runInBand
 
 # Y lo que ninguna suite puede responder: comprobar que el motor se mueve solo.
 docker compose up -d redis
-cd apps/backend && npm run build && node scripts/flowbot-demo-autonoma.mjs
+cd apps/backend && npm run build
+node scripts/flowbot-demo-autonoma.mjs   # el motor se mueve solo
+node scripts/flowbot-demo-admin.mjs      # la API administra sin JSON a mano
 ```
 
 La demostración recorre la vertical entera —incluido el handoff— por el mismo
