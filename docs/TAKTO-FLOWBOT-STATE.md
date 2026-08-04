@@ -1033,7 +1033,217 @@ build limpio, Nest arranca y mapea las 31 rutas.
 
 ---
 
+## Bloque 8 (cerrado) — El constructor visual y las pantallas
+
+Un administrador ya hace todo el recorrido desde la interfaz: crear un bot,
+elegir plantilla, diseñar el flujo, configurarlo, arreglar errores, simularlo,
+publicarlo, activarlo, ver ejecuciones, ver el contacto, archivarlo y
+administrar varios embudos. **Ocho rutas** bajo `/dashboard/flowbots`.
+
+### Acceso de plataforma, por fin atado
+
+Era la limitación abierta del bloque 7. Un `SUPER_ADMIN` entraba a los bots de
+una empresa por tener el rol; ahora entra **abriendo una sesión de soporte** —
+empresa concreta, motivo escrito, caducidad—, que ya existía en el producto.
+
+La sesión viaja en una **cabecera, no en el token**: atarlas obligaría a
+reautenticar para revocar un acceso, justo lo contrario de lo que se quiere
+cuando alguien se equivoca de empresa. Y **fija una empresa** en
+`req.user.companyId`, así que a partir de ahí es un usuario de esa empresa para
+todos los efectos: no queda ninguna ruta transversal.
+
+**El orden de las guardas no era el obvio, y lo enseñó la prueba E2E por
+HTTP.** Puesta detrás de `BusinessTenantGuard`, la guarda nunca llegaba a
+correr: un usuario de plataforma no tiene empresa y le rechazaban antes con
+«necesitas una empresa asociada». Con mocks eso no se ve, porque el orden lo
+pone quien escribe la prueba.
+
+La auditoría conserva **quién fue de verdad** —operador, empresa soportada, id
+de sesión y el motivo escrito al abrirla—. Un registro que dijera solo «se
+publicó en la empresa X» escondería que fue soporte, que es justo la pregunta
+que se hace después.
+
+### Un solo catálogo, ampliado con lo que faltaba
+
+El editor no mantiene su lista de pasos: la pide. Para poder dibujar el lienzo
+hicieron falta dos cosas que no estaban en el contrato:
+
+- **`puertosDinamicos`** — un menú de botones NO sale por «Continuar», sale por
+  la opción que eligió el cliente (`opcion:0…`). Sin esto habría que saberlo de
+  memoria, y es exactamente la clase de cosa que se olvida y deja conectar una
+  rama que el motor nunca recorre.
+- **`variables`** — la lista CERRADA del motor con etiqueta, tipo y ejemplo
+  falso. Una segunda lista escrita a mano en el frontend solo puede quedarse
+  corta o inventar variables que el validador va a rechazar.
+
+Agrupar en la paleta es presentación, no contrato: un tipo que no encaje en
+ningún grupo **aparece igualmente** en el de su categoría, para que un paso
+nuevo del backend no sea invisible hasta que alguien se acuerde de venir aquí.
+
+### Lo que el editor no deja hacer
+
+Conectar un paso consigo mismo, meter algo antes de un disparador, poner dos
+conexiones en la misma salida —dos salidas del mismo puerto no significan «las
+dos», significa que una se ignora y cuál es imposible de saber mirando el
+dibujo—, borrar el arranque sin preguntar, o publicar con errores.
+
+Quitar una opción de un menú **borra su puerto y la conexión que colgaba de
+él**, en vez de dejar una conexión a un puerto que ya no existe.
+
+### Pulsar un problema lleva al sitio
+
+Selecciona el paso, lo centra en el lienzo, abre su panel y **enfoca el campo**.
+«Falta el texto del mensaje» en un flujo de treinta pasos, sin eso, obliga a
+abrirlos uno a uno.
+
+Se distingue **incompleto** de **inválido**: uno se arregla rellenando y el
+otro revisando, y no es lo mismo.
+
+### Guardado automático y el 409
+
+«Hay cambios sin guardar» se **deduce** —el grafo en pantalla no es el último
+que confirmó el servidor—, no se apunta: guardarlo aparte solo abre la puerta a
+que el indicador diga «Guardado» con cambios pendientes encima.
+
+La revisión **solo avanza cuando el servidor confirma**. Darla por buena al
+enviar dejaría al editor creyendo una revisión que no existe, y a partir de ahí
+todo daría 409 sin que nadie tocara nada.
+
+**Un 409 no pisa nada.** No se recarga el grafo remoto ni se intenta fusionar:
+dos grafos mezclados sin una estrategia segura producen un flujo que nadie
+escribió y que además parece correcto. Se para, se explica y se ofrece
+**descargar el trabajo local** antes de tomar el del servidor.
+
+### Publicar no es activar
+
+Se puede dejar la versión lista y encenderla el lunes; juntarlo en un botón hace
+que quien solo quería prepararlo ponga a hablar un bot con clientes esa tarde.
+Y se dice que **las conversaciones en curso no cambian de versión a mitad de
+camino**.
+
+Restaurar una versión crea un **borrador**, no republica: volver atrás sin
+revisar pondría a hablar con clientes una versión vieja que nadie ha vuelto a
+mirar.
+
+### El simulador avisa siempre
+
+El cartel de que no hace nada real está **fijo arriba**, no solo al empezar: a
+los treinta segundos esa pantalla es indistinguible de la de verdad para quien
+entre a mitad.
+
+### «Eliminar» un contacto ahora lo archiva
+
+`DELETE /contacts/:id` hacía un borrado físico. Eso se lleva por delante las
+conversaciones, los mensajes y las oportunidades de esa persona, y esa
+información es del negocio: **la conversación en la que se acordó un precio no
+deja de existir porque alguien limpie la lista de contactos**. Además casi nunca
+es lo que se quiere: se pulsa «eliminar» para dejar de ver, no para destruir.
+
+El modelo ya tenía `archivedAt` y el motor ya aplicaba la política de qué pasa
+cuando la persona vuelve a escribir; faltaba justo la puerta del CRM. Archivar
+dos veces no pisa la fecha ni el motivo originales, hay restauración, y ambas
+quedan registradas: sin registro, «este contacto desapareció» no tiene respuesta
+y la conclusión natural es que el producto perdió datos.
+
+**Archivar no es bloquear.** Archivar es «ya no está activo»; bloquear es una
+decisión sobre la relación. El borrado real sigue por la solicitud de
+eliminación de datos, deliberadamente más lenta.
+
+### La etapa de entrada se marca, no se adivina
+
+`isInitial` estaba en el modelo y lo leía la entrada de leads, pero **no se
+podía tocar por la API**: en la práctica mandaba «Nuevo lead» por nombre o «la
+primera por orden» como reserva. Una empresa que llame a la suya «Primer
+contacto» tiene el mismo derecho a que sus leads caigan donde toca.
+
+La invariante la sostiene el servidor: marcar una desmarca la anterior **en la
+misma transacción** —con dos marcadas, en cuál aparece el lead depende del orden
+de la consulta—, no se puede desmarcar la única, y no se puede borrar la de
+entrada mientras queden otras.
+
+### Tiempo real por tablero
+
+El evento de oportunidad lleva ahora `pipelineId` y el cliente refresca **solo
+el tablero afectado**. Antes cualquier cambio invalidaba `["kanban"]` entero —la
+clave es un prefijo—, así que en una empresa con cuatro embudos eran tres
+consultas tiradas por cada arrastre. Siguen viajando solo identificadores: el
+contenido se pide por la API, que aplica los permisos de quien pregunta.
+
+### QA visual sobre el producto real, y lo que encontró
+
+PostgreSQL, Redis, backend, worker y frontend levantados; Chrome sin cabeza;
+sesión de verdad. `scripts/qa-flowbot-visual.mjs` — **26 comprobaciones, verde,
+0 desbordes horizontales, 0 errores de consola**, con capturas de ocho pantallas
+a 1440, 1280, 1024, 768 y 390 px.
+
+Encontró **dos fallos que ninguna prueba veía**:
+
+1. **Tres pasos de cada plantilla se dibujaban uno encima de otro.** `enFila`
+   colocaba solo la fila principal y el resto se quedaba en `{0,0}`, que es el
+   valor por defecto de todos. Para el validador un grafo con tres nodos en la
+   misma coordenada es válido, así que las 84 pruebas de plantillas pasaban. La
+   prueba que debía cazarlo solo pedía que **alguno** tuviera posición; ahora
+   exige que ningún par comparta coordenada.
+2. **El minimapa dibujaba un recuadro en blanco.** La proyección crea objetos de
+   nodo nuevos en cada render y con ellos React Flow pierde las medidas que
+   había tomado. Se pasan ancho y alto explícitos.
+
+Confirmó además que el producto ya se explicaba bien donde importa: un paso
+suelto no deja publicar y dice «no lleva a ningún sitio · conecta la salida de
+este paso a otro», y a 390 px el editor avisa de que hace falta una pantalla más
+grande en vez de romperse.
+
+```bash
+node scripts/qa-seed.mjs                       # empresa y usuario de QA
+node scripts/qa-flowbot-visual.mjs ./salida    # recorrido + capturas
+node scripts/qa-seed.mjs limpiar               # borra lo que creó
+```
+
+### Dependencia
+
+`@xyflow/react` **12.11.2**, versión exacta. Es el paquete que mantienen
+oficialmente los autores de React Flow (`reactflow` es el nombre antiguo). Sus
+`peerDependencies` piden `react >= 17` y el proyecto va con React 19.2.4 sobre
+Next 16.2.9. Sin rango: un `^` en la librería que dibuja el editor entero
+significa que una instalación limpia dentro de tres meses puede traer otro
+comportamiento de arrastre sin que nadie haya tocado el código.
+
+### Verificación
+
+Backend **1893 unit / 636 e2e**, frontend **385**, typecheck 0, lint 0, ambos
+builds limpios, las ocho rutas en el manifiesto de Next.
+
+---
+
 ## Próximo paso
+
+**Auditoría visual con ojo humano y preparación de staging.** Lo que queda no es
+construir, es mirar y decidir:
+
+- Recorrer las capturas de los cinco anchos y corregir lo que chirríe.
+- Cerrar las limitaciones abiertas de abajo, por orden de riesgo.
+- Preparar el despliegue controlado a staging (nada de esto se ha desplegado).
+
+### Limitaciones honestas que siguen abiertas
+
+- **WhatsApp sigue sobre transporte falso.** Es lo que separa esto de una beta
+  de verdad: nada ha salido nunca hacia Meta.
+- **No hay equipos.** El handoff asigna un usuario.
+- **El simulador no anima el recorrido sobre el lienzo.** Enseña la ruta paso a
+  paso en el panel y deja saltar de un paso a otro, pero no resalta el nodo en
+  el dibujo.
+- **La comparación de versiones es textual**, por listas de nodos y conexiones
+  añadidos, quitados y cambiados; no se dibujan las dos versiones lado a lado.
+- **Sin OpenAPI generado.** El contrato tipado existe en TypeScript y lo sirve
+  `GET /flowbots/catalog`, pero no hay `@nestjs/swagger` en el proyecto.
+- **`resumir` de IA devuelve vacío**: el puerto solo recibe el id de la
+  conversación.
+- **El rebinding de DNS no está cerrado del todo.**
+- **La accesibilidad está comprobada por lo básico** —nombres, etiquetas, foco
+  visible, sin desbordes— con un barrido automático; no ha pasado una auditoría
+  con lector de pantalla de verdad.
+
+### Referencia del bloque 7 (cierre de la API administrativa)
 
 **El constructor visual.** Todo lo que necesita ya existe y está probado:
 
