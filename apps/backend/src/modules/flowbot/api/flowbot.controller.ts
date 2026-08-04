@@ -81,6 +81,31 @@ export class FlowBotController {
     return construirCatalogo();
   }
 
+  /** Las plantillas oficiales. Ninguna se publica sola. */
+  @Get('templates')
+  plantillas() {
+    return this.admin.listarPlantillas();
+  }
+
+  @Roles('ADMIN', 'MANAGER', 'SUPER_ADMIN')
+  @Post('templates/:clave/use')
+  async usarPlantilla(
+    @Request() req: any,
+    @Param('clave') clave: string,
+    @Body() body: { nombre?: string },
+  ) {
+    const bot = await this.admin.crearDesdePlantilla(
+      req.user.companyId,
+      req.user.sub,
+      clave,
+      body?.nombre,
+    );
+    await this.auditar(req, 'flowbot.template.use', bot.id, {
+      plantilla: clave,
+    });
+    return bot;
+  }
+
   // ── bots ────────────────────────────────────────────────────
 
   @Get()

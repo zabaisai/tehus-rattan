@@ -11,6 +11,7 @@ import { compilar, grafoInicial } from '../graph/flowbot.compiler';
 import { GrafoFlow } from '../graph/flowbot.graph';
 import { sePuedePublicar, validarGrafo } from '../graph/flowbot.validator';
 import { FlowBotReferenciasService } from '../graph/flowbot.referencias.service';
+import { PLANTILLAS, plantillaPorClave } from './flowbot.templates';
 import {
   BotDetalleDto,
   BotResumenDto,
@@ -268,6 +269,59 @@ export class FlowBotAdminService {
     });
     if (count === 0) throw new NotFoundException('Bot no encontrado');
     return { renombrado: true };
+  }
+
+  /**
+   * Crea un bot A PARTIR DE UNA PLANTILLA.
+   *
+   * Nace DRAFT, como cualquier otro, y con los campos que la plantilla declara
+   * pendientes todavia vacios: el validador los rechazara al publicar y quien
+   * la eligio los vera en el editor. Rellenarlos por el con valores de ejemplo
+   * seria como acaba alguien mandandole a su cliente el catalogo de otro.
+   */
+  async crearDesdePlantilla(
+    companyId: string,
+    userId: string,
+    clave: string,
+    nombre?: string,
+  ) {
+    const plantilla = plantillaPorClave(clave);
+    if (!plantilla) throw new NotFoundException('Plantilla no encontrada');
+
+    const bot = await this.prisma.flowBot.create({
+      data: {
+        companyId,
+        name: nombre?.trim() || plantilla.nombre,
+        description: plantilla.descripcion,
+        status: 'DRAFT',
+        draftGraph: plantilla.graph as unknown as Prisma.InputJsonValue,
+        templateKey: plantilla.clave,
+        createdById: userId,
+        updatedById: userId,
+      },
+    });
+
+    return {
+      ...bot,
+      // Se devuelve lo que falta para que la interfaz lo pida de entrada en
+      // vez de dejar que el usuario lo descubra error a error al publicar.
+      camposPorCompletar: plantilla.camposPorCompletar,
+      requiere: plantilla.requiere,
+    };
+  }
+
+  /** El catalogo de plantillas. Son datos, no filas: no se siembran. */
+  listarPlantillas() {
+    return PLANTILLAS.map((p) => ({
+      clave: p.clave,
+      nombre: p.nombre,
+      descripcion: p.descripcion,
+      objetivo: p.objetivo,
+      categoria: p.categoria,
+      requiere: p.requiere,
+      camposPorCompletar: p.camposPorCompletar,
+      nodos: p.graph.nodes.length,
+    }));
   }
 
   // ── estados ─────────────────────────────────────────────────
