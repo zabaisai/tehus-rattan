@@ -1,4 +1,8 @@
-export type Role = "SUPER_ADMIN" | "ADMIN" | "AGENT";
+// MANAGER existe en el backend desde que FlowBot separó "diseña y publica
+// bots" de "administra la empresa": quien construye flujos no necesita las
+// credenciales de WhatsApp. Sin este valor aquí, un MANAGER real llega con un
+// rol que el tipo dice que no existe y cae en la rama de menos permisos.
+export type Role = "SUPER_ADMIN" | "ADMIN" | "MANAGER" | "AGENT";
 
 export interface User {
   id: string;

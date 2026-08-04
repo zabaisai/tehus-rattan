@@ -6,6 +6,7 @@ import {
   TipoNodo,
 } from '../graph/flowbot.graph';
 import { ejecutorDe } from '../engine/flowbot.executors';
+import { VARIABLES_SISTEMA } from '../graph/flowbot.variables';
 import { ProblemaGrafo } from '../graph/flowbot.validator';
 
 /**
@@ -47,6 +48,16 @@ export interface NodoCatalogoDto {
   ayuda: string;
   aceptaEntrada: boolean;
   puertos: PuertoDto[];
+  /**
+   * Si genera puertos a partir de su configuración: un menú de tres opciones
+   * tiene `opcion:0..2` además de los fijos.
+   *
+   * El editor lo NECESITA para dibujar las salidas. Sin esto tendría que
+   * saberse de memoria que `send.buttons` no sale por `next`, y esa es
+   * exactamente la clase de cosa que se olvida y deja conectar una rama que
+   * el motor nunca recorre.
+   */
+  puertosDinamicos?: 'opciones' | 'casos';
   config: CampoConfigDto[];
   esperaExterna: boolean;
   efectoExterno: boolean;
@@ -64,11 +75,39 @@ export interface NodoCatalogoDto {
   motivoNoDisponible?: string;
 }
 
+/**
+ * Una variable que se puede insertar en un texto.
+ *
+ * VA EN EL CATÁLOGO Y NO EN EL EDITOR por el mismo motivo que los nodos: la
+ * lista de variables del motor es CERRADA —es lo que permite al validador
+ * decir «esa variable no existe» antes de publicar en vez de mandarle la
+ * palabra `undefined` a un cliente—, así que una segunda lista escrita a mano
+ * en el frontend solo puede quedarse corta o inventar variables que el
+ * validador va a rechazar.
+ */
+export interface VariableDto {
+  /** La ruta tal cual se escribe dentro de `{{ }}`. */
+  ruta: string;
+  grupo: string;
+  etiqueta: string;
+  tipo: 'texto' | 'numero' | 'fecha' | 'identificador';
+  /** Un valor de ejemplo, claramente falso, para entender qué sale ahí. */
+  ejemplo: string;
+  /**
+   * `true` si el motor la pone siempre; `false` si depende de que antes se
+   * haya ejecutado el paso que la produce.
+   */
+  siempre: boolean;
+  /** Tipos de paso que la producen, cuando no está siempre. */
+  producidaPor?: string[];
+}
+
 export interface CatalogoDto {
   nodos: NodoCatalogoDto[];
   categorias: Array<{ id: CategoriaNodo; etiqueta: string }>;
   limites: typeof LIMITES;
   puertos: Record<string, string>;
+  variables: VariableDto[];
 }
 
 const ETIQUETAS_PUERTO: Record<string, string> = {
@@ -120,6 +159,9 @@ export function construirCatalogo(): CatalogoDto {
           id: p,
           etiqueta: ETIQUETAS_PUERTO[p] ?? p,
         })),
+        ...(def.puertosDinamicos
+          ? { puertosDinamicos: def.puertosDinamicos }
+          : {}),
         config: (def.config ?? []).map((c) => ({
           nombre: c.nombre,
           tipo: c.tipo,
@@ -146,7 +188,197 @@ export function construirCatalogo(): CatalogoDto {
     etiqueta: ETIQUETAS_CATEGORIA[id] ?? id,
   }));
 
-  return { nodos, categorias, limites: LIMITES, puertos: ETIQUETAS_PUERTO };
+  return {
+    nodos,
+    categorias,
+    limites: LIMITES,
+    puertos: ETIQUETAS_PUERTO,
+    variables: construirVariables(),
+  };
+}
+
+/**
+ * Descripción legible de cada variable.
+ *
+ * Solo METADATOS: la lista de qué variables existen sigue siendo
+ * `VARIABLES_SISTEMA` más lo que declare cada nodo en `produce`. Este mapa no
+ * puede añadir ninguna —lo que no esté en el motor no llega al editor— y una
+ * prueba comprueba que no falta ninguna, para que añadir una variable sin
+ * describirla se note al momento y no cuando alguien la vea en pantalla como
+ * `lead.value` a secas.
+ */
+const DESCRIPCIONES: Record<
+  string,
+  { grupo: string; etiqueta: string; tipo: VariableDto['tipo']; ejemplo: string }
+> = {
+  'contact.name': {
+    grupo: 'Contacto',
+    etiqueta: 'Nombre del contacto',
+    tipo: 'texto',
+    ejemplo: 'Ana Pérez',
+  },
+  'contact.phone': {
+    grupo: 'Contacto',
+    etiqueta: 'Teléfono',
+    tipo: 'texto',
+    ejemplo: '+57 300 000 0000',
+  },
+  'contact.email': {
+    grupo: 'Contacto',
+    etiqueta: 'Correo',
+    tipo: 'texto',
+    ejemplo: 'ana@ejemplo.com',
+  },
+  'contact.id': {
+    grupo: 'Contacto',
+    etiqueta: 'Identificador del contacto',
+    tipo: 'identificador',
+    ejemplo: 'cnt_ejemplo',
+  },
+  'company.name': {
+    grupo: 'Empresa',
+    etiqueta: 'Nombre de tu empresa',
+    tipo: 'texto',
+    ejemplo: 'Tu empresa',
+  },
+  'conversation.id': {
+    grupo: 'Conversación',
+    etiqueta: 'Identificador de la conversación',
+    tipo: 'identificador',
+    ejemplo: 'cnv_ejemplo',
+  },
+  'conversation.status': {
+    grupo: 'Conversación',
+    etiqueta: 'Estado de la conversación',
+    tipo: 'texto',
+    ejemplo: 'abierta',
+  },
+  'lead.id': {
+    grupo: 'Oportunidad',
+    etiqueta: 'Identificador de la oportunidad',
+    tipo: 'identificador',
+    ejemplo: 'opp_ejemplo',
+  },
+  'lead.title': {
+    grupo: 'Oportunidad',
+    etiqueta: 'Título de la oportunidad',
+    tipo: 'texto',
+    ejemplo: 'Cotización de ejemplo',
+  },
+  'lead.value': {
+    grupo: 'Oportunidad',
+    etiqueta: 'Valor',
+    tipo: 'numero',
+    ejemplo: '1500000',
+  },
+  'lead.stage': {
+    grupo: 'Oportunidad',
+    etiqueta: 'Etapa actual',
+    tipo: 'texto',
+    ejemplo: 'Nuevo lead',
+  },
+  'agent.id': {
+    grupo: 'Responsable',
+    etiqueta: 'Identificador del responsable',
+    tipo: 'identificador',
+    ejemplo: 'usr_ejemplo',
+  },
+  'agent.name': {
+    grupo: 'Responsable',
+    etiqueta: 'Nombre del responsable',
+    tipo: 'texto',
+    ejemplo: 'Camilo Ruiz',
+  },
+  'message.text': {
+    grupo: 'Mensaje',
+    etiqueta: 'Lo último que escribió el cliente',
+    tipo: 'texto',
+    ejemplo: 'Hola, quiero información',
+  },
+  'message.choice': {
+    grupo: 'Mensaje',
+    etiqueta: 'Opción que eligió',
+    tipo: 'texto',
+    ejemplo: 'Ver precios',
+  },
+  'task.id': {
+    grupo: 'Ejecución',
+    etiqueta: 'Identificador de la tarea creada',
+    tipo: 'identificador',
+    ejemplo: 'tsk_ejemplo',
+  },
+  'ai.intent': {
+    grupo: 'IA',
+    etiqueta: 'Intención detectada',
+    tipo: 'texto',
+    ejemplo: 'precio',
+  },
+  'ai.confidence': {
+    grupo: 'IA',
+    etiqueta: 'Confianza de la IA',
+    tipo: 'numero',
+    ejemplo: '0.82',
+  },
+  'ai.reply': {
+    grupo: 'IA',
+    etiqueta: 'Respuesta redactada por la IA',
+    tipo: 'texto',
+    ejemplo: 'Con gusto te cuento…',
+  },
+  'ai.summary': {
+    grupo: 'IA',
+    etiqueta: 'Resumen de la conversación',
+    tipo: 'texto',
+    ejemplo: 'El cliente pregunta por precios',
+  },
+  'now.date': {
+    grupo: 'Fecha y hora',
+    etiqueta: 'Fecha de hoy',
+    tipo: 'fecha',
+    ejemplo: '2026-08-04',
+  },
+  'now.time': {
+    grupo: 'Fecha y hora',
+    etiqueta: 'Hora actual',
+    tipo: 'fecha',
+    ejemplo: '14:35',
+  },
+};
+
+export function construirVariables(): VariableDto[] {
+  const siempre = new Set<string>(VARIABLES_SISTEMA);
+
+  // Qué paso produce cada variable, leído del propio catálogo. Sirve para
+  // avisar de que `ai.intent` no vale de nada si antes no hay un paso de IA.
+  const productores = new Map<string, string[]>();
+  for (const def of Object.values(CATALOGO) as DefinicionNodo[]) {
+    for (const ruta of def.produce ?? []) {
+      productores.set(ruta, [...(productores.get(ruta) ?? []), def.tipo]);
+    }
+  }
+
+  const rutas = [...new Set([...siempre, ...productores.keys()])].sort();
+
+  return rutas.map((ruta) => {
+    const d = DESCRIPCIONES[ruta] ?? {
+      grupo: 'Otras',
+      etiqueta: ruta,
+      tipo: 'texto' as const,
+      ejemplo: 'valor de ejemplo',
+    };
+    const produce = productores.get(ruta);
+    return {
+      ruta,
+      grupo: d.grupo,
+      etiqueta: d.etiqueta,
+      tipo: d.tipo,
+      ejemplo: d.ejemplo,
+      // «Siempre» significa que el motor la pone al arrancar. Que además la
+      // produzca un paso no la quita de ahí.
+      siempre: siempre.has(ruta),
+      ...(produce && !siempre.has(ruta) ? { producidaPor: produce } : {}),
+    };
+  });
 }
 
 // ── bots ────────────────────────────────────────────────────────

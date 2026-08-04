@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   X,
   Zap,
+  Workflow,
   Bot,
   Trash2,
   Database,
@@ -102,6 +103,11 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
         { href: '/dashboard/contacts', label: 'Contactos', icon: Users },
         { href: '/dashboard/pipeline', label: 'Pipeline', icon: KanbanSquare },
         { href: '/dashboard/conversations', label: 'Conversaciones', icon: MessageSquare },
+        // FlowBot lo ve TODO el mundo, no solo quien administra: un asesor
+        // necesita saber si el bot esta atendiendo a su cliente antes de
+        // escribirle encima. Crear, editar y publicar sí quedan restringidos,
+        // pero dentro de la pantalla.
+        { href: '/dashboard/flowbots', label: 'FlowBot', icon: Workflow },
         { href: '/dashboard/tasks', label: 'Tareas', icon: CheckSquare },
         { href: '/dashboard/products', label: 'Productos', icon: Package },
         { href: '/dashboard/quotes', label: 'Cotizaciones', icon: FileText },
