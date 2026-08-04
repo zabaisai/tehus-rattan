@@ -205,6 +205,25 @@ export class FlowBotRunnerService {
     }
 
     try {
+      // UN AVANCE SUELTO NO PUEDE MOVER LO QUE ESTA ESPERANDO.
+      //
+      // Si la ejecucion esta en WAITING_* y el trabajo no trae la espera que
+      // la desbloquea, no hay nada que hacer: el nodo que espera se volveria a
+      // ejecutar y REPETIRIA LA PREGUNTA AL CLIENTE. Solo consumir la espera
+      // —por mensaje o por vencimiento— o reanudar a mano pueden sacarla de
+      // ahi.
+      //
+      // Lo provoca cualquier evento de avance repetido: un reintento tardio,
+      // un reconciliador de una version anterior, o un duplicado del outbox.
+      if (
+        !opciones.waitId &&
+        (ejecucion.status === 'WAITING_INPUT' ||
+          ejecucion.status === 'WAITING_TIME')
+      ) {
+        await this.liberarLease(executionId, owner);
+        return { estado: 'omitido', motivo: 'esperando entrada' };
+      }
+
       const compilado = await compiladoDe(ejecucion.versionId);
       if (!compilado) {
         await this.marcarFallo(

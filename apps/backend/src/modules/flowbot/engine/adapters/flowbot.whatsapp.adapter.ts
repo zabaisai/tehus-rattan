@@ -347,14 +347,34 @@ export class WhatsappAdapter implements PuertoMensajeria {
 
     // 6.
     if (respuesta.ok) {
-      await this.prisma.message.updateMany({
-        where: { id: reservado.id },
-        data: {
-          status: 'SENT',
-          sentAt: new Date(),
-          wamid: respuesta.wamid ?? null,
-        },
-      });
+      // EL MENSAJE YA SALIÓ. A partir de aquí, nada de lo que pase escribiendo
+      // en la base puede convertirse en un error que el motor reintente:
+      // reintentar significaría mandárselo al cliente por segunda vez.
+      //
+      // `wamid` es único en la tabla. Si Meta devolviera uno repetido —o si un
+      // reenvío de otro camino ya lo hubiera guardado— la escritura chocaría.
+      // Se guarda entonces sin él: se pierde la trazabilidad de ese mensaje,
+      // que es infinitamente más barato que duplicarlo.
+      try {
+        await this.prisma.message.updateMany({
+          where: { id: reservado.id },
+          data: {
+            status: 'SENT',
+            sentAt: new Date(),
+            wamid: respuesta.wamid ?? null,
+          },
+        });
+      } catch {
+        this.logger.warn(
+          'No se pudo guardar el wamid; el mensaje queda enviado sin él',
+        );
+        await this.prisma.message
+          .updateMany({
+            where: { id: reservado.id },
+            data: { status: 'SENT', sentAt: new Date() },
+          })
+          .catch(() => undefined);
+      }
       return { wamid: respuesta.wamid };
     }
 

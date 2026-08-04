@@ -41,6 +41,12 @@ export interface FalloProgramado {
   veces?: number;
 }
 
+/**
+ * Sufijo único por proceso. Dos instancias del doble —o dos suites— no pueden
+ * generar el mismo identificador, igual que no lo harían dos números de Meta.
+ */
+const PROCESO = Math.random().toString(36).slice(2, 8);
+
 @Injectable()
 export class TransporteWhatsAppFalso implements TransporteWhatsApp {
   private readonly logger = new Logger(TransporteWhatsAppFalso.name);
@@ -56,11 +62,16 @@ export class TransporteWhatsAppFalso implements TransporteWhatsApp {
     this.restantes = fallo.veces ?? 1;
   }
 
+  /**
+   * Olvida lo enviado. NO reinicia el contador de identificadores: los wamid
+   * de Meta son únicos para siempre, no por sesión, y reiniciarlo hacía que
+   * dos pruebas seguidas intentaran guardar el mismo y chocaran contra el
+   * índice único de la tabla.
+   */
   limpiar(): void {
     this.enviados.length = 0;
     this.fallo = null;
     this.restantes = 0;
-    this.contador = 0;
   }
 
   /** Cuántos envíos de un tipo. Para aserciones legibles. */
@@ -102,7 +113,7 @@ export class TransporteWhatsAppFalso implements TransporteWhatsApp {
 
     // Con el prefijo `sim-`: si uno acabara donde no debe, se reconoce a
     // simple vista en vez de parecer un identificador legítimo de Meta.
-    return { ok: true, wamid: `sim-wamid-${this.contador}` };
+    return { ok: true, wamid: `sim-wamid-${PROCESO}-${this.contador}` };
   }
 }
 
