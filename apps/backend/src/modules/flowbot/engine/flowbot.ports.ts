@@ -132,6 +132,14 @@ export interface ContextoNodo {
   variables: Readonly<ContextoVariables>;
   /** Texto del mensaje que reanudó la ejecución, si la reanudó uno. */
   entrada?: string;
+  /**
+   * Zona horaria de la EMPRESA.
+   *
+   * Viaja en el contexto y no se consulta dentro de cada ejecutor porque el
+   * contexto es lo único que un ejecutor puede ver: darle Prisma para que
+   * mire la empresa le daría también acceso a las demás.
+   */
+  zonaHoraria: string;
   /** Nº de paso dentro de la ejecución. Para la clave de idempotencia. */
   paso: number;
   /** Intento actual de ESTE nodo. */

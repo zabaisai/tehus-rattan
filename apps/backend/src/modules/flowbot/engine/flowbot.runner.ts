@@ -268,6 +268,7 @@ export class FlowBotRunnerService {
           currentNodeId: ejecucion.currentNodeId,
           variables: (ejecucion.variables ?? {}) as ContextoVariables,
           steps: ejecucion.steps,
+          zonaHoraria: ejecucion.company?.timezone,
           entrada: opciones.entrada,
           porTimeout,
           intento: opciones.intento,
@@ -340,6 +341,10 @@ export class FlowBotRunnerService {
         steps: true,
         correlationId: true,
         status: true,
+        // La zona viaja con la ejecución para que el intérprete no tenga que
+        // consultarla: un ejecutor no puede ver Prisma, y darle acceso para
+        // esto se lo daría también a lo demás.
+        company: { select: { timezone: true } },
       },
     });
   }

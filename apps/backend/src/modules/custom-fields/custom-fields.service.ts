@@ -475,6 +475,118 @@ export class CustomFieldsService {
     }
   }
 
+  // ── retención del historial ─────────────────────────────────
+
+  /**
+   * Cuánto se conserva el historial de cambios, en días.
+   *
+   * EXISTE PORQUE EL HISTORIAL CRECE SIN LÍMITE. Un bot que escribe un campo
+   * en cada mensaje deja una fila por cambio; con cien conversaciones al día
+   * y tres campos, son cien mil filas al año por empresa. Sin retención, la
+   * tabla acaba pesando más que los datos que explica.
+   *
+   * NOVENTA DÍAS por defecto: cubre el trimestre de una reclamación, que es
+   * el plazo en que alguien pregunta «¿por qué cambió esto?».
+   *
+   * Se lee del entorno para que un despliegue con obligaciones distintas
+   * —retención legal más larga— pueda subirlo sin tocar código. `0` lo
+   * desactiva: quien necesite conservarlo todo puede hacerlo explícitamente.
+   */
+  private diasDeRetencion(): number {
+    const bruto = Number(process.env.CUSTOM_FIELD_HISTORY_DAYS ?? 90);
+    if (!Number.isFinite(bruto) || bruto < 0) return 90;
+    return Math.floor(bruto);
+  }
+
+  /**
+   * Compacta el historial viejo.
+   *
+   * NO BORRA A CIEGAS. De cada (entidad, campo) conserva SIEMPRE el cambio más
+   * reciente aunque esté fuera del plazo: sin él, un campo que se escribió una
+   * vez hace un año perdería toda explicación de por qué tiene ese valor, que
+   * es justo la pregunta que el historial existe para responder.
+   *
+   * ACOTADO por lote. Un primer barrido sobre una tabla que lleva años sin
+   * limpiarse borraría millones de filas en una transacción y bloquearía la
+   * tabla; a lotes tarda más y no interrumpe a nadie.
+   */
+  async compactarHistorial(
+    companyId: string,
+    opciones: { lote?: number; ahora?: Date } = {},
+  ): Promise<{ borrados: number; conservadosPorSerLosUltimos: number }> {
+    const dias = this.diasDeRetencion();
+    if (dias === 0) {
+      return { borrados: 0, conservadosPorSerLosUltimos: 0 };
+    }
+
+    const lote = Math.min(opciones.lote ?? 1000, 5000);
+    const corte = new Date(
+      (opciones.ahora ?? new Date()).getTime() - dias * 24 * 60 * 60_000,
+    );
+
+    const viejos = await this.prisma.customFieldValueChange.findMany({
+      where: { companyId, createdAt: { lt: corte } },
+      orderBy: { createdAt: 'asc' },
+      take: lote,
+      select: {
+        id: true,
+        definitionId: true,
+        entityId: true,
+        createdAt: true,
+      },
+    });
+    if (viejos.length === 0) {
+      return { borrados: 0, conservadosPorSerLosUltimos: 0 };
+    }
+
+    // El último de cada (entidad, campo) se salva, mire lo que mire el plazo.
+    const ultimos = new Map<string, { id: string; createdAt: Date }>();
+    for (const v of viejos) {
+      const clave = `${v.definitionId}:${v.entityId}`;
+      const actual = ultimos.get(clave);
+      if (!actual || v.createdAt > actual.createdAt) {
+        ultimos.set(clave, { id: v.id, createdAt: v.createdAt });
+      }
+    }
+
+    // …salvo que exista uno MÁS reciente fuera del lote, en cuyo caso el de
+    // aquí ya no es el último y sí se puede borrar.
+    const intocables = new Set<string>();
+    for (const [clave, candidato] of ultimos) {
+      const [definitionId, entityId] = clave.split(':');
+      const hayMasReciente = await this.prisma.customFieldValueChange.findFirst(
+        {
+          where: {
+            companyId,
+            definitionId,
+            entityId,
+            createdAt: { gt: candidato.createdAt },
+          },
+          select: { id: true },
+        },
+      );
+      if (!hayMasReciente) intocables.add(candidato.id);
+    }
+
+    const aBorrar = viejos.map((v) => v.id).filter((id) => !intocables.has(id));
+
+    if (aBorrar.length === 0) {
+      return {
+        borrados: 0,
+        conservadosPorSerLosUltimos: intocables.size,
+      };
+    }
+
+    const { count } = await this.prisma.customFieldValueChange.deleteMany({
+      where: { companyId, id: { in: aBorrar } },
+    });
+
+    this.logger.log(
+      `Historial de campos compactado: ${count} borrados, ${intocables.size} conservados por ser los últimos [empresa=${companyId}]`,
+    );
+    return { borrados: count, conservadosPorSerLosUltimos: intocables.size };
+  }
+
   /** Historial de un campo o de una entidad. Para el panel y para soporte. */
   async historial(
     companyId: string,

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PlatformModule } from '../platform/platform.module';
 import { CustomFieldsController } from './custom-fields.controller';
 import { CustomFieldsService } from './custom-fields.service';
+import { CustomFieldsRetentionService } from './custom-fields.retention';
 
 /**
  * Campos personalizados.
@@ -15,7 +16,7 @@ import { CustomFieldsService } from './custom-fields.service';
 @Module({
   imports: [PlatformModule],
   controllers: [CustomFieldsController],
-  providers: [CustomFieldsService],
-  exports: [CustomFieldsService],
+  providers: [CustomFieldsService, CustomFieldsRetentionService],
+  exports: [CustomFieldsService, CustomFieldsRetentionService],
 })
 export class CustomFieldsModule {}

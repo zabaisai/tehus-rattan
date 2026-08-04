@@ -124,6 +124,7 @@ export type TipoNodo =
   | 'control.switch'
   | 'control.wait_duration'
   | 'control.wait_until'
+  | 'control.business_hours'
   | 'control.random'
   | 'control.jump'
   | 'control.end'
@@ -547,6 +548,27 @@ export const CATALOGO: Record<TipoNodo, DefinicionNodo> = {
     puertos: [PUERTO.SALIDA],
     config: [texto('until')],
     esperaExterna: true,
+    efectoExterno: false,
+  },
+  'control.business_hours': {
+    tipo: 'control.business_hours',
+    categoria: 'control',
+    etiqueta: 'Horario comercial',
+    ayuda:
+      'Se bifurca segun si estamos dentro del horario de la empresa. La hora ' +
+      'se mide en la zona horaria de la empresa, nunca en la del servidor.',
+    aceptaEntrada: true,
+    // Tres salidas: dentro, fuera, y la de esperar a que abra. Sin la
+    // tercera, el autor solo podria disculparse; con ella puede atender al
+    // cliente a primera hora sin que nadie se acuerde de volver.
+    puertos: [PUERTO.VERDADERO, PUERTO.FALSO, PUERTO.TIMEOUT],
+    config: [
+      { nombre: 'fromHour', tipo: 'numero', obligatorio: true },
+      { nombre: 'toHour', tipo: 'numero', obligatorio: true },
+      { nombre: 'days', tipo: 'lista', obligatorio: false },
+      { nombre: 'waitUntilOpen', tipo: 'booleano', obligatorio: false },
+    ],
+    esperaExterna: false,
     efectoExterno: false,
   },
   'control.random': {

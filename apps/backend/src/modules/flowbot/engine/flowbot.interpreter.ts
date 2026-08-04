@@ -1,3 +1,4 @@
+import { zonaSegura } from '../../../common/time/zona-horaria';
 import { GrafoCompilado, NodoCompilado } from '../graph/flowbot.compiler';
 import { LIMITES } from '../graph/flowbot.graph';
 import {
@@ -66,6 +67,8 @@ export interface EstadoInicial {
   variables: ContextoVariables;
   /** Pasos ya consumidos por esta ejecución. */
   steps: number;
+  /** Zona horaria de la empresa. Sin ella se usa la del producto. */
+  zonaHoraria?: string;
   /** Texto que reanuda una espera de entrada, si la reanuda uno. */
   entrada?: string;
   /** Reanudación por vencimiento: se sale por el puerto de timeout. */
@@ -239,6 +242,7 @@ export async function avanzar(
       config,
       variables,
       entrada,
+      zonaHoraria: zonaSegura(inicial.zonaHoraria),
       paso: steps,
       intento,
       efectos,

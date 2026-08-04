@@ -1,4 +1,9 @@
 import { createHash } from 'crypto';
+import {
+  dentroDeHorario as dentroDeHorarioEnZona,
+  instanteLocal,
+  proximaApertura,
+} from '../../../common/time/zona-horaria';
 import { PUERTO, TipoNodo } from '../graph/flowbot.graph';
 import {
   esOperador,
@@ -340,14 +345,55 @@ const esperarDuracion: EjecutorNodo = async (ctx) => {
   });
 };
 
+/**
+ * Espera hasta una fecha y hora.
+ *
+ * LA FECHA SE INTERPRETA EN LA ZONA DE LA EMPRESA. «2026-08-10 14:00»
+ * significa las dos de la tarde donde esta el negocio, no en UTC. Sin esto,
+ * un recordatorio configurado para las 9 de la manana llegaba a las 4 de la
+ * madrugada — y en local nunca se veia, porque el desarrollador y el servidor
+ * comparten zona.
+ */
 const esperarHasta: EjecutorNodo = async (ctx) => {
   const cuando = texto(ctx.config.until);
-  const t = Date.parse(cuando);
-  if (!Number.isFinite(t)) return fallo('fecha-invalida', 'configuracion');
-  const wakeAt = new Date(t);
+  const wakeAt = instanteLocal(cuando, ctx.zonaHoraria);
+  if (!wakeAt) return fallo('fecha-invalida', 'configuracion');
   // Una fecha ya pasada no es un error: el flujo simplemente sigue.
   if (wakeAt <= ctx.efectos.reloj.ahora()) return continuar(PUERTO.SALIDA);
   return esperar({ kind: 'TIME', wakeAt });
+};
+
+/**
+ * Horario comercial de la empresa.
+ *
+ * Tres salidas y no dos. `si` y `no` son las obvias; la tercera —esperar a
+ * que abra— es la que convierte un «estamos cerrados» en «te atendemos a
+ * primera hora», y sin ella el autor del flujo solo puede disculparse.
+ *
+ * Una configuracion ilegible NO cierra el negocio: sale por `si`. Un horario
+ * con una errata no puede dejar a una empresa sin bot en silencio.
+ */
+const horarioComercial: EjecutorNodo = async (ctx) => {
+  const spec = {
+    fromHour: ctx.config.fromHour,
+    toHour: ctx.config.toHour,
+    days: ctx.config.days,
+  };
+  const ahora = ctx.efectos.reloj.ahora();
+  const dentro = dentroDeHorarioEnZona(ahora, ctx.zonaHoraria, spec);
+
+  if (dentro === null) {
+    return continuar(PUERTO.VERDADERO, undefined, { horarioIlegible: true });
+  }
+  if (dentro) return continuar(PUERTO.VERDADERO);
+
+  if (ctx.config.waitUntilOpen === true) {
+    const abre = proximaApertura(ahora, ctx.zonaHoraria, spec);
+    // Si nunca abre —dias imposibles— se sale por `no` en vez de dormir para
+    // siempre esperando un instante que no va a llegar.
+    if (abre) return esperar({ kind: 'TIME', wakeAt: abre });
+  }
+  return continuar(PUERTO.FALSO);
 };
 
 /**
@@ -603,6 +649,7 @@ export const EJECUTORES: Partial<Record<TipoNodo, EjecutorNodo>> = {
   'control.switch': ramas,
   'control.wait_duration': esperarDuracion,
   'control.wait_until': esperarHasta,
+  'control.business_hours': horarioComercial,
   'control.random': reparto,
   'control.jump': saltar,
   'control.end': fin,

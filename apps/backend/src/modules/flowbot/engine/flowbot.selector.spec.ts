@@ -31,7 +31,14 @@ describe('FlowBotSelectorService', () => {
   });
 
   beforeEach(() => {
-    prisma = { flowBotTrigger: { findMany: jest.fn().mockResolvedValue([]) } };
+    prisma = {
+      flowBotTrigger: { findMany: jest.fn().mockResolvedValue([]) },
+      // Solo se consulta cuando algún disparador declara horario: la zona de
+      // la empresa manda, no la del servidor.
+      company: {
+        findUnique: jest.fn().mockResolvedValue({ timezone: 'America/Bogota' }),
+      },
+    };
     selector = new FlowBotSelectorService(prisma);
   });
 

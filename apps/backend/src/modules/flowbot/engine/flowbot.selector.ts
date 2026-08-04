@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  ZONA_POR_DEFECTO,
+  dentroDeHorario as dentroDeHorarioEnZona,
+} from '../../../common/time/zona-horaria';
 
 /**
  * Elige qué bot atiende un evento.
@@ -41,6 +45,13 @@ export interface EventoEntrante {
   etiqueta?: string | null;
   /** ¿Es la primera conversación de este contacto? */
   esPrimeraConversacion?: boolean;
+  /**
+   * Zona de la empresa. Si no llega, la resuelve el selector consultándola.
+   *
+   * Se admite por parámetro para que el simulador pueda probar «¿qué pasaría
+   * un domingo a las 3 de la mañana?» sin tocar la configuración real.
+   */
+  zonaHoraria?: string;
 }
 
 export interface Candidato {
@@ -122,6 +133,15 @@ export class FlowBotSelectorService {
     const elegidos: Candidato[] = [];
     const descartados: Descartado[] = [];
 
+    // La zona de la EMPRESA, no la del servidor: un horario «de 8 a 18»
+    // configurado en Bogotá tiene que respetarse aunque el contenedor corra
+    // en UTC, que es lo habitual.
+    //
+    // SE RESUELVE PEREZOSAMENTE. Casi ningún disparador declara horario, y
+    // consultar la empresa en cada mensaje entrante para no usarla nunca es
+    // una consulta por mensaje regalada.
+    const zona = await this.zonaDeLaEmpresa(evento, disparadores, tx);
+
     for (const t of disparadores) {
       const bot = t.flowBot;
       if (!bot.publishedVersionId) {
@@ -133,7 +153,7 @@ export class FlowBotSelectorService {
         continue;
       }
 
-      const motivo = this.noPasaFiltros(t.filters, evento);
+      const motivo = this.noPasaFiltros(t.filters, evento, zona);
       if (motivo) {
         descartados.push({ flowBotId: bot.id, nombre: bot.name, motivo });
         continue;
@@ -165,6 +185,33 @@ export class FlowBotSelectorService {
   }
 
   /**
+   * La zona de la empresa, solo si de verdad hace falta.
+   *
+   * Si el evento la trae —el simulador la fija para preguntar «¿qué pasaría
+   * un domingo?»— se usa esa. Si ningún disparador declara horario, no se
+   * consulta nada: el valor no se llegaría a mirar.
+   */
+  private async zonaDeLaEmpresa(
+    evento: EventoEntrante,
+    disparadores: Array<{ filters: unknown }>,
+    tx: Prisma.TransactionClient | PrismaService,
+  ): Promise<string> {
+    if (evento.zonaHoraria) return evento.zonaHoraria;
+
+    const alguienTieneHorario = disparadores.some((d) => {
+      const f = d.filters;
+      return Boolean(f && typeof f === 'object' && 'businessHours' in f);
+    });
+    if (!alguienTieneHorario) return ZONA_POR_DEFECTO;
+
+    const empresa = await tx.company.findUnique({
+      where: { id: evento.companyId },
+      select: { timezone: true },
+    });
+    return empresa?.timezone ?? ZONA_POR_DEFECTO;
+  }
+
+  /**
    * Filtros del disparador. Devuelve el motivo del descarte, o `null` si pasa.
    *
    * Los filtros son datos, no código: cada clave tiene una comprobación
@@ -174,6 +221,7 @@ export class FlowBotSelectorService {
   private noPasaFiltros(
     filters: unknown,
     evento: EventoEntrante,
+    zona: string,
   ): string | null {
     if (!filters || typeof filters !== 'object') return null;
     const f = filters as Record<string, unknown>;
@@ -208,35 +256,13 @@ export class FlowBotSelectorService {
     // Horario comercial. Se compara en la zona horaria indicada; sin ella se
     // usa la del servidor, que en staging y producción es la de Colombia.
     if (f.businessHours && typeof f.businessHours === 'object') {
-      const dentro = this.dentroDeHorario(
-        f.businessHours as Record<string, unknown>,
-      );
+      const dentro = dentroDeHorarioEnZona(new Date(), zona, f.businessHours);
+      // `null` = configuración ilegible. NO descarta: un horario con una
+      // errata no puede silenciar un bot sin que nadie se entere.
       if (dentro === false) return 'fuera del horario configurado';
     }
 
     return null;
-  }
-
-  /** `null` si el horario está mal configurado: no descarta por una errata. */
-  private dentroDeHorario(spec: Record<string, unknown>): boolean | null {
-    const desde = Number(spec.fromHour);
-    const hasta = Number(spec.toHour);
-    if (!Number.isFinite(desde) || !Number.isFinite(hasta)) return null;
-
-    const ahora = new Date();
-    const hora = ahora.getHours();
-
-    // Un rango que cruza la medianoche (22 a 6) no es un error de datos.
-    const dentroDeRango =
-      desde <= hasta
-        ? hora >= desde && hora < hasta
-        : hora >= desde || hora < hasta;
-
-    if (Array.isArray(spec.days) && spec.days.length > 0) {
-      const dia = ahora.getDay();
-      if (!spec.days.map(Number).includes(dia)) return false;
-    }
-    return dentroDeRango;
   }
 }
 
