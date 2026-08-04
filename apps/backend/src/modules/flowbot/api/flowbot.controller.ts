@@ -13,10 +13,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { FlowBotStatus, FlowBotTriggerType, Prisma } from '@prisma/client';
+import { FlowBotStatus, FlowBotTriggerType } from '@prisma/client';
 import { BusinessTenantGuard } from '../../../common/guards/business-tenant.guard';
 import { RolesGuard } from '../../../common/guards/roles.guard';
 import { Roles } from '../../../common/decorators/roles.decorator';
+import { FlowBotSupportGuard } from './flowbot-support.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PlatformAuditLogService } from '../../platform/platform-audit-log.service';
 import { FlowBotAdminService } from './flowbot.admin.service';
@@ -54,7 +55,20 @@ import {
  * Si viniera del cliente, cambiarlo sería todo lo que haría falta para
  * administrar los bots de otra empresa.
  */
-@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
+// EL ORDEN IMPORTA, y no es el obvio. `FlowBotSupportGuard` va DESPUES de la
+// autenticacion —necesita el `req.user` resuelto para saber si es plataforma—
+// pero ANTES de `BusinessTenantGuard`: un `SUPER_ADMIN` de plataforma llega sin
+// `companyId`, asi que el guarda de empresa lo rechazaria antes de que nadie
+// mirara si tiene sesion de soporte, y el 403 diria «necesitas una empresa» en
+// vez de «necesitas una sesion de soporte». Puesto aqui, la sesion FIJA la
+// empresa y `BusinessTenantGuard` la comprueba como la de cualquier otro: sigue
+// sin existir una ruta que no pase por el filtro de empresa.
+@UseGuards(
+  AuthGuard('jwt'),
+  FlowBotSupportGuard,
+  BusinessTenantGuard,
+  RolesGuard,
+)
 @Controller('flowbots')
 export class FlowBotController {
   constructor(
@@ -592,13 +606,22 @@ export class FlowBotController {
     return Number.isNaN(d.getTime()) ? undefined : d;
   }
 
-  /** Auditoría best-effort: nunca hace fallar la operación que registra. */
+  /**
+   * Auditoría best-effort: nunca hace fallar la operación que registra.
+   *
+   * CUANDO ACTÚA PLATAFORMA SE DICE. `affectedCompanyId` es la empresa
+   * soportada y el motivo de la sesión viaja en los metadatos: un registro que
+   * dijera solo "ADMIN de la empresa X publicó" escondería que fue soporte
+   * quien lo hizo, y esa es justo la pregunta que se hace después.
+   */
   private async auditar(
     req: any,
     accion: string,
     entityId: string,
     metadata?: Record<string, unknown>,
   ): Promise<void> {
+    const soporte = req.user.soporte;
+
     await this.auditoria
       .record(this.prisma, {
         actorUserId: req.user.sub,
@@ -607,7 +630,17 @@ export class FlowBotController {
         action: accion,
         entityType: 'FlowBot',
         entityId,
-        metadata: (metadata ?? {}) as Prisma.InputJsonValue,
+        ...(soporte ? { reason: soporte.motivo } : {}),
+        metadata: {
+          ...(metadata ?? {}),
+          ...(soporte
+            ? {
+                viaSoporte: true,
+                supportSessionId: soporte.sessionId,
+                empresaSoportada: soporte.empresa,
+              }
+            : {}),
+        },
       })
       .catch(() => undefined);
   }

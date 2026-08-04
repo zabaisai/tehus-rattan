@@ -404,6 +404,7 @@ describe('transporte y recuperación durable de FlowBot (e2e, base real)', () =>
       cola.limpiar();
       cola.caida = true;
 
+      const antes = Date.now();
       await dispatcher.despachar();
 
       const evento = await prisma.outboxEvent.findFirst({
@@ -412,7 +413,13 @@ describe('transporte y recuperación durable de FlowBot (e2e, base real)', () =>
       // Marcar antes de publicar habría perdido este avance para siempre.
       expect(evento?.status).toBe('PENDING');
       expect(evento?.attempts).toBe(1);
-      expect(evento!.availableAt.getTime()).toBeGreaterThan(Date.now());
+      // El backoff se compara con el instante del despacho, NO con «ahora»:
+      // la espera del primer intento es de 2 s y la suite entera tarda más que
+      // eso en llegar a esta línea, así que medirlo contra el reloj actual
+      // hacía fallar la prueba en la máquina lenta y pasar en la rápida.
+      expect(evento!.availableAt.getTime() - antes).toBeGreaterThanOrEqual(
+        1_500,
+      );
     });
 
     it('3. el evento reprogramado se publica cuando la cola vuelve', async () => {

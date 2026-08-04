@@ -8,6 +8,7 @@ import { RegistroProveedoresIa } from './engine/adapters/flowbot.ia.provider';
 import { FlowBotReferenciasService } from './graph/flowbot.referencias.service';
 import { PlatformModule } from '../platform/platform.module';
 import { FlowBotController } from './api/flowbot.controller';
+import { FlowBotSupportGuard } from './api/flowbot-support.guard';
 import { FlowBotAdminService } from './api/flowbot.admin.service';
 import { FlowBotTriggersService } from './api/flowbot.triggers.service';
 import { FlowBotExecutionsService } from './api/flowbot.executions.service';
@@ -52,6 +53,7 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
+    FlowBotSupportGuard,
     FlowBotAdminService,
     FlowBotTriggersService,
     FlowBotExecutionsService,
@@ -73,6 +75,7 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
+    FlowBotSupportGuard,
     FlowBotAdminService,
     FlowBotTriggersService,
     FlowBotExecutionsService,
