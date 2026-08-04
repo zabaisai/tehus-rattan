@@ -46,6 +46,15 @@ export interface ReferenciasEmpresa {
   credentialIds: Set<string>;
   /** ¿Hay proveedor de IA configurado? */
   iaConfigurada: boolean;
+  /**
+   * ¿Están las llamadas HTTP encendidas Y con destinos declarados?
+   *
+   * Las dos cosas, no una: encenderlas sin lista de destinos las deja
+   * igualmente inservibles, porque una lista vacía no significa «todos». Un
+   * flujo que se publica creyendo que llamará a un servicio y luego falla en
+   * mitad de una conversación es peor que no dejarlo publicar.
+   */
+  httpConfigurado: boolean;
 }
 
 export function referenciasVacias(): ReferenciasEmpresa {
@@ -57,6 +66,7 @@ export function referenciasVacias(): ReferenciasEmpresa {
     whatsappIntegrationIds: new Set(),
     credentialIds: new Set(),
     iaConfigurada: false,
+    httpConfigurado: false,
   };
 }
 
@@ -370,14 +380,28 @@ export function validarGrafo(
   // ── variables ───────────────────────────────────────────────
   problemas.push(...validarVariables(nodos, porId));
 
-  // ── IA sin proveedor ────────────────────────────────────────
-  if (referencias && !referencias.iaConfigurada) {
+  // ── nodos que necesitan configuración que no está ───────────
+  //
+  // NO SE PUBLICA UN FLUJO QUE VA A FALLAR. Un paso que necesita algo que la
+  // empresa no ha configurado no falla al publicarlo: falla a mitad de una
+  // conversación con un cliente real, que es el peor sitio y el peor momento.
+  // Verlo en el editor es la única forma de que alguien lo arregle antes.
+  if (referencias) {
     for (const nodo of porId.values()) {
-      if (CATALOGO[nodo.type].requiereIA) {
+      if (CATALOGO[nodo.type].requiereIA && !referencias.iaConfigurada) {
         problemas.push(
           err(
             'nodo.ia_sin_proveedor',
             `"${etiqueta(nodo)}" usa inteligencia artificial y no hay proveedor configurado. Configúralo en Ajustes o sustituye el paso.`,
+            { nodeId: nodo.id },
+          ),
+        );
+      }
+      if (nodo.type === 'integration.http' && !referencias.httpConfigurado) {
+        problemas.push(
+          err(
+            'nodo.http_sin_configurar',
+            `"${etiqueta(nodo)}" hace una llamada HTTP y las integraciones no están activas o no tienen destinos permitidos. Configúralo en Ajustes.`,
             { nodeId: nodo.id },
           ),
         );

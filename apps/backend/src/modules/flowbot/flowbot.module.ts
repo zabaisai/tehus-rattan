@@ -5,6 +5,7 @@ import { ConversationsModule } from '../conversations/conversations.module';
 import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-integration.module';
 import { TransporteWhatsAppFalso } from './engine/adapters/flowbot.whatsapp.fake-transport';
 import { RegistroProveedoresIa } from './engine/adapters/flowbot.ia.provider';
+import { FlowBotReferenciasService } from './graph/flowbot.referencias.service';
 import { ProveedorIaFalso } from './engine/adapters/flowbot.ia.fake-provider';
 import { FlowBotQueueService } from './engine/flowbot.queue';
 import { FlowBotSelectorService } from './engine/flowbot.selector';
@@ -42,6 +43,7 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     TransporteWhatsAppFalso,
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
+    FlowBotReferenciasService,
     FlowBotQueueService,
     FlowBotSelectorService,
     FlowBotRunnerService,
@@ -57,6 +59,7 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     TransporteWhatsAppFalso,
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
+    FlowBotReferenciasService,
     FlowBotQueueService,
     FlowBotSelectorService,
     FlowBotRunnerService,
@@ -66,6 +69,7 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     FlowBotReconcilerService,
     TransporteWhatsAppFalso,
     ProveedorIaFalso,
+    FlowBotReferenciasService,
   ],
 })
 export class FlowBotModule {}

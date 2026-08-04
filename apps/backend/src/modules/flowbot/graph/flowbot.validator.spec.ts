@@ -612,4 +612,52 @@ describe('compilador', () => {
     // correcto — un bot recien creado no deberia poder activarse.
     expect(sePuedePublicar(validarGrafo(g))).toBe(false);
   });
+
+  describe('nodos que necesitan configuración que la empresa no tiene', () => {
+    const conHttp = (): GrafoFlow => ({
+      schemaVersion: 1,
+      startNodeId: 'inicio',
+      nodes: [
+        nodo('inicio', 'trigger.inbound_message'),
+        nodo('llamada', 'integration.http', {
+          url: 'https://api.ejemplo.com/x',
+          method: 'GET',
+        }),
+        nodo('fin', 'control.end'),
+      ],
+      edges: [con('inicio', 'next', 'llamada'), con('llamada', 'next', 'fin')],
+    });
+
+    it('un nodo HTTP no se publica si las integraciones están apagadas', () => {
+      // No se publica un flujo que VA a fallar. Un paso sin configurar no
+      // falla al publicarlo: falla a mitad de una conversación con un cliente
+      // real, que es el peor sitio y el peor momento.
+      const problemas = validarGrafo(conHttp(), {
+        ...referenciasVacias(),
+        httpConfigurado: false,
+      });
+      expect(
+        problemas.some((p) => p.codigo === 'nodo.http_sin_configurar'),
+      ).toBe(true);
+      expect(sePuedePublicar(problemas)).toBe(false);
+    });
+
+    it('con las integraciones configuradas sí se publica', () => {
+      const problemas = validarGrafo(conHttp(), {
+        ...referenciasVacias(),
+        httpConfigurado: true,
+      });
+      expect(
+        problemas.some((p) => p.codigo === 'nodo.http_sin_configurar'),
+      ).toBe(false);
+    });
+
+    it('sin referencias no se bloquea: es una validación de forma', () => {
+      // El editor valida la forma antes de saber de qué empresa es el flujo.
+      const problemas = validarGrafo(conHttp());
+      expect(
+        problemas.some((p) => p.codigo === 'nodo.http_sin_configurar'),
+      ).toBe(false);
+    });
+  });
 });
