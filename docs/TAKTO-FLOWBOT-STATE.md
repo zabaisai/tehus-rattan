@@ -581,23 +581,221 @@ build limpio, demostración autónoma completa.
 
 ---
 
+## Bloque 5 (cerrado) — La vertical completa del backend
+
+Existe una vertical funcional y demostrada:
+
+```
+mensaje entrante por el webhook real → contacto → conversación →
+oportunidad en la etapa isInitial → selección del bot → ejecución durable →
+respuesta de WhatsApp simulada → espera → segundo mensaje → reanudación →
+campos personalizados → tarea → handoff humano → reanudación manual
+```
+
+### Campos personalizados reales
+
+Se cierra la limitación anotada: `crm.contact_field` ya no guarda
+`campo:valor` como etiqueta.
+
+`CustomFieldDefinition` por empresa y entidad (`CONTACT` o `LEAD`), con los
+doce tipos, opciones, validación, orden, activo y requerido.
+
+- **La clave es `key`, no la etiqueta.** Renombrar «Cédula» a «Documento» no
+  puede romper los flujos que escriben ahí. Es inmutable, y la base lo obliga
+  con un CHECK `^[a-z][a-z0-9_]{0,62}$`: sin él, «Estado Credito» y «estado
+  credito» convivirían como campos distintos.
+- **El tipo también es inmutable.** Los valores ya están en la columna que les
+  corresponde; pasar `TEXT` a `NUMBER` dejaría los datos existentes en
+  `valueText` y las lecturas nuevas mirando `valueNumber`, así que el campo
+  parecería vacío para todos los clientes anteriores.
+- **Columnas tipadas, no un JSON opaco.** Con JSON, `"12"` y `12` conviven,
+  ordenar por número ordena alfabéticamente y filtrar por rango de fechas
+  exige castear en cada consulta. `Decimal` y no `Float` para `NUMBER` y
+  `CURRENCY`.
+- **Un CHECK** garantiza que un valor cuelga de UN contacto o de UNA
+  oportunidad, nunca de ambos ni de ninguno: en PostgreSQL los NULL no chocan
+  en un índice único, así que sin él una fila huérfana quedaría invisible.
+- **Desactivar no borra.** Los valores son datos del cliente.
+- **Historial propio**, no `AuditLog`: ese exige un rol de actor y registra lo
+  que hace una PERSONA. Un bot no tiene rol. Solo se anota cuando el valor
+  cambia de verdad — un bot que reescribe lo mismo llenaría el historial de
+  ruido. **Necesita política de retención** antes de que el volumen importe.
+- **Un solo camino de escritura**: el nodo y la API usan el mismo servicio,
+  así que un bot no puede guardar lo que un formulario rechazaría. Y no se
+  crea la definición sobre la marcha: un campo que aparece porque un bot lo
+  mencionó llena el CRM de columnas fantasma con erratas por nombre.
+
+Dos nodos nuevos: `crm.lead_field` —un dato del negocio pertenece a la
+oportunidad; en el contacto se arrastraría a la siguiente venta, donde ya no
+es cierto— y `crm.contact_archive`.
+
+Validación compartida en `custom-fields.types.ts`: `dd/mm/aaaa` leído como
+Colombia y no como Estados Unidos, `31/02` rechazada en vez de convertida en
+3 de marzo, `javascript:` rechazada en una URL que el asesor va a abrir, y un
+objeto rechazado en vez de guardado como `[object Object]`.
+
+### Archivado seguro
+
+`Contact.archivedAt` + `archivedReason`. Se marca, nunca se borra:
+conversaciones, oportunidades e historial se conservan. Distinto de
+`isBlocked`, que es una decisión sobre la relación; archivar es «ya no está
+activo». `reactivateArchived` **por fin se aplica** — se leía desde el bloque
+4 y no hacía nada porque no había estado que mirar.
+
+### Handoff persistente
+
+`ConversationHandoff` con `ACTIVE`/`RESOLVED`/`CANCELLED`. Existe como tabla y
+no como bandera porque `isPaused` no responde ninguna de las preguntas que
+importan: quién atiende, por qué, qué bot y qué nodo lo decidieron, cuándo, y
+si ya se resolvió.
+
+`RESOLVED` y `CANCELLED` se distinguen a propósito: medir «cuántas entregas se
+quedaron sin respuesta» es imposible si son lo mismo.
+
+**Una sola activa por conversación**, garantizada por un índice único PARCIAL
+—Prisma no sabe expresarlo—. Chocar contra él se trata como idempotencia: un
+reintento no le roba la conversación al asesor que ya la tenía.
+
+**Dos barreras, y la redundancia es deliberada.** El handoff mantiene
+`isPaused` en sincronía, pero esa bandera la puede quitar cualquier pantalla
+sin saber que hay una entrega viva. La fuente de verdad es la tabla.
+
+**No hay equipos en el esquema**, así que el handoff asigna un USUARIO. No se
+inventa una columna que no apunte a ninguna tabla.
+
+`GET`/`POST /api/conversations/:id/handoff[/resolve]`. `resumeBot` es decisión
+de quien resuelve: muchas veces la conversación termina con la persona, y
+despertar al bot volvería a escribirle al cliente sin motivo.
+
+### WhatsApp: adaptador real sobre transporte falso
+
+`WhatsappAdapter` implementa el puerto completo —texto, plantilla, imagen,
+documento, botones y listas— con la lógica de verdad:
+
+- Ventana de 24 h medida desde el último mensaje **ENTRANTE**: desde uno
+  saliente se renovaría sola para siempre.
+- Número remitente por donde entró la conversación, con desempate **explícito**
+  al caer al principal (`isPrimary`, `order`, `id`), nunca un `findFirst`
+  ambiguo.
+- Idempotencia por `Message.externalKey`. `wamid` no sirve: lo asigna Meta
+  después de enviar. La fila se reserva **antes** de llamar.
+- Menú de más de 3 opciones convertido a lista en vez de perder las que
+  sobran; títulos recortados a los límites de Meta.
+- Errores clasificados en reintentable / definitivo / requiere atención.
+
+**Que el transporte sea falso y no el adaptador entero es lo importante.** Si
+se falseara el adaptador completo, el día que se conecte de verdad se
+estrenaría en producción todo el código que nunca corrió. El falso implementa
+el mismo contrato y recibe el mismo sobre.
+
+Ni tokens, ni App Secret, ni teléfono completo, ni cuerpo del mensaje en
+ningún log: del fallo solo se conservan el estado HTTP y el código de Meta.
+
+### Cuatro fallos reales que encontraron las pruebas y la demostración
+
+1. **Un avance suelto le repetía la pregunta al cliente.** Un evento de avance
+   sin la espera que desbloquea la ejecución —un reintento tardío, un
+   duplicado del outbox— reejecutaba el nodo que esperaba, y ese nodo VUELVE A
+   PREGUNTAR. Ahora es un no-op.
+
+2. **Guardar el `wamid` podía tumbar un envío que ya había salido.** Es único
+   en la tabla; un choque hacía fallar el paso como reintentable y el motor
+   REENVIABA. A partir de que el mensaje sale, nada de lo que pase escribiendo
+   en la base puede convertirse en un error que se reintente.
+
+3. **Todo se reintentaba igual.** El intérprete clasificaba como `interno`
+   cualquier excepción de un ejecutor: un token caducado y un 503 de Meta se
+   reintentaban cinco veces los dos. Ahora un error puede declarar su clase y
+   el intérprete la respeta, leída por forma y no con `instanceof` —el motor no
+   puede importar los adaptadores sin invertir la dependencia que hace inocuo
+   al simulador—.
+
+4. **Dos expectativas mías estaban mal y el producto tenía razón**: al vencer
+   una espera, el nodo que preguntaba se ejecuta UNA vez; y asignar a un
+   usuario de otra empresa LANZA en vez de no hacer nada.
+
+### Pruebas
+
+- **30 E2E de la vertical** (`test/flowbot-vertical.e2e-spec.ts`) con servicios
+  reales cableados a mano: entrada, etapa por marca y no por nombre, selección
+  determinista, idempotencia, espera y reanudación, consumo exactamente una
+  vez, vencimiento, campos, historial, tarea, etapa, asignación acotada,
+  reintento sin duplicar, archivado, handoff y su bloqueo del bot, reanudación
+  manual, dos empresas aisladas, dos números, dos mensajes concurrentes, lease
+  vencido a `NEEDS_ATTENTION`, outbox pendiente y ausencia de PII.
+- **87 unitarias** de validación de campos, handoff y adaptador de WhatsApp.
+
+### Demostración autónoma, 24 pasos
+
+`apps/backend/scripts/flowbot-demo-autonoma.mjs`, por el webhook REAL y
+firmado. Levanta PostgreSQL (ya en marcha), Redis, backend y worker.
+
+```bash
+docker compose up -d redis
+cd apps/backend && npm run build
+node scripts/flowbot-demo-autonoma.mjs
+```
+
+Recorrido observado: `inicio → saluda → pide → pide → campo_contacto →
+campo_lead → tarea → entrega` con estado `HANDED_OFF`, más un segundo cliente
+que no contesta y sale por `pide → nadie → fin`. Son dos personas distintas a
+propósito: la conversación de la primera está entregada y el bot no debe
+volver a hablar en ella, cosa que el paso 20 comprueba.
+
+El token de la integración se cifra de verdad con la clave del entorno local
+—en texto plano se estaría probando el camino de error— y su contenido es la
+cadena `token-de-demostracion`. No hay ningún token de Meta.
+
+### Cuatro migraciones, todas aditivas y solo en local
+
+| Migración | Qué añade |
+|---|---|
+| `20260803224322_flowbot_recuperacion_segura` | `NEEDS_ATTENTION`, `recoveries`, índice |
+| `20260803234805_campos_personalizados` | 3 enums, 3 tablas, 2 CHECK |
+| `20260803235347_handoff_y_archivado_seguro` | `HandoffStatus`, `conversation_handoffs`, `Contact.archivedAt`, índice único parcial |
+| `20260803235900_idempotencia_de_salientes` | `Message.externalKey` + único |
+
+**Cero** `DROP`, `TRUNCATE` o `SET NOT NULL` sobre columnas existentes. Los
+índices únicos sobre columnas nulables nuevas son seguros con datos previos:
+en PostgreSQL los NULL no chocan.
+
+**Rollback:** basta con no desplegar el código; las columnas y tablas sobran
+pero no estorban. Para revertir del todo, en orden inverso a las claves
+ajenas: `DROP TABLE custom_field_value_changes, custom_field_values,
+custom_field_definitions, conversation_handoffs;` `DROP TYPE
+CustomFieldSource, CustomFieldEntity, CustomFieldType, HandoffStatus;`
+`ALTER TABLE contacts DROP COLUMN archivedAt, DROP COLUMN archivedReason;`
+`ALTER TABLE messages DROP COLUMN externalKey;`. Revertir un valor de enum
+—`NEEDS_ATTENTION`— exige recrear el tipo, así que se deja y se ignora.
+
+**Verificación:** backend **1640 unit / 541 e2e** verdes, typecheck 0, lint 0,
+build limpio, demostración autónoma completa, Nest arranca y mapea las rutas.
+
+---
+
 ## Próximo paso
 
-**Bloque 4 — nodos de WhatsApp sobre adaptador falso.** Después: ventana de 24
-horas y plantillas, handoff real sobre la conversación, panel lateral del
-contacto, archivado seguro, pipeline en tiempo real, API y permisos, editor
-visual y simulador.
+**API de administración y constructor visual.** La vertical del backend está
+cerrada; lo que falta para que alguien pueda usarla sin escribir JSON a mano
+es la superficie de administración: CRUD de bots, publicación de versiones,
+disparadores, simulador y el editor de grafo.
 
-### Limitación pendiente: campos personalizados
+### Limitaciones honestas que quedan
 
-`crm.contact_field` sigue guardando el valor como etiqueta `campo:valor` porque
-`Contact` no tiene almacén de campos libres en el esquema. **La interfaz no
-debe prometer campos personalizados mientras esto siga así**: se verían como
-una etiqueta más en el contacto, y quien configure el bot esperará otra cosa.
-
-Corresponde una migración aditiva `CustomFieldDefinition` /
-`CustomFieldValue`, que cambia el adaptador sin tocar el nodo ni el grafo —
-que es exactamente para lo que sirve el puerto.
+- **No hay equipos.** El handoff asigna un usuario. Cuando existan, el modelo
+  gana un `teamId` nulable.
+- **El historial de campos crece sin límite.** Necesita retención antes de que
+  el volumen importe.
+- **La ventana de 24 h se mide en UTC contra `Message.createdAt`.** La zona
+  horaria de la empresa (`Company.timezone`) se usa para presentación, no para
+  la ventana, porque la ventana de Meta es absoluta y no depende de la zona.
+  El **horario comercial** de los disparadores sí usa la del servidor y
+  debería pasar a la de la empresa: queda anotado como deuda real.
+- **WhatsApp sigue sobre transporte falso.** Activar envíos reales es cambiar
+  `FlowBotEffectsFactory`, no una bandera repartida por los nodos.
+- **Los nodos de HTTP e IA no tienen ejecutor todavía** (`integration.http`
+  está en el catálogo y en el validador, pero no en el registro de
+  ejecutores). Un flujo que lo use falla como configuración, no en silencio.
 
 ### Referencia del bloque 3d completo
 
@@ -657,6 +855,10 @@ npm run test:e2e -- --runInBand
 docker compose up -d redis
 cd apps/backend && npm run build && node scripts/flowbot-demo-autonoma.mjs
 ```
+
+La demostración recorre la vertical entera —incluido el handoff— por el mismo
+webhook que usaría un mensaje real. Si algo se rompe, se rompe ahí antes que
+en producción.
 
 ### Reglas que no se negocian
 
