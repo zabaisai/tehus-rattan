@@ -376,6 +376,21 @@ export function esConflictoDeBorrador(
   return cuerpo?.codigo === 'borrador.conflicto' ? cuerpo : null;
 }
 
+// ── estado operativo del transporte ─────────────────────────────
+
+export interface EstadoOperativo {
+  modo: 'falso' | 'dry-run' | 'real';
+  /** Frase ya redactada por el servidor: se enseña tal cual. */
+  etiqueta: string;
+  enviaDeVerdad: boolean;
+  killSwitch: {
+    activo: boolean;
+    motivo: string | null;
+    activadoEn: string | null;
+    activadoPor: string | null;
+  };
+}
+
 // ── llamadas ────────────────────────────────────────────────────
 
 export const flowbots = {
@@ -551,6 +566,19 @@ export const flowbots = {
   ) =>
     api
       .post(`/flowbots/executions/${executionId}/handoff`, datos)
+      .then((r) => r.data),
+
+  estadoOperativo: () =>
+    api
+      .get<EstadoOperativo>('/flowbots/operational-status')
+      .then((r) => r.data),
+
+  cambiarKillSwitch: (activo: boolean, motivo?: string) =>
+    api
+      .post<EstadoOperativo['killSwitch']>('/flowbots/kill-switch', {
+        activo,
+        motivo,
+      })
       .then((r) => r.data),
 
   metricas: (filtros: { desde?: string; hasta?: string; botId?: string } = {}) =>

@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/Button';
 import { ListState, mensajeDeError } from '@/components/ui/ListState';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EstadoBot, estadoVisible } from '@/components/flowbots/EstadoBot';
+import { EstadoTransporte } from '@/components/flowbots/EstadoTransporte';
 
 type Orden = 'reciente' | 'nombre' | 'ejecuciones' | 'errores';
 
@@ -161,6 +162,8 @@ export default function FlowBotsPage() {
           </div>
         )}
       </div>
+
+      <EstadoTransporte />
 
       {errorAccion && (
         <p

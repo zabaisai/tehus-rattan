@@ -13,6 +13,7 @@ import { Editor } from '@/components/flowbots/builder/Editor';
 import { DialogoPublicar } from '@/components/flowbots/DialogoPublicar';
 import { PanelSimulador } from '@/components/flowbots/PanelSimulador';
 import { SinPermiso } from '@/components/flowbots/SinPermiso';
+import { EstadoTransporte } from '@/components/flowbots/EstadoTransporte';
 
 export default function EditorPage() {
   const { id } = useParams<{ id: string }>();
@@ -120,6 +121,10 @@ export default function EditorPage() {
             </p>
           </div>
         </div>
+      </div>
+
+      <div className="border-b border-neutral-200 bg-white px-3 py-1.5">
+        <EstadoTransporte compacto />
       </div>
 
       {estrecho && (
