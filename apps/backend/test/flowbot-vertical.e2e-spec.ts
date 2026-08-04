@@ -105,8 +105,26 @@ describe('vertical completa de FlowBot (e2e, base real)', () => {
       mensajeria: new WhatsappAdapter(
         servicioPrisma,
         companyId,
-        transporte,
+        // Los tres apuntan al falso: esta suite corre contra la base real y
+        // NO puede tener ni la posibilidad de abrir una conexión a Meta.
+        { falso: transporte, dryRun: transporte, real: transporte },
         cripto,
+        {
+          evaluar: async () => ({
+            modo: 'falso' as const,
+            bloqueos: [],
+            explicacion: 'e2e',
+          }),
+        } as never,
+        {
+          estado: async () => ({
+            aprobada: true,
+            parametros: 0,
+            idioma: 'es',
+            verificadaEn: new Date(),
+          }),
+        } as never,
+        executionId,
       ),
       http: falsos.http,
       ia: falsos.ia,

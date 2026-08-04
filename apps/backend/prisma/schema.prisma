@@ -117,6 +117,7 @@ model Company {
   flowBotAiUsage     FlowBotAiUsage[]
 
   @@map("companies")
+  whatsappTemplates WhatsAppTemplate[]
 }
 
 model User {
@@ -186,6 +187,7 @@ model User {
   handoffsResolved ConversationHandoff[] @relation("HandoffResolver")
 
   @@map("users")
+  killSwitchActivations FlowBotKillSwitch[] @relation("KillSwitchActivatedBy")
 }
 
 model Contact {
@@ -862,6 +864,7 @@ model WhatsAppIntegration {
 
   @@index([companyId, isPrimary])
   @@map("whatsapp_integrations")
+  templates WhatsAppTemplate[]
 }
 
 // Short-lived, single-use anti-CSRF state for the Meta Embedded Signup flow.
@@ -2526,4 +2529,97 @@ model FlowBotAiUsage {
   @@unique([companyId, day])
   @@index([companyId, day])
   @@map("flowbot_ai_usage")
+}
+
+/// Interruptor de emergencia de los envios de FlowBot.
+///
+/// VIVE EN LA BASE Y NO EN UNA VARIABLE DE ENTORNO porque el momento en que
+/// hace falta apagar los envios es justo el peor momento para reiniciar los
+/// procesos: hay ejecuciones a medias, trabajos en la cola y clientes
+/// esperando. Una fila se cambia en segundos y la lee el worker en el
+/// siguiente envio.
+///
+/// UNA SOLA FILA, con `id` fijo. Un contador o una lista dejaria la pregunta
+/// "cual es el activo" sin respuesta unica, y este valor decide si salen
+/// mensajes a clientes.
+///
+/// NO PARA los mensajes que escribe una persona desde el CRM: eso es la
+/// empresa hablando con su cliente, no el bot. Apagar tambien eso convertiria
+/// una pausa de seguridad en una interrupcion del negocio.
+model FlowBotKillSwitch {
+  /// Siempre `global`. El identificador es fijo para que no puedan existir dos.
+  id String @id
+
+  /// `true` = ningun bot envia nada. Se lee en cada envio, sin cache.
+  active Boolean @default(false)
+
+  /// Por que se activo. Aparece en la pantalla de estado y en la auditoria.
+  reason String?
+
+  activatedAt   DateTime?
+  activatedById String?
+  activatedBy   User?     @relation("KillSwitchActivatedBy", fields: [activatedById], references: [id], onDelete: SetNull)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("flowbot_kill_switch")
+}
+
+/// Plantillas de WhatsApp conocidas por el CRM.
+///
+/// META ES LA AUTORIDAD, ESTA TABLA ES SOLO LO QUE SABEMOS. Consultar el
+/// estado real exige llamar a Meta, asi que aqui se guarda lo ultimo
+/// verificado y CUANDO se verifico. Una plantilla que no este en esta tabla
+/// queda BLOQUEADA en vez de asumirse aprobada: enviar una plantilla no
+/// aprobada la rechaza Meta con un codigo que nadie sabe interpretar, y en
+/// cantidad afecta a la calidad del numero.
+model WhatsAppTemplate {
+  id String @id @default(cuid())
+
+  /// Nombre exacto registrado en Meta.
+  name String
+
+  /// Codigo de idioma de Meta: `es`, `es_CO`, `en_US`.
+  language String
+
+  /// Estado conocido. `APPROVED` es el unico que permite enviar.
+  status WhatsAppTemplateStatus @default(UNKNOWN)
+
+  /// Cuantos parametros espera el cuerpo. Mandar menos de los que pide es un
+  /// rechazo seguro, y es un error que solo se ve al enviar.
+  bodyParams Int @default(0)
+
+  /// Categoria declarada en Meta: MARKETING, UTILITY, AUTHENTICATION.
+  category String?
+
+  /// Cuando se comprobo contra Meta por ultima vez. `null` = nunca.
+  lastCheckedAt DateTime?
+
+  /// Motivo del rechazo, si lo hubo. Redactado, nunca el payload.
+  rejectionReason String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// Numero al que pertenece. Una plantilla aprobada en un WABA no existe en
+  /// otro, asi que la pareja plantilla+numero es lo que identifica de verdad.
+  whatsappIntegrationId String?
+  whatsappIntegration   WhatsAppIntegration? @relation(fields: [whatsappIntegrationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, whatsappIntegrationId, name, language])
+  @@index([companyId, name])
+  @@map("whatsapp_templates")
+}
+
+enum WhatsAppTemplateStatus {
+  /// No se ha comprobado nunca. Bloquea el envio.
+  UNKNOWN
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
 }

@@ -10,6 +10,11 @@ import {
 import { CrmAdapter } from './adapters/flowbot.crm.adapter';
 import { WhatsappAdapter } from './adapters/flowbot.whatsapp.adapter';
 import { TransporteWhatsAppFalso } from './adapters/flowbot.whatsapp.fake-transport';
+import { TransporteWhatsAppDryRun } from './adapters/flowbot.whatsapp.dry-run-transport';
+import { TransporteWhatsAppReal } from './adapters/flowbot.whatsapp.transport';
+import { GuardarrailesWhatsApp } from './adapters/flowbot.whatsapp.guardarrailes';
+import { RegistroPlantillas } from './adapters/flowbot.whatsapp.plantillas';
+import { leerConfiguracion } from './adapters/flowbot.whatsapp.modo';
 import { HttpAdapter } from './adapters/flowbot.http.adapter';
 import { IaAdapter } from './adapters/flowbot.ia.adapter';
 import { RegistroProveedoresIa } from './adapters/flowbot.ia.provider';
@@ -26,10 +31,18 @@ import { WhatsAppTokenCryptoService } from '../../whatsapp-integration/whatsapp-
  *   CRM        → REAL. Contactos, oportunidades, etapas, tareas, notas,
  *                campos personalizados y handoff se escriben de verdad. Son
  *                operaciones internas, reversibles y acotadas por empresa.
- *   WhatsApp   → adaptador REAL sobre transporte FALSO. Todo el camino se
- *                ejecuta —número remitente, ventana de 24 h, idempotencia,
- *                persistencia en el hilo, clasificación de errores— y solo la
- *                petición HTTP a Meta se sustituye.
+ *   WhatsApp   → adaptador REAL con TRES transportes disponibles y la
+ *                elección hecha aquí, envío a envío:
+ *
+ *                  falso    devuelve un identificador inventado. Nada sale.
+ *                  dry-run  se prepara la petición exacta y no se abre la
+ *                           conexión.
+ *                  real     sale de verdad.
+ *
+ *                Los tres se construyen SIEMPRE; lo que decide cuál se usa es
+ *                `GuardarrailesWhatsApp`, en el momento del envío y con el
+ *                estado real del sistema delante. Con la configuración por
+ *                defecto nunca se llega a `real`.
  *   HTTP       → adaptador REAL, APAGADO por defecto. Sin que la empresa lo
  *                encienda y declare sus destinos, cualquier llamada falla
  *                como «no configurado» antes de tocar la red.
@@ -45,8 +58,10 @@ import { WhatsAppTokenCryptoService } from '../../whatsapp-integration/whatsapp-
  * transitorio de uno definitivo. Así ese código lleva meses ejecutándose antes
  * de que salga el primer mensaje real.
  *
- * ACTIVAR ENVÍOS REALES ES CAMBIAR ESTA CLASE, no una bandera repartida por los
- * nodos que alguien pueda encender por error en uno.
+ * ACTIVAR ENVÍOS REALES ES CONFIGURAR ESTA FÁBRICA, no una bandera repartida
+ * por los nodos que alguien pueda encender por error en uno. Un nodo no sabe
+ * —ni puede saber— en qué modo está el sistema: recibe un puerto de mensajería
+ * y lo usa.
  */
 @Injectable()
 export class FlowBotEffectsFactory {
@@ -63,6 +78,10 @@ export class FlowBotEffectsFactory {
      * instancia que usa el motor.
      */
     private readonly transporte: TransporteWhatsAppFalso,
+    private readonly dryRun: TransporteWhatsAppDryRun,
+    private readonly real: TransporteWhatsAppReal,
+    private readonly guardarrailes: GuardarrailesWhatsApp,
+    private readonly plantillas: RegistroPlantillas,
     private readonly registroIa: RegistroProveedoresIa,
     private readonly iaFalsa: ProveedorIaFalso,
   ) {
@@ -97,8 +116,15 @@ export class FlowBotEffectsFactory {
       mensajeria: new WhatsappAdapter(
         this.prisma,
         companyId,
-        this.transporte,
+        {
+          falso: this.transporte,
+          dryRun: this.dryRun,
+          real: this.real,
+        },
         this.cripto,
+        this.guardarrailes,
+        this.plantillas,
+        executionId,
       ),
       // HTTP REAL, pero apagado salvo que la empresa lo encienda y declare
       // sus destinos. Con la configuracion por defecto, cualquier llamada
@@ -116,6 +142,24 @@ export class FlowBotEffectsFactory {
   /** Lo que el motor habría mandado. Para la demostración y las pruebas. */
   get envios(): TransporteWhatsAppFalso {
     return this.transporte;
+  }
+
+  /** Lo preparado en modo prueba, sin salir. Para la pantalla de estado. */
+  get preparados(): TransporteWhatsAppDryRun {
+    return this.dryRun;
+  }
+
+  /**
+   * En qué modo está el sistema, para enseñarlo.
+   *
+   * NO dice «real» solo porque las banderas lo permitan: dice el techo al que
+   * se puede llegar. Cada envío vuelve a decidir con su propio contexto, y
+   * cualquiera de los guardarraíles puede dejarlo por debajo.
+   */
+  modoConfigurado(): 'falso' | 'dry-run' | 'real' {
+    const config = leerConfiguracion();
+    if (!config.realHabilitado) return 'falso';
+    return config.dryRun ? 'dry-run' : 'real';
   }
 
   /** Efectos completamente falsos, para el simulador. No tocan nada. */

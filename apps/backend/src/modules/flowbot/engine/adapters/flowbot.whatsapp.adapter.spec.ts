@@ -8,6 +8,7 @@ import { TransporteWhatsAppFalso } from './flowbot.whatsapp.fake-transport';
 import {
   clasificar,
   esReintentable,
+  politicaDeError,
   requiereAtencionHumana,
 } from './flowbot.whatsapp.transport';
 
@@ -51,11 +52,18 @@ describe('WhatsappAdapter', () => {
     transporte = new TransporteWhatsAppFalso();
     cripto = { decrypt: jest.fn().mockReturnValue('token-en-claro') };
 
+    // Los tres transportes apuntan al falso: estas pruebas son sobre la
+    // LÓGICA del adaptador —ventana, idempotencia, clasificación—, y esa es la
+    // misma corra el transporte que corra. Cuál se elige lo prueban las
+    // pruebas de guardarraíles.
     adaptador = new WhatsappAdapter(
       prisma,
       'emp-1',
-      transporte,
+      { falso: transporte, dryRun: transporte, real: transporte },
       cripto as unknown as WhatsAppTokenCryptoService,
+      guardarrailesQuePermiten(),
+      plantillasAprobadas(),
+      'ejec-1',
     );
   });
 
@@ -377,7 +385,10 @@ describe('WhatsappAdapter', () => {
       expect(requiereAtencionHumana('token-invalido')).toBe(true);
     });
 
-    it('una plantilla inválida es definitiva', async () => {
+    it('una plantilla inválida pide que alguien la mire', async () => {
+      // No se reintenta —reintentar no arregla una plantilla mal aprobada— y
+      // además NO se traga en silencio: si nadie se entera, el bot sigue
+      // fallando igual mañana con todos los clientes que lleguen.
       conVentanaAbierta();
       transporte.programarFallo({ httpStatus: 400, metaCode: 132001 });
 
@@ -388,7 +399,8 @@ describe('WhatsappAdapter', () => {
           parametros: [],
           idempotencyKey: 'k1',
         }),
-      ).rejects.toMatchObject({ clase: 'externo_definitivo' });
+      ).rejects.toMatchObject({ clase: 'atencion' });
+      expect(esReintentable('plantilla-invalida')).toBe(false);
     });
 
     it('el mensaje queda FAILED con el clasificador y SIN el texto de Meta', async () => {
@@ -406,9 +418,17 @@ describe('WhatsappAdapter', () => {
       const marcado = prisma.message.updateMany.mock.calls[0][0].data;
       expect(marcado.status).toBe('FAILED');
       expect(marcado.errorCode).toBe('destinatario-no-alcanzable');
-      // `errorMessage` queda nulo a propósito: la respuesta de Meta arrastra
-      // el teléfono del destinatario y a veces el mensaje entero.
-      expect(marcado.errorMessage).toBeUndefined();
+
+      // `errorMessage` lleva NUESTRA frase, sacada de la política de esa clase
+      // de error, nunca la respuesta de Meta: esa arrastra el teléfono del
+      // destinatario y a veces el mensaje entero. Sin frase, quien abre la
+      // conversación ve `destinatario-no-alcanzable` y tiene que preguntar
+      // qué significa.
+      expect(marcado.errorMessage).toBe(
+        politicaDeError('destinatario-no-alcanzable').mensajeVisible,
+      );
+      expect(marcado.errorMessage).not.toContain('573001112233');
+      expect(marcado.errorMessage).not.toContain('hola');
     });
 
     it('un token que no se puede descifrar pide atención', async () => {
@@ -463,3 +483,30 @@ describe('WhatsappAdapter', () => {
     });
   });
 });
+
+/**
+ * Guardarraíles que dejan pasar en modo falso.
+ *
+ * Devuelve `falso` y no `real` a propósito: estas pruebas no deben poder
+ * mandar nada aunque alguien cambie la configuración de su máquina.
+ */
+function guardarrailesQuePermiten() {
+  return {
+    evaluar: jest.fn().mockResolvedValue({
+      modo: 'falso',
+      bloqueos: [],
+      explicacion: 'prueba',
+    }),
+  } as never;
+}
+
+function plantillasAprobadas() {
+  return {
+    estado: jest.fn().mockResolvedValue({
+      aprobada: true,
+      parametros: 0,
+      idioma: 'es',
+      verificadaEn: new Date(),
+    }),
+  } as never;
+}

@@ -4,6 +4,14 @@ import { CustomFieldsModule } from '../custom-fields/custom-fields.module';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-integration.module';
 import { TransporteWhatsAppFalso } from './engine/adapters/flowbot.whatsapp.fake-transport';
+import { TransporteWhatsAppDryRun } from './engine/adapters/flowbot.whatsapp.dry-run-transport';
+import { TransporteWhatsAppReal } from './engine/adapters/flowbot.whatsapp.transport';
+import { GuardarrailesWhatsApp } from './engine/adapters/flowbot.whatsapp.guardarrailes';
+import {
+  ProveedorPlantillasFalso,
+  RegistroPlantillas,
+} from './engine/adapters/flowbot.whatsapp.plantillas';
+import { FlowBotKillSwitchService } from './engine/flowbot.kill-switch.service';
 import { RegistroProveedoresIa } from './engine/adapters/flowbot.ia.provider';
 import { FlowBotReferenciasService } from './graph/flowbot.referencias.service';
 import { PlatformModule } from '../platform/platform.module';
@@ -50,6 +58,12 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     // Singleton a proposito: las pruebas y la demostracion miran lo que se
     // habria enviado, y para eso tienen que compartir instancia con el motor.
     TransporteWhatsAppFalso,
+    TransporteWhatsAppDryRun,
+    TransporteWhatsAppReal,
+    GuardarrailesWhatsApp,
+    RegistroPlantillas,
+    ProveedorPlantillasFalso,
+    FlowBotKillSwitchService,
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
@@ -72,6 +86,12 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     // Singleton a proposito: las pruebas y la demostracion miran lo que se
     // habria enviado, y para eso tienen que compartir instancia con el motor.
     TransporteWhatsAppFalso,
+    TransporteWhatsAppDryRun,
+    TransporteWhatsAppReal,
+    GuardarrailesWhatsApp,
+    RegistroPlantillas,
+    ProveedorPlantillasFalso,
+    FlowBotKillSwitchService,
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
@@ -89,6 +109,12 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     FlowBotIntakeService,
     FlowBotReconcilerService,
     TransporteWhatsAppFalso,
+    TransporteWhatsAppDryRun,
+    TransporteWhatsAppReal,
+    GuardarrailesWhatsApp,
+    RegistroPlantillas,
+    ProveedorPlantillasFalso,
+    FlowBotKillSwitchService,
     ProveedorIaFalso,
     FlowBotReferenciasService,
     FlowBotAdminService,

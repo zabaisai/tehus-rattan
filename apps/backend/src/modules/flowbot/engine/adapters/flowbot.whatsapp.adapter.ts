@@ -7,8 +7,26 @@ import {
   RespuestaEnvio,
   TransporteWhatsApp,
   esReintentable,
+  politicaDeError,
   requiereAtencionHumana,
 } from './flowbot.whatsapp.transport';
+import { GuardarrailesWhatsApp } from './flowbot.whatsapp.guardarrailes';
+import { RegistroPlantillas } from './flowbot.whatsapp.plantillas';
+import type { ModoTransporte } from './flowbot.whatsapp.modo';
+
+/**
+ * Los tres transportes disponibles, ya construidos.
+ *
+ * EL ADAPTADOR NO LOS CREA: los recibe. Crearlos aquí significaría que el
+ * adaptador decide cuál usar leyendo variables de entorno, y entonces la
+ * decisión estaría repartida por tantos sitios como adaptadores haya. Aquí
+ * solo se elige entre los que le dieron.
+ */
+export interface JuegoDeTransportes {
+  falso: TransporteWhatsApp;
+  dryRun: TransporteWhatsApp;
+  real: TransporteWhatsApp;
+}
 
 /**
  * Adaptador REAL de WhatsApp para FlowBot.
@@ -47,8 +65,16 @@ export class WhatsappAdapter implements PuertoMensajeria {
   constructor(
     private readonly prisma: PrismaService,
     private readonly companyId: string,
-    private readonly transporte: TransporteWhatsApp,
+    private readonly transportes: JuegoDeTransportes,
     private readonly cripto: WhatsAppTokenCryptoService,
+    private readonly guardarrailes: GuardarrailesWhatsApp,
+    private readonly plantillas: RegistroPlantillas,
+    /**
+     * La ejecución en curso. Sin ella no se puede comprobar si el bot sigue
+     * publicado, si la versión es la vigente ni si la ejecución sigue viva, y
+     * sin poder comprobarlo NO se envía de verdad.
+     */
+    private readonly executionId: string | null = null,
   ) {}
 
   // ── ventana de servicio ─────────────────────────────────────
@@ -119,6 +145,14 @@ export class WhatsappAdapter implements PuertoMensajeria {
       conversationId: input.conversationId,
       idempotencyKey: input.idempotencyKey,
       tipo: 'TEMPLATE',
+      // Se comprueba contra lo que el CRM sabe de la plantilla ANTES de
+      // construir nada. Una plantilla desconocida o con otro número de
+      // parámetros la rechaza Meta con un código que no dice cuál fue el
+      // problema, y en cantidad degrada la calidad del número.
+      plantilla: {
+        nombre: input.plantilla,
+        parametros: input.parametros.length,
+      },
       cuerpoMeta: {
         type: 'template',
         template: {
@@ -269,6 +303,8 @@ export class WhatsappAdapter implements PuertoMensajeria {
     cuerpoMeta: Record<string, unknown>;
     cuerpoCrm: string;
     exigeVentana: boolean;
+    /** Presente solo en envíos de plantilla, para poder verificarla. */
+    plantilla?: { nombre: string; parametros: number };
   }): Promise<{ wamid?: string }> {
     // 1. Idempotencia. La clave del motor es `ejecución:nodo:paso`, así que
     // un reintento del mismo trabajo la reencuentra y no reenvía nada.
@@ -312,9 +348,46 @@ export class WhatsappAdapter implements PuertoMensajeria {
     const integracion = await this.remitente(conversacion.whatsappIntegration);
 
     // 3. Ventana.
-    if (op.exigeVentana && !(await this.dentroDeVentana(op))) {
+    const dentroDeVentana = await this.dentroDeVentana(op);
+    if (op.exigeVentana && !dentroDeVentana) {
       throw new ErrorDeEnvio('fuera-de-ventana', 'externo_definitivo');
     }
+
+    // 3b. Plantilla: solo se manda lo que el CRM sabe aprobado.
+    if (op.plantilla) {
+      const estado = await this.plantillas.estado({
+        companyId: this.companyId,
+        whatsappIntegrationId: integracion.id,
+        nombre: op.plantilla.nombre,
+        idioma: this.idiomaPlantillas(),
+        parametrosEnviados: op.plantilla.parametros,
+      });
+      if (!estado.aprobada) {
+        this.logger.warn(
+          `Plantilla bloqueada [nombre=${op.plantilla.nombre}]: ${estado.motivo ?? 'sin verificar'}`,
+        );
+        throw new ErrorDeEnvio('plantilla-no-verificada', 'externo_definitivo');
+      }
+    }
+
+    // 3c. Guardarraíles. Se evalúan AQUÍ, con el número ya resuelto y el
+    // destinatario conocido, y no al arrancar la ejecución: entre una cosa y
+    // la otra pueden haber pausado el bot o entrado una persona a atender.
+    const decision = await this.guardarrailes.evaluar({
+      companyId: this.companyId,
+      executionId: this.executionId,
+      conversationId: op.conversationId,
+      phoneNumberId: integracion.phoneNumberId,
+      destinatario: conversacion.contact.phone.replace(/^\+/, ''),
+      integracionConectada: integracion.conectada,
+      idempotencyKey: op.idempotencyKey,
+      // Una plantilla ya validada vale fuera de la ventana; el texto libre no.
+      ventanaOPlantilla: dentroDeVentana || !!op.plantilla,
+      dentroDeLimite: true,
+      circuitoSano: true,
+    });
+
+    const transporte = this.transporteDe(decision.modo);
 
     // 4. Reserva.
     const reservado = await this.prisma.message.create({
@@ -332,7 +405,7 @@ export class WhatsappAdapter implements PuertoMensajeria {
     // 5. Envío. El token se descifra aquí y muere con la llamada.
     let respuesta: RespuestaEnvio;
     try {
-      respuesta = await this.transporte.enviar({
+      respuesta = await transporte.enviar({
         phoneNumberId: integracion.phoneNumberId,
         accessToken: this.cripto.decrypt(integracion.accessTokenEncrypted),
         to: conversacion.contact.phone.replace(/^\+/, ''),
@@ -380,6 +453,14 @@ export class WhatsappAdapter implements PuertoMensajeria {
 
     const codigo = respuesta.errorCode ?? 'desconocido';
     await this.marcarFallo(reservado.id, codigo);
+
+    // AMBIGUO NO SE REINTENTA. No se sabe si el mensaje salió; reintentar es
+    // jugarse mandárselo dos veces al cliente. Se marca para que alguien lo
+    // mire, que es la única salida honesta.
+    if (respuesta.ambiguo) {
+      throw new ErrorDeEnvio(codigo, 'atencion');
+    }
+
     throw new ErrorDeEnvio(
       codigo,
       requiereAtencionHumana(codigo)
@@ -393,9 +474,16 @@ export class WhatsappAdapter implements PuertoMensajeria {
   private async marcarFallo(messageId: string, errorCode: string) {
     await this.prisma.message.updateMany({
       where: { id: messageId },
-      // Solo el clasificador; `errorMessage` queda nulo a propósito para que
-      // nadie caiga en la tentación de volcar ahí la respuesta de Meta.
-      data: { status: 'FAILED', failedAt: new Date(), errorCode },
+      data: {
+        status: 'FAILED',
+        failedAt: new Date(),
+        errorCode,
+        // La frase que verá una persona, tomada de la política de esa clase de
+        // error. NUNCA la respuesta de Meta: arrastra el teléfono y a veces el
+        // mensaje entero. Sin esto, quien abre la conversación ve un código
+        // como `limite-de-tasa` y tiene que preguntar qué significa.
+        errorMessage: politicaDeError(errorCode).mensajeVisible,
+      },
     });
   }
 
@@ -417,14 +505,24 @@ export class WhatsappAdapter implements PuertoMensajeria {
       status: string;
       accessTokenEncrypted: string | null;
     } | null,
-  ): Promise<{ phoneNumberId: string; accessTokenEncrypted: string }> {
+  ): Promise<{
+    id: string | null;
+    phoneNumberId: string;
+    accessTokenEncrypted: string;
+    conectada: boolean;
+  }> {
+    // EL NÚMERO DE LA CONVERSACIÓN MANDA. Es por donde escribió el cliente y
+    // por donde espera la respuesta; contestarle desde otro número de la misma
+    // empresa abre un hilo nuevo en su teléfono y pierde el contexto.
     if (
       deLaConversacion?.status === 'CONNECTED' &&
       deLaConversacion.accessTokenEncrypted
     ) {
       return {
+        id: deLaConversacion.id,
         phoneNumberId: deLaConversacion.phoneNumberId,
         accessTokenEncrypted: deLaConversacion.accessTokenEncrypted,
+        conectada: true,
       };
     }
 
@@ -434,17 +532,37 @@ export class WhatsappAdapter implements PuertoMensajeria {
         status: 'CONNECTED',
         accessTokenEncrypted: { not: null },
       },
+      // ORDEN TOTALMENTE DETERMINISTA. Sin `orderBy`, `findFirst` devuelve
+      // «alguna» fila y la empresa con dos números vería sus mensajes salir
+      // unas veces por uno y otras por otro sin patrón. Con el desempate por
+      // `id` el resultado es siempre el mismo.
       orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { id: 'asc' }],
-      select: { phoneNumberId: true, accessTokenEncrypted: true },
+      select: { id: true, phoneNumberId: true, accessTokenEncrypted: true },
     });
 
     if (!principal?.accessTokenEncrypted) {
       throw new ErrorDeEnvio('sin-numero-conectado', 'atencion');
     }
     return {
+      id: principal.id,
       phoneNumberId: principal.phoneNumberId,
       accessTokenEncrypted: principal.accessTokenEncrypted,
+      conectada: true,
     };
+  }
+
+  /**
+   * De los tres transportes, el que dijo la decisión.
+   *
+   * Es un `switch` de tres líneas a propósito: la lógica de QUÉ modo toca vive
+   * entera en `decidirModo`, y aquí solo se traduce. Repartir la decisión
+   * entre los dos sitios es como acaban existiendo caminos por los que se
+   * envía de verdad sin haber pasado por los guardarraíles.
+   */
+  private transporteDe(modo: ModoTransporte): TransporteWhatsApp {
+    if (modo === 'real') return this.transportes.real;
+    if (modo === 'dry-run') return this.transportes.dryRun;
+    return this.transportes.falso;
   }
 
   private idiomaPlantillas(): string {

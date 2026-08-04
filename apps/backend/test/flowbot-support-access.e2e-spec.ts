@@ -17,6 +17,8 @@ import { FlowBotExecutionsService } from '../src/modules/flowbot/api/flowbot.exe
 import { FlowBotMetricsService } from '../src/modules/flowbot/api/flowbot.metrics.service';
 import { FlowBotSimulatorService } from '../src/modules/flowbot/api/flowbot.simulator.service';
 import { FlowBotSupportGuard } from '../src/modules/flowbot/api/flowbot-support.guard';
+import { FlowBotEffectsFactory } from '../src/modules/flowbot/engine/flowbot.effects.factory';
+import { FlowBotKillSwitchService } from '../src/modules/flowbot/engine/flowbot.kill-switch.service';
 import { FlowBotReferenciasService } from '../src/modules/flowbot/graph/flowbot.referencias.service';
 import { CABECERA_SOPORTE } from '../src/modules/flowbot/api/flowbot-support.guard';
 
@@ -239,6 +241,24 @@ describe('Acceso de soporte a FlowBot (e2e, HTTP + base real)', () => {
           useValue: new FlowBotTriggersService(servicioPrisma),
         },
         { provide: FlowBotExecutionsService, useValue: ejecucionesStub },
+        // El controlador expone el estado operativo del transporte. Aquí no se
+        // ejercita esa ruta, pero sin los proveedores Nest no puede construir
+        // el controlador y caen todas las pruebas de la puerta de soporte.
+        {
+          provide: FlowBotEffectsFactory,
+          useValue: { modoConfigurado: () => 'falso' },
+        },
+        {
+          provide: FlowBotKillSwitchService,
+          useValue: {
+            estado: async () => ({
+              activo: false,
+              motivo: null,
+              activadoEn: null,
+              activadoPor: null,
+            }),
+          },
+        },
         {
           provide: FlowBotMetricsService,
           useValue: new FlowBotMetricsService(servicioPrisma),

@@ -25,6 +25,8 @@ import { FlowBotTriggersService } from './flowbot.triggers.service';
 import { FlowBotExecutionsService } from './flowbot.executions.service';
 import { FlowBotMetricsService } from './flowbot.metrics.service';
 import { FlowBotSimulatorService } from './flowbot.simulator.service';
+import { FlowBotEffectsFactory } from '../engine/flowbot.effects.factory';
+import { FlowBotKillSwitchService } from '../engine/flowbot.kill-switch.service';
 import { construirCatalogo } from './flowbot.contracts';
 import {
   CrearBotDto,
@@ -79,7 +81,77 @@ export class FlowBotController {
     private readonly simulador: FlowBotSimulatorService,
     private readonly auditoria: PlatformAuditLogService,
     private readonly prisma: PrismaService,
+    private readonly efectos: FlowBotEffectsFactory,
+    private readonly killSwitch: FlowBotKillSwitchService,
   ) {}
+
+  // ── estado operativo ────────────────────────────────────────
+
+  /**
+   * En qué modo está el envío de WhatsApp y si los bots están parados.
+   *
+   * LO VE CUALQUIERA CON ACCESO, incluido un AGENT: saber si los mensajes
+   * están saliendo de verdad no es un dato sensible, y esconderlo produce el
+   * peor malentendido posible —alguien probando un bot en modo de prueba y
+   * creyendo que su cliente ya recibió la respuesta—.
+   *
+   * NO devuelve las listas de permitidos ni ninguna credencial: solo el modo
+   * y el estado. Quién está en la lista de pruebas es configuración de
+   * despliegue, no información de producto.
+   */
+  @Get('operational-status')
+  async estadoOperativo() {
+    const [kill] = await Promise.all([this.killSwitch.estado()]);
+    const modo = this.efectos.modoConfigurado();
+
+    return {
+      modo,
+      // Texto ya redactado: la pantalla lo enseña tal cual y así dice lo mismo
+      // en todos los sitios donde aparezca.
+      etiqueta:
+        modo === 'real'
+          ? 'FlowBot está enviando mensajes reales'
+          : modo === 'dry-run'
+            ? 'Modo de prueba: FlowBot no está enviando mensajes reales'
+            : 'FlowBot no está conectado a WhatsApp: no sale ningún mensaje',
+      enviaDeVerdad: modo === 'real' && !kill.activo,
+      killSwitch: kill,
+    };
+  }
+
+  /**
+   * Enciende o apaga el interruptor de emergencia.
+   *
+   * SOLO PLATAFORMA. Para la mensajería de TODAS las empresas, así que no es
+   * una decisión que pueda tomar el administrador de una sola. Un SUPER_ADMIN
+   * de plataforma llega aquí por sesión de soporte, como a todo lo demás.
+   */
+  @Roles('SUPER_ADMIN')
+  @Post('kill-switch')
+  async cambiarKillSwitch(
+    @Request() req: any,
+    @Body() body: { activo: boolean; motivo?: string },
+  ) {
+    if (typeof body?.activo !== 'boolean') {
+      throw new BadRequestException(
+        'Falta indicar si se activa o se desactiva',
+      );
+    }
+    // Activar sin motivo deja la pregunta «¿por qué están parados los bots?»
+    // sin respuesta justo cuando más urge.
+    if (body.activo && !body.motivo?.trim()) {
+      throw new BadRequestException(
+        'Para parar los envíos hay que escribir por qué',
+      );
+    }
+
+    return this.killSwitch.cambiar({
+      activo: body.activo,
+      motivo: body.motivo,
+      actorUserId: req.user.sub,
+      actorRole: req.user.role,
+    });
+  }
 
   // ── catálogo ────────────────────────────────────────────────
 
