@@ -209,7 +209,12 @@ export function construirCatalogo(): CatalogoDto {
  */
 const DESCRIPCIONES: Record<
   string,
-  { grupo: string; etiqueta: string; tipo: VariableDto['tipo']; ejemplo: string }
+  {
+    grupo: string;
+    etiqueta: string;
+    tipo: VariableDto['tipo'];
+    ejemplo: string;
+  }
 > = {
   'contact.name': {
     grupo: 'Contacto',
@@ -351,7 +356,7 @@ export function construirVariables(): VariableDto[] {
   // Qué paso produce cada variable, leído del propio catálogo. Sirve para
   // avisar de que `ai.intent` no vale de nada si antes no hay un paso de IA.
   const productores = new Map<string, string[]>();
-  for (const def of Object.values(CATALOGO) as DefinicionNodo[]) {
+  for (const def of Object.values(CATALOGO)) {
     for (const ruta of def.produce ?? []) {
       productores.set(ruta, [...(productores.get(ruta) ?? []), def.tipo]);
     }

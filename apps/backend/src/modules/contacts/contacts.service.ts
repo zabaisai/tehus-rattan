@@ -15,13 +15,22 @@ export class ContactsService {
 
   async findAll(
     companyId: string,
-    filters: { search?: string; limit?: string; offset?: string } = {},
+    filters: {
+      search?: string;
+      limit?: string;
+      offset?: string;
+      includeArchived?: boolean;
+    } = {},
   ) {
     const pagination = this.parsePagination(filters.limit, filters.offset);
 
     return this.prisma.contact.findMany({
       where: {
         companyId,
+        // Los archivados NO salen salvo que se pidan. Verlos mezclados con los
+        // activos hace dudar de cuales siguen vivos, que es justo lo que
+        // archivar pretende resolver.
+        ...(filters.includeArchived ? {} : { archivedAt: null }),
         ...(filters.search && {
           OR: [
             { name: { contains: filters.search, mode: 'insensitive' } },
@@ -111,9 +120,55 @@ export class ContactsService {
     });
   }
 
-  async remove(id: string, companyId: string) {
+  /**
+   * "Eliminar" un contacto lo ARCHIVA. No lo borra.
+   *
+   * Borrarlo de verdad se llevaria por delante sus conversaciones, sus
+   * mensajes y sus oportunidades —o dejaria filas huerfanas—, y esa
+   * informacion es del negocio: la conversacion en la que se acordo un precio
+   * no deja de existir porque alguien limpie la lista de contactos. Ademas
+   * casi nunca es lo que se quiere: se pulsa "eliminar" para dejar de verlo,
+   * no para destruir el historial.
+   *
+   * El borrado real existe y tiene su camino: la solicitud de eliminacion de
+   * datos, que es deliberadamente mas lenta y deja constancia.
+   *
+   * Si la persona vuelve a escribir, `CompanyLeadSettings.reactivateArchived`
+   * decide si se reactiva sola: el motor ya aplica esa politica en la entrada
+   * de mensajes.
+   */
+  async remove(id: string, companyId: string, reason?: string) {
     await this.findById(id, companyId);
-    return this.prisma.contact.delete({ where: { id } });
+
+    // `archivedAt: null` en el filtro: archivar dos veces no puede pisar la
+    // fecha original ni el motivo por el que se archivo la primera vez.
+    const actualizados = await this.prisma.contact.updateMany({
+      where: { id, companyId, archivedAt: null },
+      data: {
+        archivedAt: new Date(),
+        archivedReason: reason?.trim() || null,
+      },
+    });
+
+    return {
+      archivado: actualizados.count > 0,
+      yaEstaba: actualizados.count === 0,
+    };
+  }
+
+  /** Devuelve un contacto archivado a las listas de trabajo. */
+  async restore(id: string, companyId: string) {
+    await this.findById(id, companyId);
+
+    const actualizados = await this.prisma.contact.updateMany({
+      where: { id, companyId, archivedAt: { not: null } },
+      data: { archivedAt: null, archivedReason: null },
+    });
+
+    return {
+      restaurado: actualizados.count > 0,
+      yaEstaba: actualizados.count === 0,
+    };
   }
 
   async block(id: string, companyId: string) {

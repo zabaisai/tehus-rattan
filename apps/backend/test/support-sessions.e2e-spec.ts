@@ -14,6 +14,7 @@ import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ContactsController } from '../src/modules/contacts/contacts.controller';
 import { ContactsService } from '../src/modules/contacts/contacts.service';
+import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { SupportSessionsController } from '../src/modules/platform/support-sessions.controller';
 import { SupportSessionsService } from '../src/modules/platform/support-sessions.service';
 import {
@@ -78,6 +79,10 @@ describe('SupportSessionsController (e2e)', () => {
           useValue: supportSessionsServiceMock,
         },
         { provide: ContactsService, useValue: contactsServiceMock },
+        // `ContactsController` registra el archivado de contactos. Aquí no se
+        // ejercita esa ruta, pero sin el proveedor Nest no puede construir el
+        // controlador y caen todas las pruebas de guardas.
+        { provide: PlatformAuditLogService, useValue: { record: jest.fn() } },
       ],
     }).compile();
 

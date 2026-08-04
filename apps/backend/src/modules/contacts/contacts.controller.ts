@@ -12,6 +12,8 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
+import { PrismaService } from '../../prisma/prisma.service';
+import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
 import { ContactsService } from './contacts.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
@@ -19,7 +21,11 @@ import { UpdateContactDto } from './dto/update-contact.dto';
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
 @Controller('contacts')
 export class ContactsController {
-  constructor(private contactsService: ContactsService) {}
+  constructor(
+    private contactsService: ContactsService,
+    private auditoria: PlatformAuditLogService,
+    private prisma: PrismaService,
+  ) {}
 
   @Get()
   findAll(
@@ -27,11 +33,13 @@ export class ContactsController {
     @Query('search') search?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
+    @Query('includeArchived') includeArchived?: string,
   ) {
     return this.contactsService.findAll(req.user.companyId, {
       search,
       limit,
       offset,
+      includeArchived: includeArchived === 'true',
     });
   }
 
@@ -54,13 +62,68 @@ export class ContactsController {
     return this.contactsService.update(id, req.user.companyId, body);
   }
 
+  /**
+   * ARCHIVA el contacto. No lo borra.
+   *
+   * Se mantiene en `DELETE` porque es lo que ya llama la interfaz y porque
+   * para quien lo usa el gesto es el mismo; lo que cambia es que deja de
+   * destruir el historial. El borrado real va por la solicitud de eliminacion
+   * de datos, que es mas lenta a proposito.
+   */
   @Delete(':id')
-  remove(@Param('id') id: string, @Request() req: any) {
-    return this.contactsService.remove(id, req.user.companyId);
+  async remove(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body?: { motivo?: string },
+  ) {
+    const r = await this.contactsService.remove(
+      id,
+      req.user.companyId,
+      body?.motivo,
+    );
+    if (r.archivado)
+      await this.auditar(req, 'contact.archive', id, body?.motivo);
+    return r;
+  }
+
+  @Post(':id/restore')
+  async restore(@Param('id') id: string, @Request() req: any) {
+    const r = await this.contactsService.restore(id, req.user.companyId);
+    if (r.restaurado) await this.auditar(req, 'contact.restore', id);
+    return r;
   }
 
   @Post(':id/block')
   block(@Param('id') id: string, @Request() req: any) {
     return this.contactsService.block(id, req.user.companyId);
+  }
+
+  /**
+   * Archivar y restaurar quedan registrados.
+   *
+   * Sin registro, «este contacto desaparecio de la lista» no tiene respuesta:
+   * ni quien lo hizo ni cuando ni por que, y la conclusion natural es que el
+   * producto perdio datos.
+   *
+   * El fallo del registro NO tumba la accion: el contacto ya esta archivado y
+   * devolver un error haria que se reintentara sobre algo ya hecho.
+   */
+  private async auditar(
+    req: any,
+    accion: string,
+    entityId: string,
+    motivo?: string,
+  ): Promise<void> {
+    await this.auditoria
+      .record(this.prisma, {
+        actorUserId: req.user.sub,
+        actorRole: req.user.role,
+        affectedCompanyId: req.user.companyId,
+        action: accion,
+        entityType: 'Contact',
+        entityId,
+        ...(motivo?.trim() ? { reason: motivo.trim() } : {}),
+      })
+      .catch(() => undefined);
   }
 }

@@ -33,7 +33,9 @@ describe('Contrato del catálogo', () => {
   });
 
   it('los puertos vienen con etiqueta legible, no con el identificador crudo', () => {
-    const condicion = catalogo.nodos.find((n) => n.tipo === 'control.condition');
+    const condicion = catalogo.nodos.find(
+      (n) => n.tipo === 'control.condition',
+    );
     expect(condicion?.puertos.map((p) => p.etiqueta)).toEqual(
       expect.arrayContaining(['Sí', 'No']),
     );

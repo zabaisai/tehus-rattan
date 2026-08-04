@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PauseCircle, PlayCircle, ArrowLeft } from 'lucide-react';
+import { PauseCircle, PlayCircle, ArrowLeft, PanelRight } from 'lucide-react';
 import {
   getInbox,
   getInboxCounters,
@@ -20,6 +20,7 @@ import { ConversationList } from "@/components/conversations/ConversationList";
 import { MessageThread } from "@/components/conversations/MessageThread";
 import { MessageInput } from "@/components/conversations/MessageInput";
 import { ConversationOpportunity } from "@/components/conversations/ConversationOpportunity";
+import { PanelContacto } from "@/components/conversations/PanelContacto";
 import { intervaloDeRefresco, useRealtime } from "@/lib/use-realtime";
 import { InboxFilters } from "@/components/conversations/InboxFilters";
 import { InboxBulkBar } from "@/components/conversations/InboxBulkBar";
@@ -30,6 +31,9 @@ export default function ConversationsPage() {
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<FiltrosBandeja>({});
   const [seleccionadas, setSeleccionadas] = useState<string[]>([]);
+  // La ficha se abre a mano: en pantallas medianas robaría el sitio del hilo,
+  // que es lo que se está leyendo.
+  const [fichaAbierta, setFichaAbierta] = useState(false);
 
   // Con canal abierto los mensajes llegan solos; el polling se relaja pero no
   // desaparece, por si se pierde algun evento.
@@ -198,6 +202,19 @@ export default function ConversationsPage() {
                   </p>
                 </div>
               </div>
+              <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setFichaAbierta((v) => !v)}
+                aria-label="Ver la ficha del contacto"
+                aria-pressed={fichaAbierta}
+                className={`rounded-md p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-line-focus ${
+                  fichaAbierta
+                    ? 'bg-primary-50 text-brand-primary'
+                    : 'text-neutral-500 hover:bg-neutral-100'
+                }`}
+              >
+                <PanelRight size={16} />
+              </button>
               <button
                 onClick={handleTogglePause}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${
@@ -218,6 +235,7 @@ export default function ConversationsPage() {
                   </>
                 )}
               </button>
+              </div>
             </div>
 
             <ConversationOpportunity
@@ -233,8 +251,21 @@ export default function ConversationsPage() {
               </p>
             )}
 
-            <MessageThread messages={messages ?? []} />
-            <MessageInput onSend={handleSend} />
+            <div className="flex min-h-0 flex-1">
+              <div className="flex min-w-0 flex-1 flex-col">
+                <MessageThread messages={messages ?? []} />
+                <MessageInput onSend={handleSend} />
+              </div>
+
+              {fichaAbierta && (
+                <div className="hidden w-72 shrink-0 lg:block">
+                  <PanelContacto
+                    conversation={selectedConversation}
+                    onCerrar={() => setFichaAbierta(false)}
+                  />
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
