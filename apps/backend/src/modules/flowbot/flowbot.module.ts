@@ -6,6 +6,13 @@ import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-inte
 import { TransporteWhatsAppFalso } from './engine/adapters/flowbot.whatsapp.fake-transport';
 import { RegistroProveedoresIa } from './engine/adapters/flowbot.ia.provider';
 import { FlowBotReferenciasService } from './graph/flowbot.referencias.service';
+import { PlatformModule } from '../platform/platform.module';
+import { FlowBotController } from './api/flowbot.controller';
+import { FlowBotAdminService } from './api/flowbot.admin.service';
+import { FlowBotTriggersService } from './api/flowbot.triggers.service';
+import { FlowBotExecutionsService } from './api/flowbot.executions.service';
+import { FlowBotMetricsService } from './api/flowbot.metrics.service';
+import { FlowBotSimulatorService } from './api/flowbot.simulator.service';
 import { ProveedorIaFalso } from './engine/adapters/flowbot.ia.fake-provider';
 import { FlowBotQueueService } from './engine/flowbot.queue';
 import { FlowBotSelectorService } from './engine/flowbot.selector';
@@ -35,8 +42,9 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     CustomFieldsModule,
     ConversationsModule,
     WhatsAppIntegrationModule,
+    PlatformModule,
   ],
-  controllers: [FlowBotAdminController],
+  controllers: [FlowBotAdminController, FlowBotController],
   providers: [
     // Singleton a proposito: las pruebas y la demostracion miran lo que se
     // habria enviado, y para eso tienen que compartir instancia con el motor.
@@ -44,6 +52,11 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
+    FlowBotAdminService,
+    FlowBotTriggersService,
+    FlowBotExecutionsService,
+    FlowBotMetricsService,
+    FlowBotSimulatorService,
     FlowBotQueueService,
     FlowBotSelectorService,
     FlowBotRunnerService,
@@ -60,6 +73,11 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
+    FlowBotAdminService,
+    FlowBotTriggersService,
+    FlowBotExecutionsService,
+    FlowBotMetricsService,
+    FlowBotSimulatorService,
     FlowBotQueueService,
     FlowBotSelectorService,
     FlowBotRunnerService,
@@ -70,6 +88,8 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     TransporteWhatsAppFalso,
     ProveedorIaFalso,
     FlowBotReferenciasService,
+    FlowBotAdminService,
+    FlowBotSimulatorService,
   ],
 })
 export class FlowBotModule {}

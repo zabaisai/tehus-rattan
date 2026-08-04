@@ -981,6 +981,21 @@ enum NotificationPriority {
 enum Role {
   SUPER_ADMIN
   ADMIN
+
+  /// Coordina el equipo sin administrar la empresa.
+  ///
+  /// EXISTE PORQUE ADMIN Y AGENT NO CUBREN EL HUECO REAL. Quien disena y
+  /// publica bots necesita mas que un asesor y menos que un administrador:
+  /// puede crear, editar, simular y publicar flujos, y ver todas las
+  /// ejecuciones, pero NO toca credenciales, integraciones ni la
+  /// configuracion de la empresa. Dar ADMIN a esa persona significa darle
+  /// tambien las claves de WhatsApp y de los servicios externos.
+  ///
+  /// Se anade DESPUES de ADMIN a proposito: el orden de un enum de PostgreSQL
+  /// es el de declaracion, y ninguna consulta del producto ordena por rol,
+  /// pero si alguna lo hiciera, insertarlo en medio cambiaria resultados.
+  MANAGER
+
   AGENT
 }
 
