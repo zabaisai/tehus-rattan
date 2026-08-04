@@ -1215,7 +1215,148 @@ builds limpios, las ocho rutas en el manifiesto de Next.
 
 ---
 
+## Bloque 9 (cerrado) — Candidato de release y transporte real bloqueado
+
+Existe el camino completo hacia Meta **y no puede recorrerse**. Con la
+configuración que hay hoy no sale ni un mensaje, y hacen falta **trece
+condiciones simultáneas** para que salga uno.
+
+### Tres modos, elegidos en un solo sitio
+
+`falso` devuelve un identificador inventado · `dry-run` ejecuta todo —número,
+ventana, plantilla, idempotencia— y construye la petición exacta sin abrir la
+conexión · `real` sale.
+
+La decisión vive en `decidirModo` y la aplica la fábrica de efectos, **envío a
+envío**. Un nodo no sabe —ni puede saber— en qué modo está el sistema: recibe
+un puerto de mensajería y lo usa.
+
+**La ausencia de configuración equivale a bloqueado.** Las listas vacías
+significan «ninguno», no «todos» —es la diferencia entre olvidarse de
+configurar y abrir el envío a todo el mundo—, y las banderas solo se encienden
+con el texto exacto: `1`, `yes` o `TRUE_` dejan el seguro puesto.
+
+### Los guardarraíles se evalúan JUSTO ANTES de enviar
+
+No al arrancar la ejecución. Entre que un bot empieza a atender y llega a un
+nodo de mensaje pueden pasar horas: en ese rato pueden haber pausado el bot,
+publicado otra versión o entrado una persona a atender.
+
+Ese es exactamente **el caso del trabajo antiguo que revive**, y lo bloquea la
+comparación entre la versión con la que arrancó la ejecución y la publicada
+ahora.
+
+### El fallo más caro estaba en la clasificación
+
+Un `timeout` caía en «red», que es reintentable. Pero un timeout ocurre
+**después** de escribir la petición —Meta pudo procesarla— así que reintentar
+es mandarle al cliente el mismo mensaje dos veces.
+
+Ahora se distingue lo que falló **antes de salir** (DNS, conexión rechazada:
+reintentar es gratis y es lo único que funciona) de lo **ambiguo** (timeout,
+socket cortado, 200 sin identificador: no se reintenta, se marca para que
+alguien lo mire). El duplicado era cuestión de tiempo.
+
+Quince clases de error con su política en una tabla —reintento, backoff,
+intentos, handoff, atención y una frase legible— en vez de condiciones
+repartidas: así «¿esto reintenta?» se lee en vez de reconstruirse. La frase
+llega al mensaje fallido, para que quien abra la conversación no vea solo
+`limite-de-tasa`.
+
+### Interruptor de emergencia
+
+En **base de datos**, no en variable de entorno: el momento en que hace falta
+parar los envíos es el peor momento para reiniciar procesos. Una fila cambia en
+segundos y el worker la lee en el siguiente envío.
+
+Para los **bots** y no los mensajes manuales del CRM —apagar también eso
+convierte una pausa de seguridad en una interrupción del negocio, que es lo que
+hace que nadie se atreva a usarlo—. No borra ejecuciones ni trabajos, exige
+motivo escrito, deja auditoría, se ve en pantalla y es **fail-closed**: si no
+se puede leer, se asume activo.
+
+### Plantillas: lo desconocido se bloquea
+
+Una plantilla que no está registrada, o está pero nunca se verificó, o espera
+otro número de parámetros, **no se manda**. Asumirla aprobada acaba en rechazos
+de Meta que degradan la calidad del número, y eso tarda semanas en revertirse.
+El idioma forma parte de su identidad: una aprobada en `es` no existe en `en`.
+
+Meta es la autoridad; la tabla local es solo lo último que se comprobó. La
+interfaz del proveedor existe y hoy solo está el falso, que devuelve «no sé» —
+un proveedor falso optimista haría pasar las pruebas y dejaría el sistema
+mandando plantillas sin verificar el día que se encienda.
+
+### Meta simulada
+
+El transporte real se prueba contra un servidor HTTP levantado en la propia
+máquina: 200, 400, 401, 403, 429, 500, timeout, conexión cortada, respuesta no
+JSON y 200 sin identificador. **Nunca se llama a `graph.facebook.com`.**
+
+Los tres transportes cumplen el mismo contrato, y las pruebas **rompen
+`http.request`** para demostrar que falso y dry-run no abren ninguna conexión —
+en vez de pasar por casualidad porque no había servidor.
+
+Ninguna respuesta arrastra el token ni el teléfono al resultado, y se comprueba
+con respuestas que los llevan dentro a propósito.
+
+### En pantalla
+
+Cuatro estados con la frase escrita: no conectado, modo de prueba, enviando de
+verdad, envíos parados. El interruptor manda sobre el modo. A un `AGENT` no se
+le enseña: no es decisión suya y sería ruido.
+
+Es la información que más caro sale no tener — alguien prueba un bot, ve
+«enviado» y cree que su cliente ya recibió la respuesta.
+
+### Migraciones
+
+**Diez en la rama, las diez aditivas**: tablas y columnas nuevas, ningún `DROP`,
+ningún cambio de tipo, ningún `SET NOT NULL`. Ensayadas en una base limpia y
+sobre una copia con la estructura anterior y datos representativos: todas las
+filas sobrevivieron y las columnas nuevas entraron nulables.
+
+### Verificación
+
+Backend **1914 unit / 675 e2e**, frontend **392**, typecheck 0, lint 0, ambos
+builds limpios.
+
+---
+
 ## Próximo paso
+
+**La autorización para encender, y el despliegue a staging.** Ambas cosas
+requieren una decisión que este trabajo no toma. El procedimiento está escrito
+en `docs/FLOWBOT-ACTIVACION-WHATSAPP.md`: empresa piloto, número piloto,
+destinatario propio, dry-run primero y ampliar de uno en uno.
+
+Antes de subir el volumen de esa prueba hay que cerrar las dos limitaciones de
+la lista de abajo que tienen que ver con el ritmo de envío.
+
+### Limitaciones honestas que siguen abiertas
+
+- **WhatsApp real nunca se ha activado.** El camino existe y está probado
+  contra una Meta simulada; contra Meta de verdad, nunca.
+- **El límite de frecuencia y el circuit breaker no están implementados.** Los
+  guardarraíles existen y se evalúan, pero hoy reciben siempre «dentro del
+  límite» y «circuito sano»: no hay contador ni detector detrás. Es la deuda
+  que hay que cerrar antes de subir el volumen.
+- **Verificar plantillas contra Meta es manual.** La interfaz está; el
+  proveedor real no.
+- **No hay equipos.** El handoff asigna un usuario.
+- **El interruptor de emergencia exige sesión de soporte** a un `SUPER_ADMIN`
+  de plataforma, como el resto de la API. Son segundos, pero conviene tenerlo
+  ensayado y no descubrirlo en la urgencia.
+- **El simulador no anima el recorrido sobre el lienzo**; lo enseña paso a paso
+  en el panel.
+- **La comparación de versiones es textual**, no lado a lado.
+- **Sin OpenAPI generado.**
+- **`resumir` de IA devuelve vacío.**
+- **El rebinding de DNS no está cerrado del todo.**
+- **La accesibilidad tiene un barrido automático**, no una auditoría con lector
+  de pantalla real.
+
+### Referencia del bloque 8 (constructor visual)
 
 **Auditoría visual con ojo humano y preparación de staging.** Lo que queda no es
 construir, es mirar y decidir:
