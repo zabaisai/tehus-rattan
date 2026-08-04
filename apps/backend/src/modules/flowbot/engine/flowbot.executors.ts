@@ -557,6 +557,10 @@ const transferir: EjecutorNodo = async (ctx) => {
     userId: texto(ctx.config.assignedTo) || undefined,
     motivo,
     nota: texto(ctx.config.note) || undefined,
+    // QUE nodo lo decidio. Un flujo con tres salidas a persona por motivos
+    // distintos es indistinguible sin esto, y es la primera pregunta de quien
+    // revisa por que se entrego una conversacion.
+    nodeId: ctx.nodo.id,
   });
   return handoff(motivo);
 };

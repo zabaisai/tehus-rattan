@@ -250,12 +250,21 @@ export async function avanzar(
       resultado = await ejecutor(ctx);
     } catch (error) {
       // Un ejecutor que revienta no puede tumbar la ejecución entera sin
-      // dejar rastro. Se clasifica como interno —reintentable— porque casi
+      // dejar rastro.
+      //
+      // SI EL ERROR DECLARA SU CLASE, SE RESPETA. Un adaptador sabe mucho
+      // mejor que el motor si lo suyo se arregla reintentando: un token
+      // caducado y un 503 de Meta llegan aquí igual de rotos, pero uno
+      // necesita que una persona reconecte el número y el otro se arregla
+      // solo en treinta segundos. Sin esta línea, los dos se reintentaban
+      // cinco veces y los dos acababan en FAILED.
+      //
+      // Sin clase declarada se asume interno —reintentable— porque casi
       // siempre lo es: un fallo de red, un tiempo agotado.
       resultado = {
         tipo: 'error',
         errorCode: nombreDeError(error),
-        claseError: 'interno',
+        claseError: claseDeclarada(error) ?? 'interno',
       };
     }
     const durationMs = Date.now() - inicio;
@@ -384,6 +393,28 @@ function nombreDeError(error: unknown): string {
  * una caída de Meta vuelven a intentarlo todas en el mismo instante y repiten
  * la avalancha que las tumbó.
  */
+/**
+ * La clase que el propio error declara, si declara alguna.
+ *
+ * Se lee con una comprobación de forma y no con `instanceof`: el motor no
+ * puede importar los adaptadores —eso invertiría la dependencia que hace
+ * inocuo al simulador— así que el contrato es «un error puede llevar una
+ * propiedad `clase`».
+ */
+function claseDeclarada(error: unknown): ClaseError | null {
+  if (!error || typeof error !== 'object') return null;
+  const clase = (error as { clase?: unknown }).clase;
+  if (typeof clase !== 'string') return null;
+
+  const traduccion: Record<string, ClaseError> = {
+    externo_transitorio: 'externo_reintentable',
+    externo_definitivo: 'externo_definitivo',
+    atencion: 'requiere_intervencion',
+    configuracion: 'configuracion',
+  };
+  return traduccion[clase] ?? null;
+}
+
 export function esperaDeReintento(
   intento: number,
   semilla = Math.random(),

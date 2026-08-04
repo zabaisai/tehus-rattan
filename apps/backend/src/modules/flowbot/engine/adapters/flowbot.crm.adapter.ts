@@ -489,6 +489,9 @@ export class CrmAdapter implements PuertoCrm {
  * el cliente espera cinco backoffs para no recibir nada.
  */
 export class ErrorDeConfiguracion extends Error {
+  /** Lo lee el interprete para NO reintentar. Ver `claseDeclarada`. */
+  readonly clase = 'configuracion' as const;
+
   constructor(motivo: string) {
     super(motivo);
     this.name = 'ErrorDeConfiguracion';

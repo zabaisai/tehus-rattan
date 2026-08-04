@@ -28,7 +28,12 @@
  * Uso, desde `apps/backend`:  node scripts/flowbot-demo-autonoma.mjs
  */
 import { spawn } from 'node:child_process';
-import { createHmac, randomBytes } from 'node:crypto';
+import {
+  createCipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+} from 'node:crypto';
 import { setTimeout as dormir } from 'node:timers/promises';
 import { PrismaClient } from '@prisma/client';
 import 'dotenv/config';
@@ -103,19 +108,60 @@ const FLUJO = {
       saveAs: 'nombre',
       timeoutSeconds: 20,
     }),
-    nodo('gracias', 'send.text', { text: 'Gracias {{flow.nombre}}' }),
+    nodo('campo_contacto', 'crm.contact_field', {
+      field: 'origen_lead',
+      value: 'whatsapp',
+    }),
+    nodo('campo_lead', 'crm.lead_field', {
+      field: 'presupuesto',
+      value: '1500000',
+    }),
+    nodo('tarea', 'crm.task_create', { title: 'Llamar a {{flow.nombre}}' }),
+    // `crm.handoff` es TERMINAL: entregar a una persona y seguir ejecutando
+    // seria el bot hablando por encima del asesor.
+    nodo('entrega', 'crm.handoff', { reason: 'cliente-identificado' }),
     nodo('nadie', 'send.text', { text: 'Sigo aqui cuando quieras' }),
     nodo('fin', 'control.end'),
   ],
   edges: [
     con('inicio', 'next', 'saluda'),
     con('saluda', 'next', 'pide'),
-    con('pide', 'next', 'gracias'),
+    con('pide', 'next', 'campo_contacto'),
     con('pide', 'timeout', 'nadie'),
-    con('gracias', 'next', 'fin'),
+    con('campo_contacto', 'next', 'campo_lead'),
+    con('campo_lead', 'next', 'tarea'),
+    con('tarea', 'next', 'entrega'),
     con('nadie', 'next', 'fin'),
   ],
 };
+
+/**
+ * Cifra como lo hace `WhatsAppTokenCryptoService`: AES-256-GCM con la clave
+ * derivada del entorno. Se reimplementa aqui —doce lineas— en vez de importar
+ * el servicio de Nest, que arrastraria medio contenedor de dependencias a un
+ * guion que solo prepara datos.
+ */
+function cifrarFalso(texto) {
+  const secreto = process.env.WHATSAPP_TOKEN_ENCRYPTION_KEY;
+  if (!secreto) {
+    throw new Error(
+      'Falta WHATSAPP_TOKEN_ENCRYPTION_KEY en .env: la demostracion cifra el ' +
+        'token falso con la misma clave que usa el servicio real.',
+    );
+  }
+  const clave = createHash('sha256').update(secreto).digest();
+  const iv = randomBytes(12);
+  const cifrador = createCipheriv('aes-256-gcm', clave, iv);
+  const cifrado = Buffer.concat([
+    cifrador.update(texto, 'utf8'),
+    cifrador.final(),
+  ]);
+  return [
+    iv.toString('hex'),
+    cifrador.getAuthTag().toString('hex'),
+    cifrado.toString('hex'),
+  ].join(':');
+}
 
 // ── utilidades de observación ───────────────────────────────────
 
@@ -183,6 +229,20 @@ async function esperarPuerto(limiteMs = 60_000) {
 
 async function limpiar(companyIds) {
   if (companyIds.length === 0) return;
+  await prisma.customFieldValueChange.deleteMany({
+    where: { companyId: { in: companyIds } },
+  });
+  await prisma.customFieldValue.deleteMany({
+    where: { companyId: { in: companyIds } },
+  });
+  await prisma.customFieldDefinition.deleteMany({
+    where: { companyId: { in: companyIds } },
+  });
+  await prisma.conversationHandoff.deleteMany({
+    where: { companyId: { in: companyIds } },
+  });
+  await prisma.task.deleteMany({ where: { companyId: { in: companyIds } } });
+  await prisma.note.deleteMany({ where: { companyId: { in: companyIds } } });
   await prisma.flowBotWait.deleteMany({
     where: { companyId: { in: companyIds } },
   });
@@ -211,12 +271,26 @@ async function limpiar(companyIds) {
   await prisma.message.deleteMany({
     where: { conversation: { companyId: { in: companyIds } } },
   });
+  await prisma.leadStageHistory.deleteMany({
+    where: { lead: { companyId: { in: companyIds } } },
+  });
   await prisma.conversation.deleteMany({
     where: { companyId: { in: companyIds } },
   });
+  await prisma.lead.deleteMany({ where: { companyId: { in: companyIds } } });
   await prisma.contact.deleteMany({
     where: { companyId: { in: companyIds } },
   });
+  await prisma.companyLeadSettings.deleteMany({
+    where: { companyId: { in: companyIds } },
+  });
+  await prisma.pipelineStage.deleteMany({
+    where: { pipeline: { companyId: { in: companyIds } } },
+  });
+  await prisma.pipeline.deleteMany({
+    where: { companyId: { in: companyIds } },
+  });
+  await prisma.user.deleteMany({ where: { companyId: { in: companyIds } } });
   await prisma.whatsAppIntegration.deleteMany({
     where: { companyId: { in: companyIds } },
   });
@@ -247,8 +321,80 @@ async function main() {
       displayPhoneNumber: '+573000000001',
       wabaId: `${PREFIJO}-waba`,
       status: 'CONNECTED',
+      // Token FALSO pero cifrado de verdad, con la misma clave del entorno
+      // local. El adaptador lo descifra igual que descifraria uno real: si se
+      // pusiera texto plano, el descifrado fallaria y estariamos probando el
+      // camino de error en vez del camino bueno.
+      //
+      // NO ES UN TOKEN DE META. Es la cadena "token-de-demostracion", y el
+      // transporte que lo recibe es falso: no sale ninguna peticion.
+      accessTokenEncrypted: cifrarFalso('token-de-demostracion'),
+      isPrimary: true,
     },
   });
+
+  // Pipeline con etapa inicial marcada EXPLICITAMENTE. El nombre no decide
+  // nada: se llama "Bandeja de entrada" y aun asi recibe.
+  const pipeline = await prisma.pipeline.create({
+    data: { companyId: empresa.id, name: `${PREFIJO}-pipeline`, order: 0 },
+  });
+  const etapaInicial = await prisma.pipelineStage.create({
+    data: {
+      pipelineId: pipeline.id,
+      name: 'Bandeja de entrada',
+      order: 0,
+      isInitial: true,
+    },
+  });
+  await prisma.pipelineStage.create({
+    data: { pipelineId: pipeline.id, name: 'Calificado', order: 1 },
+  });
+
+  const asesor = await prisma.user.create({
+    data: {
+      companyId: empresa.id,
+      email: `demo-flowbot-${Date.now()}@ejemplo.test`,
+      password: 'no-se-usa',
+      name: 'Asesora de guardia',
+      role: 'AGENT',
+    },
+  });
+
+  await prisma.companyLeadSettings.create({
+    data: {
+      companyId: empresa.id,
+      autoCreateLead: true,
+      defaultPipelineId: pipeline.id,
+      initialStageId: etapaInicial.id,
+      reuseOpenLead: true,
+      assignmentStrategy: 'NINGUNA',
+    },
+  });
+
+  // Campos personalizados REALES, no etiquetas `campo:valor`.
+  await prisma.customFieldDefinition.create({
+    data: {
+      companyId: empresa.id,
+      entity: 'CONTACT',
+      key: 'origen_lead',
+      label: 'Origen',
+      type: 'SELECT',
+      options: [
+        { value: 'whatsapp', label: 'WhatsApp' },
+        { value: 'web', label: 'Web' },
+      ],
+    },
+  });
+  await prisma.customFieldDefinition.create({
+    data: {
+      companyId: empresa.id,
+      entity: 'LEAD',
+      key: 'presupuesto',
+      label: 'Presupuesto',
+      type: 'CURRENCY',
+    },
+  });
+  detalle(`etapa inicial="${etapaInicial.name}" asesor=${asesor.id}`);
 
   const compilacion = compilar(FLUJO);
   if (!compilacion.ok) {
@@ -348,8 +494,13 @@ async function main() {
     throw new Error(`El webhook rechazó el payload: ${respuesta.status}`);
   }
 
-  /** El mismo sobre de Meta, con otro mensaje dentro. */
-  const conMensaje = (id, texto) => ({
+  /**
+   * El mismo sobre de Meta, con otro mensaje dentro y opcionalmente de otro
+   * cliente. Dos personas distintas son dos conversaciones distintas, que es
+   * justo lo que hace falta para observar el vencimiento sin pelearse con el
+   * handoff de la primera.
+   */
+  const conMensaje = (id, texto, de = '573001234567') => ({
     ...cuerpo,
     entry: [
       {
@@ -359,10 +510,13 @@ async function main() {
             ...cuerpo.entry[0].changes[0],
             value: {
               ...cuerpo.entry[0].changes[0].value,
+              contacts: [
+                { wa_id: de, profile: { name: `Cliente ${de.slice(-4)}` } },
+              ],
               messages: [
                 {
                   id,
-                  from: '573001234567',
+                  from: de,
                   type: 'text',
                   text: { body: texto },
                   timestamp: String(Math.floor(Date.now() / 1000)),
@@ -457,7 +611,11 @@ async function main() {
       const e = await prisma.flowBotExecution.findUnique({
         where: { id: ejecucion.id },
       });
-      return ['COMPLETED', 'FAILED', 'CANCELLED'].includes(e?.status ?? '')
+      // HANDED_OFF cuenta: este flujo TERMINA entregando a una persona, que
+      // es el final que se quiere demostrar.
+      return ['COMPLETED', 'FAILED', 'CANCELLED', 'HANDED_OFF'].includes(
+        e?.status ?? '',
+      )
         ? e
         : null;
     },
@@ -487,9 +645,11 @@ async function main() {
   });
   detalle(`pendientes o fallidos: ${pendientes}`);
 
-  log('Segunda ejecución, para observar el DESPERTAR POR TIEMPO');
+  log('Segundo cliente, para observar el DESPERTAR POR TIEMPO');
   const wamid3 = `wamid.demo3.${Date.now()}`;
-  await webhook(conMensaje(wamid3, 'hola otra vez'));
+  // Otro numero: la conversacion de Ana esta entregada a una persona y el bot
+  // no debe volver a hablar en ella. Eso se comprueba mas abajo a proposito.
+  await webhook(conMensaje(wamid3, 'hola', '573009998888'));
 
   const segunda = await esperarA('la segunda ejecución está esperando', async () => {
     const e = await prisma.flowBotExecution.findFirst({
@@ -527,6 +687,105 @@ async function main() {
       : '✗ NO salió por la rama de tiempo agotado',
   );
 
+  log('La oportunidad, ¿entro en la etapa marcada isInitial?');
+  const oportunidad = await prisma.lead.findFirst({
+    where: { companyId: empresa.id },
+    include: { stage: true },
+  });
+  detalle(
+    oportunidad
+      ? `oportunidad ${oportunidad.id} en "${oportunidad.stage.name}" (isInitial=${oportunidad.stage.isInitial})`
+      : '✗ no se creo ninguna oportunidad',
+  );
+
+  log('Campos personalizados: ¿se guardaron de verdad?');
+  const valores = await prisma.customFieldValue.findMany({
+    where: { companyId: empresa.id },
+    include: { definition: true },
+  });
+  for (const v of valores) {
+    const dato =
+      v.valueText ?? (v.valueNumber ? v.valueNumber.toString() : null);
+    detalle(`${v.definition.entity}.${v.definition.key} = ${dato}`);
+  }
+  const contactoFinal = await prisma.contact.findFirst({
+    where: { companyId: empresa.id },
+  });
+  detalle(
+    (contactoFinal?.tags ?? []).some((t) => t.includes(':'))
+      ? '✗ todavia hay etiquetas campo:valor'
+      : '✓ ninguna etiqueta campo:valor: almacenamiento real',
+  );
+
+  log('Historial de cambios: ¿quien los hizo?');
+  const cambios = await prisma.customFieldValueChange.findMany({
+    where: { companyId: empresa.id },
+  });
+  for (const c of cambios) {
+    detalle(
+      `${c.source} · ejecucion=${c.executionId ? 'si' : 'no'} · ${c.previousValue ?? '(vacio)'} → ${c.newValue}`,
+    );
+  }
+
+  log('Tarea creada por el flujo');
+  const tareas = await prisma.task.findMany({
+    where: { companyId: empresa.id },
+  });
+  detalle(`tareas: ${tareas.length}`);
+
+  log('Handoff: ¿se entrego la conversacion a una persona?');
+  const entrega = await prisma.conversationHandoff.findFirst({
+    where: { companyId: empresa.id },
+  });
+  detalle(
+    entrega
+      ? `handoff ${entrega.id} estado=${entrega.status} motivo=${entrega.reason} nodo=${entrega.nodeId ?? '-'}`
+      : '✗ no hubo handoff',
+  );
+  const convFinal = await prisma.conversation.findFirst({
+    where: { companyId: empresa.id },
+  });
+  detalle(`conversacion en pausa: ${convFinal?.isPaused}`);
+
+  log('¿Calla el bot mientras hay una persona atendiendo?');
+  const antesDelTercero = await prisma.message.count({
+    where: { conversation: { companyId: empresa.id }, direction: 'OUTBOUND' },
+  });
+  await webhook(conMensaje(`wamid.demo.handoff.${Date.now()}`, 'sigues ahi?'));
+  await dormir(6000);
+  const despuesDelTercero = await prisma.message.count({
+    where: { conversation: { companyId: empresa.id }, direction: 'OUTBOUND' },
+  });
+  detalle(
+    despuesDelTercero === antesDelTercero
+      ? '✓ el bot no contesto: la persona tiene la conversacion'
+      : `✗ el bot contesto ${despuesDelTercero - antesDelTercero} vez/veces`,
+  );
+
+  log('Reanudacion manual: la persona devuelve el control');
+  await prisma.conversationHandoff.updateMany({
+    where: { companyId: empresa.id, status: 'ACTIVE' },
+    data: { status: 'RESOLVED', resolvedAt: new Date() },
+  });
+  await prisma.conversation.updateMany({
+    where: { companyId: empresa.id },
+    data: { isPaused: false },
+  });
+  const trasResolver = await prisma.conversationHandoff.findFirst({
+    where: { companyId: empresa.id },
+  });
+  detalle(`handoff ahora: ${trasResolver?.status}`);
+
+  log('Lo que se habria enviado por WhatsApp (transporte falso)');
+  const salientes = await prisma.message.findMany({
+    where: { conversation: { companyId: empresa.id }, direction: 'OUTBOUND' },
+    orderBy: { createdAt: 'asc' },
+  });
+  for (const m of salientes) {
+    // Solo tipo y estado: el cuerpo del mensaje no se imprime.
+    detalle(`${m.type} · ${m.status} · clave=${m.externalKey ? 'si' : 'no'}`);
+  }
+
   log('Salud del sistema tras todo el recorrido');
   const salud = await (await fetch(`${BASE}/health/status`)).json();
   detalle(`global: ${salud.status}`);
@@ -552,10 +811,16 @@ async function main() {
   for (const r of resumen) detalle(`${r.status}: ${r._count}`);
 
   console.log(
-    '\n══ El motor arrancó, avanzó, esperó, se reanudó por mensaje y por',
+    '\n══ Vertical completa: mensaje → contacto → conversación → oportunidad',
   );
   console.log(
-    '   tiempo, y terminó. Este guion no llamó al runner ni una sola vez. ══\n',
+    '   en la etapa inicial → bot → respuesta → espera → reanudación →',
+  );
+  console.log(
+    '   campos personalizados → tarea → handoff → reanudación manual.',
+  );
+  console.log(
+    '   Este guion no llamó al runner ni una sola vez. ══\n',
   );
 
   await limpiar([empresa.id]);
