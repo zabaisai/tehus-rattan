@@ -221,6 +221,33 @@ export interface PuertoCrm {
     valor: string;
   }): Promise<void>;
 
+  /**
+   * Campo personalizado de la OPORTUNIDAD, no del contacto.
+   *
+   * Son dos operaciones y no una con bandera porque un dato del negocio
+   * —«presupuesto aprobado»— pertenece a la oportunidad: guardarlo en el
+   * contacto lo arrastraría a la siguiente venta, donde ya no es cierto.
+   */
+  campoOportunidad(input: {
+    companyId: string;
+    leadId: string;
+    campo: string;
+    valor: string;
+  }): Promise<void>;
+
+  /**
+   * Archiva un contacto sin borrar nada.
+   *
+   * Conserva conversaciones, oportunidades e historial. Distinto de bloquear:
+   * archivar es «ya no está activo», bloquear es una decisión sobre la
+   * relación.
+   */
+  archivarContacto(input: {
+    companyId: string;
+    contactId: string;
+    motivo?: string;
+  }): Promise<void>;
+
   crearOportunidad(input: {
     companyId: string;
     contactId: string | null;
@@ -302,6 +329,8 @@ export interface PuertoCrm {
     userId?: string;
     motivo?: string;
     nota?: string;
+    /** Qué nodo lo decidió, para poder explicarlo después. */
+    nodeId?: string;
   }): Promise<void>;
 }
 

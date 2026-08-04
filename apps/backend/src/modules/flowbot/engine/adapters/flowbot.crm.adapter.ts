@@ -2,6 +2,8 @@ import { Logger } from '@nestjs/common';
 import { PrismaService } from '../../../../prisma/prisma.service';
 import { PuertoCrm } from '../flowbot.ports';
 import { normalizePhone } from '../../../../common/phone/e164.util';
+import { CustomFieldsService } from '../../../custom-fields/custom-fields.service';
+import { HandoffService } from '../../../conversations/handoff.service';
 
 /**
  * Adaptador REAL de CRM.
@@ -21,6 +23,16 @@ export class CrmAdapter implements PuertoCrm {
   constructor(
     private readonly prisma: PrismaService,
     private readonly companyId: string,
+    /**
+     * Los campos personalizados y el handoff se delegan en sus servicios en
+     * vez de reimplementarse aqui. Dos caminos de escritura es como acaban
+     * divergiendo las reglas hasta que un bot puede guardar lo que un
+     * formulario rechaza, o dejar una conversacion pausada sin registro.
+     */
+    private readonly campos: CustomFieldsService,
+    private readonly handoff: HandoffService,
+    /** Que ejecucion esta produciendo estos efectos, para el historial. */
+    private readonly executionId: string | null = null,
   ) {}
 
   async guardarContacto(input: {
@@ -105,30 +117,90 @@ export class CrmAdapter implements PuertoCrm {
   }
 
   /**
-   * Campo personalizado.
+   * Campo personalizado, con almacenamiento REAL.
    *
-   * `Contact` NO tiene todavia un almacen de campos libres en el esquema, asi
-   * que esto se guarda como una etiqueta `campo:valor`. Es una limitacion
-   * real y esta anotada en el estado del proyecto: cuando exista la columna,
-   * este metodo cambia sin tocar el nodo ni el grafo, que es justo lo que el
-   * puerto permite.
+   * Antes esto guardaba `campo:valor` como etiqueta porque `Contact` no tenia
+   * donde ponerlo. Ya lo tiene, y el nodo no ha cambiado: es exactamente para
+   * lo que sirve el puerto.
+   *
+   * Escribe por el MISMO servicio que la API, asi que un bot no puede guardar
+   * un valor que un formulario rechazaria. Y NO crea la definicion sobre la
+   * marcha: un campo que aparece porque un bot lo menciono llena el CRM de
+   * columnas fantasma con erratas por nombre.
    */
   async campoPersonalizado(input: {
     contactId: string;
     campo: string;
     valor: string;
   }): Promise<void> {
-    const contacto = await this.prisma.contact.findFirst({
-      where: { id: input.contactId, companyId: this.companyId },
-      select: { tags: true },
+    const r = await this.campos.establecerPorClave({
+      companyId: this.companyId,
+      entity: 'CONTACT',
+      key: input.campo,
+      valor: input.valor,
+      destino: { contactId: input.contactId },
+      origen: { source: 'FLOWBOT', executionId: this.executionId },
     });
-    if (!contacto) return;
 
-    const prefijo = `${input.campo}:`;
-    const otras = (contacto.tags ?? []).filter((t) => !t.startsWith(prefijo));
+    if (!r.ok) {
+      // NO se traga en silencio. El motor clasifica: un campo inexistente o
+      // un valor invalido son fallos de CONFIGURACION del flujo, no de red, y
+      // reintentarlos mil veces no los va a arreglar.
+      throw new ErrorDeConfiguracion(r.motivo);
+    }
+  }
+
+  /**
+   * Campo personalizado de la OPORTUNIDAD.
+   *
+   * Mismo camino, otra entidad. Existen los dos porque un dato del negocio
+   * —"presupuesto aprobado"— pertenece a la oportunidad y no a la persona:
+   * guardarlo en el contacto lo arrastraria a la siguiente venta, donde ya no
+   * es cierto.
+   */
+  async campoOportunidad(input: {
+    leadId: string;
+    campo: string;
+    valor: string;
+  }): Promise<void> {
+    const r = await this.campos.establecerPorClave({
+      companyId: this.companyId,
+      entity: 'LEAD',
+      key: input.campo,
+      valor: input.valor,
+      destino: { leadId: input.leadId },
+      origen: { source: 'FLOWBOT', executionId: this.executionId },
+    });
+    if (!r.ok) throw new ErrorDeConfiguracion(r.motivo);
+  }
+
+  /**
+   * Archiva un contacto SIN borrar nada.
+   *
+   * Conserva conversaciones, oportunidades e historial: son datos del negocio
+   * y de la persona. Lo que cambia es que deja de aparecer en las listas de
+   * trabajo y que los bots no arrancan solos con el.
+   *
+   * Distinto de bloquear: archivar es "ya no esta activo", bloquear es una
+   * decision sobre la relacion. Confundirlos haria que limpiar la lista
+   * pareciera un veto.
+   */
+  async archivarContacto(input: {
+    contactId: string;
+    motivo?: string;
+  }): Promise<void> {
     await this.prisma.contact.updateMany({
-      where: { id: input.contactId, companyId: this.companyId },
-      data: { tags: [...otras, `${prefijo}${input.valor}`] },
+      // `archivedAt: null` en el filtro: archivar dos veces no puede mover la
+      // fecha, o se perderia cuando ocurrio de verdad.
+      where: {
+        id: input.contactId,
+        companyId: this.companyId,
+        archivedAt: null,
+      },
+      data: {
+        archivedAt: new Date(),
+        archivedReason: input.motivo ?? null,
+      },
     });
   }
 
@@ -355,45 +427,30 @@ export class CrmAdapter implements PuertoCrm {
   /**
    * Transfiere a una persona.
    *
-   * PAUSA la conversación además de asignarla. Sin la pausa, el bot seguiría
-   * contestando mientras el asesor escribe, y el cliente recibiría dos voces
-   * a la vez: el fallo que más desconcierta de todos.
+   * DELEGA EN `HandoffService`, que persiste una fila con quien atiende, por
+   * que, desde que ejecucion y desde que nodo. `isPaused` por si solo no
+   * responde ninguna de esas preguntas: solo dice "el bot calla", y cuando
+   * alguien pregunta por que, no hay respuesta.
+   *
+   * Es idempotente por conversacion: un reintento del mismo nodo no le roba
+   * la conversacion al asesor que ya la tenia.
    */
   async transferir(input: {
     conversationId: string;
     userId?: string;
     motivo?: string;
     nota?: string;
+    nodeId?: string;
   }): Promise<void> {
-    const asignado = input.userId
-      ? await this.prisma.user.findFirst({
-          where: {
-            id: input.userId,
-            companyId: this.companyId,
-            isActive: true,
-          },
-          select: { id: true },
-        })
-      : null;
-
-    await this.prisma.conversation.updateMany({
-      where: { id: input.conversationId, companyId: this.companyId },
-      data: {
-        isPaused: true,
-        ...(asignado ? { assignedTo: asignado.id } : {}),
-      },
+    await this.handoff.abrir({
+      companyId: this.companyId,
+      conversationId: input.conversationId,
+      assignedToUserId: input.userId ?? null,
+      reason: input.motivo ?? null,
+      note: input.nota ?? null,
+      executionId: this.executionId,
+      nodeId: input.nodeId ?? null,
     });
-
-    if (input.nota || input.motivo) {
-      await this.prisma.note.create({
-        data: {
-          companyId: this.companyId,
-          conversationId: input.conversationId,
-          content:
-            input.nota ?? `El bot transfirió la conversación: ${input.motivo}`,
-        },
-      });
-    }
   }
 
   /** Devuelve el id solo si la entidad es de esta empresa; si no, `null`. */
@@ -419,5 +476,21 @@ export class CrmAdapter implements PuertoCrm {
               select: { id: true },
             });
     return encontrado?.id ?? null;
+  }
+}
+
+/**
+ * Un fallo que NO se arregla reintentando: el campo no existe, el valor no
+ * pasa la validacion, la etapa es de otra empresa.
+ *
+ * El interprete lo clasifica como `configuracion` y saca la ejecucion por su
+ * rama de error en vez de reintentar cinco veces algo que va a fallar igual
+ * las cinco. Sin esta distincion, un flujo mal configurado consume la cola y
+ * el cliente espera cinco backoffs para no recibir nada.
+ */
+export class ErrorDeConfiguracion extends Error {
+  constructor(motivo: string) {
+    super(motivo);
+    this.name = 'ErrorDeConfiguracion';
   }
 }

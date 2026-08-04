@@ -106,6 +106,12 @@ model Company {
   flowBotTestRuns      FlowBotTestRun[]
   leadSettings         CompanyLeadSettings?
 
+  customFieldDefinitions CustomFieldDefinition[]
+  customFieldValues      CustomFieldValue[]
+  customFieldChanges     CustomFieldValueChange[]
+
+  handoffs ConversationHandoff[]
+
   @@map("companies")
 }
 
@@ -170,6 +176,11 @@ model User {
   leadSettingsAssigned CompanyLeadSettings[] @relation("LeadSettingsUser")
 
   @@index([companyId, isActive, autoAssignEnabled, lastAssignedAt])
+  customFieldChanges CustomFieldValueChange[] @relation("CustomFieldChangeActor")
+
+  handoffsAssigned ConversationHandoff[] @relation("HandoffAssignee")
+  handoffsResolved ConversationHandoff[] @relation("HandoffResolver")
+
   @@map("users")
 }
 
@@ -183,6 +194,21 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+
+  /// Archivado SEGURO: se marca, nunca se borra.
+  ///
+  /// Un contacto archivado conserva sus conversaciones, sus oportunidades y
+  /// su historial: son datos del negocio y de la persona. Lo que cambia es
+  /// que deja de aparecer en las listas de trabajo y que los bots no arrancan
+  /// solos con el. Si vuelve a escribir, `CompanyLeadSettings.reactivateArchived`
+  /// decide si se reactiva o si se registra sin reabrir.
+  ///
+  /// Distinto de `isBlocked`, que significa "no queremos hablar con esta
+  /// persona". Archivar es "ya no esta activo"; bloquear es una decision
+  /// sobre la relacion.
+  archivedAt     DateTime?
+  archivedReason String?
+
   companyId     String
   company       Company        @relation(fields: [companyId], references: [id])
   conversations Conversation[]
@@ -190,6 +216,8 @@ model Contact {
   tasks         Task[]
 
   flowBotExecutions FlowBotExecution[]
+
+  customFieldValues CustomFieldValue[]
 
   @@unique([phone, companyId])
   @@map("contacts")
@@ -240,6 +268,8 @@ model Conversation {
   chatbotSessions ChatbotSession[]
 
   flowBotExecutions FlowBotExecution[]
+
+  handoffs ConversationHandoff[]
 
   @@index([companyId, status, lastMessageAt])
   @@index([companyId, assignedTo])
@@ -304,6 +334,18 @@ model Message {
   // que puede incluir el token o datos del destinatario.
   errorCode    String?
   errorMessage String?
+
+  /// Clave de idempotencia de un mensaje SALIENTE que genera el sistema.
+  ///
+  /// EXISTE PORQUE `wamid` NO SIRVE PARA ESTO: lo asigna Meta y solo se
+  /// conoce DESPUES de enviar, asi que no puede impedir el envio duplicado
+  /// que ocurre justo antes. Aqui se guarda la clave del motor
+  /// —`ejecucion:nodo:paso`— y se reserva la fila ANTES de llamar a Meta: un
+  /// reintento la reencuentra y no reenvia.
+  ///
+  /// Nula para los mensajes entrantes y para los que escribe un asesor a
+  /// mano, que no tienen de que ser idempotentes.
+  externalKey String? @unique
 
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
@@ -542,6 +584,8 @@ model Lead {
   quotes        Quote[]
 
   flowBotExecutions FlowBotExecution[]
+
+  customFieldValues CustomFieldValue[]
 
   @@index([companyId, status])
   @@index([pipelineId, stageId])
@@ -2058,4 +2102,276 @@ model CompanyLeadSettings {
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   @@map("company_lead_settings")
+}
+
+// ─────────────────────────────────────────────
+// CAMPOS PERSONALIZADOS
+// ─────────────────────────────────────────────
+
+/// Que clase de dato guarda un campo. Decide como se valida, como se
+/// almacena y como se muestra.
+enum CustomFieldType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  CURRENCY
+  DATE
+  DATETIME
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+  PHONE
+  EMAIL
+  URL
+}
+
+/// A que se le pueden colgar campos personalizados.
+///
+/// Se modela como enum y no como tabla polimorfica libre porque el conjunto
+/// es cerrado y conocido: asi las claves ajenas siguen siendo reales y la
+/// base puede garantizar que un valor apunta a algo que existe.
+enum CustomFieldEntity {
+  CONTACT
+  LEAD
+}
+
+/// Quien cambio un valor. Un bot y una persona no son lo mismo y mezclarlos
+/// haria inutil el historial justo cuando hace falta.
+enum CustomFieldSource {
+  USER
+  FLOWBOT
+  AUTOMATION
+  IMPORT
+  API
+}
+
+/// Definicion de un campo personalizado de una empresa.
+///
+/// LA CLAVE ES `key`, NO EL NOMBRE VISIBLE. Renombrar "Cedula" a "Documento"
+/// no puede romper los flujos que escriben en ese campo; si la referencia
+/// fuese la etiqueta, cualquier correccion de texto dejaria bots apuntando a
+/// un campo que ya no existe.
+model CustomFieldDefinition {
+  id String @id @default(cuid())
+
+  entity CustomFieldEntity
+  /// Identificador estable dentro de (empresa, entidad). Minusculas,
+  /// numeros y guion bajo.
+  key    String
+  label  String
+  type   CustomFieldType
+
+  /// Ayuda corta para quien rellena el campo en la interfaz.
+  helpText String?
+
+  /// Opciones de SELECT y MULTI_SELECT: `[{ value, label }]`. Se guardan como
+  /// JSON porque su numero y su texto los define cada empresa.
+  options Json?
+
+  /// Reglas extra segun el tipo: `minLength`, `maxLength`, `min`, `max`,
+  /// `pattern`. Es JSON por la misma razon, y se valida al guardarlo para que
+  /// una regla imposible no se acepte en silencio.
+  validation Json?
+
+  /// Orden de presentacion. No se usa para nada semantico: reordenar la
+  /// interfaz nunca puede cambiar a que campo escribe un bot.
+  order Int @default(0)
+
+  /// Un campo inactivo deja de ofrecerse y deja de aceptar escrituras nuevas,
+  /// pero NO borra los valores ya capturados: son datos del cliente.
+  isActive   Boolean @default(true)
+  isRequired Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  values  CustomFieldValue[]
+  changes CustomFieldValueChange[]
+
+  @@unique([companyId, entity, key])
+  @@index([companyId, entity, isActive, order])
+  @@map("custom_field_definitions")
+}
+
+/// Valor de un campo personalizado para un contacto o una oportunidad.
+///
+/// EL VALOR VA EN COLUMNAS TIPADAS, no en un JSON opaco. Con JSON, "12" y 12
+/// conviven, ordenar por un numero ordena alfabeticamente y filtrar por rango
+/// de fechas es imposible sin castear en cada consulta. Cada tipo escribe en
+/// la columna que le corresponde y las demas quedan nulas.
+///
+/// El `companyId` esta DUPLICADO a proposito respecto de la definicion: cada
+/// consulta filtra por el sin tener que unir dos tablas, y una fila mal
+/// construida se detecta comparandolos.
+model CustomFieldValue {
+  id String @id @default(cuid())
+
+  /// TEXT, LONG_TEXT, PHONE, EMAIL, URL y SELECT.
+  valueText String?
+  /// NUMBER y CURRENCY. Decimal y no Float: la moneda en coma flotante es
+  /// como se acaba con centavos que no cuadran.
+  valueNumber Decimal? @db.Decimal(18, 6)
+  /// BOOLEAN.
+  valueBool Boolean?
+  /// DATE y DATETIME. DATE se normaliza a medianoche en la zona de la
+  /// empresa antes de guardarse.
+  valueDate DateTime?
+  /// MULTI_SELECT.
+  valueList String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  definitionId String
+  definition   CustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  /// Exactamente uno de los dos esta puesto. Lo garantiza un CHECK escrito a
+  /// mano en la migracion, porque Prisma no sabe expresarlo.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([definitionId, contactId])
+  @@unique([definitionId, leadId])
+  @@index([companyId, definitionId])
+  @@index([contactId])
+  @@index([leadId])
+  @@map("custom_field_values")
+}
+
+/// Historial de cambios de un valor.
+///
+/// EXISTE PORQUE UN CAMPO PERSONALIZADO GUARDA DATOS DEL CLIENTE. Cuando
+/// alguien pregunte por que su "estado de credito" cambio, la respuesta no
+/// puede ser "no lo sabemos". Guarda el antes y el despues ya serializados a
+/// texto, el origen y, si lo hubo, la ejecucion de FlowBot que lo provoco.
+///
+/// NO usa `AuditLog`: ese exige un rol de actor y registra lo que hace una
+/// PERSONA. Un bot no tiene rol, y meterlo con uno inventado convertiria la
+/// auditoria en algo que miente sobre quien hizo que.
+///
+/// Crece con cada escritura. Necesita politica de retencion antes de que el
+/// volumen importe; queda anotado en el estado del proyecto.
+model CustomFieldValueChange {
+  id String @id @default(cuid())
+
+  /// Serializados a texto para que el historial siga siendo legible aunque el
+  /// tipo del campo cambie despues.
+  previousValue String?
+  newValue      String?
+
+  source CustomFieldSource @default(USER)
+
+  createdAt DateTime @default(now())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  definitionId String
+  definition   CustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  entity   CustomFieldEntity
+  /// Id del contacto o de la oportunidad. Sin clave ajena a proposito: el
+  /// historial debe sobrevivir al borrado de la entidad, que es justo cuando
+  /// mas falta hace saber que habia.
+  entityId String
+
+  /// Quien lo cambio, cuando fue una persona.
+  actorUserId String?
+  actor       User?   @relation("CustomFieldChangeActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  /// Que ejecucion lo provoco, cuando fue un bot.
+  executionId String?
+
+  @@index([companyId, createdAt])
+  @@index([companyId, entity, entityId])
+  @@index([definitionId, createdAt])
+  @@map("custom_field_value_changes")
+}
+
+// ─────────────────────────────────────────────
+// HANDOFF A UNA PERSONA
+// ─────────────────────────────────────────────
+
+/// Estados de una entrega a una persona.
+///
+/// `ACTIVE` es el unico que silencia al bot. Los otros dos son finales y se
+/// distinguen porque no significan lo mismo: `RESOLVED` es "la persona lo
+/// atendio", `CANCELLED` es "se retiro sin atenderlo" —por ejemplo al
+/// cancelar la ejecucion entera—. Meterlos en el mismo cajon haria imposible
+/// medir cuantas entregas se quedaron sin respuesta.
+enum HandoffStatus {
+  ACTIVE
+  RESOLVED
+  CANCELLED
+}
+
+/// Una conversacion entregada a una persona.
+///
+/// EXISTE COMO TABLA Y NO COMO BANDERA porque `Conversation.isPaused` no
+/// puede responder ninguna de las preguntas que importan: quien la atiende,
+/// por que se entrego, que bot y que nodo lo decidieron, cuando, y si ya se
+/// resolvio. Una bandera solo dice "el bot calla", y cuando alguien pregunta
+/// por que, no hay respuesta.
+///
+/// `isPaused` se sigue manteniendo en sincronia a proposito: es lo que ya
+/// consultan el chatbot heredado y el intake de FlowBot, y hacer que dos
+/// motores dependan de una tabla nueva sin necesidad seria arriesgar el
+/// silencio del bot por un refactor.
+model ConversationHandoff {
+  id     String        @id @default(cuid())
+  status HandoffStatus @default(ACTIVE)
+
+  /// Clasificador corto de por que se entrego. Nunca el texto del cliente.
+  reason String?
+
+  /// Nota que dejo el bot para quien recoja la conversacion.
+  note String?
+
+  startedAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  /// A quien se entrego. Nulo significa "a la bandeja comun".
+  ///
+  /// NO HAY EQUIPOS EN EL ESQUEMA todavia, asi que no se inventa una columna
+  /// que no apunte a ninguna tabla. Cuando existan, este modelo gana un
+  /// `teamId` nulable y la regla pasa a ser "usuario o equipo, o ninguno".
+  assignedToUserId String?
+  assignedTo       User?   @relation("HandoffAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  /// Quien lo dio por resuelto y devolvio la conversacion al bot, si alguien
+  /// lo hizo.
+  resolvedByUserId String?
+  resolvedBy       User?   @relation("HandoffResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  /// Que ejecucion y que nodo lo originaron. Sin clave ajena a la ejecucion:
+  /// el handoff debe sobrevivir a la limpieza de ejecuciones antiguas, que es
+  /// justo cuando hace falta saber de donde salio.
+  executionId String?
+  nodeId      String?
+
+  /// Tarea creada al entregar, si se creo. Permite cerrarla al resolver.
+  taskId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status, startedAt])
+  @@index([conversationId, status])
+  @@index([assignedToUserId, status])
+  @@map("conversation_handoffs")
 }

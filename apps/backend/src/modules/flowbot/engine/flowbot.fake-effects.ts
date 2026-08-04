@@ -155,6 +155,12 @@ export class EfectosFalsos implements Efectos {
     campoPersonalizado: async (input) => {
       this.anotar('crm', 'campoPersonalizado', { ...input });
     },
+    campoOportunidad: async (input) => {
+      this.anotar('crm', 'campoOportunidad', { ...input });
+    },
+    archivarContacto: async (input) => {
+      this.anotar('crm', 'archivarContacto', { ...input });
+    },
     crearOportunidad: async (input) => {
       this.anotar('crm', 'crearOportunidad', { ...input });
       return { leadId: this.id('lead') };

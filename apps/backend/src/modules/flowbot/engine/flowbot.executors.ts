@@ -419,6 +419,34 @@ const campoContacto: EjecutorNodo = async (ctx) => {
   return continuar(PUERTO.SALIDA);
 };
 
+/**
+ * Campo personalizado de la OPORTUNIDAD.
+ *
+ * Falla si no hay oportunidad en contexto en vez de caer al contacto: guardar
+ * "presupuesto aprobado" en la persona lo arrastraria a la siguiente venta,
+ * donde ya no es cierto.
+ */
+const campoOportunidad: EjecutorNodo = async (ctx) => {
+  if (!ctx.leadId) return fallo('sin-oportunidad', 'no_encontrado');
+  await ctx.efectos.crm.campoOportunidad({
+    companyId: ctx.companyId,
+    leadId: ctx.leadId,
+    campo: texto(ctx.config.field),
+    valor: texto(ctx.config.value),
+  });
+  return continuar(PUERTO.SALIDA);
+};
+
+const archivarContacto: EjecutorNodo = async (ctx) => {
+  if (!ctx.contactId) return fallo('sin-contacto', 'no_encontrado');
+  await ctx.efectos.crm.archivarContacto({
+    companyId: ctx.companyId,
+    contactId: ctx.contactId,
+    motivo: texto(ctx.config.reason) || undefined,
+  });
+  return continuar(PUERTO.SALIDA);
+};
+
 const crearOportunidad: EjecutorNodo = async (ctx) => {
   const { leadId } = await ctx.efectos.crm.crearOportunidad({
     companyId: ctx.companyId,
@@ -579,6 +607,8 @@ export const EJECUTORES: Partial<Record<TipoNodo, EjecutorNodo>> = {
   'crm.contact_upsert': guardarContacto,
   'crm.contact_tag': etiquetar,
   'crm.contact_field': campoContacto,
+  'crm.lead_field': campoOportunidad,
+  'crm.contact_archive': archivarContacto,
   'crm.lead_create': crearOportunidad,
   'crm.lead_stage': moverEtapa,
   'crm.lead_value': valorOportunidad,

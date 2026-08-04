@@ -132,6 +132,8 @@ export type TipoNodo =
   | 'crm.contact_upsert'
   | 'crm.contact_tag'
   | 'crm.contact_field'
+  | 'crm.lead_field'
+  | 'crm.contact_archive'
   | 'crm.lead_create'
   | 'crm.lead_stage'
   | 'crm.lead_value'
@@ -630,6 +632,33 @@ export const CATALOGO: Record<TipoNodo, DefinicionNodo> = {
     config: [ref('field', 'customField'), texto('value')],
     esperaExterna: false,
     efectoExterno: false,
+  },
+  'crm.lead_field': {
+    tipo: 'crm.lead_field',
+    categoria: 'crm',
+    etiqueta: 'Campo de la oportunidad',
+    ayuda: 'Escribe un valor en un campo de la oportunidad, no del contacto.',
+    aceptaEntrada: true,
+    puertos: [PUERTO.SALIDA, PUERTO.ERROR],
+    config: [ref('field', 'customField'), texto('value')],
+    esperaExterna: false,
+    efectoExterno: false,
+  },
+  'crm.contact_archive': {
+    tipo: 'crm.contact_archive',
+    categoria: 'crm',
+    etiqueta: 'Archivar contacto',
+    ayuda:
+      'Retira el contacto de las listas de trabajo. NO borra nada: sus ' +
+      'conversaciones, oportunidades e historial se conservan.',
+    aceptaEntrada: true,
+    puertos: [PUERTO.SALIDA, PUERTO.ERROR],
+    config: [texto('reason', false)],
+    esperaExterna: false,
+    efectoExterno: false,
+    // Retirar un contacto de la operacion diaria no es algo que deba poder
+    // hacer cualquiera desde un flujo.
+    rolMinimo: 'ADMIN',
   },
   'crm.lead_create': {
     tipo: 'crm.lead_create',

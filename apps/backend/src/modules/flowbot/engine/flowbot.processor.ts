@@ -153,7 +153,7 @@ export class FlowBotProcessor implements OnModuleInit, OnApplicationShutdown {
 
     const resultado = await this.runner.avanzarEjecucion(
       executionId,
-      this.efectos.paraEmpresa(companyId),
+      this.efectos.paraEmpresa(companyId, executionId),
       (versionId) => this.compiladoDe(versionId, companyId),
       opciones,
     );

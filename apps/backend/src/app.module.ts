@@ -6,6 +6,7 @@ import { QueueModule } from './common/queue/queue.module';
 import { OutboxModule } from './common/outbox/outbox.module';
 import { RealtimeModule } from './common/realtime/realtime.module';
 import { FlowBotModule } from './modules/flowbot/flowbot.module';
+import { CustomFieldsModule } from './modules/custom-fields/custom-fields.module';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
 import { ComplianceModule } from './modules/compliance/compliance.module';
 import { WhatsAppHistoryModule } from './modules/whatsapp-history/whatsapp-history.module';
@@ -54,6 +55,7 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     HealthModule,
     ChatbotModule,
     FlowBotModule,
+    CustomFieldsModule,
     ComplianceModule,
     WhatsAppHistoryModule,
     ConfigModule.forRoot({
