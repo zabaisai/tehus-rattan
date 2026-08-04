@@ -773,29 +773,159 @@ build limpio, demostración autónoma completa, Nest arranca y mapea las rutas.
 
 ---
 
+## Bloque 6 (cerrado) — Deudas del backend
+
+Las cuatro deudas que quedaban anotadas. Eran el prerrequisito declarado para
+exponer nodos en la interfaz: un nodo que se muestra pero no funciona es peor
+que uno que no se muestra.
+
+### La hora es la de la EMPRESA, nunca la del servidor
+
+El fallo era **invisible en local**. Un horario «de 8 a 18» configurado en
+Bogotá se evaluaba con `Date#getHours()`, o sea con la hora del contenedor,
+que corre en UTC: a las 19:00 de Bogotá —medianoche UTC— el bot creía estar
+fuera de horario por casualidad, no por la regla. En la máquina del
+desarrollador nunca se veía, porque allí el servidor y la empresa comparten
+zona.
+
+`common/time/zona-horaria.ts`, con `Intl.DateTimeFormat` y sin dependencias
+nuevas —una librería de fechas para leer una hora sería cargar dos megas—:
+
+- `dentroDeHorario` devuelve `null`, no `false`, cuando la configuración no se
+  entiende: una errata de un administrador no puede silenciar un bot en
+  silencio.
+- `proximaApertura` avanza hora a hora en vez de sumar 24 h, porque con
+  cambios de horario de verano sumar un día no cae a la misma hora local.
+- `instanteLocal` interpreta «2026-08-10 14:00» donde está el negocio. Sin
+  esto, un recordatorio para las 9 de la mañana llegaba a las 4 de la
+  madrugada.
+- `zonaSegura` cae a la zona del producto si la de la empresa no vale: `Intl`
+  **lanza** con una zona inventada.
+
+Conectado al selector —con la consulta **perezosa**, porque casi ningún
+disparador declara horario y preguntar por la empresa en cada mensaje para no
+usar el dato es una consulta regalada—, al contexto de nodo y a
+`control.wait_until`.
+
+**Nodo nuevo `control.business_hours`**, con TRES salidas: dentro, fuera y
+esperar a que abra. La tercera convierte un «estamos cerrados» en «te
+atendemos a primera hora»; sin ella el autor solo puede disculparse.
+
+### Retención del historial de campos personalizados
+
+Crecía sin límite: un bot que escribe un campo en cada mensaje deja una fila
+por cambio, y con cien conversaciones al día son cien mil filas al año por
+empresa.
+
+90 días por defecto, configurable por entorno, `0` lo desactiva. **No borra a
+ciegas**: de cada (entidad, campo) conserva siempre el cambio más reciente
+aunque esté fuera de plazo, porque si no, un campo escrito una vez hace un año
+perdería toda explicación de por qué tiene ese valor. Por lotes y empresa por
+empresa, de madrugada y solo en el worker.
+
+### HTTP con protección SSRF
+
+`integration.http` estaba en el catálogo y en el validador desde el bloque 2,
+pero no tenía ejecutor. Toda la seguridad vive en el adaptador: un nodo no
+puede relajarla porque no la conoce.
+
+1. Apagado salvo que la empresa lo encienda.
+2. Lista de destinos, y **vacía significa ninguno**.
+3. Solo HTTPS, solo el 443, sin credenciales en la URL.
+4. DNS resuelto y comprobadas **todas** las direcciones. El validador
+   comprueba la forma al publicar, pero `evil.com` puede resolver a
+   `10.0.0.5` justo en el momento de la llamada.
+5. Redirecciones **no** seguidas: un 302 a `169.254.169.254` saltaría todas
+   las comprobaciones, que se hicieron sobre la URL original.
+6. Tiempo límite y tope de respuesta leído **por trozos**: con `.text()`, un
+   servidor que devuelve un gigabyte tumba el worker antes de que nadie mire
+   la longitud, y `content-length` no sirve porque un servidor puede mentir.
+7. Métodos y cabeceras de lista cerrada. `authorization` la pone la
+   credencial, no el flujo.
+8. Credenciales cifradas que **el flujo nunca ve**: si pudiera leerlas,
+   cualquiera con permiso de edición las exfiltraría con otro nodo.
+
+68 pruebas del guardia, que son funciones puras. Cubren metadata de nube,
+CGNAT, IPv4 envuelta en IPv6 —`::ffff:10.0.0.1`, que se salta cualquier
+comprobación que solo mire texto— y el `ejemplo.com.atacante.net` que un
+`includes` dejaría pasar.
+
+### IA con proveedor intercambiable
+
+El motor **no conoce ninguno**. Solo la interfaz `ProveedorIa`.
+
+**El único registrado hoy es el falso**, y es deliberado: sin credenciales
+reales no se puede implementar uno de verdad, y fingir que existe sería peor
+que decir que falta. Sin proveedor, `disponible()` responde que no y los nodos
+salen por su rama de reserva: el flujo sigue en vez de romperse.
+
+Redacción de PII antes de salir —lo que sale no vuelve—, prompt del sistema de
+la empresa con el del nodo **debajo**, salida validada contra la lista de
+opciones, y topes de tokens y llamadas por día contados en `FlowBotAiUsage`.
+El consumo se anota **salga bien o mal**: una llamada que falla después de
+gastar tokens los gastó igual.
+
+Hay ambigüedades reales en la redacción —diez dígitos en Colombia pueden ser
+un móvil o una cédula— y se resuelven hacia la privacidad: etiquetarlo mal es
+un problema de legibilidad, dejarlo pasar sería una fuga.
+
+### No se publica un flujo que va a fallar
+
+Un paso que necesita configuración que no está no falla al publicarlo: falla a
+mitad de una conversación con un cliente real. `FlowBotReferenciasService`
+resuelve desde la base lo que el validador necesita, **acotado por empresa**,
+manteniendo el validador puro: recibe conjuntos y responde, sin conocer
+Prisma. Así el mismo validador corre en el simulador, en la publicación y —el
+día que exista— en el navegador.
+
+### Migración `flowbot_integraciones` (solo local)
+
+Aditiva: `FlowBotCredential`, `FlowBotSettings` y `FlowBotAiUsage`. 12
+sentencias, 0 destructivas.
+
+**Rollback:** no desplegar el código. Para revertir del todo:
+`DROP TABLE flowbot_ai_usage, flowbot_settings, flowbot_credentials;`
+`DROP TYPE "FlowBotCredentialType";`
+
+**Verificación:** backend **1780 unit / 541 e2e** verdes, typecheck 0, lint 0,
+build limpio. Frontend **315** verdes.
+
+---
+
 ## Próximo paso
 
-**API de administración y constructor visual.** La vertical del backend está
-cerrada; lo que falta para que alguien pueda usarla sin escribir JSON a mano
-es la superficie de administración: CRUD de bots, publicación de versiones,
-disparadores, simulador y el editor de grafo.
+**API administrativa de FlowBot**, y después el constructor visual. Nada de
+esto está empezado.
 
-### Limitaciones honestas que quedan
+### Lo que falta para que FlowBot sea usable sin escribir JSON
 
-- **No hay equipos.** El handoff asigna un usuario. Cuando existan, el modelo
-  gana un `teamId` nulable.
-- **El historial de campos crece sin límite.** Necesita retención antes de que
-  el volumen importe.
-- **La ventana de 24 h se mide en UTC contra `Message.createdAt`.** La zona
-  horaria de la empresa (`Company.timezone`) se usa para presentación, no para
-  la ventana, porque la ventana de Meta es absoluta y no depende de la zona.
-  El **horario comercial** de los disparadores sí usa la del servidor y
-  debería pasar a la de la empresa: queda anotado como deuda real.
-- **WhatsApp sigue sobre transporte falso.** Activar envíos reales es cambiar
-  `FlowBotEffectsFactory`, no una bandera repartida por los nodos.
-- **Los nodos de HTTP e IA no tienen ejecutor todavía** (`integration.http`
-  está en el catálogo y en el validador, pero no en el registro de
-  ejecutores). Un flujo que lo use falla como configuración, no en silencio.
+| Bloque | Estado |
+|---|---|
+| API administrativa (CRUD, versiones, publicación, permisos) | **no empezado** |
+| Simulador con adaptadores falsos | **no empezado** |
+| Plantillas listas para usar | **no empezado** |
+| Constructor visual | **no empezado** |
+| Pantalla de FlowBot y de ejecuciones | **no empezado** |
+| Panel lateral en Conversaciones | **no empezado** |
+| Pipeline en tiempo real y CRUD de pipelines | **no empezado** |
+
+El motor está completo y probado; lo que falta es toda la superficie.
+
+### Limitaciones honestas que siguen abiertas
+
+- **No hay equipos.** El handoff asigna un usuario.
+- **`resumir` de IA devuelve vacío**: el puerto solo recibe el id de la
+  conversación, y darle Prisma al adaptador le daría acceso a las de todas las
+  empresas. Cuando exista un nodo que lo use, el texto tendrá que llegarle ya
+  resuelto por el motor.
+- **El rebinding de DNS no está cerrado del todo.** Entre la resolución y la
+  conexión el DNS puede cambiar. La ventana es de milisegundos frente a un
+  ataque trivial; cerrarla exige conectar a la IP ya validada con la cabecera
+  `Host` original, que es un cambio de agente HTTP.
+- **Los nombres de plantilla de WhatsApp no se validan**: exigiría llamar a
+  Meta al publicar.
+- **WhatsApp sigue sobre transporte falso.** Activarlo es cambiar
+  `FlowBotEffectsFactory`.
 
 ### Referencia del bloque 3d completo
 
