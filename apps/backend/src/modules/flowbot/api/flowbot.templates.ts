@@ -79,18 +79,38 @@ function enFila(
   return posiciones;
 }
 
+/**
+ * Arma el grafo colocando TODOS los nodos, no solo los de la fila principal.
+ *
+ * Antes, un nodo que no estuviera en `disposicion` se quedaba en `{0,0}`, y
+ * como el valor por defecto es el mismo para todos, las ramas laterales
+ * aparecían apiladas en el mismo punto: tres pasos dibujados uno encima de
+ * otro parecen uno solo, y quien abre la plantilla cree que le falta la mitad
+ * del flujo. Lo vio la QA visual, no las pruebas: un grafo con tres nodos en
+ * la misma coordenada es perfectamente válido para el validador.
+ *
+ * Los que no estén colocados a mano caen en filas de debajo, en el orden en
+ * que se declararon.
+ */
 function grafo(
   nodes: NodoFlow[],
   edges: ConexionFlow[],
   disposicion: Record<string, { x: number; y: number }> = {},
 ): GrafoFlow {
+  let sueltos = 0;
   return {
     schemaVersion: 1,
     startNodeId: 'inicio',
-    nodes: nodes.map((n) => ({
-      ...n,
-      position: disposicion[n.id] ?? n.position,
-    })),
+    nodes: nodes.map((n) => {
+      const colocado = disposicion[n.id];
+      if (colocado) return { ...n, position: colocado };
+
+      const i = sueltos++;
+      return {
+        ...n,
+        position: { x: 80 + (i % 4) * 260, y: 200 + Math.floor(i / 4) * 160 },
+      };
+    }),
     edges,
   };
 }

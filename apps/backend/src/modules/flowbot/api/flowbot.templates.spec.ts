@@ -92,11 +92,18 @@ describe('plantillas oficiales', () => {
         expect(CATALOGO[inicio!.type].categoria).toBe('trigger');
       });
 
-      it('sus nodos tienen posición: el editor la abre sin amontonarlos', () => {
-        const conPosicion = plantilla.graph.nodes.filter(
-          (n) => n.position.x !== 0 || n.position.y !== 0,
-        );
-        expect(conPosicion.length).toBeGreaterThan(0);
+      it('NINGÚN par de nodos comparte posición', () => {
+        // La versión anterior de esta prueba solo pedía que ALGUNO tuviera
+        // posición, y por eso se coló que las ramas laterales quedaran las
+        // tres apiladas en {0,0}: dibujadas una encima de otra parecen un
+        // paso solo, y quien abre la plantilla cree que le falta media
+        // plantilla. Lo encontró la QA visual, no esta prueba.
+        const vistas = new Map<string, string>();
+        for (const n of plantilla.graph.nodes) {
+          const clave = `${n.position.x},${n.position.y}`;
+          expect([n.id, vistas.get(clave)]).toEqual([n.id, undefined]);
+          vistas.set(clave, n.id);
+        }
       });
 
       it('no promete plazos ni descuentos', () => {

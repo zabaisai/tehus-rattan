@@ -55,6 +55,15 @@ import {
 
 const TIPOS_NODO = { takto: NodoFlowBot };
 
+/** `w-56` en píxeles: el ancho real de la caja de un paso. */
+const ANCHO_NODO = 224;
+
+/** Alto aproximado: cabecera, resumen, línea de estado y un puerto por salida. */
+function altoDe(datos: DatosNodo): number {
+  const estado = datos.problemas > 0 || datos.avisos > 0 || datos.estado !== 'normal';
+  return 52 + (estado ? 20 : 0) + Math.max(1, datos.puertos.length) * 16;
+}
+
 export function Editor(props: PropsEditor) {
   // El proveedor tiene que envolver al componente que usa `useReactFlow`, no
   // estar dentro: sin esto, centrar el lienzo en un nodo no funciona.
@@ -147,6 +156,13 @@ function EditorInterno({
         data: datos,
         selected: n.id === seleccionado,
         draggable: !soloLectura,
+        // Medidas EXPLÍCITAS. La proyección crea objetos de nodo nuevos en
+        // cada render, y con ellos React Flow pierde las que había medido:
+        // el minimapa, que lee esas medidas, se quedaba dibujando un recuadro
+        // en blanco encima del lienzo. El ancho es el real (`w-56`); el alto
+        // se estima por número de puertos, que es de lo que depende.
+        width: ANCHO_NODO,
+        height: altoDe(datos),
       };
     });
   }, [grafo, porTipo, problemas, seleccionado, soloLectura]);
