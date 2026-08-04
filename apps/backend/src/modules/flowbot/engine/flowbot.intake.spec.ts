@@ -4,6 +4,7 @@ import { FlowBotIntakeService } from './flowbot.intake';
 import { FlowBotQueueService } from './flowbot.queue';
 import { FlowBotRunnerService } from './flowbot.runner';
 import { FlowBotSelectorService } from './flowbot.selector';
+import { HandoffService } from '../../conversations/handoff.service';
 
 /**
  * La puerta de entrada de FlowBot decide tres cosas por cada mensaje: si calla,
@@ -21,6 +22,7 @@ describe('FlowBotIntakeService', () => {
   let cola: { encolarMensaje: jest.Mock };
   let selector: { seleccionar: jest.Mock };
   let runner: { arrancar: jest.Mock };
+  let handoff: { hayHandoffActivo: jest.Mock };
   let intake: FlowBotIntakeService;
 
   const mensaje = {
@@ -37,6 +39,7 @@ describe('FlowBotIntakeService', () => {
           id: 'conv-1',
           isPaused: false,
           contactId: 'cont-1',
+          contact: { archivedAt: null },
         }),
       },
       flowBotWait: { findFirst: jest.fn().mockResolvedValue(null) },
@@ -52,6 +55,9 @@ describe('FlowBotIntakeService', () => {
         .fn()
         .mockResolvedValue({ elegidos: [], descartados: [] }),
     };
+    // Por defecto NO hay nadie atendiendo: la mayoría de estas pruebas cubren
+    // el camino con el bot al mando.
+    handoff = { hayHandoffActivo: jest.fn().mockResolvedValue(false) };
     runner = {
       arrancar: jest
         .fn()
@@ -64,6 +70,7 @@ describe('FlowBotIntakeService', () => {
       cola as unknown as FlowBotQueueService,
       selector as unknown as FlowBotSelectorService,
       runner as unknown as FlowBotRunnerService,
+      handoff as unknown as HandoffService,
     );
   });
 
@@ -73,6 +80,7 @@ describe('FlowBotIntakeService', () => {
         id: 'conv-1',
         isPaused: true,
         contactId: 'cont-1',
+        contact: { archivedAt: null },
       });
 
       const r = await intake.atenderMensaje(mensaje);

@@ -11,6 +11,7 @@ import {
 import { FlowBotOutboxPublisher } from '../src/modules/flowbot/engine/flowbot.outbox';
 import { FlowBotIntakeService } from '../src/modules/flowbot/engine/flowbot.intake';
 import { FlowBotSelectorService } from '../src/modules/flowbot/engine/flowbot.selector';
+import { HandoffService } from '../src/modules/conversations/handoff.service';
 import { FlowBotReconcilerService } from '../src/modules/flowbot/engine/flowbot.reconciler';
 import { MAX_INTENTOS } from '../src/modules/flowbot/engine/flowbot.interpreter';
 import { EfectosFalsos } from '../src/modules/flowbot/engine/flowbot.fake-effects';
@@ -169,6 +170,7 @@ describe('transporte y recuperación durable de FlowBot (e2e, base real)', () =>
   let runner: FlowBotRunnerService;
   let intake: FlowBotIntakeService;
   let reconciler: FlowBotReconcilerService;
+  let handoffService: HandoffService;
 
   let empresa: string;
   let contacto: string;
@@ -205,12 +207,18 @@ describe('transporte y recuperación durable de FlowBot (e2e, base real)', () =>
     publisher.onModuleInit();
     dispatcher = new OutboxDispatcher(outbox, colaEntrantes, registro);
     runner = new FlowBotRunnerService(servicioPrisma, outbox, colaComoServicio);
+    // El handoff real, con notificaciones inertes: esta suite mide el
+    // transporte, no los avisos.
+    handoffService = new HandoffService(servicioPrisma, {
+      emit: async () => undefined,
+    } as never);
     intake = new FlowBotIntakeService(
       servicioPrisma,
       outbox,
       colaComoServicio,
       new FlowBotSelectorService(servicioPrisma),
       runner,
+      handoffService,
     );
     reconciler = new FlowBotReconcilerService(
       servicioPrisma,

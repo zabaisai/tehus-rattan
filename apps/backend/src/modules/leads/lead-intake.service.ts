@@ -17,7 +17,8 @@ export interface ResultadoIntake {
     | 'sin-etapas'
     | 'ya-existia'
     | 'desactivado'
-    | 'sin-etapa-inicial';
+    | 'sin-etapa-inicial'
+    | 'contacto-archivado';
 }
 
 /**
@@ -79,6 +80,42 @@ export class LeadIntakeService {
       // aplican los valores por defecto, que son los que el producto ya venía
       // usando: nadie tiene que configurar nada para que siga funcionando.
       const config = await this.settings.resolver(companyId, tx);
+
+      // UN CONTACTO ARCHIVADO QUE VUELVE A ESCRIBIR.
+      //
+      // `reactivateArchived` se leia desde el bloque 4 pero no se aplicaba en
+      // ningun sitio, porque `Contact` no tenia estado de archivado. Ahora si.
+      //
+      // Reactivar es lo razonable por defecto: si la persona escribe, esta
+      // activa otra vez, y dejarla archivada haria que sus mensajes cayeran en
+      // un limbo del que nadie se entera. Quien lo desactiva suele ser una
+      // empresa que archiva a proposito y no quiere que un mensaje suelto le
+      // reabra la lista.
+      const contacto = await tx.contact.findFirst({
+        where: { id: contactId, companyId },
+        select: { archivedAt: true },
+      });
+
+      if (contacto?.archivedAt) {
+        if (!config.reactivateArchived) {
+          // No se reabre, pero SI queda constancia: un mensaje que no produce
+          // ningun rastro es exactamente como se pierden clientes sin que
+          // nadie sepa que escribieron.
+          this.logger.log(
+            `Contacto archivado escribio y no se reactiva por configuracion [conv=${conversationId}]`,
+          );
+          return {
+            leadId: null,
+            creado: false,
+            motivo: 'contacto-archivado' as const,
+          };
+        }
+
+        await tx.contact.updateMany({
+          where: { id: contactId, companyId, archivedAt: { not: null } },
+          data: { archivedAt: null, archivedReason: null },
+        });
+      }
 
       if (!config.autoCreateLead) {
         // Apagar la creación automática deja el CRM como una bandeja. Es una

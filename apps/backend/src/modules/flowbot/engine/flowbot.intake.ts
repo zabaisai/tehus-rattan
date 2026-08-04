@@ -5,6 +5,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { FlowBotQueueService } from './flowbot.queue';
 import { FlowBotSelectorService } from './flowbot.selector';
 import { FlowBotRunnerService, OUTBOX_FLOWBOT } from './flowbot.runner';
+import { HandoffService } from '../../conversations/handoff.service';
 
 /**
  * Puerta de entrada de FlowBot para los mensajes que llegan.
@@ -45,6 +46,8 @@ export interface ResultadoIntake {
     | 'reanudada'
     | 'arrancada'
     | 'conversacion-pausada'
+    | 'handoff-activo'
+    | 'contacto-archivado'
     | 'sin-bot'
     | 'ya-hay-ejecucion'
     | 'espera-vencida'
@@ -69,6 +72,7 @@ export class FlowBotIntakeService {
     private readonly cola: FlowBotQueueService,
     private readonly selector: FlowBotSelectorService,
     private readonly runner: FlowBotRunnerService,
+    private readonly handoff: HandoffService,
   ) {}
 
   /**
@@ -83,7 +87,12 @@ export class FlowBotIntakeService {
     try {
       const conversacion = await this.prisma.conversation.findFirst({
         where: { id: entrada.conversationId, companyId: entrada.companyId },
-        select: { id: true, isPaused: true, contactId: true },
+        select: {
+          id: true,
+          isPaused: true,
+          contactId: true,
+          contact: { select: { archivedAt: true } },
+        },
       });
 
       // Pausada = un asesor tomó el control. El bot calla, igual que el
@@ -93,8 +102,35 @@ export class FlowBotIntakeService {
         return { atendido: false, motivo: 'conversacion-pausada' };
       }
 
+      // SEGUNDA BARRERA, y deliberadamente redundante con `isPaused`.
+      //
+      // El handoff mantiene `isPaused` en sincronía, así que en teoría la
+      // comprobación de arriba basta. Pero `isPaused` es una bandera que
+      // cualquier pantalla puede quitar sin saber que hay una entrega viva, y
+      // el coste de equivocarse aquí lo paga el cliente: recibe al bot por
+      // encima de la persona que le está escribiendo. La fuente de verdad de
+      // «hay alguien atendiendo» es la tabla, no la bandera.
+      if (
+        await this.handoff.hayHandoffActivo(
+          entrada.companyId,
+          entrada.conversationId,
+        )
+      ) {
+        return { atendido: false, motivo: 'handoff-activo' };
+      }
+
+      // Un contacto archivado no arranca bots. SÍ puede reanudar una
+      // ejecución que ya estaba esperando su respuesta: cortarla a mitad
+      // dejaría la conversación colgada sin que el cliente entienda por qué
+      // dejaron de contestarle.
+      const archivado = conversacion.contact?.archivedAt != null;
+
       const reanudada = await this.reanudarPorMensaje(entrada);
       if (reanudada) return reanudada;
+
+      if (archivado) {
+        return { atendido: false, motivo: 'contacto-archivado' };
+      }
 
       return await this.arrancarSiProcede(entrada, conversacion.contactId);
     } catch (error) {
