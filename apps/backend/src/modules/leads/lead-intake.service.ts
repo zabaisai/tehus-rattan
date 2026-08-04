@@ -216,6 +216,10 @@ export class LeadIntakeService {
         leadId: lead.id,
         creado: true,
         assignedTo: asesor,
+        // Viajan al evento para que el tablero afectado —y solo ese— se
+        // refresque cuando entra una oportunidad nueva.
+        stageId: lead.stageId,
+        pipelineId: pipeline.id,
       };
     });
 
@@ -234,6 +238,8 @@ export class LeadIntakeService {
       creado: boolean;
       assignedTo?: string | null;
       motivo?: string;
+      stageId?: string | null;
+      pipelineId?: string | null;
     },
   ): Promise<void> {
     if (!resultado.creado || !resultado.leadId) {
@@ -245,7 +251,12 @@ export class LeadIntakeService {
       return;
     }
 
-    this.realtime.leadUpdated(input.companyId, resultado.leadId);
+    this.realtime.leadUpdated(
+      input.companyId,
+      resultado.leadId,
+      resultado.stageId ?? undefined,
+      resultado.pipelineId ?? undefined,
+    );
 
     if (resultado.assignedTo) {
       await this.notifications.emit({

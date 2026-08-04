@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { KanbanSquare, Plus } from 'lucide-react';
+import { KanbanSquare, Plus, Settings2 } from 'lucide-react';
 import { getPipelines } from '@/lib/pipeline';
 import { KanbanBoard } from '@/components/kanban/KanbanBoard';
 import { LeadFormModal } from '@/components/leads/LeadFormModal';
@@ -10,6 +10,9 @@ import { LeadDetailModal } from '@/components/leads/LeadDetailModal';
 import { useRealtime } from '@/lib/use-realtime';
 import { PipelineSelector } from '@/components/kanban/PipelineSelector';
 import { ListState } from '@/components/ui/ListState';
+import { AdminPipelines } from '@/components/kanban/AdminPipelines';
+import { permisosDe } from '@/lib/flowbot-permisos';
+import { useAuthStore } from '@/store/auth.store';
 
 export default function PipelinePage() {
   const queryClient = useQueryClient();
@@ -26,6 +29,11 @@ export default function PipelinePage() {
   // el id en cuanto cargan los pipelines obligaria a un efecto y a un
   // renderizado extra sin ganar nada.
   const [pipelineElegido, setPipelineElegido] = useState<string | null>(null);
+  const [administrando, setAdministrando] = useState(false);
+  // Administrar embudos cambia dónde caen los leads de toda la empresa: es la
+  // misma frontera que archivar un bot.
+  const puedeAdministrar = permisosDe(useAuthStore((s) => s.user?.role))
+    .puedeArchivar;
 
   if (isLoading || isError || !pipelines?.length) {
     return (
@@ -61,13 +69,24 @@ export default function PipelinePage() {
             onChange={setPipelineElegido}
           />
         </div>
-        <button
-          onClick={() => setCreateOpen(true)}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
-        >
-          <Plus size={16} />
-          Nuevo lead
-        </button>
+        <div className="flex items-center gap-2">
+          {puedeAdministrar && (
+            <button
+              onClick={() => setAdministrando(true)}
+              className="flex items-center justify-center gap-1.5 rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-700 outline-none hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
+            >
+              <Settings2 size={16} />
+              Embudos
+            </button>
+          )}
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
+          >
+            <Plus size={16} />
+            Nuevo lead
+          </button>
+        </div>
       </div>
       <KanbanBoard pipelineId={activo.id} onLeadClick={setSelectedLeadId} />
 
@@ -81,6 +100,10 @@ export default function PipelinePage() {
             setCreateOpen(false);
           }}
         />
+      )}
+
+      {administrando && (
+        <AdminPipelines onCerrar={() => setAdministrando(false)} />
       )}
 
       {selectedLeadId && (

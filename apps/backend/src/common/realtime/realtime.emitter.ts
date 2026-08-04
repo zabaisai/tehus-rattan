@@ -79,8 +79,29 @@ export class RealtimeEmitter {
     );
   }
 
-  leadUpdated(companyId: string, leadId: string, stageId?: string): void {
-    this.toCompany(companyId, EVENTS.LEAD_UPDATED, { leadId, stageId });
+  /**
+   * Una oportunidad cambió.
+   *
+   * Lleva `pipelineId` para que el cliente recargue SOLO el tablero afectado.
+   * Sin él, mover una oportunidad obliga a recargar todos los embudos de la
+   * empresa, y en una con cuatro tableros abiertos eso es tres consultas
+   * tiradas por cada arrastre.
+   *
+   * Siguen viajando únicamente identificadores: el contenido se pide luego por
+   * la API, que aplica los permisos de quien pregunta. Un evento con los datos
+   * dentro podría enseñar algo que la API no habría devuelto.
+   */
+  leadUpdated(
+    companyId: string,
+    leadId: string,
+    stageId?: string,
+    pipelineId?: string,
+  ): void {
+    this.toCompany(companyId, EVENTS.LEAD_UPDATED, {
+      leadId,
+      stageId,
+      pipelineId,
+    });
   }
 
   taskUpdated(companyId: string, taskId: string, assignedTo?: string): void {

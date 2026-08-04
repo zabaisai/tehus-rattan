@@ -67,14 +67,17 @@ export function useRealtime(conversationId?: string | null): {
     socket.on(EVENTS.MESSAGE_CREATED, enMensaje);
     socket.on(EVENTS.MESSAGE_STATUS_CHANGED, enMensaje);
     socket.on(EVENTS.CONVERSATION_UPDATED, () => invalidar(["conversations"]));
-    socket.on(EVENTS.LEAD_UPDATED, () => {
-      // `kanban` sin el id del pipeline invalida todos sus tableros: la clave
-      // es un prefijo. Es lo que hace que una oportunidad entrante aparezca
-      // sin recargar aunque el asesor tenga abierto otro pipeline.
-      invalidar(["kanban"]);
+    const enLead = (p?: { pipelineId?: string }) => {
+      // Solo el tablero afectado. `["kanban"]` a secas invalida TODOS —la
+      // clave es un prefijo—, y en una empresa con cuatro embudos abiertos
+      // eso son tres consultas tiradas por cada arrastre. Cuando el evento no
+      // trae el embudo se recarga todo, que es la respuesta segura.
+      if (p?.pipelineId) invalidar(["kanban", p.pipelineId]);
+      else invalidar(["kanban"]);
       invalidar(["leads"]);
       invalidar(["pipeline"]);
-    });
+    };
+    socket.on(EVENTS.LEAD_UPDATED, enLead);
     socket.on(EVENTS.TASK_UPDATED, () => invalidar(["tasks"]));
     socket.on(EVENTS.NOTIFICATION_CREATED, () => invalidar(["notifications"]));
 
@@ -88,7 +91,7 @@ export function useRealtime(conversationId?: string | null): {
       socket.off(EVENTS.MESSAGE_CREATED, enMensaje);
       socket.off(EVENTS.MESSAGE_STATUS_CHANGED, enMensaje);
       socket.off(EVENTS.CONVERSATION_UPDATED);
-      socket.off(EVENTS.LEAD_UPDATED);
+      socket.off(EVENTS.LEAD_UPDATED, enLead);
       socket.off(EVENTS.TASK_UPDATED);
       socket.off(EVENTS.NOTIFICATION_CREATED);
     };

@@ -40,12 +40,18 @@ export interface PipelineStage {
   name: string;
   order: number;
   color: string | null;
+  probability?: number | null;
+  type?: 'OPEN' | 'WON' | 'LOST';
+  /** La etapa por la que entra un cliente nuevo. Una por embudo. */
+  isInitial?: boolean;
 }
 
 export interface Pipeline {
   id: string;
   name: string;
   isDefault: boolean;
+  isArchived?: boolean;
+  order?: number;
   stages: PipelineStage[];
 }
 
