@@ -5,13 +5,15 @@ import {
   Efectos,
   PuertoAuditoria,
   PuertoCrm,
-  PuertoHttp,
-  PuertoIa,
   PuertoReloj,
 } from './flowbot.ports';
 import { CrmAdapter } from './adapters/flowbot.crm.adapter';
 import { WhatsappAdapter } from './adapters/flowbot.whatsapp.adapter';
 import { TransporteWhatsAppFalso } from './adapters/flowbot.whatsapp.fake-transport';
+import { HttpAdapter } from './adapters/flowbot.http.adapter';
+import { IaAdapter } from './adapters/flowbot.ia.adapter';
+import { RegistroProveedoresIa } from './adapters/flowbot.ia.provider';
+import { ProveedorIaFalso } from './adapters/flowbot.ia.fake-provider';
 import { CustomFieldsService } from '../../custom-fields/custom-fields.service';
 import { HandoffService } from '../../conversations/handoff.service';
 import { WhatsAppTokenCryptoService } from '../../whatsapp-integration/whatsapp-token-crypto.service';
@@ -28,8 +30,13 @@ import { WhatsAppTokenCryptoService } from '../../whatsapp-integration/whatsapp-
  *                ejecuta —número remitente, ventana de 24 h, idempotencia,
  *                persistencia en el hilo, clasificación de errores— y solo la
  *                petición HTTP a Meta se sustituye.
- *   HTTP e IA  → FALSOS. No se sale a la red ni se llama a un proveedor de
- *                pago.
+ *   HTTP       → adaptador REAL, APAGADO por defecto. Sin que la empresa lo
+ *                encienda y declare sus destinos, cualquier llamada falla
+ *                como «no configurado» antes de tocar la red.
+ *   IA         → adaptador REAL sobre un registro de proveedores en el que
+ *                hoy solo está el FALSO. Sin proveedor, `disponible()` dice
+ *                que no y los nodos salen por su rama de reserva: el flujo
+ *                sigue en vez de romperse.
  *
  * QUE EL TRANSPORTE SEA FALSO Y NO EL ADAPTADOR ENTERO ES LO IMPORTANTE. Si se
  * falseara el adaptador completo, el día que se conecte de verdad se estrenaría
@@ -56,7 +63,15 @@ export class FlowBotEffectsFactory {
      * instancia que usa el motor.
      */
     private readonly transporte: TransporteWhatsAppFalso,
-  ) {}
+    private readonly registroIa: RegistroProveedoresIa,
+    private readonly iaFalsa: ProveedorIaFalso,
+  ) {
+    // El unico proveedor registrado hoy es el falso, y es deliberado: sin
+    // credenciales reales no se puede implementar uno de verdad, y fingir que
+    // existe seria peor que decir que falta. Anadir el real es registrar otra
+    // clase aqui; no se toca ni un nodo.
+    this.registroIa.registrar(this.iaFalsa);
+  }
 
   /**
    * Efectos para una empresa concreta.
@@ -85,8 +100,14 @@ export class FlowBotEffectsFactory {
         this.transporte,
         this.cripto,
       ),
-      http: falsos.http satisfies PuertoHttp,
-      ia: falsos.ia satisfies PuertoIa,
+      // HTTP REAL, pero apagado salvo que la empresa lo encienda y declare
+      // sus destinos. Con la configuracion por defecto, cualquier llamada
+      // falla como «no configurado» antes de tocar la red.
+      http: new HttpAdapter(this.prisma, companyId, this.cripto),
+      // IA real sobre el registro de proveedores. Sin proveedor configurado,
+      // `disponible()` responde que no y los nodos salen por su rama de
+      // reserva: el flujo sigue, en vez de romperse.
+      ia: new IaAdapter(this.prisma, companyId, this.registroIa, this.cripto),
       reloj: relojReal satisfies PuertoReloj,
       auditoria: falsos.auditoria satisfies PuertoAuditoria,
     } satisfies Efectos;

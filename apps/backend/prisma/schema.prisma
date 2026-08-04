@@ -112,6 +112,10 @@ model Company {
 
   handoffs ConversationHandoff[]
 
+  flowBotCredentials FlowBotCredential[]
+  flowBotSettings    FlowBotSettings?
+  flowBotAiUsage     FlowBotAiUsage[]
+
   @@map("companies")
 }
 
@@ -2374,4 +2378,137 @@ model ConversationHandoff {
   @@index([conversationId, status])
   @@index([assignedToUserId, status])
   @@map("conversation_handoffs")
+}
+
+// ─────────────────────────────────────────────
+// INTEGRACIONES DE FLOWBOT (HTTP e IA)
+// ─────────────────────────────────────────────
+
+/// Como se autentica una llamada HTTP saliente.
+///
+/// Es un conjunto CERRADO. Dejar que un flujo componga cabeceras arbitrarias
+/// convierte el nodo HTTP en un proxy con las credenciales de la empresa
+/// dentro, y ese es exactamente el agujero que un motor de automatizaciones no
+/// puede tener.
+enum FlowBotCredentialType {
+  /// Una cabecera con nombre configurable: `X-API-Key: <secreto>`.
+  API_KEY_HEADER
+  /// `Authorization: Bearer <secreto>`.
+  BEARER_TOKEN
+  /// `Authorization: Basic base64(usuario:secreto)`.
+  BASIC_AUTH
+}
+
+/// Credencial de un servicio externo, guardada CIFRADA.
+///
+/// EL SECRETO NUNCA VIAJA AL FLUJO. Un nodo referencia la credencial por id;
+/// el adaptador la descifra en memoria justo antes de la llamada y la olvida.
+/// Si el flujo pudiera leerla, cualquiera con permiso para editar un bot
+/// podria exfiltrarla mandandosela a si mismo con otro nodo HTTP.
+model FlowBotCredential {
+  id   String                @id @default(cuid())
+  name String
+  type FlowBotCredentialType
+
+  /// Nombre de la cabecera para API_KEY_HEADER. Se valida contra una lista de
+  /// caracteres seguros: una cabecera con salto de linea permite inyectar
+  /// otras.
+  headerName String?
+
+  /// Usuario de BASIC_AUTH. No es secreto, va en claro.
+  username String?
+
+  /// AES-256-GCM con la misma clave que los tokens de WhatsApp.
+  secretEncrypted String
+
+  /// Cuando se uso por ultima vez. Permite retirar las que ya nadie usa sin
+  /// adivinar.
+  lastUsedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("flowbot_credentials")
+}
+
+/// Configuracion de las integraciones de FlowBot, por empresa.
+///
+/// TODO VIENE APAGADO. Un motor que puede llamar a cualquier URL y a un
+/// proveedor de IA de pago desde el minuto cero es una factura y una fuga
+/// esperando a ocurrir. Encenderlo es una decision explicita de la empresa, y
+/// el validador impide publicar un flujo que use lo que no esta encendido.
+model FlowBotSettings {
+  id String @id @default(cuid())
+
+  // ── HTTP ──
+  httpEnabled Boolean @default(false)
+
+  /// Hosts permitidos. VACIO significa "ninguno": una lista vacia no es
+  /// "todos". Al reves, encender HTTP sin configurar nada abriria la salida a
+  /// internet entero, que es justo lo que la lista existe para evitar.
+  httpAllowedHosts String[]
+
+  httpTimeoutMs        Int @default(10000)
+  /// Tope de respuesta. Sin el, un servidor que devuelve un gigabyte tumba el
+  /// worker por memoria.
+  httpMaxResponseBytes Int @default(262144)
+
+  // ── IA ──
+  aiEnabled  Boolean @default(false)
+  /// Identificador del proveedor. El motor NO conoce ninguno: lo resuelve el
+  /// registro de proveedores, y sin registro la IA queda "sin configurar".
+  aiProvider String?
+  aiModel    String?
+
+  /// Clave del proveedor, cifrada igual que el resto.
+  aiApiKeyEncrypted String?
+
+  /// Topes de gasto. Se cuentan por empresa y por dia.
+  aiMaxTokensPerCall Int @default(500)
+  aiMaxCallsPerDay   Int @default(500)
+  aiTimeoutMs        Int @default(15000)
+
+  /// Redactar telefonos, correos y documentos antes de mandar el texto al
+  /// proveedor. Por defecto SI: lo que sale del CRM ya no vuelve.
+  aiRedactPii Boolean @default(true)
+
+  /// Instrucciones del sistema. Separadas del prompt del nodo a proposito: el
+  /// autor de un flujo no puede reescribir las reglas de la empresa desde el
+  /// texto de un nodo.
+  aiSystemPrompt String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("flowbot_settings")
+}
+
+/// Consumo de IA, para poder aplicar los topes y explicar la factura.
+///
+/// Una fila por empresa y dia. Sin esto los limites serian una promesa: no se
+/// puede impedir la llamada 501 si nadie ha contado las 500 anteriores.
+model FlowBotAiUsage {
+  id  String   @id @default(cuid())
+  day DateTime @db.Date
+
+  calls  Int @default(0)
+  tokens Int @default(0)
+  /// Coste estimado en milesimas de la moneda, como en `FlowBotMetric`: los
+  /// decimales de coma flotante no suman bien dinero.
+  costMillis Int @default(0)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, day])
+  @@index([companyId, day])
+  @@map("flowbot_ai_usage")
 }

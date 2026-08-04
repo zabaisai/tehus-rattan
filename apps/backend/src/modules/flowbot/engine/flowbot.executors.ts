@@ -611,6 +611,44 @@ const transferir: EjecutorNodo = async (ctx) => {
   return handoff(motivo);
 };
 
+/**
+ * Llamada HTTP a un servicio externo.
+ *
+ * El ejecutor es corto a proposito: TODA la seguridad —HTTPS, lista de
+ * destinos, DNS, redirecciones, tiempo limite, tope de respuesta,
+ * credenciales— vive en el adaptador. Un nodo no puede relajarla porque no la
+ * conoce.
+ *
+ * `saveAs` guarda la respuesta en las variables del flujo. Se guarda el CUERPO
+ * ya interpretado, no el objeto de respuesta entero: las cabeceras de una
+ * respuesta pueden traer cookies de sesion del servicio externo.
+ */
+const llamarHttp: EjecutorNodo = async (ctx) => {
+  const url = texto(ctx.config.url);
+  if (!url) return fallo('http-sin-url', 'configuracion');
+
+  const { estado, datos } = await ctx.efectos.http.llamar({
+    companyId: ctx.companyId,
+    url,
+    metodo: texto(ctx.config.method) || 'GET',
+    cabeceras:
+      ctx.config.headers && typeof ctx.config.headers === 'object'
+        ? (ctx.config.headers as Record<string, string>)
+        : undefined,
+    cuerpo: ctx.config.body,
+    credentialId: texto(ctx.config.credentialId) || undefined,
+  });
+
+  const guardarEn = texto(ctx.config.saveAs);
+  return continuar(
+    PUERTO.SALIDA,
+    guardarEn ? { flow: { [guardarEn]: datos } } : undefined,
+    // En el paso solo el codigo: el cuerpo puede traer datos del cliente y el
+    // historial de pasos se lee desde soporte.
+    { estado },
+  );
+};
+
 // ── registro ──────────────────────────────────────────────────
 
 /**
@@ -654,6 +692,8 @@ export const EJECUTORES: Partial<Record<TipoNodo, EjecutorNodo>> = {
   'control.jump': saltar,
   'control.end': fin,
   'control.cancel': finCancelado,
+
+  'integration.http': llamarHttp,
 
   'crm.contact_upsert': guardarContacto,
   'crm.contact_tag': etiquetar,

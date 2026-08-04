@@ -4,6 +4,8 @@ import { CustomFieldsModule } from '../custom-fields/custom-fields.module';
 import { ConversationsModule } from '../conversations/conversations.module';
 import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-integration.module';
 import { TransporteWhatsAppFalso } from './engine/adapters/flowbot.whatsapp.fake-transport';
+import { RegistroProveedoresIa } from './engine/adapters/flowbot.ia.provider';
+import { ProveedorIaFalso } from './engine/adapters/flowbot.ia.fake-provider';
 import { FlowBotQueueService } from './engine/flowbot.queue';
 import { FlowBotSelectorService } from './engine/flowbot.selector';
 import { FlowBotRunnerService } from './engine/flowbot.runner';
@@ -38,6 +40,8 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     // Singleton a proposito: las pruebas y la demostracion miran lo que se
     // habria enviado, y para eso tienen que compartir instancia con el motor.
     TransporteWhatsAppFalso,
+    ProveedorIaFalso,
+    { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotQueueService,
     FlowBotSelectorService,
     FlowBotRunnerService,
@@ -51,6 +55,8 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     // Singleton a proposito: las pruebas y la demostracion miran lo que se
     // habria enviado, y para eso tienen que compartir instancia con el motor.
     TransporteWhatsAppFalso,
+    ProveedorIaFalso,
+    { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotQueueService,
     FlowBotSelectorService,
     FlowBotRunnerService,
@@ -59,6 +65,7 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     FlowBotIntakeService,
     FlowBotReconcilerService,
     TransporteWhatsAppFalso,
+    ProveedorIaFalso,
   ],
 })
 export class FlowBotModule {}
