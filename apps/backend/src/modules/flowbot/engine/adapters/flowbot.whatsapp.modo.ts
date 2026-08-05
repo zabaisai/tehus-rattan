@@ -52,6 +52,22 @@ export interface DecisionTransporte {
   bloqueos: Guardarrail[];
   /** Frase corta para quien mire la pantalla o el registro. */
   explicacion: string;
+
+  /**
+   * `true` si este envío YA consumió cupo de frecuencia.
+   *
+   * Importa para el reintento: un envío que consumió y falló de forma ambigua
+   * NO devuelve el cupo, porque puede que el mensaje saliera.
+   */
+  cupoConsumido?: boolean;
+  /** Redis no respondió. Para el modo real esto bloquea. */
+  contadorIndisponible?: boolean;
+  /** Segundos hasta que vuelva a haber cupo, cuando lo cortó la frecuencia. */
+  retryAfterSegundos?: number;
+  /** Qué contador cortó. Sin identificadores de nadie. */
+  limiteAlcanzado?: { dimension: string; ventana: string; limite: number };
+  /** Este envío es la única prueba admitida en HALF_OPEN. */
+  esPruebaDelBreaker?: boolean;
 }
 
 /**

@@ -12,6 +12,9 @@ import {
   RegistroPlantillas,
 } from './engine/adapters/flowbot.whatsapp.plantillas';
 import { FlowBotKillSwitchService } from './engine/flowbot.kill-switch.service';
+import { MetricasEnvio } from './engine/flowbot.envio.metricas';
+import { ContadorFrecuencia } from './engine/adapters/flowbot.whatsapp.frecuencia';
+import { CircuitBreakerWhatsApp } from './engine/adapters/flowbot.whatsapp.breaker';
 import { RegistroProveedoresIa } from './engine/adapters/flowbot.ia.provider';
 import { FlowBotReferenciasService } from './graph/flowbot.referencias.service';
 import { PlatformModule } from '../platform/platform.module';
@@ -64,6 +67,9 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     RegistroPlantillas,
     ProveedorPlantillasFalso,
     FlowBotKillSwitchService,
+    MetricasEnvio,
+    ContadorFrecuencia,
+    CircuitBreakerWhatsApp,
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
@@ -92,6 +98,9 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     RegistroPlantillas,
     ProveedorPlantillasFalso,
     FlowBotKillSwitchService,
+    MetricasEnvio,
+    ContadorFrecuencia,
+    CircuitBreakerWhatsApp,
     ProveedorIaFalso,
     { provide: RegistroProveedoresIa, useClass: RegistroProveedoresIa },
     FlowBotReferenciasService,
@@ -115,6 +124,9 @@ import { FlowBotAdminController } from './flowbot-admin.controller';
     RegistroPlantillas,
     ProveedorPlantillasFalso,
     FlowBotKillSwitchService,
+    MetricasEnvio,
+    ContadorFrecuencia,
+    CircuitBreakerWhatsApp,
     ProveedorIaFalso,
     FlowBotReferenciasService,
     FlowBotAdminService,

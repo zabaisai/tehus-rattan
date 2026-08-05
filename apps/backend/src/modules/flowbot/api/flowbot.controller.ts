@@ -5,6 +5,7 @@ import {
   Delete,
   ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Patch,
   Post,
@@ -27,6 +28,7 @@ import { FlowBotMetricsService } from './flowbot.metrics.service';
 import { FlowBotSimulatorService } from './flowbot.simulator.service';
 import { FlowBotEffectsFactory } from '../engine/flowbot.effects.factory';
 import { FlowBotKillSwitchService } from '../engine/flowbot.kill-switch.service';
+import { GuardarrailesWhatsApp } from '../engine/adapters/flowbot.whatsapp.guardarrailes';
 import { construirCatalogo } from './flowbot.contracts';
 import {
   CrearBotDto,
@@ -83,6 +85,7 @@ export class FlowBotController {
     private readonly prisma: PrismaService,
     private readonly efectos: FlowBotEffectsFactory,
     private readonly killSwitch: FlowBotKillSwitchService,
+    private readonly guardarrailes: GuardarrailesWhatsApp,
   ) {}
 
   // ── estado operativo ────────────────────────────────────────
@@ -100,11 +103,19 @@ export class FlowBotController {
    * despliegue, no información de producto.
    */
   @Get('operational-status')
-  async estadoOperativo() {
-    const [kill] = await Promise.all([this.killSwitch.estado()]);
+  async estadoOperativo(@Request() req: any) {
+    const [kill, contadorDisponible] = await Promise.all([
+      this.killSwitch.estado(),
+      this.guardarrailes.contadorDisponible(),
+    ]);
     const modo = this.efectos.modoConfigurado();
 
-    return {
+    // UN AGENT VE EL MODO Y NADA MÁS. Saber si los mensajes salen de verdad le
+    // afecta a su conversación; los límites, el estado de cada número y la
+    // cola son configuración de plataforma y en su pantalla solo serían ruido.
+    const esAgente = req.user.role === 'AGENT';
+
+    const base = {
       modo,
       // Texto ya redactado: la pantalla lo enseña tal cual y así dice lo mismo
       // en todos los sitios donde aparezca.
@@ -114,8 +125,96 @@ export class FlowBotController {
           : modo === 'dry-run'
             ? 'Modo de prueba: FlowBot no está enviando mensajes reales'
             : 'FlowBot no está conectado a WhatsApp: no sale ningún mensaje',
-      enviaDeVerdad: modo === 'real' && !kill.activo,
+      enviaDeVerdad: modo === 'real' && !kill.activo && contadorDisponible,
       killSwitch: kill,
+    };
+
+    if (esAgente) return base;
+
+    // Estado por número: solo los de ESTA empresa. El `companyId` sale del
+    // token, así que un administrador no puede pedir el de otra.
+    const numeros = await this.prisma.whatsAppIntegration.findMany({
+      where: { companyId: req.user.companyId },
+      orderBy: [{ isPrimary: 'desc' }, { order: 'asc' }, { id: 'asc' }],
+      // NUNCA el token, ni siquiera cifrado: esta respuesta va al navegador.
+      select: {
+        id: true,
+        phoneNumberId: true,
+        displayPhoneNumber: true,
+        label: true,
+        status: true,
+      },
+    });
+
+    const breakers = await Promise.all(
+      numeros.map(async (n) => ({
+        integrationId: n.id,
+        // El número visible se enseña porque es de la propia empresa y es lo
+        // único que permite saber de cuál se habla.
+        etiqueta: n.label || n.displayPhoneNumber || n.phoneNumberId,
+        estadoIntegracion: n.status,
+        breaker: await this.guardarrailes.fotoBreaker(n.id),
+      })),
+    );
+
+    const necesitanAtencion = await this.prisma.flowBotExecution.count({
+      where: { companyId: req.user.companyId, status: 'NEEDS_ATTENTION' },
+    });
+
+    return {
+      ...base,
+      contador: {
+        disponible: contadorDisponible,
+        // Los límites configurados, SIN destinatarios ni identificadores: son
+        // números de configuración, no datos de nadie.
+        limites: this.guardarrailes.limitesConfigurados(),
+      },
+      numeros: breakers,
+      ejecucionesEnAtencion: necesitanAtencion,
+    };
+  }
+
+  /**
+   * Levanta el breaker de un número.
+   *
+   * NO SALTA NINGÚN OTRO GUARDARRAÍL. Cerrar el breaker solo dice «vuelve a
+   * intentarlo»: el interruptor de emergencia, las listas de permitidos y el
+   * contador de frecuencia siguen exactamente donde estaban. Quien lo pulse
+   * esperando desbloquear un envío que el kill switch impide, no lo consigue.
+   */
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Post('integrations/:integrationId/reset-breaker')
+  async reiniciarBreaker(
+    @Request() req: any,
+    @Param('integrationId') integrationId: string,
+    @Body() body: { motivo?: string },
+  ) {
+    if (!body?.motivo?.trim()) {
+      throw new BadRequestException(
+        'Para reiniciar hay que escribir por qué: es lo que se lee después',
+      );
+    }
+
+    // Acotado por empresa: sin esto, un identificador de otra empresa serviría
+    // para tocar su número.
+    const numero = await this.prisma.whatsAppIntegration.findFirst({
+      where: { id: integrationId, companyId: req.user.companyId },
+      select: { id: true },
+    });
+    if (!numero) throw new NotFoundException('Número no encontrado');
+
+    await this.guardarrailes.reiniciarBreaker(numero.id);
+    await this.auditar(
+      req,
+      'flowbot.breaker.reset',
+      numero.id,
+      { integrationId: numero.id },
+      body.motivo,
+    );
+
+    return {
+      reiniciado: true,
+      breaker: await this.guardarrailes.fotoBreaker(numero.id),
     };
   }
 
@@ -691,6 +790,7 @@ export class FlowBotController {
     accion: string,
     entityId: string,
     metadata?: Record<string, unknown>,
+    motivo?: string,
   ): Promise<void> {
     const soporte = req.user.soporte;
 
@@ -702,7 +802,13 @@ export class FlowBotController {
         action: accion,
         entityType: 'FlowBot',
         entityId,
-        ...(soporte ? { reason: soporte.motivo } : {}),
+        // El motivo escrito por quien actúa gana sobre el de la sesión de
+        // soporte: es más específico de ESTA acción.
+        ...(motivo?.trim()
+          ? { reason: motivo.trim() }
+          : soporte
+            ? { reason: soporte.motivo }
+            : {}),
         metadata: {
           ...(metadata ?? {}),
           ...(soporte

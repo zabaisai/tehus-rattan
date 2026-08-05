@@ -19,6 +19,7 @@ import { FlowBotSimulatorService } from '../src/modules/flowbot/api/flowbot.simu
 import { FlowBotSupportGuard } from '../src/modules/flowbot/api/flowbot-support.guard';
 import { FlowBotEffectsFactory } from '../src/modules/flowbot/engine/flowbot.effects.factory';
 import { FlowBotKillSwitchService } from '../src/modules/flowbot/engine/flowbot.kill-switch.service';
+import { GuardarrailesWhatsApp } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.guardarrailes';
 import { FlowBotReferenciasService } from '../src/modules/flowbot/graph/flowbot.referencias.service';
 import { CABECERA_SOPORTE } from '../src/modules/flowbot/api/flowbot-support.guard';
 
@@ -247,6 +248,18 @@ describe('Acceso de soporte a FlowBot (e2e, HTTP + base real)', () => {
         {
           provide: FlowBotEffectsFactory,
           useValue: { modoConfigurado: () => 'falso' },
+        },
+        {
+          // El estado operativo consulta contador y breaker. Aquí no se
+          // ejercita esa ruta; sin el proveedor Nest no construye el
+          // controlador y caen todas las pruebas de la puerta de soporte.
+          provide: GuardarrailesWhatsApp,
+          useValue: {
+            contadorDisponible: async () => true,
+            limitesConfigurados: () => [],
+            fotoBreaker: async () => ({ estado: 'CLOSED' }),
+            reiniciarBreaker: async () => undefined,
+          },
         },
         {
           provide: FlowBotKillSwitchService,

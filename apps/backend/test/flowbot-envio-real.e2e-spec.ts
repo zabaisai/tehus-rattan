@@ -5,6 +5,11 @@ import { FlowBotKillSwitchService } from '../src/modules/flowbot/engine/flowbot.
 import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { RegistroPlantillas } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.plantillas';
 import { GUARDARRAILES } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.modo';
+import Redis from 'ioredis';
+import { buildRedisConnection } from '../src/common/queue/queue.config';
+import { ContadorFrecuencia } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.frecuencia';
+import { CircuitBreakerWhatsApp } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.breaker';
+import { MetricasEnvio } from '../src/modules/flowbot/engine/flowbot.envio.metricas';
 
 /**
  * LOS GUARDARRAÍLES CONTRA LA BASE REAL.
@@ -22,6 +27,11 @@ import { GUARDARRAILES } from '../src/modules/flowbot/engine/adapters/flowbot.wh
  */
 const prisma = new PrismaClient();
 const PREFIJO = 'E2E-ENV';
+
+// `buildRedisConnection` apunta por defecto a `redis`, que es el nombre del
+// contenedor dentro de la red de Docker y no resuelve desde la máquina. Sin
+// esto la suite prueba el camino de «Redis caído» creyendo que prueba el otro.
+process.env.REDIS_HOST = process.env.REDIS_HOST?.trim() || '127.0.0.1';
 
 const FLUJO = {
   schemaVersion: 1,
@@ -59,7 +69,30 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
   const servicioPrisma = prisma as unknown as PrismaService;
   const auditoria = new PlatformAuditLogService(servicioPrisma);
   const killSwitch = new FlowBotKillSwitchService(servicioPrisma, auditoria);
-  const guardarrailes = new GuardarrailesWhatsApp(servicioPrisma, killSwitch);
+  // `buildRedisConnection` trae `maxRetriesPerRequest: null`, que es lo que
+  // BullMQ exige pero convierte cualquier comando de un cliente normal en un
+  // reintento infinito: la suite se quedaba colgada sin imprimir nada en vez
+  // de fallar. Aquí se acota.
+  // `buildRedisConnection` trae `maxRetriesPerRequest: null`, que es lo que
+  // BullMQ exige pero convierte cualquier comando de un cliente normal en un
+  // reintento infinito: la suite se quedaba colgada sin imprimir nada en vez
+  // de fallar. Se acota, y se DEJA la cola de espera activada —al contrario
+  // que en el contador— porque aquí interesa que el primer comando espere a
+  // que la conexión esté lista en vez de fallar por llegar medio segundo antes.
+  const redisCrudo = new Redis({
+    ...buildRedisConnection(),
+    maxRetriesPerRequest: 2,
+  });
+  const frecuencia = new ContadorFrecuencia();
+  const breaker = new CircuitBreakerWhatsApp();
+  const metricas = new MetricasEnvio();
+  const guardarrailes = new GuardarrailesWhatsApp(
+    servicioPrisma,
+    killSwitch,
+    frecuencia,
+    breaker,
+    metricas,
+  );
   const plantillas = new RegistroPlantillas(servicioPrisma);
 
   let empresaA: string;
@@ -195,10 +228,20 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
     });
     await prisma.user.deleteMany({ where: { companyId: { in: empresas } } });
     await prisma.company.deleteMany({ where: { id: { in: empresas } } });
+    await limpiarContadores();
+    await frecuencia.cerrar();
+    await breaker.cerrar();
+    await redisCrudo.quit().catch(() => undefined);
+    redisCrudo.disconnect();
     await prisma.$disconnect();
   });
 
   beforeEach(async () => {
+    // Los contadores se vacían entre pruebas. EVALUAR CONSUME CUPO —es lo que
+    // hace que el límite signifique algo— así que sin esto la séptima llamada
+    // de la suite chocaría contra el techo por minuto de la conversación y el
+    // fallo parecería del guardarraíl en vez de del contador.
+    await limpiarContadores();
     limpiarEntorno();
     await prisma.flowBotKillSwitch.deleteMany({});
     await prisma.conversationHandoff.deleteMany({
@@ -214,6 +257,15 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
     });
   });
 
+  /** Borra las claves de frecuencia y breaker de estas pruebas. */
+  async function limpiarContadores() {
+    const claves = await redisCrudo.keys('flowbot:rate:*');
+    const breakers = await redisCrudo.keys('flowbot:breaker:*');
+    if (claves.length + breakers.length > 0) {
+      await redisCrudo.del(...claves, ...breakers);
+    }
+  }
+
   const evaluar = () =>
     guardarrailes.evaluar({
       companyId: empresaA,
@@ -224,8 +276,8 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
       integracionConectada: true,
       idempotencyKey: 'ejec-1-nodo-1-1',
       ventanaOPlantilla: true,
-      dentroDeLimite: true,
-      circuitoSano: true,
+      flowBotId: botA,
+      integrationId: null,
     });
 
   it('1. con la configuración por defecto NO se llega a real', async () => {
@@ -339,8 +391,8 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
       integracionConectada: true,
       idempotencyKey: 'k',
       ventanaOPlantilla: true,
-      dentroDeLimite: true,
-      circuitoSano: true,
+      flowBotId: botA,
+      integrationId: null,
     });
 
     expect(d.modo).not.toBe('real');

@@ -75,6 +75,8 @@ export class WhatsappAdapter implements PuertoMensajeria {
      * sin poder comprobarlo NO se envía de verdad.
      */
     private readonly executionId: string | null = null,
+    /** Para contar por bot: un bot en bucle no puede gastar el cupo de todos. */
+    private readonly flowBotId: string | null = null,
   ) {}
 
   // ── ventana de servicio ─────────────────────────────────────
@@ -376,16 +378,33 @@ export class WhatsappAdapter implements PuertoMensajeria {
     const decision = await this.guardarrailes.evaluar({
       companyId: this.companyId,
       executionId: this.executionId,
+      flowBotId: this.flowBotId,
       conversationId: op.conversationId,
+      integrationId: integracion.id,
       phoneNumberId: integracion.phoneNumberId,
       destinatario: conversacion.contact.phone.replace(/^\+/, ''),
       integracionConectada: integracion.conectada,
       idempotencyKey: op.idempotencyKey,
       // Una plantilla ya validada vale fuera de la ventana; el texto libre no.
       ventanaOPlantilla: dentroDeVentana || !!op.plantilla,
-      dentroDeLimite: true,
-      circuitoSano: true,
     });
+
+    // El límite interno NO es un fallo del envío: es el sistema haciendo su
+    // trabajo. Se lanza ANTES de reservar la fila del mensaje —crear una fila
+    // FALLIDA por algo que nunca llegó a intentarse ensucia el hilo del
+    // cliente— y con `retryAfter` para que el motor reencole con espera en vez
+    // de reintentar de inmediato, que es como se construye una tormenta.
+    if (decision.limiteAlcanzado || decision.contadorIndisponible) {
+      const error = new ErrorDeEnvio(
+        decision.contadorIndisponible
+          ? 'contador-no-disponible'
+          : 'limite-interno',
+        'externo_transitorio',
+      );
+      (error as { retryAfterSegundos?: number }).retryAfterSegundos =
+        decision.retryAfterSegundos ?? 60;
+      throw error;
+    }
 
     const transporte = this.transporteDe(decision.modo);
 
@@ -448,17 +467,42 @@ export class WhatsappAdapter implements PuertoMensajeria {
           })
           .catch(() => undefined);
       }
+      if (integracion.id) {
+        await this.guardarrailes.registrarExito(integracion.id);
+      }
       return { wamid: respuesta.wamid };
     }
 
     const codigo = respuesta.errorCode ?? 'desconocido';
     await this.marcarFallo(reservado.id, codigo);
 
+    // El breaker se entera del fallo; él decide si abre.
+    if (integracion.id) {
+      await this.guardarrailes.registrarFallo(integracion.id, codigo);
+    }
+
     // AMBIGUO NO SE REINTENTA. No se sabe si el mensaje salió; reintentar es
     // jugarse mandárselo dos veces al cliente. Se marca para que alguien lo
     // mire, que es la única salida honesta.
+    //
+    // Y EL CUPO SE QUEDA CONSUMIDO: puede que el mensaje sí saliera, y
+    // devolverlo permitiría que otro ocupara su sitio y salieran dos.
     if (respuesta.ambiguo) {
       throw new ErrorDeEnvio(codigo, 'atencion');
+    }
+
+    // Aquí SÍ se sabe que no salió —Meta contestó y dijo que no—, así que el
+    // cupo vuelve: si no, un flujo mal configurado agota el presupuesto de la
+    // empresa a base de rechazos.
+    if (decision.cupoConsumido) {
+      await this.guardarrailes.devolverCupo({
+        companyId: this.companyId,
+        integrationId: integracion.id,
+        phoneNumberId: integracion.phoneNumberId,
+        flowBotId: this.flowBotId,
+        conversationId: op.conversationId,
+        destinatario: conversacion.contact.phone.replace(/^\+/, ''),
+      });
     }
 
     throw new ErrorDeEnvio(

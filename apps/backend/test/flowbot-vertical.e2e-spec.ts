@@ -114,7 +114,15 @@ describe('vertical completa de FlowBot (e2e, base real)', () => {
             modo: 'falso' as const,
             bloqueos: [],
             explicacion: 'e2e',
+            cupoConsumido: true,
           }),
+          registrarExito: async () => undefined,
+          registrarFallo: async () => ({
+            abierto: false,
+            bloqueada: false,
+            estado: 'CLOSED' as const,
+          }),
+          devolverCupo: async () => undefined,
         } as never,
         {
           estado: async () => ({

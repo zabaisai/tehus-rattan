@@ -496,7 +496,18 @@ function guardarrailesQuePermiten() {
       modo: 'falso',
       bloqueos: [],
       explicacion: 'prueba',
+      cupoConsumido: true,
     }),
+    // El adaptador avisa al breaker de cómo fue cada envío. Aquí no se
+    // comprueba el breaker —tiene sus propias pruebas contra Redis real— pero
+    // sin estos métodos el adaptador se rompe al terminar.
+    registrarExito: jest.fn(),
+    registrarFallo: jest.fn().mockResolvedValue({
+      abierto: false,
+      bloqueada: false,
+      estado: 'CLOSED',
+    }),
+    devolverCupo: jest.fn(),
   } as never;
 }
 
