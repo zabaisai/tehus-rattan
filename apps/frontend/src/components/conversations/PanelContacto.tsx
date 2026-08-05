@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { mensajeDeError } from '@/components/ui/ListState';
 import type { Conversation } from '@/types';
+import { NOMBRE_PULSO } from '@/lib/producto';
 
 interface ContactoCompleto {
   id: string;
@@ -269,7 +270,7 @@ export function PanelContacto({
 
       <div className="space-y-3 p-3">
         {ej && (
-          <Seccion titulo="FlowBot" icono={Bot}>
+          <Seccion titulo={NOMBRE_PULSO} icono={Bot}>
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={ESTADO_EJECUCION[ej.estado]?.tono ?? 'neutral'}>
                 {ESTADO_EJECUCION[ej.estado]?.etiqueta ?? ej.estado}

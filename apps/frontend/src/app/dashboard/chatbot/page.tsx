@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bot, Plus, Rocket, Trash2 } from 'lucide-react';
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bot, Plus, Rocket, Trash2 } from "lucide-react";
 import {
   createFlow,
   deleteFlow,
@@ -13,15 +13,17 @@ import {
   validarFlujo,
   type FlujoChatbot,
   type FlujoResumen,
-} from '@/lib/chatbot';
-import { ChatbotFlowEditor } from '@/components/chatbot/ChatbotFlowEditor';
-import { ListState } from '@/components/ui/ListState';
+} from "@/lib/chatbot";
+import { ChatbotFlowEditor } from "@/components/chatbot/ChatbotFlowEditor";
+import { ListState } from "@/components/ui/ListState";
+import Link from "next/link";
+import { NOMBRE_PULSO } from "@/lib/producto";
 
 const ESTADO_SESION: Record<string, string> = {
-  ACTIVE: 'En curso',
-  HANDED_OVER: 'Pasada a una persona',
-  COMPLETED: 'Terminada',
-  ABANDONED: 'Abandonada',
+  ACTIVE: "En curso",
+  HANDED_OVER: "Pasada a una persona",
+  COMPLETED: "Terminada",
+  ABANDONED: "Abandonada",
 };
 
 export default function ChatbotPage() {
@@ -35,12 +37,12 @@ export default function ChatbotPage() {
     error: errorCarga,
     refetch,
   } = useQuery({
-    queryKey: ['chatbot', 'flows'],
+    queryKey: ["chatbot", "flows"],
     queryFn: getFlows,
   });
 
   const { data: sesiones } = useQuery({
-    queryKey: ['chatbot', 'sessions'],
+    queryKey: ["chatbot", "sessions"],
     queryFn: () => getChatbotSessions({ limit: 20 }),
     refetchInterval: 30_000,
   });
@@ -48,11 +50,11 @@ export default function ChatbotPage() {
   const flujo = flujos?.find((f) => f.id === seleccionado) ?? null;
 
   async function refrescar() {
-    await queryClient.invalidateQueries({ queryKey: ['chatbot'] });
+    await queryClient.invalidateQueries({ queryKey: ["chatbot"] });
   }
 
   async function crear() {
-    const creado = await createFlow({ name: 'Flujo sin nombre' });
+    const creado = await createFlow({ name: "Flujo sin nombre" });
     await refrescar();
     setSeleccionado(creado.id);
   }
@@ -71,13 +73,35 @@ export default function ChatbotPage() {
       // El backend rechaza borrar un flujo con conversaciones en curso; su
       // motivo es más útil que un genérico, pero aquí basta con no mentir.
       setErrorLista(
-        'No se puede eliminar: hay conversaciones usándolo. Desactívalo y espera a que terminen.',
+        "No se puede eliminar: hay conversaciones usándolo. Desactívalo y espera a que terminen.",
       );
     }
   }
 
   return (
     <div className="space-y-5">
+      {/*
+        Esta pantalla y TAKTO Pulso hacían la misma promesa con dos productos
+        distintos, y el menú las ofrecía como si fueran cosas diferentes. La
+        entrada del menú se retiró; la ruta sigue viva y los flujos existentes
+        se siguen viendo y editando desde aquí, porque esconder datos reales
+        detrás de una redirección es otro defecto, no una solución.
+      */}
+      <div
+        role="status"
+        className="rounded-lg border border-status-info/30 bg-status-info-surface px-3 py-2.5 text-sm text-neutral-800"
+      >
+        Los bots nuevos se construyen en{" "}
+        <Link
+          href="/dashboard/flowbots"
+          className="font-medium underline underline-offset-2"
+        >
+          {NOMBRE_PULSO}
+        </Link>
+        , que reemplaza a esta sección. Lo que ya tengas aquí sigue funcionando
+        y se puede seguir editando.
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-semibold text-neutral-900">Chatbot</h2>
@@ -96,77 +120,77 @@ export default function ChatbotPage() {
 
       <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
         <div className="space-y-2">
-        {errorLista && (
-          <p
-            role="alert"
-            className="rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-xs text-red-700"
-          >
-            {errorLista}
-          </p>
-        )}
-        {(cargando || errorCarga) && (
-          <ListState
-            isLoading={cargando}
-            isError={!!errorCarga}
-            isEmpty={false}
-            error={errorCarga}
-            onRetry={() => void refetch()}
-            emptyMessage=""
-          />
-        )}
-
-        <ul className="h-fit divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
-          {!cargando && !errorCarga && !flujos?.length && (
-            <li className="px-3 py-8 text-center">
-              <Bot size={20} className="mx-auto mb-2 text-neutral-400" />
-              <p className="text-xs text-neutral-500">
-                Todavía no hay flujos. Crea uno para que el bot conteste solo.
-              </p>
-            </li>
-          )}
-          {flujos?.map((f) => (
-            <li
-              key={f.id}
-              className={`flex items-center gap-2 p-2.5 ${
-                seleccionado === f.id ? 'bg-neutral-100' : ''
-              }`}
+          {errorLista && (
+            <p
+              role="alert"
+              className="rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-xs text-red-700"
             >
-              <button
-                onClick={() => setSeleccionado(f.id)}
-                className="min-w-0 flex-1 text-left"
+              {errorLista}
+            </p>
+          )}
+          {(cargando || errorCarga) && (
+            <ListState
+              isLoading={cargando}
+              isError={!!errorCarga}
+              isEmpty={false}
+              error={errorCarga}
+              onRetry={() => void refetch()}
+              emptyMessage=""
+            />
+          )}
+
+          <ul className="h-fit divide-y divide-neutral-100 rounded-lg border border-neutral-200 bg-white">
+            {!cargando && !errorCarga && !flujos?.length && (
+              <li className="px-3 py-8 text-center">
+                <Bot size={20} className="mx-auto mb-2 text-neutral-400" />
+                <p className="text-xs text-neutral-500">
+                  Todavía no hay flujos. Crea uno para que el bot conteste solo.
+                </p>
+              </li>
+            )}
+            {flujos?.map((f) => (
+              <li
+                key={f.id}
+                className={`flex items-center gap-2 p-2.5 ${
+                  seleccionado === f.id ? "bg-neutral-100" : ""
+                }`}
               >
-                <span className="block truncate text-sm font-medium text-neutral-900">
-                  {f.name}
-                </span>
-                <span className="text-[11px] text-neutral-500">
-                  {f.publishedVersion
-                    ? `v${f.publishedVersion} publicada`
-                    : 'Sin publicar'}
-                  {f.isActive ? ' · Atendiendo' : ' · Inactivo'}
-                </span>
-              </button>
-              <button
-                onClick={() => void alternarActivo(f)}
-                disabled={!f.publishedVersion}
-                title={
-                  f.publishedVersion
-                    ? undefined
-                    : 'Publica una versión antes de activarlo'
-                }
-                className="shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-[11px] text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
-              >
-                {f.isActive ? 'Desactivar' : 'Activar'}
-              </button>
-              <button
-                onClick={() => void eliminar(f)}
-                aria-label={`Eliminar ${f.name}`}
-                className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-200"
-              >
-                <Trash2 size={13} />
-              </button>
-            </li>
-          ))}
-        </ul>
+                <button
+                  onClick={() => setSeleccionado(f.id)}
+                  className="min-w-0 flex-1 text-left"
+                >
+                  <span className="block truncate text-sm font-medium text-neutral-900">
+                    {f.name}
+                  </span>
+                  <span className="text-[11px] text-neutral-500">
+                    {f.publishedVersion
+                      ? `v${f.publishedVersion} publicada`
+                      : "Sin publicar"}
+                    {f.isActive ? " · Atendiendo" : " · Inactivo"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => void alternarActivo(f)}
+                  disabled={!f.publishedVersion}
+                  title={
+                    f.publishedVersion
+                      ? undefined
+                      : "Publica una versión antes de activarlo"
+                  }
+                  className="shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-[11px] text-neutral-700 hover:bg-neutral-50 disabled:opacity-40"
+                >
+                  {f.isActive ? "Desactivar" : "Activar"}
+                </button>
+                <button
+                  onClick={() => void eliminar(f)}
+                  aria-label={`Eliminar ${f.name}`}
+                  className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-200"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="space-y-3">
@@ -181,11 +205,7 @@ export default function ChatbotPage() {
             // su borrador. Sin esto haria falta un efecto que sincronizara el
             // estado local con el flujo elegido, y sincronizar estado con
             // efectos provoca renderizados en cascada.
-            <PanelDeFlujo
-              key={flujo.id}
-              flujo={flujo}
-              onGuardado={refrescar}
-            />
+            <PanelDeFlujo key={flujo.id} flujo={flujo} onGuardado={refrescar} />
           )}
         </div>
       </div>
@@ -206,7 +226,10 @@ export default function ChatbotPage() {
         ) : (
           <ul className="divide-y divide-neutral-100">
             {sesiones.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-2 px-3 py-2">
+              <li
+                key={s.id}
+                className="flex flex-wrap items-center gap-2 px-3 py-2"
+              >
                 <span className="text-xs font-medium text-neutral-800">
                   {s.flow.name}
                 </span>
@@ -220,7 +243,7 @@ export default function ChatbotPage() {
                   paso {s.currentNode} · {s.steps} mensajes
                 </span>
                 <span className="ml-auto text-[10px] text-neutral-400">
-                  {new Date(s.lastInteractionAt).toLocaleString('es-CO')}
+                  {new Date(s.lastInteractionAt).toLocaleString("es-CO")}
                 </span>
               </li>
             ))}
@@ -253,7 +276,7 @@ function PanelDeFlujo({
     setGuardando(true);
     try {
       await updateFlow(flujo.id, { draftNodes: borrador });
-      setAviso('Borrador guardado. Todavía no atiende a nadie.');
+      setAviso("Borrador guardado. Todavía no atiende a nadie.");
       await onGuardado();
     } finally {
       setGuardando(false);
@@ -264,7 +287,7 @@ function PanelDeFlujo({
     // Se comprueba antes de llamar para dar el aviso al instante; el servidor
     // vuelve a validar y es quien manda.
     if (validarFlujo(borrador).length) {
-      setAviso('Corrige los problemas marcados antes de publicar.');
+      setAviso("Corrige los problemas marcados antes de publicar.");
       return;
     }
 
@@ -274,12 +297,12 @@ function PanelDeFlujo({
       await publishFlow(flujo.id);
       setAviso(
         flujo.isActive
-          ? 'Publicado. Ya atiende con la versión nueva.'
-          : 'Publicado. Actívalo para que empiece a atender.',
+          ? "Publicado. Ya atiende con la versión nueva."
+          : "Publicado. Actívalo para que empiece a atender.",
       );
       await onGuardado();
     } catch {
-      setAviso('No se pudo publicar. Revisa los problemas marcados.');
+      setAviso("No se pudo publicar. Revisa los problemas marcados.");
     } finally {
       setGuardando(false);
     }

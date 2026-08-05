@@ -28,6 +28,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { EstadoBot, estadoVisible } from '@/components/flowbots/EstadoBot';
 import { EstadoTransporte } from '@/components/flowbots/EstadoTransporte';
 import { PanelEnvios } from '@/components/flowbots/PanelEnvios';
+import { NOMBRE_PULSO } from '@/lib/producto';
 
 type Orden = 'reciente' | 'nombre' | 'ejecuciones' | 'errores';
 
@@ -144,7 +145,7 @@ export default function FlowBotsPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-neutral-900">FlowBot</h2>
+          <h2 className="text-xl font-semibold text-neutral-900">{NOMBRE_PULSO}</h2>
           <p className="text-sm text-neutral-500">
             Bots que responden y mueven oportunidades solos.
           </p>
