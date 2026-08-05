@@ -35,9 +35,7 @@ import {
 export class ErrorHttp extends Error {
   /** La lee el intérprete para decidir si reintenta. */
   readonly clase:
-    | 'externo_transitorio'
-    | 'externo_definitivo'
-    | 'configuracion';
+    'externo_transitorio' | 'externo_definitivo' | 'configuracion';
 
   constructor(
     readonly errorCode: string,

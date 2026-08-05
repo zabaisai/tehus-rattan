@@ -41,6 +41,7 @@ import {
   RenombrarBotDto,
   ActualizarDisparadorDto,
   ForzarHandoffDto,
+  ImportarPulsoDto,
 } from './dto/flowbot.dto';
 
 /**
@@ -332,6 +333,62 @@ export class FlowBotController {
     const bot = await this.admin.duplicar(req.user.companyId, req.user.sub, id);
     await this.auditar(req, 'flowbot.duplicate', bot.id, { origen: id });
     return bot;
+  }
+
+  /**
+   * Exporta el bot a `.taktoflow.json`.
+   *
+   * Solo lectura, pero restringido a quien puede editar: el archivo describe
+   * como trabaja la empresa por dentro.
+   */
+  @Roles('ADMIN', 'MANAGER', 'SUPER_ADMIN')
+  @Get(':id/export')
+  async exportar(@Request() req: any, @Param('id') id: string) {
+    const sobre = await this.admin.exportar(req.user.companyId, id);
+    await this.auditar(req, 'flowbot.export', id, {
+      nodos: sobre.grafo.nodes.length,
+      requisitos: sobre.requisitos.length,
+    });
+    return sobre;
+  }
+
+  /**
+   * Analiza un archivo SIN importarlo. Es la vista previa.
+   *
+   * Existe aparte para que nadie tenga que crear un bot solo para descubrir
+   * que el archivo no servia.
+   */
+  @Roles('ADMIN', 'MANAGER', 'SUPER_ADMIN')
+  @Post('import/preview')
+  analizar(@Body() body: ImportarPulsoDto) {
+    const r = this.admin.analizarImportacion(body.contenido);
+    return {
+      metadatos: r.sobre.metadatos,
+      nodos: r.sobre.grafo.nodes.length,
+      conexiones: r.sobre.grafo.edges.length,
+      requisitos: r.sobre.requisitos,
+      nodosDesconocidos: r.nodosDesconocidos,
+      avisos: r.avisos,
+      checksumCoincide: r.checksumCoincide,
+    };
+  }
+
+  /** Importa. SIEMPRE como borrador y SIEMPRE inactivo. */
+  @Roles('ADMIN', 'MANAGER', 'SUPER_ADMIN')
+  @Post('import')
+  async importar(@Request() req: any, @Body() body: ImportarPulsoDto) {
+    const r = await this.admin.importar(
+      req.user.companyId,
+      req.user.sub,
+      body.contenido,
+      body.nombre,
+    );
+    await this.auditar(req, 'flowbot.import', r.bot.id, {
+      requisitos: r.requisitos.length,
+      nodosDesconocidos: r.nodosDesconocidos.length,
+      checksumCoincide: r.checksumCoincide,
+    });
+    return r;
   }
 
   @Roles('ADMIN', 'MANAGER', 'SUPER_ADMIN')

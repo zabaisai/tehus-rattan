@@ -8,7 +8,13 @@ import {
 import { FlowBotStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { compilar, grafoInicial } from '../graph/flowbot.compiler';
+import { randomUUID } from 'crypto';
 import { GrafoFlow } from '../graph/flowbot.graph';
+import { variablesDe } from '../graph/flowbot.variables';
+import {
+  analizarImportacion,
+  construirSobre,
+} from '../graph/flowbot.intercambio';
 import { sePuedePublicar, validarGrafo } from '../graph/flowbot.validator';
 import { FlowBotReferenciasService } from '../graph/flowbot.referencias.service';
 import { PLANTILLAS, plantillaPorClave } from './flowbot.templates';
@@ -217,6 +223,90 @@ export class FlowBotAdminService {
         updatedById: userId,
       },
     });
+  }
+
+  /**
+   * Exporta un bot a `.taktoflow.json`.
+   *
+   * Sale el BORRADOR, no la version publicada: exportar es para llevarse el
+   * trabajo, y el trabajo esta en el borrador. El sobre va saneado —sin
+   * secretos y sin identificadores de esta empresa— porque un archivo que la
+   * gente se manda por correo no puede llevar un token dentro.
+   */
+  async exportar(companyId: string, botId: string) {
+    const bot = await this.prisma.flowBot.findFirst({
+      where: { id: botId, companyId },
+      select: { name: true, description: true, draftGraph: true },
+    });
+    if (!bot) throw new NotFoundException('Bot no encontrado');
+
+    const grafo = bot.draftGraph as unknown as GrafoFlow;
+    return construirSobre({
+      nombre: bot.name,
+      descripcion: bot.description,
+      grafo,
+      variables: [...variablesDe(grafo.nodes.map((n) => n.config ?? {}))],
+      ahora: new Date(),
+      version: String(process.env.APP_RELEASE ?? 'desconocida'),
+    });
+  }
+
+  /**
+   * Analiza un archivo entrante SIN escribir nada. Alimenta la vista previa.
+   *
+   * Existe aparte de `importar` para que nadie tenga que crear un bot solo
+   * para descubrir que el archivo no servia.
+   */
+  analizarImportacion(crudo: string) {
+    // Ids nuevos y sin relacion con los del origen: conservar los del archivo
+    // invita a colisiones con bots que ya existen aqui.
+    return analizarImportacion(
+      crudo,
+      (semilla) => `${semilla}_${randomUUID().slice(0, 8)}`,
+    );
+  }
+
+  /**
+   * Importa un Pulso. SIEMPRE como borrador y SIEMPRE inactivo.
+   *
+   * Un bot importado que se publicara o se activara solo empezaria a contestar
+   * a clientes reales con un flujo que nadie de esta empresa ha revisado.
+   * Tampoco se le copian disparadores: se conectan despues, a mano, igual que
+   * las credenciales que el archivo no trae.
+   */
+  async importar(
+    companyId: string,
+    userId: string,
+    crudo: string,
+    nombreElegido?: string,
+  ) {
+    const analisis = this.analizarImportacion(crudo);
+
+    const bot = await this.prisma.flowBot.create({
+      data: {
+        companyId,
+        name: (nombreElegido?.trim() || analisis.sobre.metadatos.nombre).slice(
+          0,
+          120,
+        ),
+        description: analisis.sobre.metadatos.descripcion,
+        // DRAFT y sin `publishedVersionId`: no hay atajo para saltarse la
+        // revision de quien lo importa.
+        status: 'DRAFT',
+        draftGraph: analisis.sobre.grafo as unknown as Prisma.InputJsonValue,
+        createdById: userId,
+        updatedById: userId,
+      },
+      select: { id: true, name: true, status: true },
+    });
+
+    return {
+      bot,
+      requisitos: analisis.sobre.requisitos,
+      nodosDesconocidos: analisis.nodosDesconocidos,
+      avisos: analisis.avisos,
+      checksumCoincide: analisis.checksumCoincide,
+    };
   }
 
   /**

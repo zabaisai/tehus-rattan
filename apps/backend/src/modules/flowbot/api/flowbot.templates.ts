@@ -24,11 +24,7 @@ export interface PlantillaFlowBot {
   descripcion: string;
   objetivo: string;
   categoria:
-    | 'captacion'
-    | 'calificacion'
-    | 'seguimiento'
-    | 'servicio'
-    | 'operacion';
+    'captacion' | 'calificacion' | 'seguimiento' | 'servicio' | 'operacion';
   /**
    * Qué tiene que completar quien la use antes de publicar, en lenguaje
    * llano.

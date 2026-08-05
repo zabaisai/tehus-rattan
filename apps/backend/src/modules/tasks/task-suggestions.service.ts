@@ -9,7 +9,11 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 /** De dónde salió la propuesta. Sirve para saber qué regla propone basura. */
 export type OrigenSugerencia =
-  'flowbot' | 'automation' | 'rule' | 'agent' | 'system';
+  | 'flowbot'
+  | 'automation'
+  | 'rule'
+  | 'agent'
+  | 'system';
 
 export interface DatosDeSugerencia {
   companyId: string;
