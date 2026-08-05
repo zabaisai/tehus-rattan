@@ -138,10 +138,14 @@ export class ContactsController {
     @Request() req: any,
     @Body() body: EliminarContactoDto,
   ) {
-    const r = await this.eliminacion.eliminarDefinitivo(id, req.user.companyId, {
-      confirmacion: body.confirmacion,
-      motivo: body.motivo,
-    });
+    const r = await this.eliminacion.eliminarDefinitivo(
+      id,
+      req.user.companyId,
+      {
+        confirmacion: body.confirmacion,
+        motivo: body.motivo,
+      },
+    );
 
     // La auditoria guarda el IMPACTO, no solo el hecho. Sin las cifras, dentro
     // de un año «se elimino este contacto» no dice si se fueron dos mensajes o

@@ -45,9 +45,6 @@ export default function ContactsPage() {
 
   const enPapelera = vista === "papelera";
   const isLoading = enPapelera ? papelera.isLoading : activos.isLoading;
-  const lista: Contact[] = enPapelera
-    ? (papelera.data?.items ?? [])
-    : (activos.data ?? []);
 
   const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
@@ -61,6 +58,11 @@ export default function ContactsPage() {
   const puedeEliminarDefinitivo = rol === "ADMIN" || rol === "SUPER_ADMIN";
 
   const filtered = useMemo(() => {
+    // La lista se elige DENTRO del memo: fuera se recreaba en cada render y
+    // arrastraba consigo el filtrado, que es lo que este memo evita.
+    const lista: Contact[] = enPapelera
+      ? (papelera.data?.items ?? [])
+      : (activos.data ?? []);
     const term = search.toLowerCase();
     if (!term) return lista;
     return lista.filter(
@@ -69,7 +71,7 @@ export default function ContactsPage() {
         c.phone.includes(term) ||
         (c.email?.toLowerCase().includes(term) ?? false),
     );
-  }, [lista, search]);
+  }, [enPapelera, papelera.data, activos.data, search]);
 
   function openCreateModal() {
     setEditingContact(null);

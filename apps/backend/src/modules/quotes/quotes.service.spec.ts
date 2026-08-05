@@ -6,7 +6,7 @@ import { QuotesService } from './quotes.service';
  * un Decimal se serializa como "80". Lo que importa es el VALOR, y esta ayuda
  * lo compara sin volver a introducir coma flotante en la propia prueba.
  */
-const importe = (v: unknown) => Number(v as never);
+const importe = (v: unknown) => Number(v);
 
 describe('QuotesService', () => {
   const companyId = 'company-a';

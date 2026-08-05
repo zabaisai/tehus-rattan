@@ -22,7 +22,6 @@ import {
   X,
   Zap,
   Workflow,
-  Bot,
   Trash2,
   Database,
 } from 'lucide-react';

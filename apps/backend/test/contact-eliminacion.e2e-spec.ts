@@ -214,7 +214,9 @@ describe('Eliminación definitiva de contactos (e2e, base real)', () => {
     // Son datos que la empresa recogió sobre la persona, no historia
     // comercial: se van con ella.
     expect(
-      await prisma.customFieldValue.count({ where: { contactId: contacto.id } }),
+      await prisma.customFieldValue.count({
+        where: { contactId: contacto.id },
+      }),
     ).toBe(0);
 
     await prisma.customFieldDefinition.deleteMany({

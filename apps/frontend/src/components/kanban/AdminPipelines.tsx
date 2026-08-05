@@ -15,7 +15,6 @@ import {
 import {
   createPipeline,
   createStage,
-  deletePipeline,
   deleteStage,
   getPipelines,
   reorderStages,
