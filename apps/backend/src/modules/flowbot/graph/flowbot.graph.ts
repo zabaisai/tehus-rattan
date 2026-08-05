@@ -142,6 +142,7 @@ export type TipoNodo =
   | 'crm.lead_assign_round_robin'
   | 'crm.lead_close'
   | 'crm.task_create'
+  | 'crm.task_suggest'
   | 'crm.handoff'
   // integraciones
   | 'integration.http'
@@ -759,7 +760,8 @@ export const CATALOGO: Record<TipoNodo, DefinicionNodo> = {
     tipo: 'crm.task_create',
     categoria: 'crm',
     etiqueta: 'Crear tarea',
-    ayuda: 'Crea una tarea ligada a la conversación y la oportunidad.',
+    ayuda:
+      'Crea una tarea ligada a la conversación y la oportunidad. Si la empresa exige aprobación —lo predeterminado— queda como propuesta hasta que un asesor la acepte.',
     aceptaEntrada: true,
     puertos: [PUERTO.SALIDA, PUERTO.ERROR],
     config: [
@@ -768,7 +770,26 @@ export const CATALOGO: Record<TipoNodo, DefinicionNodo> = {
       ref('assignedTo', 'user', false),
       { nombre: 'priority', tipo: 'texto', obligatorio: false },
     ],
-    produce: ['task.id'],
+    produce: ['task.id', 'suggestion.id'],
+    esperaExterna: false,
+    efectoExterno: false,
+  },
+  'crm.task_suggest': {
+    tipo: 'crm.task_suggest',
+    categoria: 'crm',
+    etiqueta: 'Sugerir tarea',
+    ayuda:
+      'Propone una tarea para que un asesor la apruebe. No crea nada hasta que alguien la acepta.',
+    aceptaEntrada: true,
+    puertos: [PUERTO.SALIDA, PUERTO.ERROR],
+    config: [
+      texto('title'),
+      { nombre: 'dueInHours', tipo: 'numero', obligatorio: false },
+      ref('assignedTo', 'user', false),
+      { nombre: 'priority', tipo: 'texto', obligatorio: false },
+      texto('reason', false),
+    ],
+    produce: ['suggestion.id'],
     esperaExterna: false,
     efectoExterno: false,
   },

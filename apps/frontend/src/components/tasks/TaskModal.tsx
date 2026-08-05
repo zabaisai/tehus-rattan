@@ -1,12 +1,12 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { getLeads } from '@/lib/leads';
-import { getContacts } from '@/lib/contacts';
-import { getCompanyUsers } from '@/lib/users';
-import { Task } from '@/types';
-import { Modal } from '@/components/ui/Modal';
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getLeads } from "@/lib/leads";
+import { getContacts } from "@/lib/contacts";
+import { getCompanyUsers } from "@/lib/users";
+import { Task } from "@/types";
+import { Modal } from "@/components/ui/Modal";
 
 type ApiError = {
   response?: {
@@ -35,43 +35,51 @@ interface TaskModalProps {
 }
 
 const typeLabels: Record<string, string> = {
-  TASK: 'Tarea',
-  FOLLOW_UP: 'Seguimiento',
-  CALL: 'Llamada',
-  MEETING: 'Reunión',
+  TASK: "Tarea",
+  FOLLOW_UP: "Seguimiento",
+  CALL: "Llamada",
+  MEETING: "Reunión",
 };
 
 export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
   const isEditing = !!task;
 
-  const [title, setTitle] = useState(task?.title ?? '');
-  const [description, setDescription] = useState(task?.description ?? '');
+  const [title, setTitle] = useState(task?.title ?? "");
+  const [description, setDescription] = useState(task?.description ?? "");
   const [dueDate, setDueDate] = useState(
-    task?.dueDate ? task.dueDate.slice(0, 16) : '',
+    task?.dueDate ? task.dueDate.slice(0, 16) : "",
   );
-  const [priority, setPriority] = useState<string>(task?.priority ?? 'MEDIUM');
-  const [type] = useState<string>(task?.type ?? 'TASK');
-  const [status, setStatus] = useState<string>(task?.status ?? 'PENDING');
-  const [leadId, setLeadId] = useState(task?.leadId ?? '');
-  const [contactId, setContactId] = useState(task?.contactId ?? '');
-  const [assignedTo, setAssignedTo] = useState(task?.assignedTo ?? '');
-  const [error, setError] = useState('');
+  const [priority, setPriority] = useState<string>(task?.priority ?? "MEDIUM");
+  const [type] = useState<string>(task?.type ?? "TASK");
+  const [status, setStatus] = useState<string>(task?.status ?? "PENDING");
+  const [leadId, setLeadId] = useState(task?.leadId ?? "");
+  const [contactId, setContactId] = useState(task?.contactId ?? "");
+  const [assignedTo, setAssignedTo] = useState(task?.assignedTo ?? "");
+  const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
   const {
     data: leads,
     isLoading: loadingLeads,
     isError: leadsError,
-  } = useQuery({ queryKey: ['leads'], queryFn: () => getLeads(), enabled: !isEditing });
+  } = useQuery({
+    queryKey: ["leads"],
+    queryFn: () => getLeads(),
+    enabled: !isEditing,
+  });
 
   const {
     data: contacts,
     isLoading: loadingContacts,
     isError: contactsError,
-  } = useQuery({ queryKey: ['contacts'], queryFn: getContacts, enabled: !isEditing });
+  } = useQuery({
+    queryKey: ["contacts"],
+    queryFn: getContacts,
+    enabled: !isEditing,
+  });
 
   const { data: users, isError: usersError } = useQuery({
-    queryKey: ['company-users'],
+    queryKey: ["company-users"],
     queryFn: getCompanyUsers,
   });
 
@@ -85,7 +93,7 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
+    setError("");
     setSaving(true);
     try {
       await onSubmit({
@@ -102,205 +110,248 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
     } catch (err) {
       const message = (err as ApiError).response?.data?.message;
       const errorMessage = Array.isArray(message) ? message[0] : message;
-      setError(errorMessage || 'Ocurrió un error');
+      setError(errorMessage || "Ocurrió un error");
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal title={isEditing ? 'Editar tarea' : 'Nueva tarea'} onClose={onClose} maxWidth="sm">
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Título</label>
+    <Modal
+      title={isEditing ? "Editar tarea" : "Nueva tarea"}
+      onClose={onClose}
+      maxWidth="sm"
+    >
+      <form onSubmit={handleSubmit}>
+        <div className="mb-3">
+          <label className="mb-1 block text-xs font-medium text-neutral-600">
+            Título
+          </label>
+          <input
+            type="text"
+            required
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Llamar al cliente"
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+          />
+        </div>
+
+        <div className="mb-3">
+          <label className="mb-1 block text-xs font-medium text-neutral-600">
+            Descripción
+          </label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            rows={2}
+            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+          />
+        </div>
+
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
+              Fecha límite
+            </label>
             <input
-              type="text"
-              required
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Llamar al cliente"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
+              Prioridad
+            </label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+            >
+              <option value="LOW">Baja</option>
+              <option value="MEDIUM">Media</option>
+              <option value="HIGH">Alta</option>
+              <option value="URGENT">Urgente</option>
+            </select>
+          </div>
+        </div>
 
+        {!isEditing && (
           <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Descripción</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-            />
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
+              Tipo
+            </label>
+            <select
+              value={type}
+              disabled
+              className="w-full rounded-md border border-neutral-300 bg-neutral-100 px-2 py-2 text-sm text-neutral-500 outline-none"
+            >
+              <option value="TASK">Tarea</option>
+              <option value="FOLLOW_UP">Seguimiento</option>
+              <option value="CALL">Llamada</option>
+              <option value="MEETING">Reunión</option>
+            </select>
           </div>
+        )}
 
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Fecha límite</label>
-              <input
-                type="datetime-local"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Prioridad</label>
-              <select
-                value={priority}
-                onChange={(e) => setPriority(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-              >
-                <option value="LOW">Baja</option>
-                <option value="MEDIUM">Media</option>
-                <option value="HIGH">Alta</option>
-                <option value="URGENT">Urgente</option>
-              </select>
-            </div>
+        {isEditing && (
+          <div className="mb-3">
+            <label className="mb-1 block text-xs font-medium text-neutral-600">
+              Estado
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+            >
+              <option value="PENDING">Pendiente</option>
+              <option value="IN_PROGRESS">En progreso</option>
+              <option value="COMPLETED">Completada</option>
+              <option value="CANCELLED">Cancelada</option>
+            </select>
           </div>
+        )}
 
-          {!isEditing && (
+        {isEditing ? (
+          <div className="mb-3 rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
+            <p>
+              Tipo:{" "}
+              <span className="text-neutral-700">
+                {typeLabels[type] ?? type}
+              </span>
+            </p>
+            <p className="mt-0.5">
+              Lead:{" "}
+              <span className="text-neutral-700">
+                {task?.lead?.title ?? "Sin vincular"}
+              </span>
+            </p>
+            <p className="mt-0.5">
+              Contacto:{" "}
+              <span className="text-neutral-700">
+                {task?.contact?.name ?? "Sin vincular"}
+              </span>
+            </p>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              El lead y el contacto de una tarea no se pueden cambiar después de
+              creada.
+            </p>
+          </div>
+        ) : (
+          <>
             <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Tipo</label>
-              <select
-                value={type}
-                disabled
-                className="w-full rounded-md border border-neutral-300 bg-neutral-100 px-2 py-2 text-sm text-neutral-500 outline-none"
-              >
-                <option value="TASK">Tarea</option>
-                <option value="FOLLOW_UP">Seguimiento</option>
-                <option value="CALL">Llamada</option>
-                <option value="MEETING">Reunión</option>
-              </select>
-            </div>
-          )}
-
-          {isEditing && (
-            <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Estado</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-              >
-                <option value="PENDING">Pendiente</option>
-                <option value="IN_PROGRESS">En progreso</option>
-                <option value="COMPLETED">Completada</option>
-                <option value="CANCELLED">Cancelada</option>
-              </select>
-            </div>
-          )}
-
-          {isEditing ? (
-            <div className="mb-3 rounded-md bg-neutral-50 px-3 py-2 text-xs text-neutral-500">
-              <p>
-                Tipo: <span className="text-neutral-700">{typeLabels[type] ?? type}</span>
-              </p>
-              <p className="mt-0.5">
-                Lead: <span className="text-neutral-700">{task?.lead?.title ?? 'Sin vincular'}</span>
-              </p>
-              <p className="mt-0.5">
-                Contacto: <span className="text-neutral-700">{task?.contact?.name ?? 'Sin vincular'}</span>
-              </p>
-              <p className="mt-1 text-[11px] text-neutral-400">
-                El lead y el contacto de una tarea no se pueden cambiar después de creada.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-3">
-                <label className="mb-1 block text-xs font-medium text-neutral-600">Lead relacionado</label>
-                {leadsError ? (
-                  <p className="text-xs text-red-600">No se pudieron cargar los leads.</p>
-                ) : (
-                  <select
-                    value={leadId}
-                    onChange={(e) => handleLeadChange(e.target.value)}
-                    disabled={loadingLeads}
-                    className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
-                  >
-                    <option value="">
-                      {loadingLeads ? 'Cargando leads...' : 'Sin lead (tarea general)'}
-                    </option>
-                    {leads?.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.title}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-
-              <div className="mb-3">
-                <label className="mb-1 block text-xs font-medium text-neutral-600">Contacto relacionado</label>
-                {contactsError ? (
-                  <p className="text-xs text-red-600">No se pudieron cargar los contactos.</p>
-                ) : (
-                  <select
-                    value={contactId}
-                    onChange={(e) => setContactId(e.target.value)}
-                    disabled={loadingContacts}
-                    className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
-                  >
-                    <option value="">
-                      {loadingContacts ? 'Cargando contactos...' : 'Sin contacto (tarea interna)'}
-                    </option>
-                    {contacts?.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name || c.phone}
-                      </option>
-                    ))}
-                  </select>
-                )}
-              </div>
-            </>
-          )}
-
-          <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Responsable</label>
-            {usersError ? (
-              <p className="text-xs text-red-600">No se pudieron cargar los usuarios.</p>
-            ) : (
-              <select
-                value={assignedTo}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-              >
-                <option value="">Sin asignar</option>
-                {users
-                  ?.filter((u) => u.isActive)
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
+                Lead relacionado
+              </label>
+              {leadsError ? (
+                <p className="text-xs text-red-600">
+                  No se pudieron cargar los leads.
+                </p>
+              ) : (
+                <select
+                  value={leadId}
+                  onChange={(e) => handleLeadChange(e.target.value)}
+                  disabled={loadingLeads}
+                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
+                >
+                  <option value="">
+                    {loadingLeads
+                      ? "Cargando leads..."
+                      : "Sin lead (tarea general)"}
+                  </option>
+                  {leads?.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.title}
                     </option>
                   ))}
-              </select>
-            )}
-            {isEditing && !assignedTo && task?.assignedTo && (
-              <p className="mt-1 text-[11px] text-neutral-400">
-                Esta tarea ya tiene responsable asignado; el backend no permite quitarlo, solo reasignarlo.
-              </p>
-            )}
-          </div>
+                </select>
+              )}
+            </div>
 
-          {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+            <div className="mb-3">
+              <label className="mb-1 block text-xs font-medium text-neutral-600">
+                Contacto relacionado
+              </label>
+              {contactsError ? (
+                <p className="text-xs text-red-600">
+                  No se pudieron cargar los contactos.
+                </p>
+              ) : (
+                <select
+                  value={contactId}
+                  onChange={(e) => setContactId(e.target.value)}
+                  disabled={loadingContacts}
+                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
+                >
+                  <option value="">
+                    {loadingContacts
+                      ? "Cargando contactos..."
+                      : "Sin contacto (tarea interna)"}
+                  </option>
+                  {contacts?.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name || c.phone}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          </>
+        )}
 
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
+        <div className="mb-4">
+          <label className="mb-1 block text-xs font-medium text-neutral-600">
+            Responsable
+          </label>
+          {usersError ? (
+            <p className="text-xs text-red-600">
+              No se pudieron cargar los usuarios.
+            </p>
+          ) : (
+            <select
+              value={assignedTo}
+              onChange={(e) => setAssignedTo(e.target.value)}
+              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
-            >
-              {saving ? 'Guardando...' : 'Guardar'}
-            </button>
-          </div>
-        </form>
+              <option value="">Sin asignar</option>
+              {users
+                ?.filter((u) => u.isActive)
+                .map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name}
+                  </option>
+                ))}
+            </select>
+          )}
+          {isEditing && !assignedTo && task?.assignedTo && (
+            <p className="mt-1 text-[11px] text-neutral-400">
+              Esta tarea ya tiene responsable asignado; el backend no permite
+              quitarlo, solo reasignarlo.
+            </p>
+          )}
+        </div>
+
+        {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
+          >
+            {saving ? "Guardando..." : "Guardar"}
+          </button>
+        </div>
+      </form>
     </Modal>
   );
 }

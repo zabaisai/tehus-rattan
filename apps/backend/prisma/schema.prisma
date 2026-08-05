@@ -8,12 +8,13 @@ datasource db {
 }
 
 model Company {
-  id        String        @id @default(cuid())
-  name      String
-  phone     String?       @unique
-  status    CompanyStatus @default(ACTIVE)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  taskSuggestions TaskSuggestion[]
+  id              String           @id @default(cuid())
+  name            String
+  phone           String?          @unique
+  status          CompanyStatus    @default(ACTIVE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   // Informational company profile — display-only, never legal/fiscal/billing data.
   slug             String? @unique
@@ -121,14 +122,16 @@ model Company {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
-  name      String
-  role      Role     @default(AGENT)
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  sugerenciasPropuestas TaskSuggestion[] @relation("SugerenciaAsesor")
+  sugerenciasDecididas  TaskSuggestion[] @relation("SugerenciaDecisor")
+  id                    String           @id @default(cuid())
+  email                 String           @unique
+  password              String
+  name                  String
+  role                  Role             @default(AGENT)
+  isActive              Boolean          @default(true)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   // ── Reparto automático ──────────────────────────────────────
   // Quién entra en el turno. Separado de `isActive` porque son cosas
@@ -190,14 +193,15 @@ model User {
 }
 
 model Contact {
-  id        String   @id @default(cuid())
-  phone     String
-  name      String?
-  email     String?
-  tags      String[]
-  isBlocked Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  taskSuggestions TaskSuggestion[]
+  id              String           @id @default(cuid())
+  phone           String
+  name            String?
+  email           String?
+  tags            String[]
+  isBlocked       Boolean          @default(false)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   /// Archivado SEGURO: se marca, nunca se borra.
   ///
@@ -239,14 +243,15 @@ model Contact {
 }
 
 model Conversation {
-  id            String             @id @default(cuid())
-  status        ConversationStatus @default(OPEN)
-  stage         String?
-  isPaused      Boolean            @default(false)
-  channel       String             @default("whatsapp")
-  lastMessageAt DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
+  taskSuggestions TaskSuggestion[]
+  id              String             @id @default(cuid())
+  status          ConversationStatus @default(OPEN)
+  stage           String?
+  isPaused        Boolean            @default(false)
+  channel         String             @default("whatsapp")
+  lastMessageAt   DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   companyId  String
   company    Company @relation(fields: [companyId], references: [id])
@@ -567,7 +572,8 @@ enum StageType {
 }
 
 model Lead {
-  id                String     @id @default(cuid())
+  taskSuggestions   TaskSuggestion[]
+  id                String           @id @default(cuid())
   title             String
   /// Decimal, nunca Float.
   ///
@@ -575,12 +581,12 @@ model Lead {
   /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
   /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
   /// y quien lo mira concluye —con razon— que el sistema calcula mal.
-  value             Decimal?   @default(0) @db.Decimal(18, 4)
-  status            LeadStatus @default(OPEN)
+  value             Decimal?         @default(0) @db.Decimal(18, 4)
+  status            LeadStatus       @default(OPEN)
   lostReason        String?
   expectedCloseDate DateTime?
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
@@ -626,7 +632,7 @@ model LeadProduct {
   /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
   /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
   /// y quien lo mira concluye —con razon— que el sistema calcula mal.
-  unitPrice Decimal @db.Decimal(18, 4)
+  unitPrice Decimal  @db.Decimal(18, 4)
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -694,10 +700,83 @@ model Task {
   assignedTo String?
   agent      User?   @relation(fields: [assignedTo], references: [id])
 
+  /// La propuesta de la que nacio, si nacio de una.
+  suggestion TaskSuggestion?
+
   @@index([companyId, status, dueDate])
   @@index([companyId, assignedTo])
   @@index([conversationId])
   @@map("tasks")
+}
+
+/// Una tarea PROPUESTA, todavia no creada.
+///
+/// El bot no puede meterle trabajo a una persona en su lista sin que esa
+/// persona lo haya aceptado: cuando eso pasa, la lista deja de ser de quien
+/// la usa y se vuelve un vertedero que nadie mira. Aqui la propuesta espera, y
+/// solo la aprobacion crea la Task de verdad.
+model TaskSuggestion {
+  id     String               @id @default(cuid())
+  status TaskSuggestionStatus @default(PENDING)
+
+  /// De donde salio: `flowbot`, `automation`, `rule`, `agent`.
+  source  String
+  /// Por que se propone, en lenguaje llano. Es lo que lee el asesor.
+  reason  String?
+  /// El MINIMO fragmento del mensaje que justifica la propuesta.
+  ///
+  /// Un extracto, no la conversacion entera: la propuesta se enseña en listas
+  /// y notificaciones, y arrastrar el hilo completo copia datos personales a
+  /// sitios donde no hacen falta.
+  excerpt String?
+
+  title       String
+  description String?
+  priority    TaskPriority @default(MEDIUM)
+  dueAt       DateTime?
+
+  /// A quien se propone asignarla. El asesor puede cambiarlo al aprobar.
+  suggestedAssignee String?
+  suggestedUser     User?   @relation("SugerenciaAsesor", fields: [suggestedAssignee], references: [id], onDelete: SetNull)
+
+  /// La MISMA regla sobre el MISMO mensaje no propone dos veces. Sin esto, un
+  /// reintento del worker duplica la propuesta y el asesor ve la misma cosa
+  /// dos veces sin saber cual atender.
+  idempotencyKey String @unique
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  flowBotId String?
+  flowBot   FlowBot? @relation(fields: [flowBotId], references: [id], onDelete: SetNull)
+
+  decidedById  String?
+  decidedBy    User?     @relation("SugerenciaDecisor", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedAt    DateTime?
+  decisionNote String?
+
+  /// La tarea que nacio de aprobarla. UNICO: dos aprobaciones simultaneas no
+  /// pueden acabar en dos tareas, y la base lo garantiza aunque el codigo
+  /// falle.
+  createdTaskId String? @unique
+  createdTask   Task?   @relation(fields: [createdTaskId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status, createdAt])
+  @@index([conversationId])
+  @@index([contactId])
+  @@map("task_suggestions")
 }
 
 model Note {
@@ -732,6 +811,20 @@ enum TaskType {
   FOLLOW_UP
   CALL
   MEETING
+}
+
+/// Estado de una propuesta de tarea.
+///
+/// EXPIRED y CANCELLED existen para que una propuesta que nadie atendio no se
+/// quede PENDING para siempre ensuciando la bandeja: caducar es una respuesta,
+/// y distinguirla de un rechazo explicito importa para saber si el bot propone
+/// cosas que a nadie le sirven.
+enum TaskSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  CANCELLED
 }
 
 enum TaskStatus {
@@ -1656,10 +1749,11 @@ enum FlowBotStatus {
 
 /// Un bot. Contenedor estable: lo que cambia son sus versiones.
 model FlowBot {
-  id          String        @id @default(cuid())
-  name        String
-  description String?
-  status      FlowBotStatus @default(DRAFT)
+  taskSuggestions TaskSuggestion[]
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  status          FlowBotStatus    @default(DRAFT)
 
   /// Grafo en edicion. Cambia con cada autosave; nunca se ejecuta.
   draftGraph Json
@@ -2155,6 +2249,15 @@ model CompanyLeadSettings {
   /// Que hacer cuando vuelve a escribir un contacto archivado.
   /// `true` lo reactiva solo; `false` lo deja archivado y registra el evento.
   reactivateArchived Boolean @default(true)
+
+  /// Una tarea creada por un bot es trabajo que aparece en la lista de una
+  /// persona sin que esa persona lo haya aceptado. Con esto activo —que es lo
+  /// predeterminado— el bot PROPONE y el asesor decide; la tarea real solo
+  /// nace de una aprobacion.
+  ///
+  /// Se puede apagar por empresa, pero apagarlo es una decision explicita: el
+  /// valor seguro es el que viene de fabrica.
+  requireTaskApproval Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -19,6 +19,7 @@ import {
 import { getPerfilComercial, clavePerfil } from "@/lib/perfil";
 import { archiveContact, restoreContact } from "@/lib/contacts";
 import { Badge } from "@/components/ui/Badge";
+import { SugerenciasDeTarea } from "@/components/tasks/SugerenciasDeTarea";
 import { mensajeDeError } from "@/components/ui/ListState";
 import { NOMBRE_PULSO } from "@/lib/producto";
 
@@ -342,6 +343,10 @@ export function PerfilComercial({
               <Vacio>Todavía no hay mensajes.</Vacio>
             )}
           </Seccion>
+
+          {/* Propuestas: van ANTES de las tareas porque son lo que espera una
+              decisión, y una decisión pendiente es más urgente que una lista. */}
+          <SugerenciasDeTarea contactId={contactId} titulo="Propuestas" />
 
           {/* Tareas */}
           <Seccion

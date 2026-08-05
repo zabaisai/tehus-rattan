@@ -574,9 +574,10 @@ const cerrarOportunidad: EjecutorNodo = async (ctx) => {
   return continuar(PUERTO.SALIDA);
 };
 
-const crearTarea: EjecutorNodo = async (ctx) => {
+/** Lo comun a crear y a proponer: no hay dos formas de leer la configuracion. */
+function datosDeTarea(ctx: Parameters<EjecutorNodo>[0]) {
   const horas = numero(ctx.config.dueInHours);
-  const { taskId } = await ctx.efectos.crm.crearTarea({
+  return {
     companyId: ctx.companyId,
     titulo: texto(ctx.config.title) || 'Tarea del bot',
     conversationId: ctx.conversationId,
@@ -589,8 +590,39 @@ const crearTarea: EjecutorNodo = async (ctx) => {
         : undefined,
     prioridad: texto(ctx.config.priority) || undefined,
     idempotencyKey: clave(ctx),
+    flowBotId: ctx.flowBotId ?? null,
+    motivo: texto(ctx.config.reason) || undefined,
+  };
+}
+
+/**
+ * Crear tarea.
+ *
+ * Si la empresa exige aprobacion —lo predeterminado— esto acaba en una
+ * PROPUESTA, no en una tarea. El bot no puede meter trabajo en la lista de una
+ * persona sin que esa persona lo acepte.
+ */
+const crearTarea: EjecutorNodo = async (ctx) => {
+  const r = await ctx.efectos.crm.crearTarea(datosDeTarea(ctx));
+  return continuar(PUERTO.SALIDA, {
+    task: { id: r.taskId },
+    suggestion: { id: r.suggestionId, propuesta: r.propuesta },
   });
-  return continuar(PUERTO.SALIDA, { task: { id: taskId } });
+};
+
+/**
+ * Sugerir tarea. SIEMPRE propone, sin depender del ajuste de la empresa.
+ *
+ * Existe aparte de «Crear tarea» para que el autor del bot pueda decir «esto
+ * lo revisa alguien» de forma explicita en el propio flujo.
+ */
+const sugerirTarea: EjecutorNodo = async (ctx) => {
+  const { suggestionId } = await ctx.efectos.crm.sugerirTarea(
+    datosDeTarea(ctx),
+  );
+  return continuar(PUERTO.SALIDA, {
+    suggestion: { id: suggestionId, propuesta: true },
+  });
 };
 
 const transferir: EjecutorNodo = async (ctx) => {
@@ -707,6 +739,7 @@ export const EJECUTORES: Partial<Record<TipoNodo, EjecutorNodo>> = {
   'crm.lead_assign_round_robin': asignarPorTurno,
   'crm.lead_close': cerrarOportunidad,
   'crm.task_create': crearTarea,
+  'crm.task_suggest': sugerirTarea,
   'crm.handoff': transferir,
 };
 

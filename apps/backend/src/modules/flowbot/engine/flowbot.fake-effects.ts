@@ -185,7 +185,18 @@ export class EfectosFalsos implements Efectos {
     },
     crearTarea: async (input) => {
       this.anotar('crm', 'crearTarea', { ...input });
-      return { taskId: this.id('tarea') };
+      // El doble PROPONE, igual que el adaptador real con la configuracion de
+      // fabrica. Devolver una tarea creada aqui haria que las pruebas
+      // afirmaran justo lo contrario de lo que hace el producto.
+      return {
+        taskId: null,
+        suggestionId: this.id('sugerencia'),
+        propuesta: true,
+      };
+    },
+    sugerirTarea: async (input) => {
+      this.anotar('crm', 'sugerirTarea', { ...input });
+      return { suggestionId: this.id('sugerencia') };
     },
     notaInterna: async (input) => {
       this.anotar('crm', 'notaInterna', { ...input });

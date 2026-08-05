@@ -57,6 +57,8 @@ export type EstadoEjecucion =
 export interface EstadoInicial {
   companyId: string;
   executionId: string;
+  /** De que bot viene. Opcional: las pruebas del interprete no lo necesitan. */
+  flowBotId?: string | null;
   correlationId: string;
   conversationId: string | null;
   contactId: string | null;
@@ -246,6 +248,7 @@ export async function avanzar(
     const ctx: ContextoNodo = {
       companyId: inicial.companyId,
       executionId: inicial.executionId,
+      flowBotId: inicial.flowBotId ?? null,
       correlationId: inicial.correlationId,
       conversationId: inicial.conversationId,
       contactId: inicial.contactId,
