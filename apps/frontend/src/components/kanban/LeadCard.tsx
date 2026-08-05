@@ -19,7 +19,7 @@ export function LeadCard({
 }: {
   lead: Lead;
   index: number;
-  onOpen: (leadId: string) => void;
+  onOpen: (leadId: string, contactId: string) => void;
   stages: { id: string; name: string }[];
   onMoveStage: (leadId: string, newStageId: string) => void;
 }) {
@@ -30,11 +30,11 @@ export function LeadCard({
           ref={provided.innerRef}
           {...provided.draggableProps}
           {...provided.dragHandleProps}
-          onClick={() => onOpen(lead.id)}
+          onClick={() => onOpen(lead.id, lead.contact.id)}
           role="button"
           tabIndex={0}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') onOpen(lead.id);
+            if (e.key === 'Enter' || e.key === ' ') onOpen(lead.id, lead.contact.id);
           }}
           className={`mb-2 cursor-pointer rounded-md border border-neutral-200 bg-white p-3 shadow-sm transition-shadow hover:border-neutral-300 ${
             snapshot.isDragging ? 'shadow-md ring-1 ring-neutral-300' : ''

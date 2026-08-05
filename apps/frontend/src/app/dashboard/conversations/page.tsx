@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PauseCircle, PlayCircle, ArrowLeft, PanelRight } from 'lucide-react';
+import { PauseCircle, PlayCircle, ArrowLeft, PanelRight } from "lucide-react";
 import {
   getInbox,
   getInboxCounters,
@@ -20,14 +21,39 @@ import { ConversationList } from "@/components/conversations/ConversationList";
 import { MessageThread } from "@/components/conversations/MessageThread";
 import { MessageInput } from "@/components/conversations/MessageInput";
 import { ConversationOpportunity } from "@/components/conversations/ConversationOpportunity";
-import { PanelContacto } from "@/components/conversations/PanelContacto";
+import { PerfilComercial } from "@/components/perfil/PerfilComercial";
 import { intervaloDeRefresco, useRealtime } from "@/lib/use-realtime";
 import { InboxFilters } from "@/components/conversations/InboxFilters";
 import { InboxBulkBar } from "@/components/conversations/InboxBulkBar";
 
-export default function ConversationsPage() {
+function ConversationsContenido() {
   const queryClient = useQueryClient();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
+  const params = useSearchParams();
+
+  /**
+   * La conversación abierta vive en la URL, no en estado local.
+   *
+   * Con estado local, recargar la página perdía el chat, no había deep link y
+   * volver desde el embudo aterrizaba en la bandeja vacía. `volverA` guarda de
+   * dónde se vino para que regresar conserve embudo, filtros y scroll.
+   */
+  const selectedId = params.get("c");
+  const volverA = params.get("volverA");
+
+  const setSelectedId = useCallback(
+    (id: string | null) => {
+      const siguiente = new URLSearchParams(params.toString());
+      if (id) siguiente.set("c", id);
+      else siguiente.delete("c");
+      const cadena = siguiente.toString();
+      router.replace(cadena ? `${pathname}?${cadena}` : pathname, {
+        scroll: false,
+      });
+    },
+    [params, pathname, router],
+  );
   const [sendNotice, setSendNotice] = useState<string | null>(null);
   const [filtros, setFiltros] = useState<FiltrosBandeja>({});
   const [seleccionadas, setSeleccionadas] = useState<string[]>([]);
@@ -98,9 +124,7 @@ export default function ConversationsPage() {
 
   function alternarSeleccion(id: string) {
     setSeleccionadas((previas) =>
-      previas.includes(id)
-        ? previas.filter((x) => x !== id)
-        : [...previas, id],
+      previas.includes(id) ? previas.filter((x) => x !== id) : [...previas, id],
     );
   }
 
@@ -138,7 +162,7 @@ export default function ConversationsPage() {
       {/* Móvil: solo se muestra el listado O el chat, nunca ambos a la vez. */}
       <div
         className={`w-full shrink-0 overflow-y-auto border-neutral-200 sm:block sm:w-72 sm:border-r ${
-          selectedId ? 'hidden sm:block' : 'block'
+          selectedId ? "hidden sm:block" : "block"
         }`}
       >
         <InboxFilters
@@ -173,7 +197,7 @@ export default function ConversationsPage() {
       </div>
 
       <div
-        className={`flex-1 flex-col sm:flex ${selectedId ? 'flex' : 'hidden'}`}
+        className={`flex-1 flex-col sm:flex ${selectedId ? "flex" : "hidden"}`}
       >
         {!selectedConversation && (
           <div className="flex flex-1 items-center justify-center text-sm text-neutral-400">
@@ -203,38 +227,38 @@ export default function ConversationsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => setFichaAbierta((v) => !v)}
-                aria-label="Ver la ficha del contacto"
-                aria-pressed={fichaAbierta}
-                className={`rounded-md p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-line-focus ${
-                  fichaAbierta
-                    ? 'bg-primary-50 text-brand-primary'
-                    : 'text-neutral-500 hover:bg-neutral-100'
-                }`}
-              >
-                <PanelRight size={16} />
-              </button>
-              <button
-                onClick={handleTogglePause}
-                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${
-                  selectedConversation.isPaused
-                    ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                    : "bg-amber-50 text-amber-700 hover:bg-amber-100"
-                }`}
-              >
-            {selectedConversation.isPaused ? (
-                  <>
-                    <PlayCircle size={14} />
-                    Reanudar chatbot
-                  </>
-                ) : (
-                  <>
-                    <PauseCircle size={14} />
-                    Pausar chatbot
-                  </>
-                )}
-              </button>
+                <button
+                  onClick={() => setFichaAbierta((v) => !v)}
+                  aria-label="Ver la ficha del contacto"
+                  aria-pressed={fichaAbierta}
+                  className={`rounded-md p-1.5 outline-none focus-visible:ring-2 focus-visible:ring-line-focus ${
+                    fichaAbierta
+                      ? "bg-primary-50 text-brand-primary"
+                      : "text-neutral-500 hover:bg-neutral-100"
+                  }`}
+                >
+                  <PanelRight size={16} />
+                </button>
+                <button
+                  onClick={handleTogglePause}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${
+                    selectedConversation.isPaused
+                      ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                      : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                  }`}
+                >
+                  {selectedConversation.isPaused ? (
+                    <>
+                      <PlayCircle size={14} />
+                      Reanudar chatbot
+                    </>
+                  ) : (
+                    <>
+                      <PauseCircle size={14} />
+                      Pausar chatbot
+                    </>
+                  )}
+                </button>
               </div>
             </div>
 
@@ -257,18 +281,29 @@ export default function ConversationsPage() {
                 <MessageInput onSend={handleSend} />
               </div>
 
-              {fichaAbierta && (
-                <div className="hidden w-72 shrink-0 lg:block">
-                  <PanelContacto
-                    conversation={selectedConversation}
-                    onCerrar={() => setFichaAbierta(false)}
-                  />
-                </div>
+              {fichaAbierta && selectedConversation.contact?.id && (
+                <PerfilComercial
+                  key={selectedConversation.contact.id}
+                  contactId={selectedConversation.contact.id}
+                  origen="conversacion"
+                  volverA={volverA}
+                  onCerrar={() => setFichaAbierta(false)}
+                />
               )}
             </div>
           </>
         )}
       </div>
     </div>
+  );
+}
+
+export default function ConversationsPage() {
+  // `useSearchParams` obliga a un límite de Suspense para que la página pueda
+  // prerenderizarse; sin él, el build falla al generarla.
+  return (
+    <Suspense fallback={null}>
+      <ConversationsContenido />
+    </Suspense>
   );
 }

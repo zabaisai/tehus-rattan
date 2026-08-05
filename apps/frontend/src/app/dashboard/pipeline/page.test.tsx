@@ -23,6 +23,16 @@ vi.mock('@/components/kanban/KanbanBoard', () => ({
   KanbanBoard: () => <div data-testid="tablero" />,
 }));
 
+// La pantalla guarda su estado en la URL —qué embudo, qué perfil abierto— para
+// que volver desde el chat no aterrice en el embudo predeterminado y sin panel.
+const replace = vi.fn();
+let parametros = new URLSearchParams();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace, push: vi.fn() }),
+  usePathname: () => '/dashboard/pipeline',
+  useSearchParams: () => parametros,
+}));
+
 function pipeline(overrides = {}) {
   return {
     id: 'p1',
@@ -43,7 +53,10 @@ function renderPage() {
 }
 
 describe('PipelinePage', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    parametros = new URLSearchParams();
+  });
 
   it('sin pipelines lo dice', async () => {
     getPipelines.mockResolvedValue([]);

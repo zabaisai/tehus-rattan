@@ -10,6 +10,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { ContactsController } from '../src/modules/contacts/contacts.controller';
 import { ContactsService } from '../src/modules/contacts/contacts.service';
 import { ContactsEliminacionService } from '../src/modules/contacts/contacts-eliminacion.service';
+import { PerfilComercialService } from '../src/modules/contacts/perfil-comercial.service';
 import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { PlatformCompaniesController } from '../src/modules/platform/platform-companies.controller';
 import { PlatformCompaniesService } from '../src/modules/platform/platform-companies.service';
@@ -85,6 +86,7 @@ describe('BusinessTenantGuard (e2e)', () => {
         // La eliminacion definitiva vive en su propio servicio. Aqui no se
         // ejercita: se registra para que el controlador se pueda construir.
         { provide: ContactsEliminacionService, useValue: {} },
+        { provide: PerfilComercialService, useValue: {} },
         // `ContactsController` registra el archivado de contactos. Aquí no se
         // ejercita esa ruta, pero sin el proveedor Nest no puede construir el
         // controlador y caen todas las pruebas de guardas.

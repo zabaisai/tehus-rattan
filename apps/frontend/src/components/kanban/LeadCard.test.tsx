@@ -66,7 +66,10 @@ describe('LeadCard — mobile "mover a etapa" (non-drag-and-drop path)', () => {
     );
 
     fireEvent.click(screen.getByText('Sala Primavera'));
-    expect(onOpen).toHaveBeenCalledWith('lead-1');
+    // Lleva TAMBIÉN el contacto: el clic principal abre el perfil comercial de
+    // la persona, y con solo el id de la oportunidad haría falta otra consulta
+    // para averiguar de quién es.
+    expect(onOpen).toHaveBeenCalledWith('lead-1', lead.contact.id);
   });
 
   it('lists every pipeline stage as an option', () => {

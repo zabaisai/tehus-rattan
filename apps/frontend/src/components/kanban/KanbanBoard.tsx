@@ -12,7 +12,7 @@ export function KanbanBoard({
   onLeadClick,
 }: {
   pipelineId: string;
-  onLeadClick: (leadId: string) => void;
+  onLeadClick: (leadId: string, contactId: string) => void;
 }) {
   const queryClient = useQueryClient();
   const queryKey = ['kanban', pipelineId];

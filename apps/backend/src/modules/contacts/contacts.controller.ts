@@ -18,6 +18,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
 import { ContactsService } from './contacts.service';
 import { ContactsEliminacionService } from './contacts-eliminacion.service';
+import { PerfilComercialService } from './perfil-comercial.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { EliminarContactoDto } from './dto/eliminar-contacto.dto';
@@ -28,6 +29,7 @@ export class ContactsController {
   constructor(
     private contactsService: ContactsService,
     private eliminacion: ContactsEliminacionService,
+    private perfilComercial: PerfilComercialService,
     private auditoria: PlatformAuditLogService,
     private prisma: PrismaService,
   ) {}
@@ -101,6 +103,18 @@ export class ContactsController {
   @Post(':id/block')
   block(@Param('id') id: string, @Request() req: any) {
     return this.contactsService.block(id, req.user.companyId);
+  }
+
+  /**
+   * El perfil comercial completo, en una sola llamada.
+   *
+   * Lo consumen el panel del Pipeline y el de Conversaciones. Si cada pantalla
+   * se armara el suyo con consultas sueltas acabarian discrepando, y nadie
+   * sabria cual dice la verdad.
+   */
+  @Get(':id/perfil')
+  perfil(@Param('id') id: string, @Request() req: any) {
+    return this.perfilComercial.perfil(id, req.user.companyId);
   }
 
   /** Los contactos archivados: lo que la interfaz llama papelera. */
