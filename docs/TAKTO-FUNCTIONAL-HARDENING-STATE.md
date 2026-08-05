@@ -16,9 +16,9 @@ reanudarse sin releer la conversación.
 
 | Suite | Antes | Después |
 |---|---|---|
-| Backend unitarias | 116 suites / 1928 | 117 suites / **1952** |
-| Backend E2E | 48 suites / 712 | 50 suites / **743** |
-| Frontend | 55 archivos / 401 | 57 archivos / **412** |
+| Backend unitarias | 116 suites / 1928 | 118 suites / **1975** |
+| Backend E2E | 48 suites / 712 | 53 suites / **775** |
+| Frontend | 55 archivos / 401 | 58 archivos / **422** |
 
 Todo verde en ambos extremos. Lint, typecheck y build verdes en backend y
 frontend.
@@ -64,6 +64,12 @@ propio archivo. **Ninguna se aplicó en staging.**
 Una columna nueva, opcional, sin valor por defecto y con índice parcial. No
 reescribe la tabla. Rollback: `DROP COLUMN "anonymizedAt"`.
 
+### `20260805180000_sugerencias_de_tarea`
+Un enum, una tabla y una columna con valor por defecto (`requireTaskApproval`,
+`true`). No toca ninguna fila existente. Verificada desde base limpia: el índice
+único sobre `createdTaskId` es lo que garantiza en la base que dos aprobaciones
+no produzcan dos tareas. Rollback en el propio archivo.
+
 ### `20260805140000_dinero_en_decimal`
 `double precision` → `numeric(18,4)` en 8 columnas, in situ con `USING`.
 Lleva un cheque previo que **aborta** si encuentra importes con más de 4
@@ -94,6 +100,11 @@ por columna nueva + backfill. Está escrito en la propia migración.
 | `cda5ea3` | `fix(productos)`: rechazar `.xlsm`, aceptar CSV, neutralizar fórmulas |
 | `03b07ee` | `fix(dinero)`: importes en Decimal |
 | `be789f1` | `chore(lint)`: cerrar los avisos introducidos |
+| `dea0642` | `docs`: estado del encargo |
+| `a951bf0` | `feat(perfil)`: panel comercial compartido y navegación Pipeline ↔ Chat |
+| `0160502` | `feat(tareas)`: un bot propone, una persona decide |
+| `39d9d70` | `feat(pulso)`: importar y exportar en `.taktoflow.json` |
+| `8cc73bd` | `fix(pulso)`: un campo entrante objeto no puede acabar como `[object Object]` |
 
 ## Secciones del encargo: qué está hecho y qué no
 
@@ -105,9 +116,9 @@ por columna nueva + backfill. Está escrito en la propia migración.
 | 10 | Renombrar a TAKTO Pulso | **Completo** |
 | 8 | Importación de productos | **Parcial**: seguridad y CSV hechos; falta streaming a disco, cola, progreso, cancelación y reanudación |
 | 9 | Cotizaciones | **Parcial**: Decimal y numeración hechos; faltan impuestos, transporte, descuento por línea, revisiones y pipeline de cotizaciones |
-| 6 | Panel lateral y navegación Pipeline ↔ Chat | **Pendiente** |
-| 7 | Tareas con aprobación (`TaskSuggestion`) | **Pendiente** |
-| 11 | Importar/exportar Pulsos | **Pendiente** |
+| 6 | Panel lateral y navegación Pipeline ↔ Chat | **Completo** |
+| 7 | Tareas con aprobación (`TaskSuggestion`) | **Completo** |
+| 11 | Importar/exportar Pulsos | **Completo** |
 | 12 | Barrido general de botones y menús | **Pendiente** |
 
 ## Limitaciones conocidas
@@ -129,15 +140,24 @@ por columna nueva + backfill. Está escrito en la propia migración.
    previas; las nuevas —papelera de contactos, diálogo de retiro de embudos—
    están cubiertas por pruebas de interfaz pero no por capturas.
 
+## Hallazgos añadidos en esta sesión
+
+| # | Sev | Dominio | Defecto | Estado |
+|---|---|---|---|---|
+| 16 | A | Pulso | El bot creaba tareas humanas directamente, sin que nadie las aceptara | **Corregido** |
+| 17 | M | Perfil | Conversaciones armaba su panel con 4 consultas sueltas; el Pipeline no tenía ninguno | **Corregido** |
+| 18 | M | Navegación | La conversación abierta vivía en estado local: sin deep link, y recargar perdía el chat | **Corregido** |
+| 19 | A | Pulso | El analizador de importación convertía con `String(valor)`: un campo objeto habría entrado como `[object Object]` | **Corregido** |
+| 20 | B | Perfil | Un campo personalizado numérico habría salido como `[object Object]` si el tipo se aflojaba | **Corregido** |
+
 ## Reanudación
 
-Rama `feature/takto-functional-hardening`, publicada. Siguiente bloque
-recomendado: **§6, el panel lateral de perfil**, porque §7 (sugerencias de
-tarea) reutiliza ese mismo panel para mostrar y aprobar las propuestas.
+Rama `feature/takto-functional-hardening`, publicada. Falta **§12** (barrido
+general) y completar **§8** (streaming de importación) y **§9** (impuestos,
+transporte, descuento por línea, revisiones y pipeline de cotizaciones).
 
-Punto exacto de entrada: `apps/frontend/src/components/conversations/PanelContacto.tsx`
-ya existe y es el candidato natural a convertirse en el componente compartido;
-hoy solo lo usa Conversaciones.
+Siguiente bloque recomendado: **§9**, porque el cálculo ya está en Decimal y lo
+que queda es ampliar el modelo de la cotización sobre esa base.
 
 ```bash
 git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-hardening
