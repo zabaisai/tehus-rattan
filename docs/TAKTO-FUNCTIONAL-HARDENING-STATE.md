@@ -9,80 +9,137 @@ reanudarse sin releer la conversación.
 |---|---|
 | SHA inicial | `347b95795ef9129436532f52f03779a386b16847` |
 | Rama | `feature/takto-functional-hardening`, creada desde `origin/main` |
-| `main` vs `origin/main` | Idénticos en `347b957` |
-| Árbol | Limpio salvo `brand/` sin rastrear (no se toca) |
-| `.git/index.lock` | No existe |
+| `main` vs `origin/main` | Idénticos en `347b957` (sin tocar) |
+| Árbol al empezar | Limpio salvo `brand/` sin rastrear (no se toca) |
 
 ### Baseline de pruebas (antes de tocar nada)
 
-| Suite | Resultado |
-|---|---|
-| Backend unitarias | 116 suites, 1928 pruebas, **verde** |
-| Frontend unitarias | 55 archivos, 401 pruebas, **verde** |
-| Backend E2E | Ver sección de pruebas |
+| Suite | Antes | Después |
+|---|---|---|
+| Backend unitarias | 116 suites / 1928 | 117 suites / **1952** |
+| Backend E2E | 48 suites / 712 | 50 suites / **743** |
+| Frontend | 55 archivos / 401 | 57 archivos / **412** |
 
-### Estado de staging (solo lectura, no se modifica en este encargo)
-
-Verificado al inicio: transporte real apagado, dry-run activo, kill switch
-activo con motivo, allowlists vacías, siete contenedores sanos. PostgreSQL,
-Caddy y takto-web intactos.
+Todo verde en ambos extremos. Lint, typecheck y build verdes en backend y
+frontend.
 
 ## Datos reales que NO se tocan
 
-- Los bots creados por `admin.crm.staging@tehusrattan.com` (`Handoff a asesor`
-  archivado, `Auto` y `Captura de datos` en borrador). No se eliminan, ni se
-  archivan, ni se publican, ni se renombran, ni se usan como datos de prueba.
-- La empresa residual `QA_E2E_TEMP_Co` de una sesión anterior: **se reporta,
-  no se elimina** — queda fuera del alcance de este encargo.
-- Todas las auditorías existentes.
-- Los usuarios reales.
+- Los bots de `admin.crm.staging@tehusrattan.com` (`Handoff a asesor`
+  archivado, `Auto` y `Captura de datos` en borrador). Intactos.
+- La empresa residual **`QA_E2E_TEMP_Co`** de una sesión anterior: **se
+  reporta y NO se elimina**, por estar fuera del alcance de este encargo.
+- Todas las auditorías y los usuarios reales.
+- Staging: no se desplegó, no se migró y no se modificó nada. Verificado por
+  `smoke-test.sh` en modo solo lectura, 17/17.
 
 ## Hallazgos de la auditoría
 
 Severidad: **C** crítico, **A** alto, **M** medio, **B** bajo.
 
-| # | Sev | Dominio | Defecto | Archivo |
+| # | Sev | Dominio | Defecto | Estado |
 |---|---|---|---|---|
-| 1 | A | Productos | La importación acepta `.xlsm`, que es el formato **con macros**. El requisito es rechazarlo. | `products-import.service.ts` |
-| 2 | A | Productos | El archivo entero se carga en memoria (`FileInterceptor` sin `storage`, `workbook.xlsx.load(buffer)`). Sin streaming no hay techo real de tamaño. | `products.controller.ts`, `products-import.service.ts` |
-| 3 | A | Productos | No hay CSV, ni proceso asíncrono, ni progreso, ni cancelación, ni reanudación, ni reporte descargable. | `products-import.service.ts` |
-| 4 | A | Cotizaciones | Todo el dinero es `Float`: `Quote.subtotal/discount/total`, `QuoteItem.unitPrice/subtotal`, `Product.price`, `Lead.value`. | `schema.prisma` |
-| 5 | A | Cotizaciones | `generateNextNumber` carga **todas** las cotizaciones de la empresa en memoria para hallar el máximo. | `quotes.service.ts` |
-| 6 | A | Cotizaciones | No hay impuestos, transporte, descuento por línea, ajustes, moneda ni redondeo por empresa. | `quotes.service.ts` |
-| 7 | A | Pipelines | No existe traslado de oportunidades: un embudo con oportunidades no se puede retirar de forma segura. | `pipeline.service.ts` |
-| 8 | M | Pipelines | Archivar un embudo con oportunidades abiertas no avisa ni las cuenta. | `pipeline.service.ts` |
-| 9 | M | Contactos | El botón visible dice «Eliminar contacto» y lo que hace es archivar. La etiqueta miente. | `contacts/page.tsx` |
-| 10 | M | Contactos | No hay papelera, ni eliminación definitiva segura, ni vista previa de impacto. | `contacts.service.ts` |
-| 11 | M | Infra | `smoke-test.sh` consulta `localhost:3001/3000`; en staging los puertos no se publican y la única entrada es Caddy. Producía 15 fallos `000` engañosos. | `deploy/scripts/smoke-test.sh` |
-| 12 | B | Contactos/Pipelines | `update`/`block`/`remove` validan con `findFirst` y después escriben con `where: { id }` sin `companyId`. Ventana TOCTOU estrecha pero evitable. | `contacts.service.ts`, `pipeline.service.ts` |
-| 13 | M | Navegación | «FlowBot» y «Chatbot» conviven en el menú como dos productos distintos para la misma idea. | `Sidebar.tsx` |
-
-## Decisiones
-
-- **`Float` → `Decimal`**: se hace con `ALTER TABLE ... TYPE numeric(18,4) USING`,
-  que conserva los valores. No es un `DROP`, no pierde filas y tiene rollback
-  documentado (`USING columna::double precision`). Se prueba desde base limpia
-  y sobre una copia con datos.
-- **`.xlsm` se rechaza** aunque hoy se acepte: es un cambio de comportamiento
-  deliberado y pedido explícitamente.
-- **`QA_E2E_TEMP_Co` se reporta y no se toca**, por instrucción.
+| 1 | A | Productos | La importación aceptaba `.xlsm`, el formato **con macros** | **Corregido** |
+| 2 | A | Productos | Sin comprobación de firma: un archivo cualquiera renombrado a `.xlsx` entraba al lector | **Corregido** |
+| 3 | A | Productos | Inyección de fórmulas: una celda `=cmd|…` entraba tal cual como nombre de producto | **Corregido** |
+| 4 | A | Dinero | Todo el dinero en `Float`: totales que no cuadran con la suma de sus partes | **Corregido** |
+| 5 | A | Cotizaciones | `generateNextNumber` traía **todas** las cotizaciones de la empresa a memoria | **Corregido** |
+| 6 | A | Embudos | Sin traslado de oportunidades: un embudo en uso no se podía retirar | **Corregido** |
+| 7 | M | Embudos | `remove` culpaba a las etapas; el impedimento real eran las oportunidades | **Corregido** |
+| 8 | M | Contactos | El botón decía «Eliminar» y archivaba. La etiqueta mentía | **Corregido** |
+| 9 | M | Contactos | Sin papelera, sin eliminación definitiva, sin vista previa de impacto | **Corregido** |
+| 10 | M | Infra | `smoke-test.sh` apuntaba a `localhost`; 15 fallos `000` engañosos contra staging | **Corregido** |
+| 11 | B | Contactos | `update`/`block` escribían con `where: { id }` tras validar aparte (TOCTOU) | **Corregido** |
+| 12 | M | Navegación | «FlowBot» y «Chatbot» convivían como dos productos para la misma promesa | **Corregido** |
+| 13 | M | Productos | El límite de 500 MB **no es alcanzable** hoy: Caddy corta en 55 MB y el archivo se lee entero en memoria | **Documentado, no resuelto** |
+| 14 | B | Frontend | `og:image` en staging apunta a `http://localhost:3000` (build sin `NEXT_PUBLIC_APP_URL`) | **Abierto** |
+| 15 | B | Pruebas | El botón de borrar embudos no tenía prueba; la que lo parecía ejercitaba una **etapa** | **Corregido** |
 
 ## Migraciones
 
-_(se completa al aplicar cada una)_
+Las dos son **aditivas o conservadoras**, revisadas a mano, con rollback en el
+propio archivo. **Ninguna se aplicó en staging.**
+
+### `20260805120000_contacto_anonimizado`
+Una columna nueva, opcional, sin valor por defecto y con índice parcial. No
+reescribe la tabla. Rollback: `DROP COLUMN "anonymizedAt"`.
+
+### `20260805140000_dinero_en_decimal`
+`double precision` → `numeric(18,4)` en 8 columnas, in situ con `USING`.
+Lleva un cheque previo que **aborta** si encuentra importes con más de 4
+decimales en vez de redondearlos en silencio.
+
+Verificada de tres formas:
+
+| Prueba | Resultado |
+|---|---|
+| Desde base limpia | `numeric(18,4)` en las 6 columnas comprobadas |
+| Sobre el esquema anterior **con datos** | Valores idénticos; igualdad exacta comprobada en SQL; 0 filas perdidas |
+| Rollback documentado | Ejecutado; los valores vuelven intactos |
+
+Datos de la prueba: `11700000.55`, `19.99`, `91.19`, `4.35`, `86.84`, `59.97`.
+
+Riesgo: toma `ACCESS EXCLUSIVE` y reescribe las tablas. Con los volúmenes
+actuales (miles de filas) es instantáneo; en una base grande habría que hacerlo
+por columna nueva + backfill. Está escrito en la propia migración.
 
 ## Commits
 
-_(se completa)_
+| SHA | Qué |
+|---|---|
+| `a358192` | `fix(smoke-test)`: topología real de Caddy + documento de estado |
+| `d3bc633` | `feat(contactos)`: archivar, papelera y eliminación definitiva |
+| `1045030` | `feat(embudos)`: retiro seguro con traslado de oportunidades |
+| `6bc9747` | `refactor(pulso)`: nombre visible y fin de la duplicación con Chatbot |
+| `cda5ea3` | `fix(productos)`: rechazar `.xlsm`, aceptar CSV, neutralizar fórmulas |
+| `03b07ee` | `fix(dinero)`: importes en Decimal |
+| `be789f1` | `chore(lint)`: cerrar los avisos introducidos |
+
+## Secciones del encargo: qué está hecho y qué no
+
+| § | Bloque | Estado |
+|---|---|---|
+| 1–3 | Preflight, baseline, auditoría | **Completo** |
+| 4 | Contactos: archivo, papelera, eliminación | **Completo** |
+| 5 | Embudos: CRUD y retiro seguro | **Completo** |
+| 10 | Renombrar a TAKTO Pulso | **Completo** |
+| 8 | Importación de productos | **Parcial**: seguridad y CSV hechos; falta streaming a disco, cola, progreso, cancelación y reanudación |
+| 9 | Cotizaciones | **Parcial**: Decimal y numeración hechos; faltan impuestos, transporte, descuento por línea, revisiones y pipeline de cotizaciones |
+| 6 | Panel lateral y navegación Pipeline ↔ Chat | **Pendiente** |
+| 7 | Tareas con aprobación (`TaskSuggestion`) | **Pendiente** |
+| 11 | Importar/exportar Pulsos | **Pendiente** |
+| 12 | Barrido general de botones y menús | **Pendiente** |
 
 ## Limitaciones conocidas
 
-_(se completa)_
+1. **La importación de 500 MB no es alcanzable hoy** y no se ha fingido que lo
+   sea. El techo efectivo es el menor de: el límite configurable
+   (`PRODUCT_IMPORT_MAX_MB`, 50 por defecto), el `request_body max_size` de
+   Caddy (55 MB) y la memoria del proceso, porque el archivo se lee entero.
+   Techo operativo medido: **~50 MB**. Llegar a 500 MB exige carga por
+   fragmentos y lectura en streaming.
+2. **La comprobación de macros depende de exceljs.** Se rechaza la extensión,
+   la firma que no es ZIP y el libro que trae `vbaProject`. Un `.xlsm`
+   despojado de su proyecto de VBA pasaría, pero entonces ya no tiene macros.
+3. **`og:image` en staging apunta a localhost.** Es un defecto de build
+   (`NEXT_PUBLIC_APP_URL` ausente al construir), no de código. No se corrigió
+   porque tocarlo implica redesplegar staging, que está fuera de alcance.
+4. **La QA responsive de este encargo no se ha rehecho.** La de la sesión
+   anterior (40 capturas, 5 anchos, 0 desbordamientos) cubre las pantallas
+   previas; las nuevas —papelera de contactos, diálogo de retiro de embudos—
+   están cubiertas por pruebas de interfaz pero no por capturas.
 
 ## Reanudación
 
-Rama `feature/takto-functional-hardening`. Siguiente comando seguro:
+Rama `feature/takto-functional-hardening`, publicada. Siguiente bloque
+recomendado: **§6, el panel lateral de perfil**, porque §7 (sugerencias de
+tarea) reutiliza ese mismo panel para mostrar y aprobar las propuestas.
+
+Punto exacto de entrada: `apps/frontend/src/components/conversations/PanelContacto.tsx`
+ya existe y es el candidato natural a convertirse en el componente compartido;
+hoy solo lo usa Conversaciones.
 
 ```bash
-git -C C:/Users/Usuario/Desktop/Tehus_Rattan status
+git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-hardening
+git -C C:/Users/Usuario/Desktop/Tehus_Rattan pull --ff-only
 ```
