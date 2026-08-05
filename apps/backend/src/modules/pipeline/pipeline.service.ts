@@ -5,6 +5,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { suma, aNumeroParaMostrar } from '../../common/dinero/dinero';
 
 @Injectable()
 export class PipelineService {
@@ -330,7 +331,7 @@ export class PipelineService {
       name: stage.name,
       order: stage.order,
       color: stage.color,
-      totalValue: stage.leads.reduce((sum, lead) => sum + (lead.value || 0), 0),
+      totalValue: aNumeroParaMostrar(suma(...stage.leads.map((l) => l.value))),
       leadCount: stage.leads.length,
       leads: stage.leads,
     }));

@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Readable } from 'stream';
 import { PrismaService } from '../../prisma/prisma.service';
+import { aNumeroParaMostrar } from '../../common/dinero/dinero';
 import {
   MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES,
   FILE_TOO_LARGE_MESSAGE,
@@ -432,7 +433,7 @@ export class ProductsImportService {
             id: result.value.id,
             name: result.value.name,
             category: result.value.category,
-            price: result.value.price,
+            price: aNumeroParaMostrar(result.value.price),
           });
         }
       } else {

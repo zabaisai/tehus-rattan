@@ -5,6 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, QuoteStatus } from '@prisma/client';
+import {
+  type Dinero,
+  dinero,
+  suma,
+  resta,
+  multiplica,
+  redondea,
+  noNegativo,
+  mayorQue,
+} from '../../common/dinero/dinero';
 import { PrismaService } from '../../prisma/prisma.service';
 
 const LEAD_SELECT = { id: true, title: true, status: true };
@@ -29,8 +39,26 @@ const COMPANY_IDENTITY_SELECT = {
   quoteFooter: true,
 } as const;
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+/**
+ * El calculo del dinero vive en el SERVIDOR y en Decimal.
+ *
+ * El navegador puede calcular para que el usuario vea el total al instante,
+ * pero lo que se guarda es esto: si las dos cifras discrepan, manda esta. Un
+ * total que llega del cliente es un total que el cliente puede cambiar.
+ */
+function calcularTotales(
+  lineas: Array<{ quantity: number; unitPrice: Prisma.Decimal.Value }>,
+  descuentoGeneral: Prisma.Decimal.Value,
+): { subtotal: Dinero; descuento: Dinero; total: Dinero } {
+  const subtotal = redondea(
+    suma(...lineas.map((l) => multiplica(l.quantity, l.unitPrice))),
+  );
+  // El descuento no puede superar al subtotal: un total negativo no es un
+  // cobro, es un error de captura.
+  const descuento = redondea(
+    mayorQue(descuentoGeneral, subtotal) ? subtotal : dinero(descuentoGeneral),
+  );
+  return { subtotal, descuento, total: redondea(resta(subtotal, descuento)) };
 }
 
 @Injectable()
@@ -133,15 +161,15 @@ export class QuotesService {
       category: lp.product.category,
       quantity: lp.quantity,
       unitPrice: lp.unitPrice,
-      subtotal: round2(lp.quantity * lp.unitPrice),
+      subtotal: redondea(multiplica(lp.quantity, lp.unitPrice)),
       notes: lp.notes,
     }));
 
-    const subtotal = round2(
-      itemsData.reduce((sum, item) => sum + item.subtotal, 0),
+    const { subtotal, descuento, total } = calcularTotales(
+      leadProducts,
+      data.discount ?? 0,
     );
-    const discount = data.discount ?? 0;
-    const total = Math.max(0, round2(subtotal - discount));
+    const discount = descuento;
     const number = await this.generateNextNumber(companyId);
 
     try {
@@ -197,8 +225,15 @@ export class QuotesService {
     });
     if (!quote) throw new NotFoundException('Cotización no encontrada');
 
-    const discount = data.discount ?? quote.discount;
-    const total = Math.max(0, round2(quote.subtotal - discount));
+    // El descuento nunca puede dejar el total por debajo de cero, y se acota
+    // al subtotal en vez de recortar el total a 0: asi lo que queda guardado
+    // como descuento es lo que de verdad se aplico, y no una cifra mayor que
+    // el documento no refleja.
+    const pedido = dinero(data.discount ?? quote.discount);
+    const discount = redondea(
+      mayorQue(pedido, quote.subtotal) ? quote.subtotal : pedido,
+    );
+    const total = redondea(noNegativo(resta(quote.subtotal, discount)));
 
     return this.prisma.quote.update({
       where: { id },
@@ -236,21 +271,27 @@ export class QuotesService {
     return { id };
   }
 
+  /**
+   * Siguiente numero de cotizacion.
+   *
+   * Antes se traian TODAS las cotizaciones de la empresa a memoria solo para
+   * quedarse con el maximo: con mil cotizaciones son mil filas por cada
+   * documento nuevo, y crece para siempre. Ahora el maximo lo calcula la base
+   * y vuelve un unico entero.
+   *
+   * Sigue habiendo carrera —dos peticiones simultaneas pueden leer el mismo
+   * maximo— y por eso NO se confia en esto para la unicidad: el indice unico
+   * `(companyId, number)` es quien la garantiza, y `createFromLead` traduce su
+   * violacion en un 409 que se puede reintentar.
+   */
   private async generateNextNumber(companyId: string): Promise<string> {
-    const quotes = await this.prisma.quote.findMany({
-      where: { companyId },
-      select: { number: true },
-    });
+    const filas = await this.prisma.$queryRaw<Array<{ maximo: number | null }>>`
+      SELECT MAX(NULLIF(regexp_replace("number", '^.*?(\\d+)$', '\\1'), "number")::bigint) AS maximo
+      FROM "quotes"
+      WHERE "companyId" = ${companyId}
+    `;
 
-    let max = 0;
-    for (const quote of quotes) {
-      const match = quote.number.match(/(\d+)$/);
-      if (match) {
-        const parsed = parseInt(match[1], 10);
-        if (parsed > max) max = parsed;
-      }
-    }
-
+    const max = Number(filas[0]?.maximo ?? 0);
     return `COT-${String(max + 1).padStart(4, '0')}`;
   }
 }

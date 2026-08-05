@@ -569,7 +569,13 @@ enum StageType {
 model Lead {
   id                String     @id @default(cuid())
   title             String
-  value             Float?     @default(0)
+  /// Decimal, nunca Float.
+  ///
+  /// La coma flotante binaria no puede representar 0,1 exactamente, asi que
+  /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
+  /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
+  /// y quien lo mira concluye —con razon— que el sistema calcula mal.
+  value             Decimal?   @default(0) @db.Decimal(18, 4)
   status            LeadStatus @default(OPEN)
   lostReason        String?
   expectedCloseDate DateTime?
@@ -614,7 +620,13 @@ model LeadProduct {
   // Snapshot of Product.price at the moment it was attached — must not
   // follow future catalog price changes, since quotes built from this later
   // need to reflect the price the lead actually saw.
-  unitPrice Float
+  /// Decimal, nunca Float.
+  ///
+  /// La coma flotante binaria no puede representar 0,1 exactamente, asi que
+  /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
+  /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
+  /// y quien lo mira concluye —con razon— que el sistema calcula mal.
+  unitPrice Decimal @db.Decimal(18, 4)
   notes     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -737,7 +749,13 @@ model Product {
   code        String?
   name        String
   description String?
-  price       Float
+  /// Decimal, nunca Float.
+  ///
+  /// La coma flotante binaria no puede representar 0,1 exactamente, asi que
+  /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
+  /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
+  /// y quien lo mira concluye —con razon— que el sistema calcula mal.
+  price       Decimal  @db.Decimal(18, 4)
   imageUrl    String?
   category    String?
   sku         String?
@@ -765,9 +783,15 @@ model Quote {
   status     QuoteStatus @default(DRAFT)
   // subtotal/total are computed and stored by the backend on every write —
   // never trust a client-supplied value for either.
-  subtotal   Float       @default(0)
-  discount   Float       @default(0)
-  total      Float       @default(0)
+  /// Decimal, nunca Float.
+  ///
+  /// La coma flotante binaria no puede representar 0,1 exactamente, asi que
+  /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
+  /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
+  /// y quien lo mira concluye —con razon— que el sistema calcula mal.
+  subtotal   Decimal     @default(0) @db.Decimal(18, 4)
+  discount   Decimal     @default(0) @db.Decimal(18, 4)
+  total      Decimal     @default(0) @db.Decimal(18, 4)
   notes      String?
   validUntil DateTime?
   createdAt  DateTime    @default(now())
@@ -807,8 +831,14 @@ model QuoteItem {
   description String?
   category    String?
   quantity    Int
-  unitPrice   Float
-  subtotal    Float
+  /// Decimal, nunca Float.
+  ///
+  /// La coma flotante binaria no puede representar 0,1 exactamente, asi que
+  /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
+  /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
+  /// y quien lo mira concluye —con razon— que el sistema calcula mal.
+  unitPrice   Decimal  @db.Decimal(18, 4)
+  subtotal    Decimal  @db.Decimal(18, 4)
   notes       String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

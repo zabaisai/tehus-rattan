@@ -19,6 +19,7 @@ import { QuotesService } from './quotes.service';
 import { QuotePdfService } from './quote-pdf.service';
 import { CreateQuoteFromLeadDto } from './dto/create-quote-from-lead.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
+import { aNumeroParaMostrar } from '../../common/dinero/dinero';
 
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
 @Controller('quotes')
@@ -59,16 +60,22 @@ export class QuotesController {
       number: cotizacion.number,
       title: cotizacion.title,
       status: cotizacion.status,
-      subtotal: cotizacion.subtotal,
-      discount: cotizacion.discount,
-      total: cotizacion.total,
+      // El PDF es presentacion: recibe numeros ya redondeados a la moneda.
+      // El calculo exacto ya ocurrio en el servicio, en Decimal.
+      subtotal: aNumeroParaMostrar(cotizacion.subtotal),
+      discount: aNumeroParaMostrar(cotizacion.discount),
+      total: aNumeroParaMostrar(cotizacion.total),
       notes: cotizacion.notes,
       validUntil: cotizacion.validUntil,
       createdAt: cotizacion.createdAt,
       company: cotizacion.company,
       lead: { title: cotizacion.lead.title },
       contact: cotizacion.lead.contact,
-      items: cotizacion.items,
+      items: cotizacion.items.map((i) => ({
+        ...i,
+        unitPrice: aNumeroParaMostrar(i.unitPrice),
+        subtotal: aNumeroParaMostrar(i.subtotal),
+      })),
     });
 
     res.set({
