@@ -95,7 +95,7 @@ export function ProductImportModal({ onClose, onImport }: ProductImportModalProp
               </span>
               <input
                 type="file"
-                accept=".xlsx"
+                accept=".xlsx,.csv"
                 className="hidden"
                 onChange={(e) => selectFile(e.target.files?.[0] ?? null)}
               />

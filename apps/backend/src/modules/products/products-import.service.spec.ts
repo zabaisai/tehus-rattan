@@ -418,3 +418,141 @@ describe('ProductsImportService', () => {
     );
   });
 });
+
+/**
+ * FORMATOS Y SEGURIDAD DEL ARCHIVO.
+ *
+ * La importacion aceptaba `.xlsm`, que es el formato de Excel CON MACROS.
+ * Nadie ejecutaba esas macros aqui —solo se leen celdas— pero el archivo
+ * quedaba almacenado y acababa descargandose en el equipo de alguien, donde
+ * Excel si pregunta si quiere habilitarlas.
+ */
+describe('ProductsImportService — formatos aceptados y saneado', () => {
+  let prisma: any;
+  let service: ProductsImportService;
+
+  beforeEach(() => {
+    prisma = {
+      product: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn((args: any) =>
+          Promise.resolve({ id: `id-${Math.random()}`, ...args.data }),
+        ),
+      },
+    };
+    service = new ProductsImportService(prisma);
+  });
+
+  it('RECHAZA un .xlsm y explica por qué', async () => {
+    const buffer = await buildWorkbookBuffer(
+      ['Nombre', 'Precio'],
+      [['Mesa', 100]],
+    );
+
+    await expect(
+      service.importFromExcel(
+        'company-1',
+        fakeExcelFile(buffer, 'catalogo.xlsm'),
+        'http://localhost:3001',
+      ),
+    ).rejects.toThrow(/macros/i);
+
+    expect(prisma.product.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['.xlsb', '.xltm', '.xls'])(
+    'rechaza %s con un mensaje propio, no con un genérico',
+    async (ext) => {
+      const buffer = await buildWorkbookBuffer(['Nombre'], [['Mesa']]);
+
+      await expect(
+        service.importFromExcel(
+          'company-1',
+          fakeExcelFile(buffer, `catalogo${ext}`),
+          'http://localhost:3001',
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+    },
+  );
+
+  it('un .xlsx que no es ni siquiera un ZIP se rechaza antes de abrirlo', async () => {
+    // La extensión la pone quien sube el archivo. Un ejecutable renombrado a
+    // .xlsx no puede llegar al lector de libros.
+    const basura = Buffer.from('MZ\x90\x00 esto es un ejecutable, no un libro');
+
+    await expect(
+      service.importFromExcel(
+        'company-1',
+        fakeExcelFile(basura, 'catalogo.xlsx'),
+        'http://localhost:3001',
+      ),
+    ).rejects.toThrow(/no parece un .xlsx válido/i);
+  });
+
+  it('importa un CSV', async () => {
+    const csv = 'Nombre,Precio\nSilla Nórdica,250000\nMesa Roble,890000\n';
+    const buffer = Buffer.from(csv, 'utf8');
+
+    const resumen = await service.importFromExcel(
+      'company-1',
+      fakeExcelFile(buffer, 'catalogo.csv'),
+      'http://localhost:3001',
+    );
+
+    expect(resumen.created).toBe(2);
+    expect(prisma.product.create).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * INYECCION DE FORMULAS.
+   *
+   * Una celda que empieza por `=` la interpreta Excel como formula al ABRIR el
+   * archivo. Si ese texto entra como nombre de producto y despues sale en una
+   * exportacion, quien abra ese CSV ejecuta lo que otro escribio.
+   */
+  it('neutraliza una fórmula que llega como nombre de producto', async () => {
+    const csv = "Nombre,Precio\n=cmd|' /c calc'!A1,100\n";
+    const buffer = Buffer.from(csv, 'utf8');
+
+    await service.importFromExcel(
+      'company-1',
+      fakeExcelFile(buffer, 'trampa.csv'),
+      'http://localhost:3001',
+    );
+
+    const guardado = prisma.product.create.mock.calls[0][0].data.name;
+    expect(guardado.startsWith("'")).toBe(true);
+    expect(guardado.startsWith('=')).toBe(false);
+  });
+
+  it.each(['=SUM(A1)', '+1+1', '-1+1', '@SUM(A1)'])(
+    'neutraliza el prefijo peligroso %s',
+    async (peligroso) => {
+      const csv = `Nombre,Precio\n"${peligroso}",100\n`;
+
+      await service.importFromExcel(
+        'company-1',
+        fakeExcelFile(Buffer.from(csv, 'utf8'), 'trampa.csv'),
+        'http://localhost:3001',
+      );
+
+      expect(prisma.product.create.mock.calls[0][0].data.name).toBe(
+        `'${peligroso}`,
+      );
+    },
+  );
+
+  it('un nombre normal NO se toca', async () => {
+    const csv = 'Nombre,Precio\nSilla Nórdica,250000\n';
+
+    await service.importFromExcel(
+      'company-1',
+      fakeExcelFile(Buffer.from(csv, 'utf8'), 'catalogo.csv'),
+      'http://localhost:3001',
+    );
+
+    expect(prisma.product.create.mock.calls[0][0].data.name).toBe(
+      'Silla Nórdica',
+    );
+  });
+});

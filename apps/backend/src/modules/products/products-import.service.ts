@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Readable } from 'stream';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES,
@@ -105,7 +106,29 @@ const FIELD_ALIASES: Array<{
   },
 ];
 
-const ALLOWED_EXTENSIONS = ['.xlsx', '.xlsm'];
+/**
+ * `.xlsm` NO entra. Es el formato de Excel CON MACROS.
+ *
+ * Se aceptaba, y aceptarlo significa que el producto recibe y guarda en disco
+ * archivos con codigo ejecutable dentro. Aqui nadie ejecuta esas macros —solo
+ * se leen celdas—, pero el archivo queda almacenado y acaba descargandose en
+ * el equipo de alguien, donde Excel si pregunta si quiere habilitarlas. No hay
+ * ninguna razon para aceptarlo: un catalogo de productos son datos, y los
+ * datos se guardan igual de bien en `.xlsx` o `.csv`.
+ */
+const EXTENSIONES_PERMITIDAS = ['.xlsx', '.csv'];
+
+/** Formatos que se rechazan con una explicacion propia, no con un genérico. */
+const RECHAZOS_EXPLICADOS: Record<string, string> = {
+  '.xlsm':
+    'Los archivos .xlsm llevan macros y no se aceptan. Abre el archivo en Excel y guárdalo como .xlsx («Libro de Excel») para importarlo.',
+  '.xlsb':
+    'El formato binario .xlsb no es compatible. Guarda el archivo como .xlsx e inténtalo de nuevo.',
+  '.xls':
+    'El formato .xls (Excel 97-2003) no es compatible. Guarda el archivo como .xlsx desde Excel e intenta de nuevo.',
+  '.xltm':
+    'Las plantillas con macros (.xltm) no se aceptan. Guarda el archivo como .xlsx para importarlo.',
+};
 
 /**
  * Convierte a texto SOLO lo que tiene una representacion legible.
@@ -116,11 +139,27 @@ const ALLOWED_EXTENSIONS = ['.xlsx', '.xlsm'];
  * cadena acababa siendo el NOMBRE de un producto en el catalogo del cliente.
  */
 function textoPlano(valor: unknown): string {
-  if (typeof valor === 'string') return valor;
+  if (typeof valor === 'string') return sanearFormula(valor);
   if (typeof valor === 'number' || typeof valor === 'boolean') {
     return String(valor);
   }
   return '';
+}
+
+/**
+ * Neutraliza la inyeccion de formulas.
+ *
+ * Una celda que empieza por `=`, `+`, `-`, `@`, tabulador o retorno de carro
+ * la interpreta Excel como formula CUANDO SE ABRE el archivo, no cuando se
+ * escribe. Si ese texto entra como nombre de producto y despues sale en una
+ * exportacion, quien abra ese CSV ejecuta lo que otro escribio —incluido
+ * `=cmd|...`—, y el producto habria sido el mensajero.
+ *
+ * Se antepone un apostrofo, que es la forma estandar de decir «esto es texto»:
+ * el valor se sigue leyendo igual y deja de ser ejecutable.
+ */
+export function sanearFormula(valor: string): string {
+  return /^[=+\-@\t\r]/.test(valor) ? `'${valor}` : valor;
 }
 
 interface ColumnMap {
@@ -160,16 +199,28 @@ export class ProductsImportService {
   ): Promise<ImportSummary> {
     this.validateFile(file);
 
+    const esCsv = path.extname(file!.originalname).toLowerCase() === '.csv';
+
     const workbook = new ExcelJS.Workbook();
     try {
-      // exceljs bundles its own Buffer typing, incompatible with this project's
-      // @types/node at the type level only (runtime accepts a plain Buffer fine).
-      await workbook.xlsx.load(Buffer.from(file!.buffer) as any);
+      if (esCsv) {
+        // Un CSV no es un libro: se lee como una hoja unica. `Readable.from`
+        // evita escribirlo antes a disco solo para poder leerlo.
+        await workbook.csv.read(Readable.from(file!.buffer.toString('utf8')));
+      } else {
+        // exceljs bundles its own Buffer typing, incompatible with this project's
+        // @types/node at the type level only (runtime accepts a plain Buffer fine).
+        await workbook.xlsx.load(Buffer.from(file!.buffer) as any);
+      }
     } catch {
       throw new BadRequestException(
-        'No se pudo leer el archivo. Verifica que sea un Excel .xlsx válido y no esté dañado.',
+        esCsv
+          ? 'No se pudo leer el archivo. Verifica que sea un CSV válido y esté codificado en UTF-8.'
+          : 'No se pudo leer el archivo. Verifica que sea un Excel .xlsx válido y no esté dañado.',
       );
     }
+
+    if (!esCsv) this.rechazarSiTieneMacros(workbook);
 
     const worksheet = workbook.worksheets[0];
     if (!worksheet) {
@@ -403,18 +454,52 @@ export class ProductsImportService {
     }
 
     const ext = path.extname(file.originalname).toLowerCase();
-    if (ext === '.xls') {
+
+    const explicacion = RECHAZOS_EXPLICADOS[ext];
+    if (explicacion) throw new BadRequestException(explicacion);
+
+    if (!EXTENSIONES_PERMITIDAS.includes(ext)) {
       throw new BadRequestException(
-        'El formato .xls (Excel 97-2003) no es compatible. Guarda el archivo como .xlsx desde Excel e intenta de nuevo.',
-      );
-    }
-    if (!ALLOWED_EXTENSIONS.includes(ext)) {
-      throw new BadRequestException(
-        'Formato de archivo no permitido. Usa un archivo .xlsx',
+        `Formato de archivo no permitido. Usa ${EXTENSIONES_PERMITIDAS.join(' o ')}.`,
       );
     }
     if (file.size > MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES) {
       throw new BadRequestException(FILE_TOO_LARGE_MESSAGE);
+    }
+
+    // La extension la pone quien sube el archivo. Un `.xlsm` renombrado a
+    // `.xlsx` pasaria el filtro de arriba, asi que ademas se mira la FIRMA: un
+    // .xlsx es un ZIP y empieza por "PK". Lo que distingue a un .xlsm de un
+    // .xlsx esta dentro del ZIP —el `vbaProject.bin`—, y eso se comprueba al
+    // abrirlo, no aqui; esto solo descarta lo que ni siquiera es un ZIP.
+    if (ext === '.xlsx' && !this.pareceZip(file.buffer)) {
+      throw new BadRequestException(
+        'El archivo no parece un .xlsx válido. Vuelve a guardarlo desde Excel como «Libro de Excel».',
+      );
+    }
+  }
+
+  private pareceZip(buffer: Buffer): boolean {
+    return (
+      buffer.length >= 2 &&
+      buffer[0] === 0x50 /* P */ &&
+      buffer[1] === 0x4b /* K */
+    );
+  }
+
+  /**
+   * Un `.xlsx` legitimo no lleva proyecto de VBA. Si el libro trae uno, el
+   * archivo es un `.xlsm` con la extension cambiada.
+   */
+  private rechazarSiTieneMacros(workbook: ExcelJS.Workbook): void {
+    // exceljs no expone el ZIP, pero conserva el proyecto de VBA cuando el
+    // libro lo trae. Si esta ahi, el archivo es un .xlsm con la extension
+    // cambiada, por descuido o a proposito.
+    const vba = (workbook as unknown as { vbaProject?: unknown }).vbaProject;
+    if (vba) {
+      throw new BadRequestException(
+        'El archivo contiene macros. Guárdalo como .xlsx sin macros para importarlo.',
+      );
     }
   }
 
