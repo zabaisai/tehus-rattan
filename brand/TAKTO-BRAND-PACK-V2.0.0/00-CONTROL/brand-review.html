@@ -1,0 +1,188 @@
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TAKTO — Control visual del sistema de marca (V2)</title>
+<link rel="icon" href="../05-FAVICON-PWA/favicon.svg">
+<link rel="stylesheet" href="../02-COLOR-TOKENS/takto-tokens.css">
+<style>
+@font-face{font-family:'Archivo';font-weight:800;src:url('../03-TIPOGRAFIA/fonts/Archivo-ExtraBold.ttf') format('truetype')}
+@font-face{font-family:'Archivo';font-weight:700;src:url('../03-TIPOGRAFIA/fonts/Archivo-Bold.ttf') format('truetype')}
+@font-face{font-family:'IBM Plex Sans';font-weight:400;src:url('../03-TIPOGRAFIA/fonts/IBMPlexSans-Regular.ttf') format('truetype')}
+@font-face{font-family:'IBM Plex Sans';font-weight:600;src:url('../03-TIPOGRAFIA/fonts/IBMPlexSans-SemiBold.ttf') format('truetype')}
+@font-face{font-family:'IBM Plex Mono';font-weight:500;src:url('../03-TIPOGRAFIA/fonts/IBMPlexMono-Medium.ttf') format('truetype')}
+*{box-sizing:border-box}
+body{margin:0;font-family:'IBM Plex Sans',Arial,sans-serif;color:#171B24;background:#F7F8FA;line-height:1.5}
+header{background:#131C4A;color:#fff;padding:40px 48px;border-bottom:8px solid #FF6A00}
+header .wm{font-family:'Archivo';font-weight:800;font-size:40px;letter-spacing:-1px}
+header .wm .to{color:#FF6A00} header p{color:#B3BAD8;margin:6px 0 0}
+main{max-width:1180px;margin:0 auto;padding:32px 24px 80px}
+section{background:#fff;border:1px solid #E2E5EC;border-radius:14px;padding:28px 32px;margin:22px 0;box-shadow:0 1px 3px rgba(19,28,74,.06)}
+h2{font-family:'Archivo';font-weight:800;font-size:24px;margin:0 0 4px;color:#131C4A}
+h2 .n{color:#FF6A00;font-size:14px;vertical-align:super;margin-right:8px}
+.sub{color:#525A6B;margin:0 0 20px;font-size:14px}
+.grid{display:grid;gap:16px} .g2{grid-template-columns:repeat(2,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)}
+.lc{margin:0;background:#fff;border:1px solid #E2E5EC;border-radius:10px;padding:22px;text-align:center}
+.lc.dark{background:#131C4A} .lc img{max-width:100%;height:56px;object-fit:contain}
+.lc figcaption{margin-top:12px;font-size:12px;color:#6E7688} .lc.dark figcaption{color:#B3BAD8}
+.fav{display:flex;gap:28px;align-items:flex-end} .fav div{text-align:center} .fav img{image-rendering:pixelated;display:block;margin-bottom:8px} .fav span{font-size:12px;color:#6E7688}
+.swrow{display:flex;flex-wrap:wrap;gap:6px} .sw{text-align:center;font-size:10px;color:#525A6B} .sw span{display:block;width:64px;height:44px;border-radius:6px;border:1px solid rgba(0,0,0,.06)}
+.scale{margin-bottom:16px} .scale h4{margin:0 0 8px;font-size:13px;color:#3B4252}
+.semrow{display:flex;flex-wrap:wrap;gap:10px} .chip{display:flex;align-items:center;gap:8px;border:1px solid #E2E5EC;border-radius:8px;padding:8px 12px;font-size:12px}
+.dot{width:16px;height:16px;border-radius:4px}
+.callout{display:grid;grid-template-columns:1fr 1fr;gap:0;border-radius:12px;overflow:hidden;border:1px solid #E2E5EC}
+.callout div{padding:26px;text-align:center;font-family:'Archivo';font-weight:800;font-size:30px}
+.btns{display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.btn{font-family:'IBM Plex Sans';font-weight:600;border:0;border-radius:6px;padding:11px 20px;font-size:14px;cursor:pointer}
+.btn-primary{background:#131C4A;color:#fff} .btn-primary:hover{background:#0E1538}
+.btn-secondary{background:#FF6A00;color:#131C4A;font-weight:700} .btn-secondary:hover{background:#E05C00}
+.btn-quiet{background:#EFF1F5;color:#131C4A} .btn-ghost{background:transparent;color:#131C4A;border:1px solid #CBD0DB}
+.btn-disabled{background:#EFF1F5;color:#9AA1B2;cursor:not-allowed}
+.pipe{display:flex;flex-wrap:wrap;gap:8px} .pill{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;color:#fff}
+.spec{border-bottom:1px solid #EFF1F5;padding:14px 0} .spec:last-child{border:0}
+.ic{text-align:center;font-size:11px;color:#6E7688} .ic img{width:30px;height:30px;color:#131C4A;display:block;margin:0 auto 6px}
+table{width:100%;border-collapse:collapse;font-size:13px} th,td{text-align:left;padding:8px 10px;border-bottom:1px solid #EFF1F5}
+th{color:#525A6B;font-weight:600} td.r{font-family:'IBM Plex Mono';text-align:right} code{font-family:'IBM Plex Mono';font-size:12px;color:#3B4252}
+.badge{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700}
+.badge.ok{background:#E6F5EF;color:#0E8A5F} .badge.mid{background:#FFF4E0;color:#B26A00} .badge.bad{background:#FCEAEA;color:#C42B2B}
+.note{background:#FFF4E0;border-left:3px solid #B26A00;padding:10px 14px;border-radius:8px;font-size:13px;margin-top:12px}
+.shot{width:100%;border:1px solid #E2E5EC;border-radius:10px}
+.motion-wrap{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.mbox{background:#131C4A;border-radius:10px;padding:30px;text-align:center}
+.tlogo{font-family:'Archivo';font-weight:800;font-size:56px;letter-spacing:-2px}
+.mbox .takto-tak{color:#fff!important} .mbox .takto-to{color:#FF6A00!important}
+.reduce .takto-tak,.reduce .takto-to{opacity:1!important;transform:none!important;animation:none!important}
+small.cap{color:#6E7688;font-size:12px}
+</style>
+<link rel="stylesheet" href="../06-MOTION/takto-motion.css">
+</head><body>
+<header>
+  <div class="wm">TAK<span class="to">TO</span></div>
+  <p>Control visual del sistema de marca · Brand Pack V2 · La jugada · <em>Vender ordenado.</em></p>
+</header>
+<main>
+
+<section><h2><span class="n">01</span>Sistema de logotipo</h2>
+<p class="sub">Isotipo compacto (24u · banda 3u · par rotacional 180°), wordmark TAK|TO, lockups. Fondos claro y oscuro.</p>
+<div class="grid g4">
+  <figure class="lc "><img src="../01-LOGOS/svg-editable/isotipo/takto-isotype-color.svg" alt="isotipo color"><figcaption>isotipo color</figcaption></figure>
+  <figure class="lc "><img src="../01-LOGOS/svg-editable/isotipo/takto-isotype-master.svg" alt="isotipo master"><figcaption>isotipo master</figcaption></figure>
+  <figure class="lc dark"><img src="../01-LOGOS/svg-editable/isotipo/takto-isotype-negative.svg" alt="isotipo negativo"><figcaption>isotipo negativo</figcaption></figure>
+  <figure class="lc dark"><img src="../01-LOGOS/svg-editable/isotipo/takto-isotype-mono-white.svg" alt="isotipo mono blanco"><figcaption>isotipo mono blanco</figcaption></figure>
+  <figure class="lc "><img src="../01-LOGOS/svg-editable/wordmark/takto-wordmark-primary.svg" alt="wordmark principal"><figcaption>wordmark principal</figcaption></figure>
+  <figure class="lc dark"><img src="../01-LOGOS/svg-editable/wordmark/takto-wordmark-negative.svg" alt="wordmark negativo"><figcaption>wordmark negativo</figcaption></figure>
+  <figure class="lc "><img src="../01-LOGOS/svg-editable/wordmark/takto-wordmark-grayscale.svg" alt="wordmark grises"><figcaption>wordmark grises</figcaption></figure>
+  <figure class="lc dark"><img src="../01-LOGOS/svg-editable/wordmark/takto-wordmark-mono-white.svg" alt="wordmark mono"><figcaption>wordmark mono</figcaption></figure>
+  <figure class="lc "><img src="../01-LOGOS/svg-editable/lockup/takto-lockup-horizontal-primary.svg" alt="lockup horizontal"><figcaption>lockup horizontal</figcaption></figure>
+  <figure class="lc dark"><img src="../01-LOGOS/svg-editable/lockup/takto-lockup-horizontal-negative.svg" alt="lockup horizontal neg"><figcaption>lockup horizontal neg</figcaption></figure>
+  <figure class="lc "><img src="../01-LOGOS/svg-editable/lockup/takto-lockup-vertical-primary.svg" alt="lockup vertical"><figcaption>lockup vertical</figcaption></figure>
+  <figure class="lc dark"><img src="../01-LOGOS/svg-editable/lockup/takto-lockup-vertical-negative.svg" alt="lockup vertical neg"><figcaption>lockup vertical neg</figcaption></figure>
+</div>
+<div class="note">Zona de seguridad 3u · tamaños mínimos: isotipo 24px, wordmark 16px de alto, lockup 96px de ancho.</div>
+</section>
+
+<section><h2><span class="n">02</span>Favicon en 16 / 32 / 48 px</h2>
+<p class="sub">Render real a tamaño. La banda de 3u no desaparece y las figuras no se fusionan.</p>
+<div class="fav">
+  <div><img src="../05-FAVICON-PWA/favicon-16.png" width="16" height="16"><span>16 px</span></div>
+  <div><img src="../05-FAVICON-PWA/favicon-32.png" width="32" height="32"><span>32 px</span></div>
+  <div><img src="../05-FAVICON-PWA/favicon-48.png" width="48" height="48"><span>48 px</span></div>
+  <div><img src="../05-FAVICON-PWA/apple-touch-icon-180.png" width="72" height="72" style="border-radius:16px"><span>apple 180</span></div>
+  <div><img src="../05-FAVICON-PWA/maskable-512.png" width="72" height="72" style="border-radius:50%"><span>maskable</span></div>
+</div>
+</section>
+
+<section><h2><span class="n">03</span>Color</h2>
+<p class="sub">Escalas de marca + tokens semánticos. Valores desde <code>takto-tokens.css</code>.</p>
+<div class="scale"><h4>Primary (navy)</h4><div class="swrow"><div class="sw"><span style="background:var(--color-primary-50)"></span><b>50</b></div><div class="sw"><span style="background:var(--color-primary-100)"></span><b>100</b></div><div class="sw"><span style="background:var(--color-primary-200)"></span><b>200</b></div><div class="sw"><span style="background:var(--color-primary-300)"></span><b>300</b></div><div class="sw"><span style="background:var(--color-primary-400)"></span><b>400</b></div><div class="sw"><span style="background:var(--color-primary-500)"></span><b>500</b></div><div class="sw"><span style="background:var(--color-primary-600)"></span><b>600</b></div><div class="sw"><span style="background:var(--color-primary-700)"></span><b>700</b></div><div class="sw"><span style="background:var(--color-primary-800)"></span><b>800</b></div><div class="sw"><span style="background:var(--color-primary-900)"></span><b>900</b></div><div class="sw"><span style="background:var(--color-primary-950)"></span><b>950</b></div></div></div>
+<div class="scale"><h4>Secondary (naranja)</h4><div class="swrow"><div class="sw"><span style="background:var(--color-secondary-50)"></span><b>50</b></div><div class="sw"><span style="background:var(--color-secondary-100)"></span><b>100</b></div><div class="sw"><span style="background:var(--color-secondary-200)"></span><b>200</b></div><div class="sw"><span style="background:var(--color-secondary-300)"></span><b>300</b></div><div class="sw"><span style="background:var(--color-secondary-400)"></span><b>400</b></div><div class="sw"><span style="background:var(--color-secondary-500)"></span><b>500</b></div><div class="sw"><span style="background:var(--color-secondary-600)"></span><b>600</b></div><div class="sw"><span style="background:var(--color-secondary-700)"></span><b>700</b></div><div class="sw"><span style="background:var(--color-secondary-800)"></span><b>800</b></div><div class="sw"><span style="background:var(--color-secondary-900)"></span><b>900</b></div><div class="sw"><span style="background:var(--color-secondary-950)"></span><b>950</b></div></div></div>
+<div class="scale"><h4>Neutral</h4><div class="swrow"><div class="sw"><span style="background:var(--color-neutral-0)"></span><b>0</b></div><div class="sw"><span style="background:var(--color-neutral-50)"></span><b>50</b></div><div class="sw"><span style="background:var(--color-neutral-100)"></span><b>100</b></div><div class="sw"><span style="background:var(--color-neutral-200)"></span><b>200</b></div><div class="sw"><span style="background:var(--color-neutral-300)"></span><b>300</b></div><div class="sw"><span style="background:var(--color-neutral-400)"></span><b>400</b></div><div class="sw"><span style="background:var(--color-neutral-500)"></span><b>500</b></div><div class="sw"><span style="background:var(--color-neutral-600)"></span><b>600</b></div><div class="sw"><span style="background:var(--color-neutral-700)"></span><b>700</b></div><div class="sw"><span style="background:var(--color-neutral-800)"></span><b>800</b></div><div class="sw"><span style="background:var(--color-neutral-900)"></span><b>900</b></div><div class="sw"><span style="background:var(--color-neutral-950)"></span><b>950</b></div></div></div>
+<h4 style="margin:16px 0 8px;font-size:13px;color:#3B4252">Semánticos y pipeline</h4>
+<div class="semrow">
+  <span class="chip"><span class="dot" style="background:var(--color-status-success)"></span>success</span>
+  <span class="chip"><span class="dot" style="background:var(--color-status-warning)"></span>warning</span>
+  <span class="chip"><span class="dot" style="background:var(--color-status-error)"></span>error</span>
+  <span class="chip"><span class="dot" style="background:var(--color-status-info)"></span>info</span>
+  <span class="chip"><span class="dot" style="background:var(--color-pipeline-nuevo)"></span>nuevo</span>
+  <span class="chip"><span class="dot" style="background:var(--color-pipeline-contactado)"></span>contactado</span>
+  <span class="chip"><span class="dot" style="background:var(--color-pipeline-cotizado)"></span>cotizado</span>
+  <span class="chip"><span class="dot" style="background:var(--color-pipeline-negociacion)"></span>negociación</span>
+  <span class="chip"><span class="dot" style="background:var(--color-pipeline-ganado)"></span>ganado</span>
+  <span class="chip"><span class="dot" style="background:var(--color-pipeline-perdido)"></span>perdido</span>
+</div>
+</section>
+
+<section><h2><span class="n">04</span>TAK primario / TO secundario</h2>
+<p class="sub">Regla única: TAK en primario, TO en secundario. Solo por color.</p>
+<div class="callout">
+  <div style="background:#131C4A;color:#fff">TAK <small class="cap" style="display:block;color:#B3BAD8;font:400 12px 'IBM Plex Sans'">#131C4A · primario</small></div>
+  <div style="background:#FF6A00;color:#131C4A">TO <small class="cap" style="display:block;color:#131C4A;font:400 12px 'IBM Plex Sans'">#FF6A00 · secundario</small></div>
+</div>
+</section>
+
+<section><h2><span class="n">05</span>Botones y estados</h2>
+<p class="sub">Botón naranja con <b>texto navy</b> (regla de marca). Naranja nunca como texto fino sobre claro.</p>
+<div class="btns">
+  <button class="btn btn-primary">Primario</button>
+  <button class="btn btn-secondary">Secundario</button>
+  <button class="btn btn-quiet">Quiet</button>
+  <button class="btn btn-ghost">Ghost</button>
+  <button class="btn btn-disabled" disabled>Deshabilitado</button>
+</div>
+<h4 style="margin:18px 0 8px;font-size:13px;color:#3B4252">Chips de pipeline</h4>
+<div class="pipe">
+  <span class="pill" style="background:var(--color-pipeline-nuevo)">Nuevo</span>
+  <span class="pill" style="background:var(--color-pipeline-contactado)">Contactado</span>
+  <span class="pill" style="background:var(--color-pipeline-cotizado)">Cotizado</span>
+  <span class="pill" style="background:var(--color-pipeline-negociacion)">Negociación</span>
+  <span class="pill" style="background:var(--color-pipeline-ganado)">Ganado</span>
+  <span class="pill" style="background:var(--color-pipeline-perdido)">Perdido</span>
+</div>
+</section>
+
+<section><h2><span class="n">06</span>Tipografía</h2>
+<p class="sub">Archivo (marca) · IBM Plex Sans (UI) · IBM Plex Mono (datos). OFL 1.1.</p>
+<div class="spec"><div style="font-family:'Archivo';font-weight:800;font-size:40px;letter-spacing:-1px;color:#131C4A">Archivo ExtraBold — Vender ordenado.</div><small class="cap">Marca / titulares</small></div>
+<div class="spec"><div style="font-family:'IBM Plex Sans';font-weight:400;font-size:20px">IBM Plex Sans — Cada conversación con dueño, etapa y siguiente paso.</div><small class="cap">Interfaz / cuerpo</small></div>
+<div class="spec"><div style="font-family:'IBM Plex Mono';font-weight:500;font-size:20px;color:#3B4252">IBM Plex Mono — $ 1.920.000 / año · ID-004821</div><small class="cap">Datos / montos</small></div>
+</section>
+
+<section><h2><span class="n">07</span>Iconografía</h2>
+<p class="sub">Línea, trazo 1.75, currentColor.</p>
+<div class="grid g4" style="grid-template-columns:repeat(5,1fr)"><div class="ic"><img src="../04-ICONOGRAFIA/svg/message.svg" alt="message"><span>message</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/whatsapp.svg" alt="whatsapp"><span>whatsapp</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/contact.svg" alt="contact"><span>contact</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/company.svg" alt="company"><span>company</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/opportunity.svg" alt="opportunity"><span>opportunity</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/pipeline.svg" alt="pipeline"><span>pipeline</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/task-check.svg" alt="task-check"><span>task-check</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/quote.svg" alt="quote"><span>quote</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/calendar.svg" alt="calendar"><span>calendar</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/next-step.svg" alt="next-step"><span>next-step</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/won.svg" alt="won"><span>won</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/lost.svg" alt="lost"><span>lost</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/funnel.svg" alt="funnel"><span>funnel</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/send.svg" alt="send"><span>send</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/search.svg" alt="search"><span>search</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/bell.svg" alt="bell"><span>bell</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/settings.svg" alt="settings"><span>settings</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/dashboard.svg" alt="dashboard"><span>dashboard</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/phone.svg" alt="phone"><span>phone</span></div><div class="ic"><img src="../04-ICONOGRAFIA/svg/tag.svg" alt="tag"><span>tag</span></div></div>
+</section>
+
+<section><h2><span class="n">08</span>Animación TAK → TO · reduced motion</h2>
+<p class="sub">Izquierda: secuencia normal (TAK y luego TO). Derecha: reduced motion (aparece completo, sin movimiento).</p>
+<div class="motion-wrap">
+  <div class="mbox"><span class="tlogo takto-logo" id="anim"><span class="takto-tak">TAK</span><span class="takto-to">TO</span></span><br><br><button class="btn btn-secondary" onclick="var a=document.getElementById('anim');var c=a.cloneNode(true);a.replaceWith(c);c.id='anim';">Repetir</button></div>
+  <div class="mbox reduce"><span class="tlogo takto-logo"><span class="takto-tak">TAK</span><span class="takto-to">TO</span></span><br><br><small class="cap" style="color:#B3BAD8">prefers-reduced-motion: reduce</small></div>
+</div>
+</section>
+
+<section><h2><span class="n">09</span>Open Graph</h2>
+<p class="sub">Tarjeta social 1200×630.</p>
+<img class="shot" src="../05-FAVICON-PWA/og-image-1200x630.png" alt="Open Graph">
+</section>
+
+<section><h2><span class="n">10</span>Email y documento</h2>
+<div class="grid g2">
+  <div><img class="shot" src="../08-EMAIL-DOCUMENTOS/email-header-600x140.png" alt="email header"><br><br><iframe src="../08-EMAIL-DOCUMENTOS/email-signature.html" style="width:100%;height:150px;border:1px solid #E2E5EC;border-radius:10px"></iframe></div>
+  <div><img class="shot" src="../08-EMAIL-DOCUMENTOS/document-letterhead.png" alt="membrete" style="max-height:520px;object-fit:contain;background:#fff"></div>
+</div>
+</section>
+
+<section><h2><span class="n">11</span>Producto — login, sidebar, conversación, pipeline</h2>
+<p class="sub">Ejemplos originales de TAKTO (no se copia Kommo).</p>
+<div class="grid" style="gap:18px">
+  <img class="shot" src="../07-PRODUCT-UI/png/login.png" alt="login">
+  <img class="shot" src="../07-PRODUCT-UI/png/sidebar-conversation.png" alt="sidebar + conversación">
+  <img class="shot" src="../07-PRODUCT-UI/png/pipeline.png" alt="pipeline">
+</div>
+</section>
+
+<section><h2><span class="n">QA</span>Validación de contraste (WCAG)</h2>
+<p class="sub">Confirma las reglas de marca. Naranja fino sobre claro FALLA (por eso se prohíbe); botón naranja con texto navy pasa AA.</p>
+<table><thead><tr><th>Caso</th><th>Texto</th><th>Fondo</th><th>Ratio</th><th>WCAG</th></tr></thead><tbody><tr><td>Texto principal #171B24</td><td><code>#171B24</code></td><td><code>#FFFFFF</code></td><td class="r">17.23:1</td><td><span class="badge ok">AAA</span></td></tr><tr><td>Texto secundario #525A6B</td><td><code>#525A6B</code></td><td><code>#FFFFFF</code></td><td class="r">6.92:1</td><td><span class="badge ok">AA</span></td></tr><tr><td>Navy marca #131C4A</td><td><code>#131C4A</code></td><td><code>#FFFFFF</code></td><td class="r">16.25:1</td><td><span class="badge ok">AAA</span></td></tr><tr><td>Blanco</td><td><code>#FFFFFF</code></td><td><code>#131C4A</code></td><td class="r">16.25:1</td><td><span class="badge ok">AAA</span></td></tr><tr><td>TO naranja #FF6A00</td><td><code>#FF6A00</code></td><td><code>#131C4A</code></td><td class="r">5.66:1</td><td><span class="badge ok">AA</span></td></tr><tr><td>Boton naranja: texto navy #131C4A</td><td><code>#131C4A</code></td><td><code>#FF6A00</code></td><td class="r">5.66:1</td><td><span class="badge ok">AA</span></td></tr><tr><td>Naranja #FF6A00 como texto</td><td><code>#FF6A00</code></td><td><code>#FFFFFF</code></td><td class="r">2.87:1</td><td><span class="badge bad">FALLA</span></td></tr><tr><td>Naranja texto seguro #C24A00</td><td><code>#C24A00</code></td><td><code>#FFFFFF</code></td><td class="r">4.91:1</td><td><span class="badge ok">AA</span></td></tr><tr><td>Enlace #1A2352</td><td><code>#1A2352</code></td><td><code>#FFFFFF</code></td><td class="r">14.93:1</td><td><span class="badge ok">AAA</span></td></tr></tbody></table>
+</section>
+
+<p style="text-align:center;color:#9AA1B2;font-size:12px;margin-top:32px">TAKTO-BRAND-PACK-V2 · generado 2026-07-30 · CRM/ no modificado</p>
+</main></body></html>

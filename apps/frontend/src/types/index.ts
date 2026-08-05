@@ -33,6 +33,34 @@ export interface Contact {
   tags: string[];
   isBlocked: boolean;
   createdAt: string;
+  /** Archivado: fuera de las listas de trabajo, con su historia intacta. */
+  archivedAt?: string | null;
+  archivedReason?: string | null;
+  /** Se ejerció una supresión de datos: ya no conserva datos personales. */
+  anonymizedAt?: string | null;
+}
+
+/** Lo que una eliminación definitiva afectaría. Se consulta antes de decidir. */
+export interface ImpactoDeContacto {
+  contactId: string;
+  nombre: string | null;
+  archivado: boolean;
+  anonimizado: boolean;
+  relaciones: {
+    conversaciones: number;
+    mensajes: number;
+    oportunidades: number;
+    tareas: number;
+    cotizaciones: number;
+    notas: number;
+    camposPersonalizados: number;
+    ejecucionesDePulso: number;
+    auditorias: number;
+  };
+  totalRelaciones: number;
+  vacio: boolean;
+  accionPropuesta: "borrado" | "anonimizado";
+  seConservan: string[];
 }
 
 export interface PipelineStage {

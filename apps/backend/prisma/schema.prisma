@@ -115,9 +115,9 @@ model Company {
   flowBotCredentials FlowBotCredential[]
   flowBotSettings    FlowBotSettings?
   flowBotAiUsage     FlowBotAiUsage[]
+  whatsappTemplates  WhatsAppTemplate[]
 
   @@map("companies")
-  whatsappTemplates WhatsAppTemplate[]
 }
 
 model User {
@@ -178,16 +178,15 @@ model User {
   // Elegir a quién le toca es una consulta caliente: ocurre en cada mensaje
   // entrante de un contacto nuevo. Con este índice sale directa, sin recorrer
   // los usuarios de la empresa.
-  leadSettingsAssigned CompanyLeadSettings[] @relation("LeadSettingsUser")
+  leadSettingsAssigned CompanyLeadSettings[]    @relation("LeadSettingsUser")
+  customFieldChanges   CustomFieldValueChange[] @relation("CustomFieldChangeActor")
+
+  handoffsAssigned      ConversationHandoff[] @relation("HandoffAssignee")
+  handoffsResolved      ConversationHandoff[] @relation("HandoffResolver")
+  killSwitchActivations FlowBotKillSwitch[]   @relation("KillSwitchActivatedBy")
 
   @@index([companyId, isActive, autoAssignEnabled, lastAssignedAt])
-  customFieldChanges CustomFieldValueChange[] @relation("CustomFieldChangeActor")
-
-  handoffsAssigned ConversationHandoff[] @relation("HandoffAssignee")
-  handoffsResolved ConversationHandoff[] @relation("HandoffResolver")
-
   @@map("users")
-  killSwitchActivations FlowBotKillSwitch[] @relation("KillSwitchActivatedBy")
 }
 
 model Contact {
@@ -199,7 +198,6 @@ model Contact {
   isBlocked Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
 
   /// Archivado SEGURO: se marca, nunca se borra.
   ///
@@ -214,6 +212,17 @@ model Contact {
   /// sobre la relacion.
   archivedAt     DateTime?
   archivedReason String?
+
+  /// Eliminacion definitiva de un contacto QUE TIENE HISTORIA.
+  ///
+  /// No se borra la fila: se le quitan los datos personales y se conserva todo
+  /// lo que es del negocio —la conversacion, el precio acordado, la cotizacion
+  /// firmada—. Borrar eso en cascada seria destruir contabilidad para atender
+  /// una peticion sobre datos personales, y son dos cosas distintas.
+  ///
+  /// Un contacto sin ninguna relacion no llega aqui: ese se borra de verdad,
+  /// porque no hay nada que preservar.
+  anonymizedAt DateTime?
 
   companyId     String
   company       Company        @relation(fields: [companyId], references: [id])
@@ -861,10 +870,10 @@ model WhatsAppIntegration {
   // FlowBot: disparadores atados a este numero y ejecuciones que entraron por el.
   flowBotTriggers   FlowBotTrigger[]
   flowBotExecutions FlowBotExecution[]
+  templates         WhatsAppTemplate[]
 
   @@index([companyId, isPrimary])
   @@map("whatsapp_integrations")
-  templates WhatsAppTemplate[]
 }
 
 // Short-lived, single-use anti-CSRF state for the Meta Embedded Signup flow.
@@ -2232,17 +2241,17 @@ model CustomFieldValue {
   id String @id @default(cuid())
 
   /// TEXT, LONG_TEXT, PHONE, EMAIL, URL y SELECT.
-  valueText String?
+  valueText   String?
   /// NUMBER y CURRENCY. Decimal y no Float: la moneda en coma flotante es
   /// como se acaba con centavos que no cuadran.
-  valueNumber Decimal? @db.Decimal(18, 6)
+  valueNumber Decimal?  @db.Decimal(18, 6)
   /// BOOLEAN.
-  valueBool Boolean?
+  valueBool   Boolean?
   /// DATE y DATETIME. DATE se normaliza a medianoche en la zona de la
   /// empresa antes de guardarse.
-  valueDate DateTime?
+  valueDate   DateTime?
   /// MULTI_SELECT.
-  valueList String[]
+  valueList   String[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2517,8 +2526,8 @@ model FlowBotAiUsage {
   id  String   @id @default(cuid())
   day DateTime @db.Date
 
-  calls  Int @default(0)
-  tokens Int @default(0)
+  calls      Int @default(0)
+  tokens     Int @default(0)
   /// Coste estimado en milesimas de la moneda, como en `FlowBotMetric`: los
   /// decimales de coma flotante no suman bien dinero.
   costMillis Int @default(0)
