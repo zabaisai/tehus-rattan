@@ -13,6 +13,8 @@ export const QUEUE_NAMES = {
   AUTOMATION: 'takto.automation',
   /** Descarga de medios de WhatsApp, fuera del webhook. */
   MEDIA: 'takto.media',
+  /** Pasos de ejecucion de FlowBot, incluidas las reanudaciones por tiempo. */
+  FLOWBOT: 'takto.flowbot',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

@@ -50,6 +50,7 @@ describe('ContactsService (normalización E.164 y aislamiento)', () => {
           Promise.resolve({ id: args.where.id, ...args.data }),
         ),
         delete: jest.fn().mockResolvedValue(contactRow),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
     };
     service = new ContactsService(prisma);
@@ -341,12 +342,67 @@ describe('ContactsService (normalización E.164 y aislamiento)', () => {
       expect(prisma.contact.delete).not.toHaveBeenCalled();
     });
 
-    it('HOY remove borra en duro, no es soft delete (relevante para retención)', async () => {
-      await service.remove(CONTACT_A, COMPANY_A);
+    it('remove ARCHIVA y no borra: el historial es del negocio', async () => {
+      // Borrarlo de verdad se llevaria por delante las conversaciones en las
+      // que se acordo un precio, y casi nunca es lo que se quiere: se pulsa
+      // "eliminar" para dejar de verlo en la lista.
+      const r = await service.remove(CONTACT_A, COMPANY_A, 'ya no es cliente');
 
-      expect(prisma.contact.delete).toHaveBeenCalledWith({
-        where: { id: CONTACT_A },
+      expect(prisma.contact.delete).not.toHaveBeenCalled();
+      expect(prisma.contact.updateMany).toHaveBeenCalledWith({
+        where: { id: CONTACT_A, companyId: COMPANY_A, archivedAt: null },
+        data: {
+          archivedAt: expect.any(Date),
+          archivedReason: 'ya no es cliente',
+        },
       });
+      expect(r.archivado).toBe(true);
+    });
+
+    it('archivar dos veces no pisa la fecha ni el motivo originales', async () => {
+      // El filtro `archivedAt: null` es lo que lo impide: sin el, un segundo
+      // clic reescribiria cuando y por que se archivo la primera vez.
+      prisma.contact.updateMany.mockResolvedValue({ count: 0 });
+
+      const r = await service.remove(CONTACT_A, COMPANY_A, 'otro motivo');
+
+      expect(r.archivado).toBe(false);
+      expect(r.yaEstaba).toBe(true);
+    });
+
+    it('restore lo devuelve a las listas y limpia el motivo', async () => {
+      await service.restore(CONTACT_A, COMPANY_A);
+
+      expect(prisma.contact.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: CONTACT_A,
+          companyId: COMPANY_A,
+          archivedAt: { not: null },
+        },
+        data: { archivedAt: null, archivedReason: null },
+      });
+    });
+
+    it('no archiva un contacto de OTRA empresa', async () => {
+      prisma.contact.findFirst.mockResolvedValue(null);
+
+      await expect(service.remove(CONTACT_A, 'otra-empresa')).rejects.toThrow();
+      expect(prisma.contact.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('el listado NO trae los archivados salvo que se pidan', async () => {
+      await service.findAll(COMPANY_A);
+      expect(prisma.contact.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ archivedAt: null }),
+        }),
+      );
+
+      prisma.contact.findMany.mockClear();
+      await service.findAll(COMPANY_A, { includeArchived: true });
+      expect(prisma.contact.findMany.mock.calls[0][0].where.archivedAt).toBe(
+        undefined,
+      );
     });
   });
 });

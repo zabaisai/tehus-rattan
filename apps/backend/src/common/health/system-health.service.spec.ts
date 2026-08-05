@@ -24,6 +24,8 @@ describe('SystemHealthService', () => {
         count: jest.fn().mockResolvedValue(0),
         findFirst: jest.fn().mockResolvedValue(null),
       },
+      flowBotExecution: { count: jest.fn().mockResolvedValue(0) },
+      flowBotWait: { count: jest.fn().mockResolvedValue(0) },
     };
     queueHealth = {
       check: jest.fn().mockResolvedValue({ state: 'up', latencyMs: 1 }),
@@ -50,6 +52,67 @@ describe('SystemHealthService', () => {
       expect(r.components.worker.state).toBe('up');
       expect(r.components.outbox.state).toBe('up');
       expect(r.components.realtime.state).toBe('up');
+      expect(r.components.flowbot.state).toBe('up');
+    });
+  });
+
+  describe('FlowBot degrada, nunca tumba', () => {
+    it('con ejecuciones esperando revisión reporta degraded', async () => {
+      prisma.flowBotExecution.count.mockResolvedValue(3);
+
+      const r = await service.check(conCola);
+
+      expect(r.status).toBe('degraded');
+      expect(r.components.flowbot.state).toBe('stale');
+      expect(r.components.flowbot.reason).toBe(
+        'ejecuciones-esperando-revision',
+      );
+      expect(r.components.flowbot.needsAttention).toBe(3);
+    });
+
+    it('con despertares sin disparar reporta degraded', async () => {
+      prisma.flowBotWait.count.mockResolvedValue(2);
+
+      const r = await service.check(conCola);
+
+      expect(r.status).toBe('degraded');
+      expect(r.components.flowbot.reason).toBe('despertares-sin-disparar');
+    });
+
+    it('NUNCA hace caer el sistema entero', async () => {
+      // Un motor de bots que necesita revisión no impide atender
+      // conversaciones a mano. Marcar el backend como no sano lo sacaría del
+      // balanceador y convertiría un problema de bots en una caída total.
+      prisma.flowBotExecution.count.mockResolvedValue(500);
+      prisma.flowBotWait.count.mockResolvedValue(500);
+
+      const r = await service.check(conCola);
+
+      expect(r.status).not.toBe('down');
+    });
+
+    it('un fallo al consultarlo se reporta como unknown y no degrada', async () => {
+      prisma.flowBotExecution.count.mockRejectedValue(new Error('timeout'));
+
+      const r = await service.check(conCola);
+
+      // "No lo sé" no es "está roto": alarmar por una consulta que falló daría
+      // falsos positivos en cada pico de carga.
+      expect(r.components.flowbot.state).toBe('unknown');
+      expect(r.status).toBe('ok');
+    });
+
+    it('no publica datos de clientes, solo cuántos', async () => {
+      prisma.flowBotExecution.count.mockResolvedValue(1);
+
+      const r = await service.check(conCola);
+
+      expect(Object.keys(r.components.flowbot).sort()).toEqual([
+        'needsAttention',
+        'overdueWaits',
+        'reason',
+        'state',
+      ]);
     });
   });
 

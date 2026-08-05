@@ -19,6 +19,7 @@ import { CreateMessageDto } from './dto/create-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { BulkConversationsDto } from './dto/bulk-conversations.dto';
 import { InboxService } from './inbox.service';
+import { HandoffService } from './handoff.service';
 
 @UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
 @Controller('conversations')
@@ -28,6 +29,7 @@ export class ConversationsController {
     private messagesService: MessagesService,
     private whatsappService: WhatsappService,
     private inbox: InboxService,
+    private handoff: HandoffService,
   ) {}
 
   /**
@@ -126,6 +128,38 @@ export class ConversationsController {
   @Post(':id/resume')
   resume(@Param('id') id: string, @Request() req: any) {
     return this.conversationsService.resume(id, req.user.companyId);
+  }
+
+  // ── entrega a una persona ───────────────────────────────────
+  //
+  // Vive aqui y no en un controlador aparte porque es una operacion SOBRE la
+  // conversacion: quien tiene permiso para verla tiene permiso para recogerla.
+
+  /** La entrega activa, si la hay. Es lo que decide si el bot esta callado. */
+  @Get(':id/handoff')
+  handoffActivo(@Param('id') id: string, @Request() req: any) {
+    return this.handoff.activa(req.user.companyId, id);
+  }
+
+  /**
+   * Devuelve la conversacion al bot.
+   *
+   * `resumeBot` es una decision de quien resuelve, no del sistema: muchas
+   * veces la conversacion TERMINA con la persona, y despertar al bot volveria
+   * a escribirle al cliente sin motivo.
+   */
+  @Post(':id/handoff/resolve')
+  resolverHandoff(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: { resumeBot?: boolean },
+  ) {
+    return this.handoff.resolver({
+      companyId: req.user.companyId,
+      conversationId: id,
+      resolvedByUserId: req.user.sub,
+      reanudarBot: body?.resumeBot === true,
+    });
   }
 
   @Get(':id/messages')

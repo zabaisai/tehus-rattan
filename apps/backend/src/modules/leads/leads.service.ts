@@ -163,7 +163,12 @@ export class LeadsService {
 
     // El tablero es compartido: si un asesor mueve o reasigna una
     // oportunidad, el resto debe verlo sin recargar.
-    this.realtime.leadUpdated(companyId, actualizado.id, actualizado.stageId);
+    this.realtime.leadUpdated(
+      companyId,
+      actualizado.id,
+      actualizado.stageId,
+      actualizado.pipelineId,
+    );
     return actualizado;
   }
 
@@ -209,7 +214,12 @@ export class LeadsService {
       return updated;
     });
 
-    this.realtime.leadUpdated(companyId, movido.id, movido.stageId);
+    this.realtime.leadUpdated(
+      companyId,
+      movido.id,
+      movido.stageId,
+      movido.pipelineId,
+    );
     return movido;
   }
 
@@ -228,7 +238,12 @@ export class LeadsService {
       },
     });
 
-    this.realtime.leadUpdated(companyId, cerrado.id, cerrado.stageId);
+    this.realtime.leadUpdated(
+      companyId,
+      cerrado.id,
+      cerrado.stageId,
+      cerrado.pipelineId,
+    );
     return cerrado;
   }
 

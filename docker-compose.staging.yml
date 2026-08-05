@@ -158,6 +158,33 @@ services:
       - .env.staging
     environment:
       WORKER_ROLE: "queue"
+    # Healthcheck PROPIO. Sin esto hereda el de la imagen del backend, que
+    # consulta `http://127.0.0.1:3001/api/health` — y el worker no expone HTTP
+    # por diseño, asi que figuraba `unhealthy` estando perfectamente vivo.
+    # Docker no lo reiniciaba (`restart: unless-stopped` no actua sobre la
+    # salud), pero quien mirase la monitorizacion leia lo contrario de la
+    # verdad.
+    #
+    # Comprueba la marca que el propio proceso refresca en cada latido: mide
+    # que ESTE proceso sigue vivo y su temporizador corriendo, sin abrir una
+    # conexion a la base en cada sondeo y sin marcar enfermo al worker porque
+    # PostgreSQL parpadee.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          const fs=require('fs');
+          const f=process.env.WORKER_HEARTBEAT_FILE||'/tmp/worker-heartbeat';
+          const edad=Date.now()-fs.statSync(f).mtimeMs;
+          if(edad>75000){console.error('latido viejo: '+edad+'ms');process.exit(1)}
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      # El primer latido se escribe al arrancar, pero el arranque de Nest tarda:
+      # este margen evita un `unhealthy` inicial que no significa nada.
+      start_period: 40s
     depends_on:
       postgres:
         condition: service_healthy

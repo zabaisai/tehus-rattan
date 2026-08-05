@@ -35,7 +35,17 @@ describe('OutboxDispatcher', () => {
     inboundQueue = {
       enqueueInboundMessage: jest.fn().mockResolvedValue(true),
     };
-    dispatcher = new OutboxDispatcher(outbox, inboundQueue);
+    dispatcher = new OutboxDispatcher(
+      outbox,
+      inboundQueue,
+      // Sin manejadores registrados: estas pruebas cubren el camino de
+      // entrantes, que sigue siendo el de siempre.
+      {
+        obtener: () => null,
+        registrar: jest.fn(),
+        tiposRegistrados: () => [],
+      } as never,
+    );
   });
 
   afterEach(() => {
@@ -142,6 +152,82 @@ describe('OutboxDispatcher', () => {
 
       expect(outbox.markFailed).toHaveBeenCalledTimes(1);
       expect(inboundQueue.enqueueInboundMessage).not.toHaveBeenCalled();
+    });
+
+    it('pasa el tipo a markFailed para que aplique su política', async () => {
+      outbox.claimBatch.mockResolvedValue([evento({ type: 'inventado' })]);
+
+      await dispatcher.despachar();
+
+      expect(outbox.markFailed.mock.calls[0][3]).toBe('inventado');
+    });
+  });
+
+  describe('manejadores registrados por otros módulos', () => {
+    // El despachador vive en `common/` y no debe conocer FlowBot. Solo busca
+    // quién sabe publicar cada tipo.
+    const conManejador = (manejador: jest.Mock) =>
+      new OutboxDispatcher(outbox, inboundQueue, {
+        obtener: (t: string) => (t === 'flowbot.advance' ? manejador : null),
+        registrar: jest.fn(),
+        tiposRegistrados: () => ['flowbot.advance'],
+      } as never);
+
+    it('delega en el manejador y completa solo si publicó', async () => {
+      const manejador = jest.fn().mockResolvedValue(true);
+      outbox.claimBatch.mockResolvedValue([
+        evento({ type: 'flowbot.advance' }),
+      ]);
+
+      await conManejador(manejador).despachar();
+
+      expect(manejador).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'evt-1', type: 'flowbot.advance' }),
+      );
+      expect(outbox.markCompleted).toHaveBeenCalledWith('evt-1');
+    });
+
+    it('si el manejador no pudo publicar, el evento queda pendiente', async () => {
+      // ORDEN INVIOLABLE: marcar antes de publicar perdería el trabajo.
+      const manejador = jest.fn().mockResolvedValue(false);
+      outbox.claimBatch.mockResolvedValue([
+        evento({ type: 'flowbot.advance' }),
+      ]);
+
+      await conManejador(manejador).despachar();
+
+      expect(outbox.markCompleted).not.toHaveBeenCalled();
+      expect(outbox.markFailed).toHaveBeenCalledTimes(1);
+    });
+
+    it('un manejador que lanza no tumba el pase', async () => {
+      const manejador = jest.fn().mockRejectedValue(new Error('Redis'));
+      outbox.claimBatch.mockResolvedValue([
+        evento({ type: 'flowbot.advance' }),
+      ]);
+
+      await expect(
+        conManejador(manejador).despachar(),
+      ).resolves.toBeUndefined();
+      expect(outbox.markFailed).toHaveBeenCalledTimes(1);
+    });
+
+    it('marca DESPUÉS de publicar, nunca antes', async () => {
+      const orden: string[] = [];
+      const manejador = jest.fn().mockImplementation(async () => {
+        orden.push('publicar');
+        return true;
+      });
+      outbox.markCompleted.mockImplementation(async () => {
+        orden.push('marcar');
+      });
+      outbox.claimBatch.mockResolvedValue([
+        evento({ type: 'flowbot.advance' }),
+      ]);
+
+      await conManejador(manejador).despachar();
+
+      expect(orden).toEqual(['publicar', 'marcar']);
     });
   });
 

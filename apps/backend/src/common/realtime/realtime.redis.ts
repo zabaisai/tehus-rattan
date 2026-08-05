@@ -5,6 +5,7 @@ import type { INestApplicationContext } from '@nestjs/common';
 import { Logger } from '@nestjs/common';
 import type { ServerOptions } from 'socket.io';
 import { buildRedisConnection } from '../queue/queue.config';
+import { ESPERA_MAXIMA_REDIS_MS, puenteUtilizable } from '../redis/redis-ready';
 
 /**
  * ¿Hay que puentear el tiempo real por Redis?
@@ -19,31 +20,28 @@ export function usaPuenteRedis(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 /**
- * Cuánto se espera a Redis antes de arrancar sin puente.
- *
- * EXISTE POR UN FALLO REAL: sin límite, un `ping()` a un Redis inalcanzable
- * NO falla. ioredis encola el comando y reintenta la conexión para siempre,
- * así que el proceso se queda colgado a mitad del arranque —ni escucha, ni
- * responde al health, ni registra un error que explique por qué—. Es el peor
- * modo de fallo posible: parece un cuelgue sin causa.
- *
- * Tres segundos son de sobra para un Redis en la misma red de Docker, y a
- * cambio una máquina sin Redis arranca igual, solo que sin propagación entre
- * procesos.
+ * La espera a que Redis esté lista vive en `common/redis/redis-ready.ts`, en
+ * un solo sitio: el sondeo de la cola tenía este mismo fallo por otro camino.
+ * Se reexporta para no romper a quien ya importaba desde aquí.
  */
-export const ESPERA_MAXIMA_REDIS_MS = 3_000;
+export {
+  ESPERA_MAXIMA_REDIS_MS,
+  conTiempoLimite,
+  esperarListo,
+  puenteUtilizable,
+} from '../redis/redis-ready';
 
 /**
- * Estado del puente entre procesos, para que la monitorizacion lo vea.
+ * Estado del puente entre procesos, para que la monitorización lo vea.
  *
  * El tiempo real PUEDE degradarse a polling sin romper nada, pero esa
- * degradacion no debe ser invisible: si el puente lleva semanas caido, el
- * producto funciona "raro pero funciona" y nadie lo mira. Se publica aqui, en
- * el mismo modulo que lo abre, para que no haya dos verdades.
+ * degradación no debe ser invisible: si el puente lleva semanas caído, el
+ * producto funciona «raro pero funciona» y nadie lo mira. Se publica aquí, en
+ * el mismo módulo que lo abre, para que no haya dos verdades.
  */
 export const estadoDelPuente: {
   conectado: boolean;
-  /** Por que no esta conectado, ya clasificado. Nunca la cadena de conexion. */
+  /** Por qué no está conectado, ya clasificado. Nunca la cadena de conexión. */
   motivo?: string;
 } = { conectado: false };
 
@@ -55,7 +53,8 @@ export function crearClientesRedis(env: NodeJS.ProcessEnv = process.env): {
   const pub = new Redis({
     ...buildRedisConnection(env),
     // Sin cola de espera: un comando enviado mientras no hay conexión falla
-    // en el acto en vez de quedarse guardado esperando un reintento.
+    // en el acto en vez de quedarse guardado esperando un reintento. La
+    // espera a estar listo la resuelve `esperarListo`, no la cola offline.
     enableOfflineQueue: false,
     connectTimeout: ESPERA_MAXIMA_REDIS_MS,
   });
@@ -63,102 +62,6 @@ export function crearClientesRedis(env: NodeJS.ProcessEnv = process.env): {
   // acepta otros comandos por el mismo socket.
   const sub = pub.duplicate();
   return { pub, sub };
-}
-
-/**
- * Espera a que el cliente esté LISTO para aceptar comandos.
- *
- * EXISTE POR UN FALLO QUE LLEGÓ A STAGING. `ping()` se llamaba nada más
- * construir el cliente. ioredis conecta de forma asíncrona, así que el socket
- * todavía no era escribible y, con `enableOfflineQueue: false`, el comando se
- * rechazaba EN EL ACTO con "Stream isn't writeable". El resultado se
- * interpretaba como "Redis inalcanzable" y el puente quedaba desactivado en
- * TODOS los arranques, contra una Redis perfectamente sana —la misma que
- * BullMQ usaba sin problema, porque BullMQ sí espera a la conexión—.
- *
- * `enableOfflineQueue: false` se conserva a propósito: es lo que hace que un
- * comando posterior contra una Redis caída falle rápido en vez de quedarse
- * encolado para siempre. Lo que faltaba no era la cola, era esperar.
- *
- * Los escuchadores se retiran SIEMPRE al salir. Sin eso, cada arranque fallido
- * dejaría un `once('ready')` vivo sobre un cliente que ioredis sigue
- * reintentando, y una reconexión posterior resolvería una promesa que ya no
- * mira nadie.
- */
-export function esperarListo(cliente: Redis): Promise<void> {
-  // Ya está listo: no hay nada que esperar y suscribirse ahora significaría
-  // esperar al SIGUIENTE 'ready', que quizá no llegue nunca.
-  if (cliente.status === 'ready') return Promise.resolve();
-
-  return new Promise<void>((resolver, rechazar) => {
-    const limpiar = () => {
-      cliente.removeListener('ready', alListo);
-      cliente.removeListener('end', alCerrar);
-    };
-    const alListo = () => {
-      limpiar();
-      resolver();
-    };
-    // 'end' es el final de la vía: ioredis ya no reintenta. Sin escucharlo, la
-    // espera se agotaría por tiempo cuando la respuesta ya se conoce.
-    const alCerrar = () => {
-      limpiar();
-      rechazar(new Error('conexión cerrada'));
-    };
-    cliente.once('ready', alListo);
-    cliente.once('end', alCerrar);
-  });
-}
-
-/**
- * Resuelve a `false` si la comprobación no termina a tiempo, en vez de
- * quedarse esperando. El temporizador se limpia siempre: dejarlo vivo
- * mantendría el proceso despierto y un `docker stop` tardaría de más.
- */
-export async function conTiempoLimite(
-  tarea: Promise<unknown>,
-  ms = ESPERA_MAXIMA_REDIS_MS,
-): Promise<boolean> {
-  let temporizador: NodeJS.Timeout | undefined;
-  try {
-    await Promise.race([
-      tarea,
-      new Promise((_, rechazar) => {
-        temporizador = setTimeout(
-          () => rechazar(new Error('timeout')),
-          ms,
-        ).unref?.();
-      }),
-    ]);
-    return true;
-  } catch {
-    return false;
-  } finally {
-    if (temporizador) clearTimeout(temporizador);
-  }
-}
-
-/**
- * Comprobación completa del par de clientes: esperar a que ambos estén listos
- * y solo entonces hacer PING, todo dentro del mismo límite de tiempo.
- *
- * Se ofrece como una sola función porque el backend y el worker abren el
- * puente por caminos distintos y ANTES cada uno escribía su propia versión de
- * la comprobación. Dos copias de esta secuencia son dos oportunidades de
- * repetir exactamente el fallo que esto arregla.
- */
-export async function puenteUtilizable(
-  pub: Redis,
-  sub: Redis,
-  ms = ESPERA_MAXIMA_REDIS_MS,
-): Promise<boolean> {
-  return conTiempoLimite(
-    (async () => {
-      await Promise.all([esperarListo(pub), esperarListo(sub)]);
-      await Promise.all([pub.ping(), sub.ping()]);
-    })(),
-    ms,
-  );
 }
 
 /**

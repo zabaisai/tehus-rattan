@@ -31,8 +31,9 @@ describe('ConversationsController', () => {
       conversationsService,
       messagesService,
       whatsappService,
-      // La bandeja no participa en estas pruebas -cubren el envio de un
-      // mensaje-, pero el controlador la exige.
+      // La bandeja y el handoff no participan en estas pruebas -cubren el
+      // envio de un mensaje-, pero el controlador los exige.
+      {} as never,
       {} as never,
     );
   });

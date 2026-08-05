@@ -69,11 +69,54 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      # Las E2E de FlowBot que prueban el contador de frecuencia y el circuit
+      # breaker necesitan Redis DE VERDAD: lo que comprueban —que dos workers
+      # concurrentes no se cuelen, que un script Lua sea atomico, que en
+      # HALF_OPEN pase una sola prueba— depende de como ejecuta Redis, y un
+      # doble contestaria que si a todo.
+      #
+      # Sin este servicio, esas dos suites fallaban (47 tests) y ademas dejaban
+      # sockets reintentando: Jest terminaba en ~163 s, no podia salir, y
+      # GitHub cancelaba el job a los 25 minutos.
+      redis:
+        # Version fijada: un `redis:alpine` flotante cambia de version mayor sin
+        # avisar y las pruebas de Lua dejarian de significar lo mismo.
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
       # All dummy/fictitious — safe to commit, never real credentials.
       DATABASE_URL: postgresql://ci_user:ci_password@localhost:5432/ci_db
       JWT_SECRET: ci-dummy-jwt-secret-not-a-real-value
       NODE_ENV: test
+      # El job corre SOBRE el runner (no dentro de un contenedor) y los
+      # servicios publican sus puertos, asi que se llega a ellos por
+      # `127.0.0.1`. Si algun dia este job pasara a `container:`, habria que
+      # cambiarlo por el nombre del servicio (`redis`), que es como se resuelve
+      # dentro de la red de Docker.
+      #
+      # Se pone EXPLICITO en vez de confiar en el valor por defecto de
+      # `buildRedisConnection`, que apunta a `redis` porque esta pensado para
+      # docker-compose local.
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: "6379"
+      # ── FlowBot: todo apagado, explicito ────────────────────────────────
+      # Son los valores por defecto del codigo; se escriben igual para que el
+      # CI no dependa de que ese defecto siga siendo el mismo manana. Con esto,
+      # ninguna prueba puede mandar un WhatsApp aunque alguien se equivoque.
+      FLOWBOT_REAL_WHATSAPP_ENABLED: "false"
+      FLOWBOT_WHATSAPP_DRY_RUN: "true"
+      FLOWBOT_WHATSAPP_COMPANY_ALLOWLIST: ""
+      FLOWBOT_WHATSAPP_PHONE_ALLOWLIST: ""
+      FLOWBOT_WHATSAPP_RECIPIENT_ALLOWLIST: ""
+      # Clave de cifrado FICTICIA, solo para que el servicio arranque en las
+      # pruebas. No descifra ningun token real porque no hay ninguno.
+      WHATSAPP_TOKEN_ENCRYPTION_KEY: ci-dummy-encryption-key-not-real
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -106,5 +149,36 @@ jobs:
         run: npm run build
       - name: Apply migrations (isolated CI database)
         run: npx prisma migrate deploy
+      # Comprobacion previa con timeout corto. Sin ella, un Redis ausente se
+      # manifestaba como 47 tests rojos y un proceso que no terminaba, y el job
+      # moria por el limite de 25 minutos: el sintoma no se parecia en nada a
+      # la causa. Asi el fallo llega en segundos y dice que pasa.
+      - name: Redis reachable (gate)
+        timeout-minutes: 1
+        run: |
+          set -e
+          echo "Comprobando Redis en ${REDIS_HOST}:${REDIS_PORT}..."
+          for i in $(seq 1 20); do
+            if (echo > /dev/tcp/${REDIS_HOST}/${REDIS_PORT}) 2>/dev/null; then
+              echo "Redis responde."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Redis NO responde en ${REDIS_HOST}:${REDIS_PORT}."
+          echo "Las E2E de FlowBot (contador de frecuencia y circuit breaker)"
+          echo "necesitan Redis de verdad. Revisa el servicio 'redis' del job."
+          exit 1
       - name: E2E tests
         run: npm run test:e2e -- --runInBand
+        env:
+          # Solo para las E2E, NO para todo el job. Varias unitarias comprueban
+          # el comportamiento por defecto de la cola leyendo `process.env` en
+          # tiempo de ejecucion, y ponerlo a nivel de job las rompia: 14 tests
+          # en 4 suites. Lo descubrio reproducir el job entero en local en vez
+          # de solo el paso de E2E.
+          #
+          # Aqui si hace falta: con el consumidor encendido, un worker de BullMQ
+          # quedaria vivo al terminar y Jest no podria salir.
+          QUEUE_ENABLED: "false"
+

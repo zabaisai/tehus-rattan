@@ -3,6 +3,8 @@ import {
   OutboxService,
   OUTBOX_MAX_ATTEMPTS,
   OUTBOX_TYPES,
+  POLITICA_POR_DEFECTO,
+  politicaDe,
 } from './outbox.service';
 
 const duplicado = () =>
@@ -176,6 +178,74 @@ describe('OutboxService', () => {
       expect(data.lastError).toBe('Error');
       expect(JSON.stringify(data)).not.toContain('573001112233');
       expect(JSON.stringify(data)).not.toContain('secreto');
+    });
+  });
+
+  describe('políticas de reintento por tipo', () => {
+    // Una sola política para todos obliga a elegir entre insistir demasiado en
+    // lo que otro va a rehacer, o rendirse pronto con lo que nadie rehará.
+    it('un avance reintenta más rápido que un mensaje entrante', () => {
+      expect(politicaDe('flowbot.advance').baseMs).toBeLessThan(
+        politicaDe('inbound.message').baseMs,
+      );
+    });
+
+    it('un despertar insiste más veces que un avance', () => {
+      // Perder un despertar deja la ejecución dormida para siempre; perder un
+      // avance solo lo retrasa hasta que el reconciliador lo vea.
+      expect(politicaDe('flowbot.wake').maxIntentos).toBeGreaterThan(
+        politicaDe('flowbot.advance').maxIntentos,
+      );
+    });
+
+    it('un tipo desconocido cae en la política por defecto', () => {
+      expect(politicaDe('tipo.inventado')).toEqual(POLITICA_POR_DEFECTO);
+    });
+
+    it('el backoff nunca supera el tope del tipo', () => {
+      const politica = politicaDe('flowbot.advance');
+      // Sin tope, el exponencial llegaría a horas y la ejecución parecería
+      // muerta mucho antes de agotar sus intentos.
+      const esperaMs =
+        politica.baseMs * Math.pow(2, politica.maxIntentos - 1) >
+        politica.topeMs;
+      expect(esperaMs).toBe(true);
+      expect(politica.topeMs).toBeLessThanOrEqual(60_000);
+    });
+
+    it('aplica el máximo del tipo, no el global', async () => {
+      // `flowbot.wake` admite 12 intentos: al sexto —el máximo global— todavía
+      // debe seguir vivo.
+      await service.markFailed(
+        'evt-1',
+        OUTBOX_MAX_ATTEMPTS - 1,
+        new Error('x'),
+        'flowbot.wake',
+      );
+
+      const data = prisma.outboxEvent.update.mock.calls[0][0].data;
+      expect(data.status).toBe('PENDING');
+    });
+
+    it('aplica el backoff del tipo', async () => {
+      await service.markFailed('evt-1', 0, new Error('x'), 'flowbot.advance');
+      const avance =
+        prisma.outboxEvent.update.mock.calls[0][0].data.availableAt;
+
+      prisma.outboxEvent.update.mockClear();
+      await service.markFailed('evt-1', 0, new Error('x'), 'inbound.message');
+      const entrante =
+        prisma.outboxEvent.update.mock.calls[0][0].data.availableAt;
+
+      expect(avance.getTime()).toBeLessThan(entrante.getTime());
+    });
+
+    it('sin tipo se comporta como antes: nadie se queda sin reintentos', async () => {
+      await service.markFailed('evt-1', 0, new Error('x'));
+
+      const data = prisma.outboxEvent.update.mock.calls[0][0].data;
+      expect(data.status).toBe('PENDING');
+      expect(data.attempts).toBe(1);
     });
   });
 

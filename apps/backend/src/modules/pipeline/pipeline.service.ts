@@ -126,6 +126,7 @@ export class PipelineService {
       color?: string;
       probability?: number;
       type?: 'OPEN' | 'WON' | 'LOST';
+      isInitial?: boolean;
     },
   ) {
     await this.findById(pipelineId, companyId);
@@ -137,6 +138,22 @@ export class PipelineService {
         orderBy: { order: 'desc' },
       });
       order = lastStage ? lastStage.order + 1 : 0;
+    }
+
+    // Una etapa inicial y solo una por embudo. Si la nueva lo es, la anterior
+    // deja de serlo en la MISMA transacción: con dos marcadas, cuál recibe al
+    // cliente que acaba de escribir depende del orden de la consulta, y eso no
+    // se puede depurar mirando la pantalla.
+    if (data.isInitial) {
+      return this.prisma.$transaction(async (tx) => {
+        await tx.pipelineStage.updateMany({
+          where: { pipelineId, isInitial: true },
+          data: { isInitial: false },
+        });
+        return tx.pipelineStage.create({
+          data: { ...data, order, pipelineId },
+        });
+      });
     }
 
     return this.prisma.pipelineStage.create({
@@ -154,6 +171,7 @@ export class PipelineService {
       color?: string;
       probability?: number;
       type?: 'OPEN' | 'WON' | 'LOST';
+      isInitial?: boolean;
     },
   ) {
     await this.findById(pipelineId, companyId);
@@ -162,6 +180,26 @@ export class PipelineService {
       where: { id: stageId, pipelineId },
     });
     if (!stage) throw new NotFoundException('Etapa no encontrada');
+
+    // Quitar la marca a mano dejaría el embudo SIN etapa inicial, y entonces
+    // el primer mensaje de un cliente cae en «la primera por orden», que es
+    // una regla de reserva y no una decisión de nadie. Se cambia de etapa
+    // inicial marcando otra, no desmarcando esta.
+    if (data.isInitial === false && stage.isInitial) {
+      throw new BadRequestException(
+        'Un embudo necesita una etapa de entrada. Marca otra como inicial en vez de quitarle la marca a esta.',
+      );
+    }
+
+    if (data.isInitial) {
+      return this.prisma.$transaction(async (tx) => {
+        await tx.pipelineStage.updateMany({
+          where: { pipelineId, isInitial: true, id: { not: stageId } },
+          data: { isInitial: false },
+        });
+        return tx.pipelineStage.update({ where: { id: stageId }, data });
+      });
+    }
 
     return this.prisma.pipelineStage.update({
       where: { id: stageId },
@@ -184,6 +222,19 @@ export class PipelineService {
       throw new BadRequestException(
         'No se puede eliminar una etapa que tiene leads activos. Mueve los leads primero.',
       );
+    }
+
+    // Borrar la etapa de entrada deja el embudo sin puerta: el siguiente
+    // mensaje caería en «la primera por orden», que puede ser «Ganado».
+    if (stage.isInitial) {
+      const otras = await this.prisma.pipelineStage.count({
+        where: { pipelineId, id: { not: stageId } },
+      });
+      if (otras > 0) {
+        throw new BadRequestException(
+          'Esa es la etapa de entrada del embudo. Marca otra como inicial antes de borrarla.',
+        );
+      }
     }
 
     return this.prisma.pipelineStage.delete({ where: { id: stageId } });

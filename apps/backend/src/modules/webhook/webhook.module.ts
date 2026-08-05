@@ -11,6 +11,7 @@ import { WhatsAppIntegrationModule } from '../whatsapp-integration/whatsapp-inte
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LeadsModule } from '../leads/leads.module';
 import { ChatbotModule } from '../chatbot/chatbot.module';
+import { FlowBotModule } from '../flowbot/flowbot.module';
 import { WhatsAppHistoryModule } from '../whatsapp-history/whatsapp-history.module';
 
 @Module({
@@ -23,6 +24,7 @@ import { WhatsAppHistoryModule } from '../whatsapp-history/whatsapp-history.modu
     NotificationsModule,
     LeadsModule,
     ChatbotModule,
+    FlowBotModule,
     WhatsAppHistoryModule,
   ],
   controllers: [WebhookController],

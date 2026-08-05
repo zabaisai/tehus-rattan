@@ -6,6 +6,7 @@ import {
 } from '../queue/inbound-queue.service';
 import { shouldEnqueue } from '../queue/queue.role';
 import { OutboxService, OUTBOX_TYPES } from './outbox.service';
+import { OutboxHandlerRegistry } from './outbox.handlers';
 
 /**
  * Empuja los eventos del outbox a la cola.
@@ -28,6 +29,7 @@ export class OutboxDispatcher implements OnApplicationShutdown {
   constructor(
     private readonly outbox: OutboxService,
     private readonly inboundQueue: InboundQueueService,
+    private readonly registro: OutboxHandlerRegistry,
   ) {}
 
   /**
@@ -73,6 +75,18 @@ export class OutboxDispatcher implements OnApplicationShutdown {
     attempts: number;
   }): Promise<void> {
     try {
+      // Los tipos que declara otro modulo se publican por su manejador. El
+      // despachador no necesita conocerlos: solo que alguien sepa publicarlos.
+      const manejador = this.registro.obtener(evento.type);
+      if (manejador) {
+        const publicado = await manejador(evento);
+        if (!publicado) throw new Error('ColaNoDisponible');
+        // Se marca DESPUES de que la cola confirme. Al reves se perderia el
+        // trabajo si la publicacion fallara.
+        await this.outbox.markCompleted(evento.id);
+        return;
+      }
+
       if (evento.type !== OUTBOX_TYPES.INBOUND_MESSAGE) {
         // Un tipo desconocido no se reintenta eternamente: se marca fallido
         // para que quede visible en vez de girar en el lote para siempre.
@@ -93,7 +107,14 @@ export class OutboxDispatcher implements OnApplicationShutdown {
 
       await this.outbox.markCompleted(evento.id);
     } catch (error) {
-      await this.outbox.markFailed(evento.id, evento.attempts, error);
+      // El tipo decide la política: cada evento tiene su propio equilibrio
+      // entre insistir y rendirse.
+      await this.outbox.markFailed(
+        evento.id,
+        evento.attempts,
+        error,
+        evento.type,
+      );
     }
   }
 

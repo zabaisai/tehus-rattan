@@ -27,6 +27,7 @@ export interface SaludDelSistema {
     worker: ComponenteSalud;
     outbox: ComponenteSalud;
     realtime: ComponenteSalud;
+    flowbot: ComponenteSalud;
   };
 }
 
@@ -39,6 +40,13 @@ export const MARGEN_LATIDO_MS = INTERVALO_LATIDO_MS * 3;
  * retraso normal en una alarma.
  */
 export const ANTIGUEDAD_MAXIMA_OUTBOX_MS = 10 * 60_000;
+
+/**
+ * Una espera vencida más de esto significa que su despertar no llegó. El
+ * reconciliador pasa cada minuto, así que cinco minutos ya son varias
+ * oportunidades perdidas y no un retraso normal.
+ */
+export const RETRASO_MAXIMO_FLOWBOT_MS = 5 * 60_000;
 
 /**
  * Salud agregada del sistema.
@@ -71,15 +79,16 @@ export class SystemHealthService {
   ) {}
 
   async check(env: NodeJS.ProcessEnv = process.env): Promise<SaludDelSistema> {
-    const [database, queue, worker, outbox] = await Promise.all([
+    const [database, queue, worker, outbox, flowbot] = await Promise.all([
       this.comprobarBase(),
       this.comprobarCola(env),
       this.comprobarWorker(env),
       this.comprobarOutbox(),
+      this.comprobarFlowBot(),
     ]);
     const realtime = this.comprobarTiempoReal(env);
 
-    const components = { database, queue, worker, outbox, realtime };
+    const components = { database, queue, worker, outbox, realtime, flowbot };
     return { status: this.agregar(components), components };
   }
 
@@ -192,6 +201,60 @@ export class SystemHealthService {
     }
   }
 
+  /**
+   * Salud del motor de bots.
+   *
+   * SE CONSULTA LA BASE, NO LOS SERVICIOS DE FLOWBOT. Este servicio vive en
+   * `common/` y hacerlo depender de `modules/flowbot` invertiría las capas.
+   * Además los síntomas están en PostgreSQL, así que el backend puede verlos
+   * aunque el motor solo corra en el worker: es justo el caso en el que
+   * preguntar a un servicio en memoria no serviría de nada.
+   *
+   * DEGRADA, NO TUMBA. Que haya ejecuciones esperando revisión significa que
+   * el motor necesita atención, no que el CRM no pueda atender. Marcar el
+   * backend como no sano por esto lo sacaría del balanceador y convertiría un
+   * problema de bots en una caída del producto.
+   */
+  private async comprobarFlowBot(): Promise<ComponenteSalud> {
+    try {
+      const corte = new Date(Date.now() - RETRASO_MAXIMO_FLOWBOT_MS);
+
+      const [necesitanAtencion, esperasVencidas] = await Promise.all([
+        this.prisma.flowBotExecution.count({
+          where: { status: 'NEEDS_ATTENTION' },
+        }),
+        // Esperas que debieron dispararse y siguen sin consumir: la señal de
+        // que un despertar se perdió y el reconciliador aún no lo ha repuesto.
+        this.prisma.flowBotWait.count({
+          where: {
+            consumedAt: null,
+            wakeAt: { not: null, lt: corte },
+            execution: { status: { in: ['WAITING_TIME', 'WAITING_INPUT'] } },
+          },
+        }),
+      ]);
+
+      if (necesitanAtencion > 0 || esperasVencidas > 0) {
+        return {
+          state: 'stale',
+          needsAttention: necesitanAtencion,
+          overdueWaits: esperasVencidas,
+          reason:
+            necesitanAtencion > 0
+              ? 'ejecuciones-esperando-revision'
+              : 'despertares-sin-disparar',
+        };
+      }
+
+      return { state: 'up', needsAttention: 0, overdueWaits: 0 };
+    } catch (error) {
+      return {
+        state: 'unknown',
+        reason: error instanceof Error ? error.name || 'Error' : 'Error',
+      };
+    }
+  }
+
   private comprobarTiempoReal(env: NodeJS.ProcessEnv): ComponenteSalud {
     if (!usaPuenteRedis(env)) return { state: 'disabled' };
     return estadoDelPuente.conectado
@@ -214,6 +277,9 @@ export class SystemHealthService {
       components.worker,
       components.outbox,
       components.realtime,
+      // FlowBot degrada como los demás y NUNCA tumba: un motor de bots que
+      // necesita revisión no impide atender conversaciones a mano.
+      components.flowbot,
     ].some((c) => c.state === 'down' || c.state === 'stale');
 
     return degradados ? 'degraded' : 'ok';

@@ -198,6 +198,14 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
           .mockResolvedValue({ atendido: false, motivo: 'sin-flujo' }),
       } as never;
 
+      // FlowBot tampoco atiende: esta prueba mide el aislamiento entre
+      // empresas del camino completo, no la respuesta automatica.
+      const flowbotMock = {
+        atenderMensaje: jest
+          .fn()
+          .mockResolvedValue({ atendido: false, motivo: 'sin-bot' }),
+      } as never;
+
       // El historial de coexistencia no participa aqui: llega por otro campo
       // del webhook y no dispara efectos.
       const historySyncMock = {
@@ -221,6 +229,7 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
         outboxMock,
         leadIntakeMock,
         chatbotMock,
+        flowbotMock,
         historySyncMock,
       );
     });

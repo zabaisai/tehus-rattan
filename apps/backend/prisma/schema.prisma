@@ -99,8 +99,25 @@ model Company {
   userSessions         UserSession[]
   loginEvents          LoginEvent[]
   outboxEvents         OutboxEvent[]
+  flowBots             FlowBot[]
+  flowBotExecutions    FlowBotExecution[]
+  flowBotWaits         FlowBotWait[]
+  flowBotMetrics       FlowBotMetric[]
+  flowBotTestRuns      FlowBotTestRun[]
+  leadSettings         CompanyLeadSettings?
+
+  customFieldDefinitions CustomFieldDefinition[]
+  customFieldValues      CustomFieldValue[]
+  customFieldChanges     CustomFieldValueChange[]
+
+  handoffs ConversationHandoff[]
+
+  flowBotCredentials FlowBotCredential[]
+  flowBotSettings    FlowBotSettings?
+  flowBotAiUsage     FlowBotAiUsage[]
 
   @@map("companies")
+  whatsappTemplates WhatsAppTemplate[]
 }
 
 model User {
@@ -152,11 +169,25 @@ model User {
   notificationPreferences NotificationPreference[]
   conversationReads       ConversationRead[]
 
+  // FlowBot: quien crea, edita, publica y prueba los bots.
+  flowBotsCreated          FlowBot[]        @relation("FlowBotCreatedBy")
+  flowBotsUpdated          FlowBot[]        @relation("FlowBotUpdatedBy")
+  flowBotVersionsPublished FlowBotVersion[] @relation("FlowBotVersionPublishedBy")
+  flowBotTestRuns          FlowBotTestRun[] @relation("FlowBotTestRunCreatedBy")
+
   // Elegir a quién le toca es una consulta caliente: ocurre en cada mensaje
   // entrante de un contacto nuevo. Con este índice sale directa, sin recorrer
   // los usuarios de la empresa.
+  leadSettingsAssigned CompanyLeadSettings[] @relation("LeadSettingsUser")
+
   @@index([companyId, isActive, autoAssignEnabled, lastAssignedAt])
+  customFieldChanges CustomFieldValueChange[] @relation("CustomFieldChangeActor")
+
+  handoffsAssigned ConversationHandoff[] @relation("HandoffAssignee")
+  handoffsResolved ConversationHandoff[] @relation("HandoffResolver")
+
   @@map("users")
+  killSwitchActivations FlowBotKillSwitch[] @relation("KillSwitchActivatedBy")
 }
 
 model Contact {
@@ -169,11 +200,30 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+
+  /// Archivado SEGURO: se marca, nunca se borra.
+  ///
+  /// Un contacto archivado conserva sus conversaciones, sus oportunidades y
+  /// su historial: son datos del negocio y de la persona. Lo que cambia es
+  /// que deja de aparecer en las listas de trabajo y que los bots no arrancan
+  /// solos con el. Si vuelve a escribir, `CompanyLeadSettings.reactivateArchived`
+  /// decide si se reactiva o si se registra sin reabrir.
+  ///
+  /// Distinto de `isBlocked`, que significa "no queremos hablar con esta
+  /// persona". Archivar es "ya no esta activo"; bloquear es una decision
+  /// sobre la relacion.
+  archivedAt     DateTime?
+  archivedReason String?
+
   companyId     String
   company       Company        @relation(fields: [companyId], references: [id])
   conversations Conversation[]
   leads         Lead[]
   tasks         Task[]
+
+  flowBotExecutions FlowBotExecution[]
+
+  customFieldValues CustomFieldValue[]
 
   @@unique([phone, companyId])
   @@map("contacts")
@@ -217,11 +267,15 @@ model Conversation {
   whatsappIntegrationId String?
   whatsappIntegration   WhatsAppIntegration? @relation(fields: [whatsappIntegrationId], references: [id], onDelete: SetNull)
 
-  messages Message[]
-  notes    Note[]
-  tasks    Task[]
-  reads    ConversationRead[]
+  messages        Message[]
+  notes           Note[]
+  tasks           Task[]
+  reads           ConversationRead[]
   chatbotSessions ChatbotSession[]
+
+  flowBotExecutions FlowBotExecution[]
+
+  handoffs ConversationHandoff[]
 
   @@index([companyId, status, lastMessageAt])
   @@index([companyId, assignedTo])
@@ -230,10 +284,10 @@ model Conversation {
 }
 
 model Message {
-  id        String        @id @default(cuid())
-  wamid     String?       @unique
+  id        String      @id @default(cuid())
+  wamid     String?     @unique
   body      String?
-  type      MessageType   @default(TEXT)
+  type      MessageType @default(TEXT)
   direction Direction
 
   /// De donde salio este mensaje.
@@ -243,7 +297,7 @@ model Message {
   /// automatizaciones, ni despertar al chatbot: eso mandaria cientos de
   /// WhatsApp a clientes por conversaciones que ya terminaron. Sin este campo
   /// no hay forma de distinguirlo de un mensaje que acaba de llegar.
-  source MessageSource @default(LIVE)
+  source    MessageSource @default(LIVE)
   status    MessageStatus @default(QUEUED)
   createdAt DateTime      @default(now())
 
@@ -286,6 +340,18 @@ model Message {
   // que puede incluir el token o datos del destinatario.
   errorCode    String?
   errorMessage String?
+
+  /// Clave de idempotencia de un mensaje SALIENTE que genera el sistema.
+  ///
+  /// EXISTE PORQUE `wamid` NO SIRVE PARA ESTO: lo asigna Meta y solo se
+  /// conoce DESPUES de enviar, asi que no puede impedir el envio duplicado
+  /// que ocurre justo antes. Aqui se guarda la clave del motor
+  /// —`ejecucion:nodo:paso`— y se reserva la fila ANTES de llamar a Meta: un
+  /// reintento la reencuentra y no reenvia.
+  ///
+  /// Nula para los mensajes entrantes y para los que escribe un asesor a
+  /// mano, que no tienen de que ser idempotentes.
+  externalKey String? @unique
 
   conversationId String
   conversation   Conversation @relation(fields: [conversationId], references: [id])
@@ -439,14 +505,27 @@ model Pipeline {
   // Prisma no soporta índices parciales. Se crea como SQL en la migración
   // (`pipelines_one_default_per_company`) y se refuerza en el servicio dentro
   // de una transacción. Ver la nota en el propio migration.sql.
+  leadSettingsUsing CompanyLeadSettings[] @relation("LeadSettingsPipeline")
+
   @@index([companyId, isArchived, order])
   @@map("pipelines")
 }
 
 model PipelineStage {
-  id        String   @id @default(cuid())
-  name      String
-  order     Int      @default(0)
+  id    String @id @default(cuid())
+  name  String
+  order Int    @default(0)
+
+  /// Etapa por la que ENTRAN las oportunidades automaticas.
+  ///
+  /// Antes se usaba "la primera por orden", que funciona hasta que alguien
+  /// reordena el tablero y las oportunidades nuevas empiezan a caer en otra
+  /// etapa sin que nadie lo haya pedido. Marcarla explicitamente separa "donde
+  /// esta dibujada" de "por donde se entra".
+  ///
+  /// El nombre puede ser "Nuevo lead" o cualquier otro: el comportamiento se
+  /// ata a esta bandera, nunca al texto.
+  isInitial Boolean  @default(false)
   color     String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -463,9 +542,10 @@ model PipelineStage {
   // sigue siendo la fuente de verdad hasta que la transición se complete.
   type StageType @default(OPEN)
 
-  pipelineId String
-  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
-  leads      Lead[]
+  pipelineId        String
+  pipeline          Pipeline              @relation(fields: [pipelineId], references: [id])
+  leads             Lead[]
+  leadSettingsUsing CompanyLeadSettings[] @relation("LeadSettingsStage")
 
   @@index([pipelineId, order])
   @@map("pipeline_stages")
@@ -508,6 +588,10 @@ model Lead {
   notes         Note[]
   leadProducts  LeadProduct[]
   quotes        Quote[]
+
+  flowBotExecutions FlowBotExecution[]
+
+  customFieldValues CustomFieldValue[]
 
   @@index([companyId, status])
   @@index([pipelineId, stageId])
@@ -774,8 +858,13 @@ model WhatsAppIntegration {
 
   conversations Conversation[]
 
+  // FlowBot: disparadores atados a este numero y ejecuciones que entraron por el.
+  flowBotTriggers   FlowBotTrigger[]
+  flowBotExecutions FlowBotExecution[]
+
   @@index([companyId, isPrimary])
   @@map("whatsapp_integrations")
+  templates WhatsAppTemplate[]
 }
 
 // Short-lived, single-use anti-CSRF state for the Meta Embedded Signup flow.
@@ -895,6 +984,21 @@ enum NotificationPriority {
 enum Role {
   SUPER_ADMIN
   ADMIN
+
+  /// Coordina el equipo sin administrar la empresa.
+  ///
+  /// EXISTE PORQUE ADMIN Y AGENT NO CUBREN EL HUECO REAL. Quien disena y
+  /// publica bots necesita mas que un asesor y menos que un administrador:
+  /// puede crear, editar, simular y publicar flujos, y ver todas las
+  /// ejecuciones, pero NO toca credenciales, integraciones ni la
+  /// configuracion de la empresa. Dar ADMIN a esa persona significa darle
+  /// tambien las claves de WhatsApp y de los servicios externos.
+  ///
+  /// Se anade DESPUES de ADMIN a proposito: el orden de un enum de PostgreSQL
+  /// es el de declaracion, y ninguna consulta del producto ordena por rol,
+  /// pero si alguna lo hiciera, insertarlo en medio cambiaria resultados.
+  MANAGER
+
   AGENT
 }
 
@@ -1395,9 +1499,9 @@ model ChatbotSession {
   /// cliente.
   steps Int @default(0)
 
-  startedAt        DateTime  @default(now())
-  lastInteractionAt DateTime @default(now())
-  endedAt          DateTime?
+  startedAt         DateTime  @default(now())
+  lastInteractionAt DateTime  @default(now())
+  endedAt           DateTime?
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
@@ -1485,4 +1589,1037 @@ enum MessageSource {
   HISTORY_SYNC
   /// Importacion controlada desde CSV. Tampoco dispara efectos.
   CSV_IMPORT
+}
+
+// ─────────────────────────────────────────────
+// TAKTO FLOWBOT — constructor visual de bots
+// ─────────────────────────────────────────────
+//
+// POR QUE MODELOS NUEVOS Y NO AMPLIAR ChatbotFlow: el chatbot v1 esta
+// desplegado y con datos en staging. Su grafo es lineal (`next` mas opciones
+// de menu) y su ejecucion es sincrona dentro del webhook; FlowBot necesita un
+// grafo con puertos tipados, ejecucion durable, esperas que sobreviven a un
+// reinicio y disparadores que no son solo "mensaje entrante". Forzar ambas
+// semanticas sobre las mismas tablas dejaria filas que significan una cosa u
+// otra segun una bandera, que es la clase de ambiguedad que despues nadie se
+// atreve a tocar.
+//
+// El chatbot v1 se conserva intacto y sigue funcionando. FlowBot lo sustituye
+// cuando cubra su superficie; hasta entonces conviven y NO compiten por la
+// misma conversacion (ver la politica de seleccion en FlowBotTrigger).
+
+enum FlowBotStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+/// Un bot. Contenedor estable: lo que cambia son sus versiones.
+model FlowBot {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  status      FlowBotStatus @default(DRAFT)
+
+  /// Grafo en edicion. Cambia con cada autosave; nunca se ejecuta.
+  draftGraph Json
+
+  /// Version publicada que ejecuta el motor. Nula mientras solo hay borrador.
+  publishedVersionId String?         @unique
+  publishedVersion   FlowBotVersion? @relation("FlowBotPublished", fields: [publishedVersionId], references: [id], onDelete: SetNull)
+
+  /// Contador monotono de versiones. No se reutiliza al borrar.
+  lastVersionNumber Int @default(0)
+
+  /// Control de concurrencia optimista del borrador: dos pestanas abiertas
+  /// sobre el mismo bot no pueden pisarse en silencio.
+  draftRevision Int @default(0)
+
+  /// Marca las plantillas del catalogo. Una plantilla se clona, nunca se
+  /// ejecuta: por eso vive en la misma tabla en vez de en una paralela que
+  /// habria que mantener en sincronia con el formato del grafo.
+  isTemplate  Boolean @default(false)
+  templateKey String?
+
+  /// De que plantilla o bot se clono, para poder rastrear el origen.
+  clonedFromId String?
+
+  createdById String?
+  createdBy   User?   @relation("FlowBotCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedById String?
+  updatedBy   User?   @relation("FlowBotUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  versions   FlowBotVersion[]   @relation("FlowBotVersions")
+  triggers   FlowBotTrigger[]
+  executions FlowBotExecution[]
+  metrics    FlowBotMetric[]
+  testRuns   FlowBotTestRun[]
+
+  @@index([companyId, status])
+  @@index([companyId, isTemplate])
+  @@map("flowbots")
+}
+
+/// Version publicada. INMUTABLE: editar crea un borrador nuevo, nunca cambia
+/// una version que puede tener ejecuciones vivas apuntando a ella.
+model FlowBotVersion {
+  id      String @id @default(cuid())
+  version Int
+
+  /// Grafo tal cual lo dibujo el autor, para poder restaurarlo como borrador.
+  graph Json
+
+  /// Grafo compilado: indices de nodo, puertos resueltos y orden de
+  /// evaluacion. Es lo que lee el motor, para no recorrer el grafo crudo en
+  /// cada paso.
+  compiled Json
+
+  /// Huella del compilado. Permite detectar que dos versiones son iguales y
+  /// comprobar que una ejecucion no cambio de definicion a mitad.
+  compiledHash String
+
+  publishNote   String?
+  publishedById String?
+  publishedBy   User?    @relation("FlowBotVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  publishedAt   DateTime @default(now())
+
+  flowBotId String
+  flowBot   FlowBot @relation("FlowBotVersions", fields: [flowBotId], references: [id], onDelete: Cascade)
+
+  /// Lado inverso de FlowBot.publishedVersion.
+  publishedFor FlowBot? @relation("FlowBotPublished")
+
+  executions FlowBotExecution[]
+  metrics    FlowBotMetric[]
+  testRuns   FlowBotTestRun[]
+
+  @@unique([flowBotId, version])
+  @@index([flowBotId, publishedAt])
+  @@map("flowbot_versions")
+}
+
+enum FlowBotTriggerType {
+  INBOUND_MESSAGE
+  FIRST_CONVERSATION
+  KEYWORD
+  INTENT
+  CONVERSATION_CREATED
+  CONTACT_CREATED
+  LEAD_CREATED
+  STAGE_CHANGED
+  TAG_ADDED
+  TASK_OVERDUE
+  NO_REPLY
+  SCHEDULE
+  MANUAL
+  WEBHOOK
+  AUTOMATION_EVENT
+}
+
+/// Cuando arranca un bot y con que filtros.
+///
+/// Vive en su propia tabla y no dentro del grafo porque hay que CONSULTARLO:
+/// al llegar un mensaje se buscan los disparadores candidatos de esa empresa y
+/// ese numero. Metido en el JSON del grafo habria que leer todos los bots de
+/// la empresa y deserializarlos en cada mensaje.
+model FlowBotTrigger {
+  id      String             @id @default(cuid())
+  type    FlowBotTriggerType
+  enabled Boolean            @default(true)
+
+  /// Desempate cuando varios disparadores encajan con el mismo evento. Mayor
+  /// gana. Sin esto, el bot elegido dependeria del orden de la base — es
+  /// decir, del azar.
+  priority Int @default(0)
+
+  /// Si es exclusivo, ningun otro bot arranca para esa conversacion.
+  exclusive Boolean @default(true)
+
+  /// Filtros del disparador (palabras, etapa, etiqueta, horario, campos...).
+  /// Su forma depende de `type` y la valida el compilador.
+  filters Json?
+
+  /// Numero concreto de WhatsApp. Nulo = cualquiera de la empresa.
+  whatsappIntegrationId String?
+  whatsappIntegration   WhatsAppIntegration? @relation(fields: [whatsappIntegrationId], references: [id], onDelete: Cascade)
+
+  /// Para SCHEDULE: expresion horaria ya normalizada y proxima ejecucion.
+  scheduleSpec String?
+  nextRunAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  flowBotId String
+  flowBot   FlowBot @relation(fields: [flowBotId], references: [id], onDelete: Cascade)
+
+  @@index([flowBotId])
+  @@index([type, enabled])
+  @@index([whatsappIntegrationId, enabled])
+  @@index([nextRunAt])
+  @@map("flowbot_triggers")
+}
+
+enum FlowBotExecutionStatus {
+  RUNNING
+  WAITING_INPUT
+  WAITING_TIME
+  HANDED_OFF
+  COMPLETED
+  FAILED
+  CANCELLED
+  PAUSED
+
+  /// La ejecucion quedo en un estado que el sistema NO puede resolver solo.
+  ///
+  /// EXISTE PARA NO REPETIR UN EFECTO EXTERNO A CIEGAS. Cuando un lease vence
+  /// a mitad de un paso que ya pudo haber mandado un WhatsApp, cobrado algo o
+  /// llamado a un tercero, hay dos opciones malas: reintentar —y quiza
+  /// duplicarlo— o abandonar —y quiza dejarlo a medias—. Si el motor no puede
+  /// PROBAR que el efecto no ocurrio, no elige ninguna: para la ejecucion
+  /// aqui y deja que lo mire una persona.
+  ///
+  /// No es un estado final: desde aqui se puede reanudar o cancelar a mano.
+  NEEDS_ATTENTION
+}
+
+/// Una ejecucion del bot sobre una conversacion. Es el estado durable: si el
+/// worker muere a mitad, esta fila es lo que permite retomar.
+model FlowBotExecution {
+  id     String                 @id @default(cuid())
+  status FlowBotExecutionStatus @default(RUNNING)
+
+  /// Nodo en el que esta parada la ejecucion.
+  currentNodeId String?
+
+  /// Variables acumuladas. Solo datos del flujo; NUNCA secretos ni
+  /// credenciales: esas viven cifradas y se referencian por id.
+  variables Json @default("{}")
+
+  /// Tope de pasos consumidos, para cortar bucles que el validador no pudo
+  /// descartar estaticamente.
+  steps Int @default(0)
+
+  /// Idempotencia del ARRANQUE: dos entregas del mismo webhook no pueden
+  /// abrir dos ejecuciones. Se construye con empresa, bot, disparador y
+  /// evento (por ejemplo el wamid).
+  idempotencyKey String @unique
+
+  /// Para correlacionar logs, pasos y eventos de outbox de una misma cadena.
+  correlationId String
+
+  /// Profundidad de encadenamiento entre automatizaciones y bots. Es lo que
+  /// impide que un bot dispare una automatizacion que dispare al bot.
+  depth Int @default(0)
+
+  /// Clasificador de error ya redactado. Nunca el mensaje crudo del
+  /// proveedor: ese arrastra telefonos y cuerpos de peticion.
+  errorCode String?
+
+  /// Por que necesita revision humana. Clasificador corto, nunca texto libre
+  /// del cliente ni respuesta del proveedor.
+  attentionReason String?
+
+  /// Cuantas veces el reconciliador ha tenido que intervenir sobre esta
+  /// ejecucion. Un numero que sube sin parar es la senal de que algo esta
+  /// roto de verdad y no es un tropiezo aislado.
+  recoveries Int @default(0)
+
+  /// Cuando intervino por ultima vez. Con `recoveries` permite distinguir
+  /// "se recupero una vez hace un mes" de "lleva media hora en bucle".
+  lastRecoveryAt DateTime?
+
+  /// Por que termino: fin normal, cancelacion, transferencia, tope de pasos.
+  endedReason String?
+
+  /// Quien esta avanzando esta ejecucion ahora mismo, y hasta cuando.
+  ///
+  /// Es el lease que impide que dos workers la avancen a la vez: un reintento
+  /// de BullMQ y una continuacion pueden coincidir, y el cliente recibiria dos
+  /// respuestas. Se toma con una escritura condicional, no con un `findFirst`
+  /// seguido de `update`, porque entre esas dos operaciones hay un hueco por
+  /// el que otro worker se cuela.
+  ///
+  /// Con vencimiento a proposito: si el proceso que lo tenia muere, nadie
+  /// libera el lease y la ejecucion quedaria bloqueada para siempre.
+  leaseOwner String?
+  leaseUntil DateTime?
+
+  startedAt  DateTime  @default(now())
+  lastStepAt DateTime  @default(now())
+  endedAt    DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  flowBotId String
+  flowBot   FlowBot @relation(fields: [flowBotId], references: [id], onDelete: Cascade)
+
+  versionId String
+  version   FlowBotVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  /// Numero por el que entro. Se responde SIEMPRE por aqui: con varios
+  /// numeros, contestar desde el principal manda la respuesta desde un numero
+  /// que el cliente no reconoce.
+  whatsappIntegrationId String?
+  whatsappIntegration   WhatsAppIntegration? @relation(fields: [whatsappIntegrationId], references: [id], onDelete: SetNull)
+
+  /// Mensaje que la disparo, para poder auditar el origen.
+  triggerMessageId String?
+
+  executionSteps FlowBotExecutionStep[]
+  waits          FlowBotWait[]
+
+  @@index([companyId, status])
+  @@index([conversationId, status])
+  @@index([flowBotId, startedAt])
+  @@index([versionId])
+  @@index([companyId, startedAt])
+  @@index([status, leaseUntil])
+  /// Para el reconciliador: barre por estado y por cuanto lleva sin avanzar.
+  /// Sin este indice, cada pase leeria la tabla entera de ejecuciones.
+  @@index([status, lastStepAt])
+  @@map("flowbot_executions")
+}
+
+enum FlowBotStepStatus {
+  OK
+  FAILED
+  SKIPPED
+}
+
+/// Un paso ejecutado. Es la caja negra: sin esto, "el bot no hizo nada" no
+/// tiene respuesta posible.
+model FlowBotExecutionStep {
+  id       String            @id @default(cuid())
+  nodeId   String
+  nodeType String
+  status   FlowBotStepStatus @default(OK)
+
+  /// Puerto por el que salio (next, true, false, timeout, error...).
+  outPort String?
+
+  /// Entrada y salida ya redactadas: sirven para depurar sin volcar el texto
+  /// completo del cliente.
+  input  Json?
+  output Json?
+
+  errorCode  String?
+  durationMs Int?
+
+  /// Idempotencia POR PASO: un reintento del mismo paso no repite su efecto
+  /// externo (crear una tarea, enviar un mensaje).
+  idempotencyKey String? @unique
+
+  attempt   Int      @default(1)
+  createdAt DateTime @default(now())
+
+  executionId String
+  execution   FlowBotExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([executionId, createdAt])
+  @@index([nodeType, status])
+  @@map("flowbot_execution_steps")
+}
+
+enum FlowBotWaitKind {
+  INPUT
+  TIME
+  EVENT
+}
+
+/// Una espera pendiente. Vive en PostgreSQL y no en Redis a proposito: una
+/// espera de tres dias no puede depender de que la cola conserve el trabajo.
+model FlowBotWait {
+  id   String          @id @default(cuid())
+  kind FlowBotWaitKind
+
+  /// Cuando reanudar. Para INPUT es el vencimiento, si lo hay.
+  wakeAt DateTime?
+
+  /// Nodo al que volver al reanudar.
+  resumeNodeId String
+
+  /// Puerto por el que salir si vence sin respuesta.
+  timeoutPort String?
+
+  /// Para EVENT: que evento se espera.
+  eventKey String?
+
+  /// Se marca en vez de borrarse: una espera consumida es evidencia de por
+  /// que la ejecucion siguio, y borrarla dejaria el historial cojo.
+  consumedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  executionId String
+  execution   FlowBotExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  @@index([wakeAt, consumedAt])
+  @@index([executionId, consumedAt])
+  @@index([companyId, kind, consumedAt])
+  @@map("flowbot_waits")
+}
+
+/// Contadores agregados por bot, version y dia.
+///
+/// Agregado y no calculado al vuelo: contar ejecuciones de meses sobre la
+/// tabla de pasos convierte el panel en una consulta lenta que ademas crece
+/// sin limite.
+model FlowBotMetric {
+  id  String   @id @default(cuid())
+  day DateTime @db.Date
+
+  executionsStarted   Int @default(0)
+  executionsCompleted Int @default(0)
+  executionsFailed    Int @default(0)
+  executionsCancelled Int @default(0)
+  handedOff           Int @default(0)
+  messagesSent        Int @default(0)
+  templatesSent       Int @default(0)
+  contactsCaptured    Int @default(0)
+  leadsCreated        Int @default(0)
+  tasksCreated        Int @default(0)
+  aiCalls             Int @default(0)
+
+  /// Coste estimado en milesimas de la moneda, para no perder precision con
+  /// decimales de coma flotante.
+  aiCostMillis Int @default(0)
+
+  totalDurationMs BigInt @default(0)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  flowBotId String
+  flowBot   FlowBot @relation(fields: [flowBotId], references: [id], onDelete: Cascade)
+
+  versionId String?
+  version   FlowBotVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+
+  @@unique([flowBotId, versionId, day])
+  @@index([companyId, day])
+  @@map("flowbot_metrics")
+}
+
+/// Resultado de una simulacion. NUNCA produce efectos reales: los adaptadores
+/// del simulador son falsos y lo que aqui se guarda es la traza.
+model FlowBotTestRun {
+  id String @id @default(cuid())
+
+  /// Escenario de entrada: mensajes, variables y contacto ficticio.
+  scenario Json
+
+  /// Traza de nodos recorridos, ramas tomadas y variables.
+  trace Json
+
+  /// Efectos que SE HABRIAN producido, para poder revisarlos sin causarlos.
+  effects Json?
+
+  passed  Boolean @default(true)
+  summary String?
+
+  createdById String?
+  createdBy   User?    @relation("FlowBotTestRunCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  flowBotId String
+  flowBot   FlowBot @relation(fields: [flowBotId], references: [id], onDelete: Cascade)
+
+  versionId String?
+  version   FlowBotVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([flowBotId, createdAt])
+  @@map("flowbot_test_runs")
+}
+
+// ─────────────────────────────────────────────
+// ENTRADA AUTOMATICA DE OPORTUNIDADES
+// ─────────────────────────────────────────────
+
+enum EstrategiaAsignacion {
+  /// Nadie: la oportunidad queda sin responsable hasta que alguien la tome.
+  NINGUNA
+  /// Reparto por turnos entre quienes estan disponibles.
+  ROUND_ROBIN
+  /// Siempre a la misma persona.
+  FIJA
+}
+
+/// Que hace el CRM cuando entra un mensaje de alguien nuevo.
+///
+/// VIVE EN SU PROPIA TABLA y no como columnas de `Company` por dos razones:
+/// `Company` ya tiene mas de treinta campos y sigue creciendo, y esto es una
+/// unidad de configuracion que se consulta entera o no se consulta — cada
+/// mensaje entrante la lee de una vez.
+///
+/// Una empresa SIN fila aqui usa los valores por defecto documentados, que son
+/// los que el producto ya venia aplicando. Nadie tiene que configurar nada
+/// para que el CRM siga funcionando igual que antes.
+model CompanyLeadSettings {
+  id String @id @default(cuid())
+
+  /// Crear oportunidad al recibir un mensaje. Apagarlo deja el CRM como una
+  /// bandeja: contacto y conversacion si, pipeline no.
+  autoCreateLead Boolean @default(true)
+
+  /// Pipeline donde entra. Nulo = el predeterminado de la empresa.
+  defaultPipelineId String?
+  defaultPipeline   Pipeline? @relation("LeadSettingsPipeline", fields: [defaultPipelineId], references: [id], onDelete: SetNull)
+
+  /// Etapa de entrada. Nula = la marcada como inicial en ese pipeline.
+  ///
+  /// Se guarda el ID y no el nombre a proposito: llamarla "Nuevo lead" es una
+  /// decision de cada empresa, y atar el comportamiento a un texto lo rompe en
+  /// cuanto alguien la renombra o trabaja en otro idioma.
+  initialStageId String?
+  initialStage   PipelineStage? @relation("LeadSettingsStage", fields: [initialStageId], references: [id], onDelete: SetNull)
+
+  /// Reutilizar la oportunidad abierta del contacto en vez de abrir otra.
+  /// Apagarlo hace que cada conversacion nueva abra su propia oportunidad.
+  reuseOpenLead Boolean @default(true)
+
+  /// Crear una tarea de primer contacto junto con la oportunidad.
+  createInitialTask   Boolean @default(false)
+  initialTaskTitle    String?
+  /// Horas hasta el vencimiento de esa tarea.
+  initialTaskDueHours Int     @default(24)
+
+  assignmentStrategy EstrategiaAsignacion @default(ROUND_ROBIN)
+  /// Para `FIJA`: a quien.
+  assignedUserId     String?
+  assignedUser       User?                @relation("LeadSettingsUser", fields: [assignedUserId], references: [id], onDelete: SetNull)
+
+  /// Que hacer cuando vuelve a escribir un contacto archivado.
+  /// `true` lo reactiva solo; `false` lo deja archivado y registra el evento.
+  reactivateArchived Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("company_lead_settings")
+}
+
+// ─────────────────────────────────────────────
+// CAMPOS PERSONALIZADOS
+// ─────────────────────────────────────────────
+
+/// Que clase de dato guarda un campo. Decide como se valida, como se
+/// almacena y como se muestra.
+enum CustomFieldType {
+  TEXT
+  LONG_TEXT
+  NUMBER
+  CURRENCY
+  DATE
+  DATETIME
+  BOOLEAN
+  SELECT
+  MULTI_SELECT
+  PHONE
+  EMAIL
+  URL
+}
+
+/// A que se le pueden colgar campos personalizados.
+///
+/// Se modela como enum y no como tabla polimorfica libre porque el conjunto
+/// es cerrado y conocido: asi las claves ajenas siguen siendo reales y la
+/// base puede garantizar que un valor apunta a algo que existe.
+enum CustomFieldEntity {
+  CONTACT
+  LEAD
+}
+
+/// Quien cambio un valor. Un bot y una persona no son lo mismo y mezclarlos
+/// haria inutil el historial justo cuando hace falta.
+enum CustomFieldSource {
+  USER
+  FLOWBOT
+  AUTOMATION
+  IMPORT
+  API
+}
+
+/// Definicion de un campo personalizado de una empresa.
+///
+/// LA CLAVE ES `key`, NO EL NOMBRE VISIBLE. Renombrar "Cedula" a "Documento"
+/// no puede romper los flujos que escriben en ese campo; si la referencia
+/// fuese la etiqueta, cualquier correccion de texto dejaria bots apuntando a
+/// un campo que ya no existe.
+model CustomFieldDefinition {
+  id String @id @default(cuid())
+
+  entity CustomFieldEntity
+  /// Identificador estable dentro de (empresa, entidad). Minusculas,
+  /// numeros y guion bajo.
+  key    String
+  label  String
+  type   CustomFieldType
+
+  /// Ayuda corta para quien rellena el campo en la interfaz.
+  helpText String?
+
+  /// Opciones de SELECT y MULTI_SELECT: `[{ value, label }]`. Se guardan como
+  /// JSON porque su numero y su texto los define cada empresa.
+  options Json?
+
+  /// Reglas extra segun el tipo: `minLength`, `maxLength`, `min`, `max`,
+  /// `pattern`. Es JSON por la misma razon, y se valida al guardarlo para que
+  /// una regla imposible no se acepte en silencio.
+  validation Json?
+
+  /// Orden de presentacion. No se usa para nada semantico: reordenar la
+  /// interfaz nunca puede cambiar a que campo escribe un bot.
+  order Int @default(0)
+
+  /// Un campo inactivo deja de ofrecerse y deja de aceptar escrituras nuevas,
+  /// pero NO borra los valores ya capturados: son datos del cliente.
+  isActive   Boolean @default(true)
+  isRequired Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  values  CustomFieldValue[]
+  changes CustomFieldValueChange[]
+
+  @@unique([companyId, entity, key])
+  @@index([companyId, entity, isActive, order])
+  @@map("custom_field_definitions")
+}
+
+/// Valor de un campo personalizado para un contacto o una oportunidad.
+///
+/// EL VALOR VA EN COLUMNAS TIPADAS, no en un JSON opaco. Con JSON, "12" y 12
+/// conviven, ordenar por un numero ordena alfabeticamente y filtrar por rango
+/// de fechas es imposible sin castear en cada consulta. Cada tipo escribe en
+/// la columna que le corresponde y las demas quedan nulas.
+///
+/// El `companyId` esta DUPLICADO a proposito respecto de la definicion: cada
+/// consulta filtra por el sin tener que unir dos tablas, y una fila mal
+/// construida se detecta comparandolos.
+model CustomFieldValue {
+  id String @id @default(cuid())
+
+  /// TEXT, LONG_TEXT, PHONE, EMAIL, URL y SELECT.
+  valueText String?
+  /// NUMBER y CURRENCY. Decimal y no Float: la moneda en coma flotante es
+  /// como se acaba con centavos que no cuadran.
+  valueNumber Decimal? @db.Decimal(18, 6)
+  /// BOOLEAN.
+  valueBool Boolean?
+  /// DATE y DATETIME. DATE se normaliza a medianoche en la zona de la
+  /// empresa antes de guardarse.
+  valueDate DateTime?
+  /// MULTI_SELECT.
+  valueList String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  definitionId String
+  definition   CustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  /// Exactamente uno de los dos esta puesto. Lo garantiza un CHECK escrito a
+  /// mano en la migracion, porque Prisma no sabe expresarlo.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([definitionId, contactId])
+  @@unique([definitionId, leadId])
+  @@index([companyId, definitionId])
+  @@index([contactId])
+  @@index([leadId])
+  @@map("custom_field_values")
+}
+
+/// Historial de cambios de un valor.
+///
+/// EXISTE PORQUE UN CAMPO PERSONALIZADO GUARDA DATOS DEL CLIENTE. Cuando
+/// alguien pregunte por que su "estado de credito" cambio, la respuesta no
+/// puede ser "no lo sabemos". Guarda el antes y el despues ya serializados a
+/// texto, el origen y, si lo hubo, la ejecucion de FlowBot que lo provoco.
+///
+/// NO usa `AuditLog`: ese exige un rol de actor y registra lo que hace una
+/// PERSONA. Un bot no tiene rol, y meterlo con uno inventado convertiria la
+/// auditoria en algo que miente sobre quien hizo que.
+///
+/// Crece con cada escritura. Necesita politica de retencion antes de que el
+/// volumen importe; queda anotado en el estado del proyecto.
+model CustomFieldValueChange {
+  id String @id @default(cuid())
+
+  /// Serializados a texto para que el historial siga siendo legible aunque el
+  /// tipo del campo cambie despues.
+  previousValue String?
+  newValue      String?
+
+  source CustomFieldSource @default(USER)
+
+  createdAt DateTime @default(now())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  definitionId String
+  definition   CustomFieldDefinition @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+
+  entity   CustomFieldEntity
+  /// Id del contacto o de la oportunidad. Sin clave ajena a proposito: el
+  /// historial debe sobrevivir al borrado de la entidad, que es justo cuando
+  /// mas falta hace saber que habia.
+  entityId String
+
+  /// Quien lo cambio, cuando fue una persona.
+  actorUserId String?
+  actor       User?   @relation("CustomFieldChangeActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  /// Que ejecucion lo provoco, cuando fue un bot.
+  executionId String?
+
+  @@index([companyId, createdAt])
+  @@index([companyId, entity, entityId])
+  @@index([definitionId, createdAt])
+  @@map("custom_field_value_changes")
+}
+
+// ─────────────────────────────────────────────
+// HANDOFF A UNA PERSONA
+// ─────────────────────────────────────────────
+
+/// Estados de una entrega a una persona.
+///
+/// `ACTIVE` es el unico que silencia al bot. Los otros dos son finales y se
+/// distinguen porque no significan lo mismo: `RESOLVED` es "la persona lo
+/// atendio", `CANCELLED` es "se retiro sin atenderlo" —por ejemplo al
+/// cancelar la ejecucion entera—. Meterlos en el mismo cajon haria imposible
+/// medir cuantas entregas se quedaron sin respuesta.
+enum HandoffStatus {
+  ACTIVE
+  RESOLVED
+  CANCELLED
+}
+
+/// Una conversacion entregada a una persona.
+///
+/// EXISTE COMO TABLA Y NO COMO BANDERA porque `Conversation.isPaused` no
+/// puede responder ninguna de las preguntas que importan: quien la atiende,
+/// por que se entrego, que bot y que nodo lo decidieron, cuando, y si ya se
+/// resolvio. Una bandera solo dice "el bot calla", y cuando alguien pregunta
+/// por que, no hay respuesta.
+///
+/// `isPaused` se sigue manteniendo en sincronia a proposito: es lo que ya
+/// consultan el chatbot heredado y el intake de FlowBot, y hacer que dos
+/// motores dependan de una tabla nueva sin necesidad seria arriesgar el
+/// silencio del bot por un refactor.
+model ConversationHandoff {
+  id     String        @id @default(cuid())
+  status HandoffStatus @default(ACTIVE)
+
+  /// Clasificador corto de por que se entrego. Nunca el texto del cliente.
+  reason String?
+
+  /// Nota que dejo el bot para quien recoja la conversacion.
+  note String?
+
+  startedAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  /// A quien se entrego. Nulo significa "a la bandeja comun".
+  ///
+  /// NO HAY EQUIPOS EN EL ESQUEMA todavia, asi que no se inventa una columna
+  /// que no apunte a ninguna tabla. Cuando existan, este modelo gana un
+  /// `teamId` nulable y la regla pasa a ser "usuario o equipo, o ninguno".
+  assignedToUserId String?
+  assignedTo       User?   @relation("HandoffAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+
+  /// Quien lo dio por resuelto y devolvio la conversacion al bot, si alguien
+  /// lo hizo.
+  resolvedByUserId String?
+  resolvedBy       User?   @relation("HandoffResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  /// Que ejecucion y que nodo lo originaron. Sin clave ajena a la ejecucion:
+  /// el handoff debe sobrevivir a la limpieza de ejecuciones antiguas, que es
+  /// justo cuando hace falta saber de donde salio.
+  executionId String?
+  nodeId      String?
+
+  /// Tarea creada al entregar, si se creo. Permite cerrarla al resolver.
+  taskId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId, status, startedAt])
+  @@index([conversationId, status])
+  @@index([assignedToUserId, status])
+  @@map("conversation_handoffs")
+}
+
+// ─────────────────────────────────────────────
+// INTEGRACIONES DE FLOWBOT (HTTP e IA)
+// ─────────────────────────────────────────────
+
+/// Como se autentica una llamada HTTP saliente.
+///
+/// Es un conjunto CERRADO. Dejar que un flujo componga cabeceras arbitrarias
+/// convierte el nodo HTTP en un proxy con las credenciales de la empresa
+/// dentro, y ese es exactamente el agujero que un motor de automatizaciones no
+/// puede tener.
+enum FlowBotCredentialType {
+  /// Una cabecera con nombre configurable: `X-API-Key: <secreto>`.
+  API_KEY_HEADER
+  /// `Authorization: Bearer <secreto>`.
+  BEARER_TOKEN
+  /// `Authorization: Basic base64(usuario:secreto)`.
+  BASIC_AUTH
+}
+
+/// Credencial de un servicio externo, guardada CIFRADA.
+///
+/// EL SECRETO NUNCA VIAJA AL FLUJO. Un nodo referencia la credencial por id;
+/// el adaptador la descifra en memoria justo antes de la llamada y la olvida.
+/// Si el flujo pudiera leerla, cualquiera con permiso para editar un bot
+/// podria exfiltrarla mandandosela a si mismo con otro nodo HTTP.
+model FlowBotCredential {
+  id   String                @id @default(cuid())
+  name String
+  type FlowBotCredentialType
+
+  /// Nombre de la cabecera para API_KEY_HEADER. Se valida contra una lista de
+  /// caracteres seguros: una cabecera con salto de linea permite inyectar
+  /// otras.
+  headerName String?
+
+  /// Usuario de BASIC_AUTH. No es secreto, va en claro.
+  username String?
+
+  /// AES-256-GCM con la misma clave que los tokens de WhatsApp.
+  secretEncrypted String
+
+  /// Cuando se uso por ultima vez. Permite retirar las que ya nadie usa sin
+  /// adivinar.
+  lastUsedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("flowbot_credentials")
+}
+
+/// Configuracion de las integraciones de FlowBot, por empresa.
+///
+/// TODO VIENE APAGADO. Un motor que puede llamar a cualquier URL y a un
+/// proveedor de IA de pago desde el minuto cero es una factura y una fuga
+/// esperando a ocurrir. Encenderlo es una decision explicita de la empresa, y
+/// el validador impide publicar un flujo que use lo que no esta encendido.
+model FlowBotSettings {
+  id String @id @default(cuid())
+
+  // ── HTTP ──
+  httpEnabled Boolean @default(false)
+
+  /// Hosts permitidos. VACIO significa "ninguno": una lista vacia no es
+  /// "todos". Al reves, encender HTTP sin configurar nada abriria la salida a
+  /// internet entero, que es justo lo que la lista existe para evitar.
+  httpAllowedHosts String[]
+
+  httpTimeoutMs        Int @default(10000)
+  /// Tope de respuesta. Sin el, un servidor que devuelve un gigabyte tumba el
+  /// worker por memoria.
+  httpMaxResponseBytes Int @default(262144)
+
+  // ── IA ──
+  aiEnabled  Boolean @default(false)
+  /// Identificador del proveedor. El motor NO conoce ninguno: lo resuelve el
+  /// registro de proveedores, y sin registro la IA queda "sin configurar".
+  aiProvider String?
+  aiModel    String?
+
+  /// Clave del proveedor, cifrada igual que el resto.
+  aiApiKeyEncrypted String?
+
+  /// Topes de gasto. Se cuentan por empresa y por dia.
+  aiMaxTokensPerCall Int @default(500)
+  aiMaxCallsPerDay   Int @default(500)
+  aiTimeoutMs        Int @default(15000)
+
+  /// Redactar telefonos, correos y documentos antes de mandar el texto al
+  /// proveedor. Por defecto SI: lo que sale del CRM ya no vuelve.
+  aiRedactPii Boolean @default(true)
+
+  /// Instrucciones del sistema. Separadas del prompt del nodo a proposito: el
+  /// autor de un flujo no puede reescribir las reglas de la empresa desde el
+  /// texto de un nodo.
+  aiSystemPrompt String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  companyId String  @unique
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@map("flowbot_settings")
+}
+
+/// Consumo de IA, para poder aplicar los topes y explicar la factura.
+///
+/// Una fila por empresa y dia. Sin esto los limites serian una promesa: no se
+/// puede impedir la llamada 501 si nadie ha contado las 500 anteriores.
+model FlowBotAiUsage {
+  id  String   @id @default(cuid())
+  day DateTime @db.Date
+
+  calls  Int @default(0)
+  tokens Int @default(0)
+  /// Coste estimado en milesimas de la moneda, como en `FlowBotMetric`: los
+  /// decimales de coma flotante no suman bien dinero.
+  costMillis Int @default(0)
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, day])
+  @@index([companyId, day])
+  @@map("flowbot_ai_usage")
+}
+
+/// Interruptor de emergencia de los envios de FlowBot.
+///
+/// VIVE EN LA BASE Y NO EN UNA VARIABLE DE ENTORNO porque el momento en que
+/// hace falta apagar los envios es justo el peor momento para reiniciar los
+/// procesos: hay ejecuciones a medias, trabajos en la cola y clientes
+/// esperando. Una fila se cambia en segundos y la lee el worker en el
+/// siguiente envio.
+///
+/// UNA SOLA FILA, con `id` fijo. Un contador o una lista dejaria la pregunta
+/// "cual es el activo" sin respuesta unica, y este valor decide si salen
+/// mensajes a clientes.
+///
+/// NO PARA los mensajes que escribe una persona desde el CRM: eso es la
+/// empresa hablando con su cliente, no el bot. Apagar tambien eso convertiria
+/// una pausa de seguridad en una interrupcion del negocio.
+model FlowBotKillSwitch {
+  /// Siempre `global`. El identificador es fijo para que no puedan existir dos.
+  id String @id
+
+  /// `true` = ningun bot envia nada. Se lee en cada envio, sin cache.
+  active Boolean @default(false)
+
+  /// Por que se activo. Aparece en la pantalla de estado y en la auditoria.
+  reason String?
+
+  activatedAt   DateTime?
+  activatedById String?
+  activatedBy   User?     @relation("KillSwitchActivatedBy", fields: [activatedById], references: [id], onDelete: SetNull)
+
+  updatedAt DateTime @updatedAt
+
+  @@map("flowbot_kill_switch")
+}
+
+/// Plantillas de WhatsApp conocidas por el CRM.
+///
+/// META ES LA AUTORIDAD, ESTA TABLA ES SOLO LO QUE SABEMOS. Consultar el
+/// estado real exige llamar a Meta, asi que aqui se guarda lo ultimo
+/// verificado y CUANDO se verifico. Una plantilla que no este en esta tabla
+/// queda BLOQUEADA en vez de asumirse aprobada: enviar una plantilla no
+/// aprobada la rechaza Meta con un codigo que nadie sabe interpretar, y en
+/// cantidad afecta a la calidad del numero.
+model WhatsAppTemplate {
+  id String @id @default(cuid())
+
+  /// Nombre exacto registrado en Meta.
+  name String
+
+  /// Codigo de idioma de Meta: `es`, `es_CO`, `en_US`.
+  language String
+
+  /// Estado conocido. `APPROVED` es el unico que permite enviar.
+  status WhatsAppTemplateStatus @default(UNKNOWN)
+
+  /// Cuantos parametros espera el cuerpo. Mandar menos de los que pide es un
+  /// rechazo seguro, y es un error que solo se ve al enviar.
+  bodyParams Int @default(0)
+
+  /// Categoria declarada en Meta: MARKETING, UTILITY, AUTHENTICATION.
+  category String?
+
+  /// Cuando se comprobo contra Meta por ultima vez. `null` = nunca.
+  lastCheckedAt DateTime?
+
+  /// Motivo del rechazo, si lo hubo. Redactado, nunca el payload.
+  rejectionReason String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  /// Numero al que pertenece. Una plantilla aprobada en un WABA no existe en
+  /// otro, asi que la pareja plantilla+numero es lo que identifica de verdad.
+  whatsappIntegrationId String?
+  whatsappIntegration   WhatsAppIntegration? @relation(fields: [whatsappIntegrationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, whatsappIntegrationId, name, language])
+  @@index([companyId, name])
+  @@map("whatsapp_templates")
+}
+
+enum WhatsAppTemplateStatus {
+  /// No se ha comprobado nunca. Bloquea el envio.
+  UNKNOWN
+  PENDING
+  APPROVED
+  REJECTED
+  PAUSED
+  DISABLED
 }
