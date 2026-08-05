@@ -60,6 +60,7 @@ a bloqueado**: las listas vacías significan *ninguno*, no *todos*.
 | `FLOWBOT_WHATSAPP_COMPANY_ALLOWLIST` | vacía | Ids de empresa separados por coma. |
 | `FLOWBOT_WHATSAPP_PHONE_ALLOWLIST` | vacía | `phoneNumberId` remitentes separados por coma. |
 | `FLOWBOT_WHATSAPP_RECIPIENT_ALLOWLIST` | vacía | Destinatarios de prueba. Se comparan por dígitos, así que el formato da igual. |
+| `FLOWBOT_RATE_<ÁMBITO>_<VENTANA>` | ver §9 | Techo de envíos. Un valor inválido se ignora y se usa el defecto. |
 | `WHATSAPP_GRAPH_BASE_URL` | sin poner | **Solo para pruebas.** Únicamente admite `localhost`/`127.0.0.1`; con cualquier otro destino se ignora y se usa Meta. En producción debe estar sin poner. |
 
 Ejemplo con valores **ficticios** — nunca poner identificadores reales en el
@@ -220,13 +221,153 @@ revertirlo:
 
 ---
 
-## 9. Lo que este runbook NO cubre
+## 9. Límites de envío
 
-- **Verificar plantillas contra Meta.** La interfaz existe (`ProveedorPlantillas`)
-  y hoy solo está el proveedor falso, que devuelve «no sé». El registro es
-  manual y deliberadamente conservador.
-- **Límite de frecuencia y circuit breaker reales.** Los guardarraíles existen
-  y se evalúan, pero hoy reciben siempre «dentro del límite» y «circuito sano»:
-  no hay contador ni detector implementados. Antes de subir el volumen de la
-  prueba hay que cerrarlos.
+Hay siete ámbitos —global, empresa, integración, número, bot, conversación y
+destinatario— por tres ventanas: minuto, hora y día. **Basta con que uno se
+pase para bloquear.**
+
+Los valores por defecto son deliberadamente bajos: están pensados para una
+prueba piloto de un número, no para producción a volumen. Subirlos es un acto
+manual, y ese acto es justamente la revisión que queremos que ocurra.
+
+| Ámbito | Minuto | Hora | Día |
+| --- | --- | --- | --- |
+| global | 60 | 600 | 5.000 |
+| empresa | 30 | 300 | 2.000 |
+| integración / número / bot | 20 | 200 | 1.000 |
+| conversación / destinatario | 6 | 60 | 200 |
+
+Se cambian con `FLOWBOT_RATE_<ÁMBITO>_<VENTANA>`, por ejemplo
+`FLOWBOT_RATE_EMPRESA_MINUTO=50`. Un valor no numérico o negativo **se ignora**
+y se usa el defecto: una variable mal escrita no puede subir el techo. Un `0`
+sí se respeta, y es la forma de cerrar un ámbito del todo sin tocar código.
+
+**El cupo se consume al reservar, justo antes de enviar**, y solo si todo lo
+demás pasó. Un envío bloqueado por el interruptor o por la lista de permitidos
+no gasta cupo. Si Meta rechaza el mensaje —y por tanto se sabe que no salió— el
+cupo se devuelve. **Si el resultado es ambiguo, el cupo se queda consumido**:
+puede que el mensaje sí saliera, y devolverlo permitiría que otro ocupara su
+sitio y acabaran saliendo dos.
+
+Las claves de Redis llevan la **huella** del teléfono, nunca el teléfono.
+
+## 10. Cuando Redis no responde
+
+**El envío real se bloquea.** No se asume que hay cupo: sin contador no se
+puede afirmar que quepa un mensaje más, y el lado seguro del error es no
+mandarlo.
+
+- Los modos falso y dry-run **siguen funcionando** e indican que el cupo no se
+  consumió.
+- El estado operativo lo dice con lo que implica —«los envíos reales están
+  bloqueados hasta que vuelva»— y el health queda degradado.
+- El circuit breaker, en cambio, **deja pasar**: dos guardarraíles fallando
+  cerrado por el mismo motivo bloquearían el producto entero cada vez que Redis
+  parpadea. El que puede afirmar algo es el contador.
+
+**Recuperación:** cuando Redis vuelve, los contadores empiezan de cero. Es
+deliberado: son ventanas de minutos y horas, y reconstruirlas exigiría una
+fuente de verdad que Redis no es. El riesgo real —una ráfaga justo después de
+un reinicio— está acotado por los techos por hora y por día, que se rellenan
+enseguida.
+
+## 11. Circuit breaker
+
+Uno **por número**, no global: un breaker global es peor que ninguno, porque el
+número de una empresa sin token dejaría sin bot a todas las demás.
+
+| Estado | Qué significa |
+| --- | --- |
+| `CLOSED` | Enviando con normalidad. |
+| `OPEN` | Cinco fallos seguidos del canal. Se pausan los envíos un minuto. |
+| `HALF_OPEN` | Pasado el minuto, se admite **una sola** prueba. |
+
+Un éxito lo cierra; un fallo en la prueba lo reabre de inmediato sin esperar a
+cinco.
+
+**Lo abren** los fallos del canal: timeouts, conexiones cortadas, 429, 5xx,
+respuestas ilegibles. **No lo abren** los del contenido —destinatario inválido,
+plantilla mal aprobada, ventana cerrada—: volverán a fallar igual con otro
+número y abrir por ellos dejaría a la empresa sin bot por un flujo mal
+configurado.
+
+**401 y 403 bloquean el número y NO se reabren solos.** Un token caducado sigue
+caducado dentro de una hora; reintentarlo cada minuto es una tormenta
+silenciosa contra Meta. Lo levanta una persona.
+
+Si Redis pierde el estado, el breaker vuelve a `CLOSED`. También es deliberado:
+quedarse abierto dejaría a una empresa sin bot tras un reinicio rutinario en el
+que nadie falló. Lo que protege es que el primer fallo real vuelve a abrirlo en
+segundos.
+
+**Reiniciarlo a mano** (`POST /api/flowbots/integrations/:id/reset-breaker`,
+ADMIN, motivo obligatorio) solo dice «vuelve a intentarlo»: **no salta el
+interruptor de emergencia, ni las listas de permitidos, ni el contador**.
+
+## 12. Alertas
+
+No hay canal externo y **no se ha inventado uno**: sin credenciales de un
+servicio real, un webhook a un sitio inventado parecería alerta sin serlo. Las
+señales se dejan donde ya se mira —el estado operativo y el health, que puede
+quedar degradado—:
+
+- contador no disponible (grave);
+- uno o varios números con envíos en pausa;
+- interruptor de emergencia activo;
+- muchas ejecuciones esperando revisión;
+- cola acumulada;
+- aumento de 429;
+- varios resultados ambiguos sin confirmar.
+
+Conectarlas a un canal real es un cambio pequeño el día que exista ese canal.
+
+## 13. Lo que este runbook NO cubre
+
+- **Verificar plantillas contra Meta.** La interfaz existe
+  (`ProveedorPlantillas`) y hoy solo está el proveedor falso, que devuelve «no
+  sé». El registro es manual y deliberadamente conservador.
 - **Revocar el token del lado de Meta** al desconectar un número.
+- **Un canal de alertas externo** (ver arriba).
+
+---
+
+## 14. Checklist de activación limitada
+
+Marcar en orden. **Si un paso no sale como dice, no se sigue.**
+
+- [ ] Autorización explícita para encender WhatsApp real.
+- [ ] Redis responde: el estado operativo NO muestra «contador no disponible».
+- [ ] Plantillas del bot registradas y con estado `APPROVED` en el CRM.
+- [ ] `FLOWBOT_REAL_WHATSAPP_ENABLED=true`, `FLOWBOT_WHATSAPP_DRY_RUN=true`.
+- [ ] Las tres listas con **un** valor cada una: empresa piloto, número piloto,
+      teléfono propio.
+- [ ] Reiniciar backend y worker.
+- [ ] La pantalla dice **«Modo de prueba: FlowBot no está enviando mensajes
+      reales»**.
+- [ ] Provocar una conversación y ver `[DRY-RUN] no se envía nada a Meta` con
+      el número y el destinatario esperados.
+- [ ] Todos los números en `CLOSED` en el panel de estado.
+- [ ] `FLOWBOT_WHATSAPP_DRY_RUN=false` y reiniciar.
+- [ ] La pantalla dice **«FlowBot está enviando mensajes reales»**.
+- [ ] Mandar **un** mensaje desde el teléfono de prueba y comprobar que llega.
+- [ ] Comprobar que un teléfono que NO está en la lista sigue bloqueado.
+- [ ] Ampliar de uno en uno, comprobando entre medias.
+
+## 15. Checklist de desactivación inmediata
+
+En este orden; el primero basta para parar.
+
+- [ ] `POST /api/flowbots/kill-switch { "activo": true, "motivo": "…" }`.
+      (Un `SUPER_ADMIN` de plataforma necesita sesión de soporte abierta:
+      ensáyalo antes, no en la urgencia.)
+- [ ] Confirmar en pantalla: **«Envíos parados»** con el motivo.
+- [ ] Revisar qué salió: ejecuciones en revisión y mensajes fallidos, que
+      llevan una frase legible y no solo un código.
+- [ ] **No reintentar a ciegas** lo que quedó ambiguo: comprobarlo en WhatsApp
+      antes de decidir.
+- [ ] Si hay dudas sobre un número concreto, pausar sus bots (`PAUSED`).
+- [ ] `FLOWBOT_REAL_WHATSAPP_ENABLED=false` y reiniciar: vuelta al transporte
+      falso.
+- [ ] Escribir qué pasó en el motivo antes de levantar el interruptor.
+- [ ] Levantar el interruptor.

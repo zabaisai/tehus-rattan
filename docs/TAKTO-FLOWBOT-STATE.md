@@ -1323,7 +1323,163 @@ builds limpios.
 
 ---
 
+## Bloque 10 (cerrado) — Contador atómico, breaker y candidato de release
+
+Las dos deudas que el bloque 9 dejó escritas están cerradas: los guardarraíles
+de frecuencia y circuito ya no reciben «true» de adorno.
+
+### Contador de frecuencia
+
+Siete ámbitos —global, empresa, integración, número, bot, conversación,
+destinatario— por tres ventanas. Basta con que uno se pase para bloquear.
+
+**ATÓMICO POR SCRIPT LUA, no por tres comandos.** «Leer, comparar, incrementar»
+desde el código deja una ventana entre la lectura y la escritura: dos workers
+leen 19 de 20, ambos deciden que caben, salen 21. Redis ejecuta el script
+entero sin intercalar nada.
+
+**Se comprueban todas las ventanas ANTES de tocar ninguna.** Incrementar ámbito
+a ámbito dejaría los primeros gastados cuando el último bloquea: el envío no
+sale y el cupo se ha perdido igual.
+
+**Sin configuración NO es ilimitado.** Los techos por defecto son bajos a
+propósito; subirlos es un acto manual y ese acto es la revisión. Una variable
+mal escrita no sube el techo; un `0` sí se respeta y cierra el ámbito.
+
+**Las claves llevan la huella del teléfono, nunca el teléfono.** Redis se
+inspecciona con `KEYS *`, se vuelca en soporte y no tiene control de acceso por
+fila.
+
+**El cupo se consume al reservar y se devuelve si Meta rechaza** —ahí se sabe
+que no salió—. **Si el resultado es ambiguo se queda consumido**: puede que el
+mensaje sí saliera, y devolverlo dejaría sitio para un segundo.
+
+### Circuit breaker
+
+**Por número, no global.** Uno global es peor que ninguno: el número de una
+empresa sin token dejaría sin bot a todas las demás.
+
+Lo abren los fallos del CANAL —timeouts, 429, 5xx, respuestas ilegibles—; no
+los del CONTENIDO, que volverían a fallar igual con otro número y dejarían a la
+empresa sin bot por un flujo mal configurado.
+
+**401 y 403 bloquean el número sin reabrirse solos.** Un token caducado sigue
+caducado dentro de una hora; reintentarlo cada minuto es una tormenta
+silenciosa contra Meta.
+
+**`HALF_OPEN` con `SET NX`:** cuando el minuto termina, los trabajos en cola
+llegan a la vez y todos verían «ya se puede probar». Solo el primero se lleva
+el permiso, y el permiso caduca por si quien lo tomó muere sin reportar.
+
+Al perder el estado vuelve a `CLOSED`, y es deliberado: quedarse abierto dejaría
+a una empresa sin bot tras un reinicio en el que nadie falló. Lo que protege es
+que el primer fallo real vuelve a abrirlo en segundos.
+
+### Orden de comprobación
+
+El contador es **lo último**, porque es lo único que consume. Gastar cupo por un
+envío que el interruptor iba a bloquear igualmente vacía el presupuesto de la
+empresa sin que salga nada. El interruptor prevalece sobre breaker y contador.
+
+### Cuando Redis no responde
+
+El envío real **se bloquea**: sin contador no se puede afirmar que quepa un
+mensaje más. Falso y dry-run siguen, indicando que el cupo no se consumió. El
+breaker, en cambio, deja pasar: dos guardarraíles fallando cerrado por el mismo
+motivo bloquearían el producto entero cada vez que Redis parpadea.
+
+### Tres fallos que solo aparecieron al ejecutar
+
+1. **`lazyConnect` sin cola de espera** hacía que el PRIMER comando saliera con
+   el socket a medio abrir. El sistema informaba de «Redis no disponible» con
+   Redis sano, y el primer envío de cada worker recién arrancado quedaba
+   bloqueado.
+2. **`maxRetriesPerRequest` acota los comandos, no la conexión.** Con Redis
+   caído, ioredis reintentaba abrir el socket indefinidamente y el envío se
+   quedaba colgado en vez de fallar cerrado.
+3. **`buildRedisConnection` apunta por defecto a `redis`**, el nombre del
+   contenedor: las pruebas creían medir el camino sano y medían el de Redis
+   caído.
+
+Ninguno lo habría enseñado el tipo. Los tres los enseñó correr la suite.
+
+### Backpressure
+
+El motor ya tenía exponencial con jitter; faltaba respetar la espera que pide
+quien falló. El contador sabe cuándo se libera su ventana y Meta manda
+`Retry-After`: ignorarlos hace que el reintento choque contra el mismo techo.
+Gana el mayor de los dos, también con jitter, para que N trabajos que fallaron
+a la vez no vuelvan a la vez. El tope de intentos sigue siendo lo que impide el
+reintento infinito.
+
+### Observabilidad
+
+Dieciocho contadores con la clave como **tipo cerrado**, no `string`, para que
+nadie pueda meter un teléfono el día que quiera «más detalle». Las alertas se
+dejan en el estado operativo y el health; **no se inventa un canal externo**,
+que parecería alerta sin serlo.
+
+El panel de estado es la pantalla que evita el ticket: sin ella, «el bot no
+contesta» obliga a abrir registros del servidor. El contador caído se explica
+por lo que IMPLICA —«los envíos reales están bloqueados»— y no por lo que es.
+
+### Prueba de carga
+
+`scripts/flowbot-carga-concurrente.mjs`: 200 intentos concurrentes contra un
+techo de 25 dan exactamente 25, el contador coincide con los permisos, y entre
+50 clientes simultáneos en `HALF_OPEN` pasa exactamente uno.
+
+### Hallazgo de dependencias
+
+`ioredis` se usaba directamente pero **no estaba declarado**: venía como
+transitiva de BullMQ. Una actualización de BullMQ podría cambiarla o quitarla y
+romper el contador en silencio. Declarada con la versión exacta ya resuelta —no
+es una actualización, es hacer explícito lo que ya se usa.
+
+Las tres vulnerabilidades altas del frontend (`next`, `postcss`, `sharp`) **son
+anteriores a esta rama**: `next` está en la misma versión que en `main` y las
+otras dos son transitivas. Se reportan, no se tocan aquí.
+
+### Verificación
+
+Backend **1928 unit / 712 e2e**, frontend **401**, typecheck 0, lint 0, ambos
+builds limpios, imágenes Docker construyen, smoke sobre imagen limpia.
+
+---
+
 ## Próximo paso
+
+**Fusionar y desplegar a staging en modo falso/dry-run.** Ambas cosas requieren
+la autorización que este trabajo no tiene. El orden que propone el runbook:
+desplegar con todo apagado, comprobar que el estado dice «no está conectado a
+WhatsApp», y solo después empezar la activación limitada de §14.
+
+### Limitaciones honestas que siguen abiertas
+
+- **WhatsApp real nunca se ha activado.** Probado contra una Meta simulada;
+  contra Meta de verdad, nunca.
+- **Verificar plantillas contra Meta es manual.** La interfaz está; el
+  proveedor real no.
+- **No hay canal de alertas externo.** Las señales quedan en el estado
+  operativo y el health.
+- **Los contadores empiezan de cero tras un reinicio de Redis.** Son ventanas
+  de minutos y horas y reconstruirlas exigiría una fuente de verdad que Redis
+  no es; el riesgo está acotado por los techos por hora y por día.
+- **No hay equipos.** El handoff asigna un usuario.
+- **El interruptor de emergencia exige sesión de soporte** a un `SUPER_ADMIN`
+  de plataforma. Son segundos, pero conviene tenerlo ensayado.
+- **El simulador no anima el recorrido sobre el lienzo.**
+- **La comparación de versiones es textual**, no lado a lado.
+- **Sin OpenAPI generado.**
+- **`resumir` de IA devuelve vacío.**
+- **El rebinding de DNS no está cerrado del todo.**
+- **La accesibilidad tiene un barrido automático**, no una auditoría con lector
+  de pantalla real.
+- **Tres vulnerabilidades altas anteriores a esta rama** en dependencias del
+  frontend, sin corregir aquí para no mezclar una actualización no relacionada
+  con un candidato de release.
+
+### Referencia del bloque 9 (transporte real bloqueado)
 
 **La autorización para encender, y el despliegue a staging.** Ambas cosas
 requieren una decisión que este trabajo no toma. El procedimiento está escrito
