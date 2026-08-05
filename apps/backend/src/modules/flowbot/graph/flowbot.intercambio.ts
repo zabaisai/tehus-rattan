@@ -319,7 +319,7 @@ export function analizarImportacion(
   const nodosDesconocidos: Array<{ id: string; type: string }> = [];
   const nodes: NodoFlow[] = nodosCrudos.map((n) => {
     const crudoNodo = n as Record<string, unknown>;
-    const tipo = String(crudoNodo.type ?? '');
+    const tipo = textoSeguro(crudoNodo.type);
     if (!(tipo in CATALOGO)) {
       nodosDesconocidos.push({ id: String(crudoNodo.id), type: tipo });
     }
@@ -362,7 +362,7 @@ export function analizarImportacion(
     .map((e) => ({
       id: nuevoId('e'),
       from: remapeo[e.from as string],
-      fromPort: String(e.fromPort ?? 'next').slice(0, 40),
+      fromPort: textoSeguro(e.fromPort, 'next').slice(0, 40),
       to: remapeo[e.to as string],
     }));
 
@@ -397,8 +397,8 @@ export function analizarImportacion(
     nodes: nodosCrudos.map((n) => {
       const c = n as Record<string, unknown>;
       return {
-        id: String(c.id),
-        type: String(c.type) as TipoNodo,
+        id: textoSeguro(c.id),
+        type: textoSeguro(c.type) as TipoNodo,
         position: { x: 0, y: 0 },
         config: limpiarObjeto(c.config),
       };
@@ -408,10 +408,10 @@ export function analizarImportacion(
       .map((e) => {
         const c = e;
         return {
-          id: String(c.id ?? ''),
-          from: String(c.from ?? ''),
-          fromPort: String(c.fromPort ?? 'next'),
-          to: String(c.to ?? ''),
+          id: textoSeguro(c.id),
+          from: textoSeguro(c.from),
+          fromPort: textoSeguro(c.fromPort, 'next'),
+          to: textoSeguro(c.to),
         };
       }),
   };
@@ -471,6 +471,23 @@ export function analizarImportacion(
 
 function esObjeto(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+/**
+ * A texto SOLO lo que tiene una representacion legible.
+ *
+ * `String(valor)` sobre un objeto produce "[object Object]", y esto lee un
+ * archivo de fuera: un `type` que llegue como objeto acabaria siendo el tipo
+ * de nodo literal «[object Object]». Es el mismo fallo que ya mordio en la
+ * importacion de productos, donde esa cadena acabo siendo el NOMBRE de un
+ * producto en el catalogo de un cliente.
+ */
+function textoSeguro(valor: unknown, porDefecto = ''): string {
+  if (typeof valor === 'string') return valor;
+  if (typeof valor === 'number' || typeof valor === 'boolean') {
+    return String(valor);
+  }
+  return porDefecto;
 }
 
 /**

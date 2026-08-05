@@ -199,27 +199,31 @@ export class FlowBotExecutionsService {
     return {
       ...this.aResumen(e),
       variables: redactarVariables(e.variables),
-      pasos_detalle: e.executionSteps.map((p): PasoDto => ({
-        id: p.id,
-        nodeId: p.nodeId,
-        nodeType: p.nodeType,
-        estado: p.status,
-        puertoSalida: p.outPort,
-        errorCode: p.errorCode,
-        duracionMs: p.durationMs,
-        intento: p.attempt,
-        meta: redactarVariables(p.output),
-        en: p.createdAt.toISOString(),
-      })),
-      esperas: e.waits.map((w): EsperaDto => ({
-        id: w.id,
-        tipo: w.kind,
-        resumeNodeId: w.resumeNodeId,
-        timeoutPort: w.timeoutPort,
-        wakeAt: w.wakeAt?.toISOString() ?? null,
-        consumidaEn: w.consumedAt?.toISOString() ?? null,
-        eventKey: w.eventKey,
-      })),
+      pasos_detalle: e.executionSteps.map(
+        (p): PasoDto => ({
+          id: p.id,
+          nodeId: p.nodeId,
+          nodeType: p.nodeType,
+          estado: p.status,
+          puertoSalida: p.outPort,
+          errorCode: p.errorCode,
+          duracionMs: p.durationMs,
+          intento: p.attempt,
+          meta: redactarVariables(p.output),
+          en: p.createdAt.toISOString(),
+        }),
+      ),
+      esperas: e.waits.map(
+        (w): EsperaDto => ({
+          id: w.id,
+          tipo: w.kind,
+          resumeNodeId: w.resumeNodeId,
+          timeoutPort: w.timeoutPort,
+          wakeAt: w.wakeAt?.toISOString() ?? null,
+          consumidaEn: w.consumedAt?.toISOString() ?? null,
+          eventKey: w.eventKey,
+        }),
+      ),
       handoff: handoff
         ? {
             id: handoff.id,

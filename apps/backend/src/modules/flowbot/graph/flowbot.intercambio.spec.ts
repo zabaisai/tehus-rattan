@@ -314,6 +314,45 @@ describe('Intercambio de Pulsos — importar', () => {
     expect(config.text).toBe('bien');
   });
 
+  /**
+   * `String(objeto)` produce "[object Object]".
+   *
+   * Esto lee un archivo de FUERA: un `type` que llegue como objeto acabaría
+   * siendo el tipo de nodo literal «[object Object]». Es el mismo fallo que ya
+   * mordió en la importación de productos, donde esa cadena acabó siendo el
+   * nombre de un producto en el catálogo de un cliente.
+   */
+  it('un campo que llega como objeto NO se convierte en "[object Object]"', () => {
+    const trampa = {
+      formato: 'taktoflow',
+      schemaVersion: 1,
+      metadatos: { nombre: 'Trampa' },
+      grafo: {
+        startNodeId: 'a',
+        nodes: [
+          {
+            id: 'a',
+            type: { malicioso: true },
+            position: { x: 0, y: 0 },
+            config: {},
+          },
+        ],
+        edges: [
+          { id: 'e', from: 'a', fromPort: { raro: 1 }, to: 'a' },
+        ],
+      },
+    };
+
+    const r = analizarImportacion(JSON.stringify(trampa), contador());
+
+    expect(r.sobre.grafo.nodes[0].type).not.toContain('[object Object]');
+    expect(r.sobre.grafo.nodes[0].type).toBe('');
+    // Y se reporta como tipo desconocido, que es lo que es.
+    expect(r.nodosDesconocidos).toHaveLength(1);
+    // El puerto cae al valor por defecto en vez de a una cadena inventada.
+    expect(r.sobre.grafo.edges[0].fromPort).toBe('next');
+  });
+
   // ── avisos que no impiden importar ────────────────────────────
 
   it('detecta nodos de un tipo desconocido y avisa, sin romper', () => {

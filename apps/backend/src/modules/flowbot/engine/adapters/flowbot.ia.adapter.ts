@@ -25,7 +25,9 @@ import {
 
 export class ErrorIa extends Error {
   readonly clase:
-    'externo_transitorio' | 'externo_definitivo' | 'configuracion';
+    | 'externo_transitorio'
+    | 'externo_definitivo'
+    | 'configuracion';
 
   constructor(
     readonly errorCode: string,

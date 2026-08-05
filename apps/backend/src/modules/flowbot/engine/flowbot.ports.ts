@@ -17,7 +17,12 @@ import { ContextoVariables } from '../graph/flowbot.variables';
 
 /** Cómo terminó un nodo. */
 export type ResultadoTipo =
-  'continuar' | 'esperar' | 'terminar' | 'cancelar' | 'handoff' | 'error';
+  | 'continuar'
+  | 'esperar'
+  | 'terminar'
+  | 'cancelar'
+  | 'handoff'
+  | 'error';
 
 /** Clasificación de errores. Decide si se reintenta y con qué cara. */
 export type ClaseError =

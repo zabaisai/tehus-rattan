@@ -17,7 +17,12 @@
 // ── categorías ─────────────────────────────────────────────────
 
 export type CategoriaNodo =
-  'trigger' | 'conversation' | 'control' | 'crm' | 'integration' | 'ai';
+  | 'trigger'
+  | 'conversation'
+  | 'control'
+  | 'crm'
+  | 'integration'
+  | 'ai';
 
 /** Puertos con significado fijo. Los menús generan además `opcion:<i>`. */
 export const PUERTO = {
