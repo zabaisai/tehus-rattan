@@ -22,7 +22,7 @@ import { CreateContactDto } from './dto/create-contact.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { EliminarContactoDto } from './dto/eliminar-contacto.dto';
 
-@UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
 @Controller('contacts')
 export class ContactsController {
   constructor(
@@ -132,7 +132,6 @@ export class ContactsController {
    * vuelta atras y un dialogo de confirmacion se pulsa sin leerlo.
    */
   @Delete(':id/definitivo')
-  @UseGuards(RolesGuard)
   @Roles('ADMIN', 'SUPER_ADMIN')
   async eliminarDefinitivo(
     @Param('id') id: string,

@@ -26,6 +26,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { mensajeDeError } from '@/components/ui/ListState';
+import { RetirarEmbudoDialog } from '@/components/pipeline/RetirarEmbudoDialog';
 import type { Pipeline, PipelineStage } from '@/types';
 
 const COLORES = [
@@ -164,6 +165,7 @@ function FilaPipeline({
   vecino: (dir: -1 | 1) => Pipeline | undefined;
 }) {
   const [renombrando, setRenombrando] = useState(false);
+  const [retirando, setRetirando] = useState(false);
   const [nombre, setNombre] = useState(pipeline.name);
 
   /** Intercambia el orden con el vecino: mover uno solo dejaría empates. */
@@ -269,16 +271,18 @@ function FilaPipeline({
             <Button variant="quiet" size="sm" onClick={() => setRenombrando(true)}>
               Renombrar
             </Button>
+            {/*
+              Abre el diálogo de retiro en vez de llamar a `deletePipeline`
+              directo. Antes, un embudo con oportunidades devolvía un error
+              genérico —«no se pudo eliminar»— sin decir que dentro había
+              trabajo de todo un equipo ni ofrecer a dónde moverlo.
+            */}
             <Button
               variant="quiet"
               size="sm"
-              aria-label={`Eliminar ${pipeline.name}`}
-              onClick={() =>
-                void onAccion(
-                  () => deletePipeline(pipeline.id),
-                  'No se pudo eliminar el embudo.',
-                )
-              }
+              aria-label={`Retirar ${pipeline.name}`}
+              title="Retirar embudo"
+              onClick={() => setRetirando(true)}
             >
               <Trash2 size={13} />
             </Button>
@@ -287,6 +291,20 @@ function FilaPipeline({
       </div>
 
       {abierto && <Etapas pipeline={pipeline} onAccion={onAccion} />}
+
+      {retirando && (
+        <RetirarEmbudoDialog
+          pipeline={pipeline}
+          onClose={() => setRetirando(false)}
+          onDone={async (mensaje) => {
+            setRetirando(false);
+            // Se reutiliza `onAccion` para que el listado se refresque por el
+            // mismo camino que el resto de operaciones: el traslado pudo
+            // cambiar varios embudos a la vez, no solo este.
+            await onAccion(async () => mensaje, '');
+          }}
+        />
+      )}
     </li>
   );
 }
