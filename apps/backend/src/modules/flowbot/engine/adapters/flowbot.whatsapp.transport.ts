@@ -53,6 +53,8 @@ export interface RespuestaEnvio {
   /** Código numérico de Meta, que sí es seguro y sirve para clasificar. */
   metaCode?: number;
   httpStatus?: number;
+  /** Lo que pidió Meta esperar, si lo pidió. Gana sobre el backoff propio. */
+  retryAfterSegundos?: number;
 }
 
 export interface TransporteWhatsApp {
@@ -150,7 +152,22 @@ export class TransporteWhatsAppReal implements TransporteWhatsApp {
           metaCode ?? '-'
         } clase=${errorCode}]`,
       );
-      return { ok: false, ambiguo, httpStatus: status, metaCode, errorCode };
+      // `Retry-After` de Meta manda sobre el backoff propio: cuando el otro
+      // extremo dice cuánto esperar, insistir antes solo empeora el 429.
+      const retryAfter = axios.isAxiosError(error)
+        ? Number(error.response?.headers?.['retry-after'])
+        : NaN;
+
+      return {
+        ok: false,
+        ambiguo,
+        httpStatus: status,
+        metaCode,
+        errorCode,
+        ...(Number.isFinite(retryAfter) && retryAfter > 0
+          ? { retryAfterSegundos: retryAfter }
+          : {}),
+      };
     }
   }
 }

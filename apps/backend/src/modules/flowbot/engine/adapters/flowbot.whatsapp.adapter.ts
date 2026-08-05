@@ -505,6 +505,15 @@ export class WhatsappAdapter implements PuertoMensajeria {
       });
     }
 
+    // La espera que pidió Meta viaja con el error para que el motor la
+    // respete en vez de aplicar su exponencial genérico.
+    if (respuesta.retryAfterSegundos) {
+      const conEspera = new ErrorDeEnvio(codigo, 'externo_transitorio');
+      (conEspera as { retryAfterSegundos?: number }).retryAfterSegundos =
+        respuesta.retryAfterSegundos;
+      throw conEspera;
+    }
+
     throw new ErrorDeEnvio(
       codigo,
       requiereAtencionHumana(codigo)

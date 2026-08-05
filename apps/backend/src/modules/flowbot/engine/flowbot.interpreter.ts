@@ -88,6 +88,17 @@ export interface ResultadoAvance {
   claseError?: ClaseError;
   /** Si el error admite otro intento, el motor lo reencola. */
   reintentable?: boolean;
+  /**
+   * Cuánto hay que esperar como MÍNIMO antes de reintentar, si quien falló lo
+   * sabe.
+   *
+   * Lo ponen el contador de frecuencia —que sabe cuándo se libera la ventana—
+   * y un 429 de Meta con `Retry-After`. Sin esto el motor aplicaría su
+   * exponencial genérico y volvería a chocar contra el mismo techo, que es
+   * como se construye una tormenta de reintentos contra un servicio que ya
+   * está diciendo «para».
+   */
+  retryAfterMs?: number;
   motivo?: string;
 }
 
@@ -143,6 +154,8 @@ export async function avanzar(
   let steps = inicial.steps;
   let entrada = inicial.entrada;
   let intento = inicial.intento ?? 1;
+  /** Espera mínima que pidió el último fallo, si la pidió. */
+  let esperaPedida: number | undefined;
 
   // Reanudación por vencimiento: no se ejecuta el nodo otra vez, se sale por
   // su puerto de timeout. Volver a ejecutarlo reenviaría la pregunta.
@@ -270,6 +283,9 @@ export async function avanzar(
         errorCode: nombreDeError(error),
         claseError: claseDeclarada(error) ?? 'interno',
       };
+      // Quien falló puede saber cuándo tiene sentido volver: el contador de
+      // frecuencia sabe cuándo se libera su ventana y Meta manda `Retry-After`.
+      esperaPedida = esperaDeclarada(error) ?? esperaPedida;
     }
     const durationMs = Date.now() - inicio;
 
@@ -352,6 +368,7 @@ export async function avanzar(
           errorCode: resultado.errorCode,
           claseError: clase,
           reintentable: esReintentable(clase),
+          ...(esperaPedida ? { retryAfterMs: esperaPedida } : {}),
         };
       }
       case 'continuar': {
@@ -405,6 +422,12 @@ function nombreDeError(error: unknown): string {
  * inocuo al simulador— así que el contrato es «un error puede llevar una
  * propiedad `clase`».
  */
+function esperaDeclarada(error: unknown): number | undefined {
+  if (!error || typeof error !== 'object') return undefined;
+  const s = (error as { retryAfterSegundos?: unknown }).retryAfterSegundos;
+  return typeof s === 'number' && s > 0 ? s * 1000 : undefined;
+}
+
 function claseDeclarada(error: unknown): ClaseError | null {
   if (!error || typeof error !== 'object') return null;
   const clase = (error as { clase?: unknown }).clase;
@@ -422,10 +445,24 @@ function claseDeclarada(error: unknown): ClaseError | null {
 export function esperaDeReintento(
   intento: number,
   semilla = Math.random(),
+  minimoMs = 0,
 ): number {
   const base = Math.min(1000 * 2 ** (intento - 1), 5 * 60_000);
+  // El jitter existe para que N trabajos que fallaron a la vez no vuelvan a
+  // la vez: sin él, un corte de treinta segundos produce una avalancha exacta
+  // al reconectar.
   const dispersion = base * 0.2 * semilla;
-  return Math.round(base + dispersion);
+  const propuesta = Math.round(base + dispersion);
+
+  // Quien falló puede saber mejor cuándo tiene sentido volver: el contador
+  // sabe cuándo se libera su ventana y Meta manda `Retry-After`. Se toma el
+  // mayor de los dos, y se le añade jitter también al mínimo por el mismo
+  // motivo de arriba.
+  if (minimoMs > 0) {
+    const conDispersion = Math.round(minimoMs * (1 + 0.2 * semilla));
+    return Math.max(propuesta, conDispersion);
+  }
+  return propuesta;
 }
 
 export const MAX_INTENTOS = 5;

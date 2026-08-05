@@ -181,6 +181,32 @@ describe('Transporte real contra una Meta simulada (e2e)', () => {
     );
   });
 
+  it('17. un 429 con `Retry-After` propaga esa espera', async () => {
+    // Cuando el otro extremo dice cuánto esperar, insistir antes solo empeora
+    // el 429 y acerca el bloqueo del número.
+    guion = (_req, res) => {
+      res.writeHead(429, {
+        'Content-Type': 'application/json',
+        'Retry-After': '90',
+      });
+      res.end(JSON.stringify({ error: { code: 130429 } }));
+    };
+
+    const r = await real().enviar(sobre());
+
+    expect(r.errorCode).toBe('limite-de-tasa');
+    expect(r.retryAfterSegundos).toBe(90);
+  });
+
+  it('un 429 sin cabecera no inventa una espera', async () => {
+    guion = (_req, res) => {
+      res.writeHead(429, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: { code: 130429 } }));
+    };
+
+    expect((await real().enviar(sobre())).retryAfterSegundos).toBeUndefined();
+  });
+
   it('14. 401 NO se reintenta a ciegas', async () => {
     guion = (_req, res) => {
       res.writeHead(401, { 'Content-Type': 'application/json' });

@@ -75,6 +75,8 @@ describe('Acceso de soporte a FlowBot (e2e, HTTP + base real)', () => {
   let empresaA: string;
   let empresaB: string;
   let adminA: string;
+  let agenteA: string;
+  let sidAgenteA: string;
   let plataforma: string;
   let sidAdminA: string;
   let sidPlataforma: string;
@@ -165,7 +167,19 @@ describe('Acceso de soporte a FlowBot (e2e, HTTP + base real)', () => {
       },
     });
 
+    const ag = await prisma.user.create({
+      data: {
+        companyId: empresaA,
+        email: `${PREFIJO.toLowerCase()}-agente-a@ejemplo.test`,
+        password: 'x',
+        name: 'Agente A',
+        role: 'AGENT',
+      },
+    });
+    agenteA = ag.id;
+
     sidAdminA = await sesionDeUsuario(adminA, empresaA);
+    sidAgenteA = await sesionDeUsuario(agenteA, empresaA);
     sidPlataforma = await sesionDeUsuario(plataforma, null);
 
     const bot = (companyId: string, nombre: string) =>
@@ -511,6 +525,104 @@ describe('Acceso de soporte a FlowBot (e2e, HTTP + base real)', () => {
           }),
         ]);
       }
+    });
+  });
+
+  describe('controles administrativos', () => {
+    it('31. un AGENT NO puede reiniciar el breaker', async () => {
+      // Reiniciar un breaker afecta a los envíos de toda la empresa: no es una
+      // decisión de quien atiende una conversación.
+      const res = await request(app.getHttpServer())
+        .post('/api/flowbots/integrations/int-1/reset-breaker')
+        .set(
+          'Authorization',
+          `Bearer ${token(agenteA, 'AGENT', empresaA, sidAgenteA)}`,
+        )
+        .send({ motivo: 'lo intento igual' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('un AGENT tampoco puede tocar el interruptor de emergencia', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/api/flowbots/kill-switch')
+        .set(
+          'Authorization',
+          `Bearer ${token(agenteA, 'AGENT', empresaA, sidAgenteA)}`,
+        )
+        .send({ activo: true, motivo: 'no debería poder' });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('reiniciar SIN motivo se rechaza', async () => {
+      // «¿Por qué se reinició esto?» es la primera pregunta que se hace
+      // después, y sin motivo la respuesta hay que reconstruirla preguntando.
+      const res = await request(app.getHttpServer())
+        .post('/api/flowbots/integrations/int-1/reset-breaker')
+        .set(
+          'Authorization',
+          `Bearer ${token(adminA, 'ADMIN', empresaA, sidAdminA)}`,
+        )
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(String(res.body.message)).toMatch(/por qué/i);
+    });
+
+    it('32. un SUPER_ADMIN de plataforma SIN sesión de soporte recibe 403', async () => {
+      const res = await comoPlataforma().post('/api/flowbots/kill-switch', {
+        activo: true,
+        motivo: 'sin sesión',
+      });
+
+      expect(res.status).toBe(403);
+      expect(String(res.body.message)).toContain('sesión de soporte');
+    });
+
+    it('un ADMIN ve el estado operativo con el detalle de sus números', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/flowbots/operational-status')
+        .set(
+          'Authorization',
+          `Bearer ${token(adminA, 'ADMIN', empresaA, sidAdminA)}`,
+        );
+
+      expect(res.status).toBe(200);
+      expect(res.body.modo).toBeTruthy();
+      expect(res.body.contador).toBeDefined();
+      expect(res.body.numeros).toBeDefined();
+    });
+
+    it('un AGENT ve el modo pero NO la configuración global', async () => {
+      // Saber si los mensajes salen de verdad le afecta a su conversación; los
+      // límites y el estado de cada número son configuración de plataforma.
+      const res = await request(app.getHttpServer())
+        .get('/api/flowbots/operational-status')
+        .set(
+          'Authorization',
+          `Bearer ${token(agenteA, 'AGENT', empresaA, sidAgenteA)}`,
+        );
+
+      expect(res.status).toBe(200);
+      expect(res.body.modo).toBeTruthy();
+      expect(res.body.contador).toBeUndefined();
+      expect(res.body.numeros).toBeUndefined();
+      expect(res.body.ejecucionesEnAtencion).toBeUndefined();
+    });
+
+    it('35. la respuesta de estado NO lleva ningún token', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/api/flowbots/operational-status')
+        .set(
+          'Authorization',
+          `Bearer ${token(adminA, 'ADMIN', empresaA, sidAdminA)}`,
+        );
+
+      const texto = JSON.stringify(res.body);
+      expect(texto).not.toContain('accessToken');
+      expect(texto).not.toContain('cifrado');
+      expect(texto).not.toMatch(/EAA[A-Za-z0-9]/);
     });
   });
 

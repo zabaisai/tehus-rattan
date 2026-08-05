@@ -378,6 +378,16 @@ export function esConflictoDeBorrador(
 
 // ── estado operativo del transporte ─────────────────────────────
 
+export interface FotoBreaker {
+  estado: 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+  fallosConsecutivos: number;
+  abiertoEn: string | null;
+  proximoIntento: string | null;
+  ultimaCausa: string | null;
+  ultimoExito: string | null;
+  aperturas: number;
+}
+
 export interface EstadoOperativo {
   modo: 'falso' | 'dry-run' | 'real';
   /** Frase ya redactada por el servidor: se enseña tal cual. */
@@ -389,6 +399,27 @@ export interface EstadoOperativo {
     activadoEn: string | null;
     activadoPor: string | null;
   };
+  /**
+   * Todo lo de abajo llega SOLO a quien administra. A un AGENT el servidor le
+   * manda el modo y nada más: los límites y el estado de cada número son
+   * configuración de plataforma y en su pantalla serían ruido.
+   */
+  contador?: {
+    disponible: boolean;
+    limites: Array<{
+      dimension: string;
+      minuto: number;
+      hora: number;
+      dia: number;
+    }>;
+  };
+  numeros?: Array<{
+    integrationId: string;
+    etiqueta: string;
+    estadoIntegracion: string;
+    breaker: FotoBreaker;
+  }>;
+  ejecucionesEnAtencion?: number;
 }
 
 // ── llamadas ────────────────────────────────────────────────────
@@ -571,6 +602,11 @@ export const flowbots = {
   estadoOperativo: () =>
     api
       .get<EstadoOperativo>('/flowbots/operational-status')
+      .then((r) => r.data),
+
+  reiniciarBreaker: (integrationId: string, motivo: string) =>
+    api
+      .post(`/flowbots/integrations/${integrationId}/reset-breaker`, { motivo })
       .then((r) => r.data),
 
   cambiarKillSwitch: (activo: boolean, motivo?: string) =>

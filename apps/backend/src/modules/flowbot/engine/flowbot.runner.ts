@@ -413,10 +413,19 @@ export class FlowBotRunnerService {
     intentoActual: number,
   ): { siguiente: number; delayMs: number } | null {
     if (resultado.estado !== 'FAILED' || !resultado.reintentable) return null;
+    // El tope de intentos es lo que impide el reintento infinito: pasado él,
+    // la ejecución queda FAILED y alguien decide, en vez de girar para siempre.
     if (intentoActual >= MAX_INTENTOS) return null;
     return {
       siguiente: intentoActual + 1,
-      delayMs: esperaDeReintento(intentoActual),
+      // `retryAfterMs` gana cuando existe: el contador sabe cuándo se libera
+      // su ventana y Meta manda `Retry-After`. Ignorarlo haría que el
+      // reintento chocara contra el mismo techo.
+      delayMs: esperaDeReintento(
+        intentoActual,
+        Math.random(),
+        resultado.retryAfterMs ?? 0,
+      ),
     };
   }
 
