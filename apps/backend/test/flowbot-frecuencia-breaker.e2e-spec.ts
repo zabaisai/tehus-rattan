@@ -1,5 +1,9 @@
-import Redis from 'ioredis';
-import { buildRedisConnection } from '../src/common/queue/queue.config';
+import {
+  cerrarClienteE2E,
+  conectarE2E,
+  crearClienteE2E,
+  limpiarClavesDeSuite,
+} from './helpers/redis-e2e';
 import {
   ContadorFrecuencia,
   LIMITES_POR_DEFECTO,
@@ -21,40 +25,58 @@ import {
  *
  * NADA DE AQUÍ ABRE UNA CONEXIÓN A META. No hay transporte por ningún lado.
  */
+// En CI el job corre SOBRE el runner con Redis como servicio con puerto
+// publicado, así que `127.0.0.1` es correcto. En local, `buildRedisConnection`
+// apunta por defecto a `redis` —el nombre del contenedor en la red de Docker—
+// que no resuelve desde la máquina. Se deja poner por fuera para que el CI
+// mande.
 process.env.REDIS_HOST = process.env.REDIS_HOST?.trim() || '127.0.0.1';
 
 const PREFIJO = 'E2E-FREQ';
 
 describe('Contador de frecuencia y circuit breaker (e2e, Redis real)', () => {
-  const redis = new Redis({
-    ...buildRedisConnection(),
-    maxRetriesPerRequest: 2,
-  });
+  const redis = crearClienteE2E();
 
   let contador: ContadorFrecuencia;
   let breaker: CircuitBreakerWhatsApp;
   let n = 0;
 
+  /**
+   * Destinatarios usados, para poder limpiarlos.
+   *
+   * Su clave lleva la HUELLA del teléfono y no el teléfono, así que no
+   * contiene el prefijo de la suite: hay que apuntarlos para saber qué borrar.
+   */
+  const destinatariosUsados: string[] = [];
+
   /** Claves de un envío nuevo, para que cada prueba parta de cero. */
   const claves = (extra: Partial<Record<string, string>> = {}) => {
     n += 1;
+    const destinatario =
+      extra.destinatario ?? `5730011122${String(n).padStart(2, '0')}`;
+    destinatariosUsados.push(destinatario);
     return {
       companyId: `${PREFIJO}-emp-${n}`,
       integrationId: `${PREFIJO}-int-${n}`,
       phoneNumberId: `${PREFIJO}-num-${n}`,
       flowBotId: `${PREFIJO}-bot-${n}`,
       conversationId: `${PREFIJO}-conv-${n}`,
-      destinatario: `5730011122${String(n).padStart(2, '0')}`,
       ...extra,
+      destinatario,
     };
   };
 
-  async function limpiar() {
-    const claves = await redis.keys('flowbot:*');
-    if (claves.length > 0) await redis.del(...claves);
-  }
+  const limpiar = () =>
+    limpiarClavesDeSuite(redis, [
+      PREFIJO,
+      ...destinatariosUsados.map((d) => huella(d)),
+    ]);
 
-  beforeAll(() => {
+  beforeAll(async () => {
+    // Se conecta y se comprueba ANTES de nada: sin Redis, la suite falla aquí
+    // en dos segundos con un mensaje que se entiende, en vez de fallar test a
+    // test con `MaxRetriesPerRequestError`.
+    await conectarE2E(redis);
     contador = new ContadorFrecuencia();
     breaker = new CircuitBreakerWhatsApp();
   });
@@ -68,10 +90,11 @@ describe('Contador de frecuencia y circuit breaker (e2e, Redis real)', () => {
 
   afterAll(async () => {
     await limpiar();
+    // Cada recurso abierto por la suite se cierra aquí. Sin esto el proceso
+    // sigue vivo con sockets reintentando y Jest no puede salir.
     await contador.cerrar();
     await breaker.cerrar();
-    await redis.quit().catch(() => undefined);
-    redis.disconnect();
+    await cerrarClienteE2E(redis);
   });
 
   // ── contador ──────────────────────────────────────────────────

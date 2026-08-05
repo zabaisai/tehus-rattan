@@ -5,9 +5,16 @@ import { FlowBotKillSwitchService } from '../src/modules/flowbot/engine/flowbot.
 import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { RegistroPlantillas } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.plantillas';
 import { GUARDARRAILES } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.modo';
-import Redis from 'ioredis';
-import { buildRedisConnection } from '../src/common/queue/queue.config';
-import { ContadorFrecuencia } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.frecuencia';
+import {
+  cerrarClienteE2E,
+  conectarE2E,
+  crearClienteE2E,
+  limpiarClavesDeSuite,
+} from './helpers/redis-e2e';
+import {
+  ContadorFrecuencia,
+  huella,
+} from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.frecuencia';
 import { CircuitBreakerWhatsApp } from '../src/modules/flowbot/engine/adapters/flowbot.whatsapp.breaker';
 import { MetricasEnvio } from '../src/modules/flowbot/engine/flowbot.envio.metricas';
 
@@ -73,16 +80,7 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
   // BullMQ exige pero convierte cualquier comando de un cliente normal en un
   // reintento infinito: la suite se quedaba colgada sin imprimir nada en vez
   // de fallar. Aquí se acota.
-  // `buildRedisConnection` trae `maxRetriesPerRequest: null`, que es lo que
-  // BullMQ exige pero convierte cualquier comando de un cliente normal en un
-  // reintento infinito: la suite se quedaba colgada sin imprimir nada en vez
-  // de fallar. Se acota, y se DEJA la cola de espera activada —al contrario
-  // que en el contador— porque aquí interesa que el primer comando espere a
-  // que la conexión esté lista en vez de fallar por llegar medio segundo antes.
-  const redisCrudo = new Redis({
-    ...buildRedisConnection(),
-    maxRetriesPerRequest: 2,
-  });
+  const redisCrudo = crearClienteE2E();
   const frecuencia = new ContadorFrecuencia();
   const breaker = new CircuitBreakerWhatsApp();
   const metricas = new MetricasEnvio();
@@ -106,6 +104,9 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
   const TELEFONO = '573001112233';
 
   beforeAll(async () => {
+    // Igual que en la otra suite: si Redis no está, esto falla en dos segundos
+    // con un mensaje claro en vez de dejar el proceso colgado.
+    await conectarE2E(redisCrudo);
     process.env.QUEUE_ENABLED = 'false';
 
     const a = await prisma.company.create({
@@ -231,8 +232,7 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
     await limpiarContadores();
     await frecuencia.cerrar();
     await breaker.cerrar();
-    await redisCrudo.quit().catch(() => undefined);
-    redisCrudo.disconnect();
+    await cerrarClienteE2E(redisCrudo);
     await prisma.$disconnect();
   });
 
@@ -257,14 +257,23 @@ describe('Guardarraíles de envío real (e2e, base real)', () => {
     });
   });
 
-  /** Borra las claves de frecuencia y breaker de estas pruebas. */
-  async function limpiarContadores() {
-    const claves = await redisCrudo.keys('flowbot:rate:*');
-    const breakers = await redisCrudo.keys('flowbot:breaker:*');
-    if (claves.length + breakers.length > 0) {
-      await redisCrudo.del(...claves, ...breakers);
-    }
-  }
+  /**
+   * Borra las claves de frecuencia y breaker DE ESTA SUITE.
+   *
+   * Se filtra por los identificadores reales —cuid de empresa, conversación,
+   * bot y número— porque son los que acaban dentro de la clave. El nombre de
+   * la suite no aparece en ninguna.
+   */
+  const limpiarContadores = () =>
+    limpiarClavesDeSuite(redisCrudo, [
+      empresaA,
+      empresaB,
+      conversacionA,
+      botA,
+      numeroA,
+      huella(`+${TELEFONO}`),
+      huella(TELEFONO),
+    ]);
 
   const evaluar = () =>
     guardarrailes.evaluar({
