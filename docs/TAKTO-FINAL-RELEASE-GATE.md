@@ -221,6 +221,29 @@ unitarias y 805 E2E invita a sospechar. No lo era: los contenedores se
 levantaron, las migraciones se aplicaron, el gate de Redis pasó y las dos suites
 corrieron.
 
+### La caída siguió, y conviene decir qué cubre ese verde
+
+El incidente no se cerró con esa ejecución. A las 19:43Z GitHub seguía
+informando de que «capacity remains constrained and jobs may still be delayed or
+fail while it recovers gradually», y la ejecución del commit siguiente
+—`d549993`, solo documentación— volvió a perderse con la misma anotación y cero
+pasos en los dos trabajos.
+
+Por eso importa ser preciso sobre **qué** está verificado remotamente:
+
+| | |
+|---|---|
+| SHA con CI verde | `0e1395a` |
+| Diferencia con el HEAD final | **solo `docs/`** |
+| `apps/` · `deploy/` · `.github/` · `package.json` | **idénticos byte a byte** |
+
+Es decir: **todo el código que se fusionaría está cubierto por la ejecución
+verde.** Lo que quedó sin ejecución propia es un cambio de documentación que no
+entra en ningún build ni en ninguna prueba. No se reintenta en bucle: cada
+reintento exige un commit nuevo, y encadenarlos solo produce ruido en la
+historia y cancela ejecuciones que iban avanzando —que es exactamente lo que le
+pasó a la de `172beee`, cancelada por mi propio push—.
+
 ---
 
 # Evidencia recogida
