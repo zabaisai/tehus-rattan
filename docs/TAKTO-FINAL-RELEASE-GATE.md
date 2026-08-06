@@ -123,73 +123,70 @@ regresión que fallan con la versión anterior.
 Verificado contra el producto en ejecución: **HTTP 200, 2.118 bytes, cabecera
 `%PDF-1.3`**.
 
-## Bloqueador 3 — CI remoto en rojo · CAUSA IDENTIFICADA, FUERA DE LA RAMA
+## Bloqueador 3 — CI remoto en rojo · CAÍDA MAYOR DE GITHUB ACTIONS, PROBADA
 
-El trabajo de **backend** falla; el de **frontend** pasa siempre. Durante un
-rato di por buena una hipótesis equivocada —cupo de descarga anónima de Docker
-Hub al levantar los contenedores de servicio— y llegué a cambiar las imágenes a
-un espejo en `a5db833`.
+El propio GitHub lo declara. `githubstatus.com`, consultado durante este gate:
 
-**Era falsa.** Las anotaciones del check dan el motivo literal:
+| Componente | Estado |
+|---|---|
+| **Actions** | **`major_outage`** |
+| Git Operations · API Requests · Webhooks · Pull Requests | `operational` |
 
-> `The job was not acquired by Runner of type hosted even after multiple attempts`
+Incidente abierto **2026-08-06T15:22:49Z**, en estado `investigating`, con este
+texto:
 
-El trabajo **nunca consiguió un runner**. No llegó a ejecutar ni «Set up job»:
-la API devuelve el trabajo con **cero pasos** y 15 minutos entre inicio y
-cancelación, con el tiempo de espera del propio trabajo fijado en 25. Las
-imágenes de servicio ni siquiera se descargaron, así que el registro del que
-venían no podía influir.
+> Workflow runs are still failing or delayed in starting, and some queued jobs
+> may time out.
 
-Por eso **deshice el cambio del workflow**: el archivo vuelve a ser idéntico al
-original, byte a byte. Una modificación cuya única justificación resultó ser
-falsa no se queda «porque tampoco hace daño».
+Es exactamente lo que le pasa a esta rama.
 
-Por qué el backend y no el frontend: es el trabajo caro —contenedores de
-servicio, 25 minutos de tiempo máximo—, así que necesita un runner con más
-holgura y es el primero en quedarse sin asignación cuando la capacidad de
-GitHub aprieta.
+### El historial completo, sin recortar
 
-El historial encaja con una limitación de capacidad, no con el código:
+| SHA | Hora (UTC) | Resultado | Causa según las anotaciones |
+|---|---|---|---|
+| `dea0642` | 05/08 22:02 | éxito | — |
+| `4b8cda1` | 05/08 23:49 | fallo | **`Lint`** — fallo real de código, 18 pasos ejecutados |
+| `2270e30` | 06/08 00:43 | **éxito** | — |
+| `ec78724` | 06/08 16:12 | fallo | `Failed to resolve action download info` |
+| `d89170b` | 06/08 16:32 | cancelado | runner no asignado — **en los dos trabajos** |
+| `638c3b8` | 06/08 16:51 | fallo | `Failed to resolve action download info` + runner no asignado |
+| `172beee` | 06/08 17:07 | cancelado | reemplazado por el push siguiente |
+| `a5db833` | 06/08 17:19 | cancelado | reemplazado por el push siguiente |
+| `c497c85` | 06/08 17:36 | fallo | `The job was not acquired by Runner of type hosted` |
+| `1954755` | 06/08 ~18:2x | **sin ejecución** | GitHub no la programó |
+| `4330ced` | 06/08 ~18:5x | **sin ejecución** | GitHub no la programó |
 
-| SHA | Resultado | Hora (UTC) |
-|---|---|---|
-| `4b8cda1` | fallo | 05/08 23:49 |
-| `2270e30` | **éxito** | 06/08 00:43 |
-| `ec78724` | fallo | 06/08 16:12 |
-| `d89170b` | fallo | 06/08 16:32 |
-| `638c3b8` | fallo | 06/08 16:51 |
-| `c497c85` | fallo | 06/08 17:36 |
+La línea divisoria es nítida: **el incidente empieza a las 15:22Z y todos los
+fallos de infraestructura son de las 16:12Z en adelante.** El único fallo
+anterior, `4b8cda1`, fue un `Lint` de verdad —con sus 18 pasos ejecutados— y
+quedó corregido en `2270e30`, que pasó en verde con más código.
 
-`2270e30` pasó con **más** código que `4b8cda1`, que había fallado. Y todos los
-fallos se agrupan en la misma ventana de hora y media de hoy.
+### Dos cosas que dije mal, y que esto desmiente
 
-**Esto no se corrige desde la rama.** El remedio de una asignación fallida de
-runner es volver a lanzarla; no hay cambio de código que la evite. Los registros
-del trabajo devuelven **403** con las credenciales disponibles, así que el
-diagnóstico se apoya en las anotaciones del check, que sí son legibles y dan el
-mensaje exacto.
+**Primera:** afirmé que el trabajo de frontend «no falló ahí ni una vez». **Es
+falso.** En `d89170b` y `638c3b8` el frontend también se queda sin runner. Sobre
+esa asimetría inexistente construí la hipótesis del cupo de Docker Hub y llegué
+a cambiar las imágenes de servicio en `a5db833`. El cambio está deshecho: el
+workflow es idéntico al original, byte a byte.
 
-### Y después dejó de programarse nada
+**Segunda:** especulé con minutos de Actions agotados. El repositorio es
+**público**, con minutos gratuitos e ilimitados. Comprobado y descartado antes
+de dejarlo escrito.
 
-El commit correctivo `1954755` llegó al remoto —`git ls-remote` devuelve el
-mismo SHA que HEAD— y **GitHub no creó ninguna ejecución**. El workflow no tiene
-filtro de rutas y la rama encaja con `feature/**`, así que debía dispararse.
-
-Lo que sí se pudo comprobar, y descarta las explicaciones fáciles:
+### Lo que sí se comprobó
 
 | Comprobación | Resultado |
 |---|---|
 | Estado del workflow | `active` |
-| Repositorio | **público** → minutos de Actions gratuitos e ilimitados |
-| `archived` / `disabled` | `false` / `false` |
-| HEAD remoto == HEAD local | sí (`1954755`) |
+| Repositorio | público · `archived=false` · `disabled=false` |
+| HEAD remoto == HEAD local | sí |
 | Filtro de rutas en el disparador | ninguno |
+| Pasos ejecutados por los trabajos caídos | **cero** |
+| Componente Actions en githubstatus | **`major_outage`** |
 
-Es decir: **no es facturación ni minutos agotados** —lo di por posible antes de
-comprobarlo y era falso— ni un workflow apagado ni un push que no llegó. Los
-repositorios públicos tiran del grupo compartido de runners alojados, que es
-exactamente lo que nombra el mensaje de error. Todo apunta a una degradación de
-capacidad del lado de GitHub, y no hay nada en esta rama que la sortee.
+No es el código, ni el workflow, ni la facturación, ni un push que no llegó.
+**No hay nada en esta rama que lo sortee**, y el remedio —relanzar— depende de
+que GitHub restablezca el servicio.
 
 ---
 
@@ -291,15 +288,18 @@ El gate exige textualmente no aceptar solamente pruebas locales. Los dos
 bloqueadores que sí eran del producto están corregidos y verificados contra el
 producto vivo; todo lo demás está demostrado y en verde.
 
-La causa del tercero está identificada con el mensaje literal de GitHub —el
-trabajo no consiguió runner— y **no es corregible desde esta rama**: no hay
-cambio de código que consiga capacidad de runners. Pero **una causa
-identificada no es una ejecución verde**, y mientras no exista esa ejecución la
+La causa del tercero está probada con la página de estado del propio GitHub:
+**Actions en `major_outage`**, incidente abierto a las 15:22Z, y todos los
+fallos de infraestructura de esta rama a partir de las 16:12Z. **No es
+corregible desde esta rama.**
+
+Pero **una caída ajena demostrada no es una ejecución verde**. El gate exige no
+aceptar solamente pruebas locales, y mientras esa ejecución no exista la
 decisión honesta es NO APTO.
 
-**Para pasar a APTO basta con relanzar el trabajo de backend hasta que consiga
-runner y termine en verde.** No hay ningún otro trabajo pendiente, y el
-contenido de la rama no necesita cambiar para lograrlo.
+**Para pasar a APTO basta con relanzar el CI cuando Actions vuelva a
+`operational`.** No hay ningún otro trabajo pendiente y el contenido de la rama
+no necesita cambiar para lograrlo.
 
 **No se fusionó ni se desplegó nada.** Solo se publicó
 `feature/takto-functional-hardening`.

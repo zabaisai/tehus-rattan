@@ -203,12 +203,13 @@ Tres bloqueadores encontrados:
    `DecimalInterceptor`, que reconstruía el `StreamableFile` y le quitaba el
    prototipo. Corregido en `172beee` y verificado contra el producto vivo: 200,
    2.118 bytes, `%PDF-1.3`.
-3. **CI remoto en rojo** en el trabajo de backend. La causa la da GitHub
-   literalmente: `The job was not acquired by Runner of type hosted even after
-   multiple attempts`. El trabajo nunca consiguió runner —cero pasos
-   ejecutados—, así que **no es corregible desde la rama**. Mi primera
-   hipótesis (cupo de Docker Hub) era falsa y el cambio que hice por ella
-   quedó deshecho: el workflow vuelve a ser idéntico al original.
+3. **CI remoto en rojo** por una **caída mayor de GitHub Actions**, declarada
+   por el propio GitHub: componente `Actions` en `major_outage`, incidente
+   abierto el 06/08 a las 15:22Z. Todos los fallos de infraestructura de la
+   rama son de las 16:12Z en adelante; el único fallo anterior (`4b8cda1`) era
+   un `Lint` real, ya corregido. **No es corregible desde la rama.** Mi primera
+   hipótesis —cupo de Docker Hub— era falsa y el cambio que hice por ella quedó
+   deshecho: el workflow es idéntico al original, byte a byte.
 
 **Decisión: NO APTO PARA FUSIÓN A MAIN**, por un único bloqueador: no hay una
 ejecución de CI remota verde confirmada sobre el SHA de HEAD. Todo lo demás está
