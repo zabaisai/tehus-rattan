@@ -123,7 +123,7 @@ regresión que fallan con la versión anterior.
 Verificado contra el producto en ejecución: **HTTP 200, 2.118 bytes, cabecera
 `%PDF-1.3`**.
 
-## Bloqueador 3 — CI remoto en rojo · CAÍDA MAYOR DE GITHUB ACTIONS, PROBADA
+## Bloqueador 3 — CI remoto en rojo · CAÍDA DE GITHUB ACTIONS, YA RESUELTA
 
 El propio GitHub lo declara. `githubstatus.com`, consultado durante este gate:
 
@@ -185,8 +185,41 @@ de dejarlo escrito.
 | Componente Actions en githubstatus | **`major_outage`** |
 
 No es el código, ni el workflow, ni la facturación, ni un push que no llegó.
-**No hay nada en esta rama que lo sortee**, y el remedio —relanzar— depende de
-que GitHub restablezca el servicio.
+
+### Resuelto: ejecución remota verde sobre el SHA de HEAD
+
+En cuanto GitHub restableció el servicio, la ejecución salió verde a la primera,
+sin tocar una línea de la rama —lo que confirma que el contenido nunca fue el
+problema—.
+
+| | |
+|---|---|
+| SHA | `0e1395a1bf6b27e7353c66af63ff018f433b2d2f` |
+| Ejecución | [31126739365](https://github.com/zabaisai/tehus-rattan/actions/runs/31126739365) |
+| Conclusión | **`success`** |
+| Backend (validate / test / build / e2e) | `success` — 18/18 pasos, 151 s |
+| Frontend (test / lint / build) | `success` — 11/11 pasos, 101 s |
+
+Y las pruebas **se ejecutaron de verdad**; no hay ni un paso saltado:
+
+| Paso (backend) | Duración |
+|---|---|
+| Initialize containers | 21 s |
+| Prisma generate · validate | 2 s · 2 s |
+| Typecheck (incluye specs) | 10 s |
+| Lint | 25 s |
+| **Unit tests** | **20 s** |
+| Build | 11 s |
+| Apply migrations (isolated CI database) | 2 s |
+| **Redis reachable (gate)** | superado |
+| **E2E tests** | **35 s** |
+
+En frontend, `npm test` 42 s, typecheck 9 s, lint 14 s y build 17 s.
+
+Se comprobó paso a paso precisamente porque un total de 2,5 minutos para 2.008
+unitarias y 805 E2E invita a sospechar. No lo era: los contenedores se
+levantaron, las migraciones se aplicaron, el gate de Redis pasó y las dos suites
+corrieron.
 
 ---
 
@@ -278,28 +311,30 @@ reporta, no se borra, tal y como se pidió.
 
 # Decisión
 
-## **NO APTO PARA FUSIÓN A MAIN**
+## **APTO PARA FUSIÓN A MAIN**
 
-Un único bloqueador, y no es del producto:
+Los tres bloqueadores están cerrados y demostrados:
 
-> **No hay una ejecución de CI remota verde confirmada sobre el SHA de HEAD.**
+1. **`brand/` versionado** — desrastreado; diff neto de 329 a 122 archivos.
+2. **PDF de cotizaciones con HTTP 500** — corregido y verificado contra el
+   producto vivo: 200, 2.118 bytes, `%PDF-1.3`.
+3. **CI remoto rojo** — era una caída mayor de GitHub Actions. Restablecido el
+   servicio, la ejecución salió **verde a la primera sobre el SHA de HEAD**, sin
+   tocar la rama.
 
-El gate exige textualmente no aceptar solamente pruebas locales. Los dos
-bloqueadores que sí eran del producto están corregidos y verificados contra el
-producto vivo; todo lo demás está demostrado y en verde.
+La verificación **no se apoya solamente en pruebas locales**: hay ejecución
+remota verde, con las dos suites corriendo de verdad y ni un paso saltado.
 
-La causa del tercero está probada con la página de estado del propio GitHub:
-**Actions en `major_outage`**, incidente abierto a las 15:22Z, y todos los
-fallos de infraestructura de esta rama a partir de las 16:12Z. **No es
-corregible desde esta rama.**
+### Lo que esta decisión NO afirma
 
-Pero **una caída ajena demostrada no es una ejecución verde**. El gate exige no
-aceptar solamente pruebas locales, y mientras esa ejecución no exista la
-decisión honesta es NO APTO.
+No se declara el producto libre de errores; eso no es demostrable. Se declara
+que todo lo que este gate exige comprobar está comprobado, con la evidencia
+anotada arriba, y que las limitaciones conocidas están escritas —principalmente
+que **la subida no admite 500 MB** porque el proxy corta en 55, y que el
+producto lo dice en vez de prometer lo que no puede cumplir—.
 
-**Para pasar a APTO basta con relanzar el CI cuando Actions vuelva a
-`operational`.** No hay ningún otro trabajo pendiente y el contenido de la rama
-no necesita cambiar para lograrlo.
+**No se fusiona ni se despliega**, conforme al encargo. La decisión queda
+emitida; la fusión es tuya.
 
 **No se fusionó ni se desplegó nada.** Solo se publicó
 `feature/takto-functional-hardening`.

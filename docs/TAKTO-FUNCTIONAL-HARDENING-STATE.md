@@ -203,17 +203,22 @@ Tres bloqueadores encontrados:
    `DecimalInterceptor`, que reconstruía el `StreamableFile` y le quitaba el
    prototipo. Corregido en `172beee` y verificado contra el producto vivo: 200,
    2.118 bytes, `%PDF-1.3`.
-3. **CI remoto en rojo** por una **caída mayor de GitHub Actions**, declarada
-   por el propio GitHub: componente `Actions` en `major_outage`, incidente
-   abierto el 06/08 a las 15:22Z. Todos los fallos de infraestructura de la
-   rama son de las 16:12Z en adelante; el único fallo anterior (`4b8cda1`) era
-   un `Lint` real, ya corregido. **No es corregible desde la rama.** Mi primera
-   hipótesis —cupo de Docker Hub— era falsa y el cambio que hice por ella quedó
-   deshecho: el workflow es idéntico al original, byte a byte.
+3. **CI remoto en rojo** por una **caída mayor de GitHub Actions** (componente
+   `Actions` en `major_outage`, incidente del 06/08 a las 15:22Z). Todos los
+   fallos de infraestructura de la rama son posteriores; el único anterior
+   (`4b8cda1`) era un `Lint` real, ya corregido. Restablecido el servicio, la
+   ejecución salió **verde a la primera** sobre el SHA de HEAD, sin tocar la
+   rama. Mi hipótesis inicial —cupo de Docker Hub— era falsa y el cambio que
+   hice por ella quedó deshecho: el workflow es idéntico al original.
 
-**Decisión: NO APTO PARA FUSIÓN A MAIN**, por un único bloqueador: no hay una
-ejecución de CI remota verde confirmada sobre el SHA de HEAD. Todo lo demás está
-demostrado y verde. Para pasar a APTO basta con esa confirmación.
+**Decisión: APTO PARA FUSIÓN A MAIN.** Los tres bloqueadores están cerrados y
+la verificación no se apoya solamente en pruebas locales: hay ejecución remota
+verde sobre el SHA de HEAD —ejecución `31126739365`, backend 18/18 pasos y
+frontend 11/11—, con las dos suites corriendo de verdad.
+
+No se declara el producto libre de errores, porque no es demostrable. Se declara
+que lo que el gate exige comprobar está comprobado y que las limitaciones
+conocidas están escritas.
 
 No se fusionó, no se desplegó y no se tocó staging.
 
@@ -224,8 +229,5 @@ git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-h
 git -C C:/Users/Usuario/Desktop/Tehus_Rattan pull --ff-only
 ```
 
-Lo único pendiente es comprobar el CI remoto de `a5db833`:
-
-```bash
-curl -s "https://api.github.com/repos/zabaisai/tehus-rattan/actions/runs?head_sha=a5db833"
-```
+No queda trabajo pendiente. La fusión es una decisión tuya: el encargo prohíbe
+expresamente fusionar y desplegar.
