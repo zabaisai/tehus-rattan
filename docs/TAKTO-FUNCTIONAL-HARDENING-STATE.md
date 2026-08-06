@@ -179,21 +179,50 @@ lado de HTTP. Apareció al levantar el producto y mirar el tablero.
 por requisito y con la prueba que lo demuestra, está en
 `TAKTO-FUNCTIONAL-HARDENING-AUDIT.md`.
 
-Lo único que no alcanza lo pedido literalmente son los 500 MB de subida: el
-procesamiento ya no tiene ese techo —probado a 145 MB con la memoria plana—
-pero `request_body max_size` de Caddy corta en 55 MB, y subirlo exige tocar la
-configuración del VPS, que está fuera del alcance de este encargo.
+Sobre los 500 MB: **el motor de importación los procesa**, y está demostrado
+—524.288.338 bytes, 1.524.918 filas, 568 s, con el RSS en un pico de 262,9 MB,
+la mitad del archivo, porque se lee en streaming—. El techo operativo real lo
+pone `request_body max_size` de Caddy, que en staging corta en **55 MB**.
+
+Por eso el producto **no promete 500 MB**: `GET /api/products/import/limits`
+devuelve el menor entre el límite del producto y el del proxy y avisa cuál
+manda, y la interfaz muestra ese número. Subir el techo del proxy exige tocar la
+configuración del VPS, fuera del alcance de este encargo.
+
+## Gate final de release
+
+Ejecutado sobre `a5db833`. El detalle completo —evidencia, medidas y
+bloqueadores— está en `TAKTO-FINAL-RELEASE-GATE.md`.
+
+Tres bloqueadores encontrados:
+
+1. **`brand/` versionado por error** en `d3bc633`. Desrastreado en `7165d0e`;
+   diff neto de 329 a 122 archivos. Sin reescribir la historia: la rama está
+   publicada y el force push está prohibido.
+2. **El PDF de una cotización devolvía HTTP 500**, por culpa de mi propio
+   `DecimalInterceptor`, que reconstruía el `StreamableFile` y le quitaba el
+   prototipo. Corregido en `172beee` y verificado contra el producto vivo: 200,
+   2.118 bytes, `%PDF-1.3`.
+3. **CI remoto en rojo** en el trabajo de backend, fallando en «Set up job»
+   antes de ejecutar código del repositorio. Corregido en `a5db833` —imágenes
+   de servicio desde un espejo sin cupo anónimo—, **sin confirmación remota
+   todavía**.
+
+**Decisión: NO APTO PARA FUSIÓN A MAIN**, por un único bloqueador: no hay una
+ejecución de CI remota verde confirmada sobre el SHA de HEAD. Todo lo demás está
+demostrado y verde. Para pasar a APTO basta con esa confirmación.
+
+No se fusionó, no se desplegó y no se tocó staging.
 
 ## Reanudación
-
-No queda trabajo pendiente de este encargo. Para retomar la rama:
 
 ```bash
 git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-hardening
 git -C C:/Users/Usuario/Desktop/Tehus_Rattan pull --ff-only
 ```
 
+Lo único pendiente es comprobar el CI remoto de `a5db833`:
+
 ```bash
-git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-hardening
-git -C C:/Users/Usuario/Desktop/Tehus_Rattan pull --ff-only
+curl -s "https://api.github.com/repos/zabaisai/tehus-rattan/actions/runs?head_sha=a5db833"
 ```

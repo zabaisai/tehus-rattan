@@ -104,4 +104,170 @@ prohibido. Se desrastreó en `7165d0e` y se añadió a `.gitignore`, de modo que
 
 Efecto en el diff neto: **de 329 archivos a 122**.
 
-_(El resto de secciones se completa a medida que se verifican.)_
+## Bloqueador 2 — El PDF de una cotización devolvía HTTP 500 · CORREGIDO
+
+Lo introduje yo. El `DecimalInterceptor` de `f232f17` reconstruía **cualquier**
+objeto de la respuesta para sustituir los `Decimal`. El PDF se devuelve como
+`StreamableFile`; al rehacerlo se copiaban sus propiedades pero se perdía el
+prototipo, y Nest recibía un objeto plano donde esperaba un flujo:
+
+    Cannot read properties of undefined (reading 'destroyed')
+
+Ninguna prueba lo vio: todas comprueban el **servicio**, donde el Buffer todavía
+está intacto. Solo apareció pidiendo el PDF al producto vivo.
+
+Corregido en `172beee` con un guardián `esObjetoPlano()` —solo se reconstruyen
+objetos planos y listas; todo lo demás pasa por referencia— y dos pruebas de
+regresión que fallan con la versión anterior.
+
+Verificado contra el producto en ejecución: **HTTP 200, 2.118 bytes, cabecera
+`%PDF-1.3`**.
+
+## Bloqueador 3 — CI remoto en rojo · CORREGIDO EN LA RAMA, PENDIENTE DE CONFIRMAR
+
+El trabajo de **backend** fallaba en «Set up job», es decir **antes de que se
+ejecute una sola línea de este repositorio**. El de **frontend**, el único sin
+contenedores de servicio, no falló ahí ni una vez.
+
+El historial de la rama descarta una regresión de código:
+
+| SHA | Resultado |
+|---|---|
+| `dea0642` | éxito |
+| `4b8cda1` | fallo |
+| `2270e30` | éxito |
+| `ec78724` | fallo |
+| `638c3b8` | fallo |
+
+`2270e30` pasó con **más** código que `4b8cda1`, que había fallado. Es
+intermitente.
+
+Los runners de GitHub comparten IP y Docker Hub limita las descargas anónimas
+por IP: cuando toca una cuota agotada, el contenedor de servicio no arranca y el
+trabajo muere en el arranque. Los registros del trabajo devuelven **403** con
+las credenciales disponibles, así que el diagnóstico se apoya en el patrón, no
+en la traza.
+
+Corregido en `a5db833`: las imágenes de servicio se descargan de
+`public.ecr.aws/docker/library/*` —las **mismas** imágenes oficiales, sin cupo
+anónimo—, con las versiones igual de fijadas que antes.
+
+**Estado de la comprobación:** la ejecución de `a5db833` quedó encolada y el
+sondeo agotó la cuota anónima de la API de GitHub (60 peticiones/hora) antes de
+poder leer su resultado. **A la hora de escribir esto no hay una ejecución
+remota verde confirmada sobre el SHA de HEAD.** Esto es determinante para la
+decisión y se trata como tal más abajo.
+
+---
+
+# Evidencia recogida
+
+## Importación de 500 MB — opción A: demostrada
+
+Archivo generado, procesado por el camino real y borrado; nunca entró a Git.
+
+| Medida | Valor |
+|---|---|
+| Tamaño exacto | 524.288.338 bytes (500,0 MB) |
+| Formato | CSV |
+| Filas | 1.524.918 |
+| Tiempo | 568 s |
+| Velocidad | 2.685 filas/s |
+| RSS inicial / máximo / final | 48,4 / 262,9 / 222,2 MB |
+| Disco temporal | 500 MB |
+| Progreso observado | sí — 113 muestras crecientes |
+| Fallidas | 0 |
+| Temporal limpiado | sí |
+| Reprocesar una terminada | no duplica |
+
+El pico de memoria es **la mitad** del archivo, no un múltiplo: se lee en
+streaming, no se carga entero.
+
+**Cancelación:** detuvo el proceso en 0,2 s. **Reinicio del worker a mitad de
+carga:** reanudó y terminó en 400.000 productos con 400.000 SKU únicos, sin
+duplicados.
+
+**Lo que el producto promete:** `GET /api/products/import/limits` devuelve el
+**menor** entre el límite del producto y el del proxy, y avisa cuál manda. En
+staging Caddy corta en **55 MB**, así que la interfaz ofrece 55 MB en staging
+—no 500— y lo dice. Los 500 MB están demostrados sobre el motor de importación;
+el proxy es el techo operativo real y no se oculta.
+
+Un archivo por encima del límite se rechaza **por el tamaño declarado**, sin
+abrirlo ni leer una fila, y la subida se rechaza también si no cabe en disco.
+
+## QA de navegador real
+
+Chrome y Microsoft Edge, vía CDP, a 1440 / 1280 / 1024 / 768 / 390 px.
+
+**Chrome 51/51 · Edge 51/51 · 0 fallos.**
+
+El arnés se niega a dar por buena una captura si no encuentra la navegación de
+la aplicación en la página, después de que una versión anterior informara de 39
+capturas verdes de una página de error del navegador porque el frontend se había
+caído. También se corrigieron dos falsos negativos suyos en el enlace profundo
+al perfil: buscaba la palabra «Perfil» en los primeros caracteres del texto
+—donde solo está la barra lateral— en vez de detectar el panel por su etiqueta
+accesible. Un arnés que miente en cualquiera de los dos sentidos no sirve.
+
+## Verificación completa
+
+| Comprobación | Resultado |
+|---|---|
+| Backend unitarias | 2.008 |
+| Backend E2E | 805 |
+| Frontend | 422 |
+| Typecheck / lint / build (ambos) | verde |
+| Docker (ambas imágenes) | verde |
+| Migraciones desde cero | verde |
+| Migraciones sobre esquema anterior con datos | verde — `11700000.55` conservado exacto |
+| Bot `ACTIVE` preexistente tras migrar | intacto |
+| Claves Redis residuales | 0 |
+| Archivos temporales residuales | 0 |
+| Llamadas a `graph.facebook.com` | 0 |
+
+## Auditoría del diff `origin/main...HEAD`
+
+| Comprobación | Resultado |
+|---|---|
+| Archivos | 128 · +16.559 / −3.045 |
+| `brand/` | fuera del control de versiones |
+| Archivos fuera del alcance | ninguno |
+| Dependencias declaradas nuevas | ninguna — solo lockfiles (`npm audit fix`) |
+| Datos personales reales | ninguno — todos los teléfonos y correos del diff son ficticios |
+| Secretos | ninguno |
+
+## Estado de staging — no se tocó
+
+`killswitch=true`, 7 contenedores, sin migraciones, sin despliegues. Los bots de
+`admin.crm.staging@tehusrattan.com` pasaron de 3 a 4 durante el encargo: los
+creó la persona usuaria real, no yo. `QA_E2E_TEMP_Co` **sigue existiendo**: se
+reporta, no se borra, tal y como se pidió.
+
+---
+
+# Decisión
+
+## **NO APTO PARA FUSIÓN A MAIN**
+
+Un único bloqueador, y no es del producto:
+
+> **No hay una ejecución de CI remota verde confirmada sobre el SHA de HEAD
+> (`a5db833`).**
+
+El gate exige textualmente no aceptar solamente pruebas locales. Todo lo demás
+está demostrado y en verde, y los tres bloqueadores encontrados están corregidos
+en la rama —dos verificados contra el producto vivo, el tercero corregido pero
+sin confirmación remota todavía.
+
+El diagnóstico apunta a infraestructura, no a código: el fallo ocurre antes de
+que se ejecute nada de este repositorio, solo en el trabajo que usa contenedores
+de servicio, de forma intermitente y con un commit posterior y mayor pasando en
+verde. Pero **un diagnóstico no es una ejecución verde**, y mientras no exista
+esa ejecución la decisión honesta es NO APTO.
+
+**Para pasar a APTO basta con confirmar la ejecución de `a5db833` en verde.** No
+hay ningún otro trabajo pendiente.
+
+**No se fusionó ni se desplegó nada.** Solo se publicó
+`feature/takto-functional-hardening`.
