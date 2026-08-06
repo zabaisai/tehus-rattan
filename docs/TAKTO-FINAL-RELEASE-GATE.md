@@ -123,40 +123,51 @@ regresión que fallan con la versión anterior.
 Verificado contra el producto en ejecución: **HTTP 200, 2.118 bytes, cabecera
 `%PDF-1.3`**.
 
-## Bloqueador 3 — CI remoto en rojo · CORREGIDO EN LA RAMA, PENDIENTE DE CONFIRMAR
+## Bloqueador 3 — CI remoto en rojo · CAUSA IDENTIFICADA, FUERA DE LA RAMA
 
-El trabajo de **backend** fallaba en «Set up job», es decir **antes de que se
-ejecute una sola línea de este repositorio**. El de **frontend**, el único sin
-contenedores de servicio, no falló ahí ni una vez.
+El trabajo de **backend** falla; el de **frontend** pasa siempre. Durante un
+rato di por buena una hipótesis equivocada —cupo de descarga anónima de Docker
+Hub al levantar los contenedores de servicio— y llegué a cambiar las imágenes a
+un espejo en `a5db833`.
 
-El historial de la rama descarta una regresión de código:
+**Era falsa.** Las anotaciones del check dan el motivo literal:
 
-| SHA | Resultado |
-|---|---|
-| `dea0642` | éxito |
-| `4b8cda1` | fallo |
-| `2270e30` | éxito |
-| `ec78724` | fallo |
-| `638c3b8` | fallo |
+> `The job was not acquired by Runner of type hosted even after multiple attempts`
 
-`2270e30` pasó con **más** código que `4b8cda1`, que había fallado. Es
-intermitente.
+El trabajo **nunca consiguió un runner**. No llegó a ejecutar ni «Set up job»:
+la API devuelve el trabajo con **cero pasos** y 15 minutos entre inicio y
+cancelación, con el tiempo de espera del propio trabajo fijado en 25. Las
+imágenes de servicio ni siquiera se descargaron, así que el registro del que
+venían no podía influir.
 
-Los runners de GitHub comparten IP y Docker Hub limita las descargas anónimas
-por IP: cuando toca una cuota agotada, el contenedor de servicio no arranca y el
-trabajo muere en el arranque. Los registros del trabajo devuelven **403** con
-las credenciales disponibles, así que el diagnóstico se apoya en el patrón, no
-en la traza.
+Por eso **deshice el cambio del workflow**: el archivo vuelve a ser idéntico al
+original, byte a byte. Una modificación cuya única justificación resultó ser
+falsa no se queda «porque tampoco hace daño».
 
-Corregido en `a5db833`: las imágenes de servicio se descargan de
-`public.ecr.aws/docker/library/*` —las **mismas** imágenes oficiales, sin cupo
-anónimo—, con las versiones igual de fijadas que antes.
+Por qué el backend y no el frontend: es el trabajo caro —contenedores de
+servicio, 25 minutos de tiempo máximo—, así que necesita un runner con más
+holgura y es el primero en quedarse sin asignación cuando la capacidad de
+GitHub aprieta.
 
-**Estado de la comprobación:** la ejecución de `a5db833` quedó encolada y el
-sondeo agotó la cuota anónima de la API de GitHub (60 peticiones/hora) antes de
-poder leer su resultado. **A la hora de escribir esto no hay una ejecución
-remota verde confirmada sobre el SHA de HEAD.** Esto es determinante para la
-decisión y se trata como tal más abajo.
+El historial encaja con una limitación de capacidad, no con el código:
+
+| SHA | Resultado | Hora (UTC) |
+|---|---|---|
+| `4b8cda1` | fallo | 05/08 23:49 |
+| `2270e30` | **éxito** | 06/08 00:43 |
+| `ec78724` | fallo | 06/08 16:12 |
+| `d89170b` | fallo | 06/08 16:32 |
+| `638c3b8` | fallo | 06/08 16:51 |
+| `c497c85` | fallo | 06/08 17:36 |
+
+`2270e30` pasó con **más** código que `4b8cda1`, que había fallado. Y todos los
+fallos se agrupan en la misma ventana de hora y media de hoy.
+
+**Esto no se corrige desde la rama.** El remedio de una asignación fallida de
+runner es volver a lanzarla; no hay cambio de código que la evite. Los registros
+del trabajo devuelven **403** con las credenciales disponibles, así que el
+diagnóstico se apoya en las anotaciones del check, que sí son legibles y dan el
+mensaje exacto.
 
 ---
 
@@ -252,22 +263,21 @@ reporta, no se borra, tal y como se pidió.
 
 Un único bloqueador, y no es del producto:
 
-> **No hay una ejecución de CI remota verde confirmada sobre el SHA de HEAD
-> (`a5db833`).**
+> **No hay una ejecución de CI remota verde confirmada sobre el SHA de HEAD.**
 
-El gate exige textualmente no aceptar solamente pruebas locales. Todo lo demás
-está demostrado y en verde, y los tres bloqueadores encontrados están corregidos
-en la rama —dos verificados contra el producto vivo, el tercero corregido pero
-sin confirmación remota todavía.
+El gate exige textualmente no aceptar solamente pruebas locales. Los dos
+bloqueadores que sí eran del producto están corregidos y verificados contra el
+producto vivo; todo lo demás está demostrado y en verde.
 
-El diagnóstico apunta a infraestructura, no a código: el fallo ocurre antes de
-que se ejecute nada de este repositorio, solo en el trabajo que usa contenedores
-de servicio, de forma intermitente y con un commit posterior y mayor pasando en
-verde. Pero **un diagnóstico no es una ejecución verde**, y mientras no exista
-esa ejecución la decisión honesta es NO APTO.
+La causa del tercero está identificada con el mensaje literal de GitHub —el
+trabajo no consiguió runner— y **no es corregible desde esta rama**: no hay
+cambio de código que consiga capacidad de runners. Pero **una causa
+identificada no es una ejecución verde**, y mientras no exista esa ejecución la
+decisión honesta es NO APTO.
 
-**Para pasar a APTO basta con confirmar la ejecución de `a5db833` en verde.** No
-hay ningún otro trabajo pendiente.
+**Para pasar a APTO basta con relanzar el trabajo de backend hasta que consiga
+runner y termine en verde.** No hay ningún otro trabajo pendiente, y el
+contenido de la rama no necesita cambiar para lograrlo.
 
 **No se fusionó ni se desplegó nada.** Solo se publicó
 `feature/takto-functional-hardening`.

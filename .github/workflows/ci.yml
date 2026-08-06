@@ -55,22 +55,9 @@ jobs:
     defaults:
       run:
         working-directory: apps/backend
-    # IMAGENES DESDE UN ESPEJO SIN LIMITE DE DESCARGA ANONIMA.
-    #
-    # El trabajo de backend fallaba de forma INTERMITENTE en «Set up job», que
-    # es antes de que corra una sola linea de este repositorio. El de frontend
-    # —el unico sin contenedores de servicio— no fallo nunca ahi. Eso señala a
-    # la descarga de las imagenes: los runners de GitHub comparten IP y Docker
-    # Hub limita las descargas anonimas por IP, asi que a veces toca un cupo
-    # agotado y el trabajo muere antes de empezar.
-    #
-    # `public.ecr.aws/docker/library/*` sirve las MISMAS imagenes oficiales sin
-    # ese limite. Las versiones siguen fijadas: un `alpine` flotante cambiaria
-    # de version mayor sin avisar y las pruebas de Lua dejarian de significar
-    # lo mismo.
     services:
       postgres:
-        image: public.ecr.aws/docker/library/postgres:16-alpine
+        image: postgres:16-alpine
         env:
           POSTGRES_USER: ci_user
           POSTGRES_PASSWORD: ci_password
@@ -94,7 +81,7 @@ jobs:
       redis:
         # Version fijada: un `redis:alpine` flotante cambia de version mayor sin
         # avisar y las pruebas de Lua dejarian de significar lo mismo.
-        image: public.ecr.aws/docker/library/redis:7.4-alpine
+        image: redis:7.4-alpine
         ports:
           - 6379:6379
         options: >-
