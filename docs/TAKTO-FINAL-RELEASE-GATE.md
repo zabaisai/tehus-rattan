@@ -169,6 +169,28 @@ del trabajo devuelven **403** con las credenciales disponibles, así que el
 diagnóstico se apoya en las anotaciones del check, que sí son legibles y dan el
 mensaje exacto.
 
+### Y después dejó de programarse nada
+
+El commit correctivo `1954755` llegó al remoto —`git ls-remote` devuelve el
+mismo SHA que HEAD— y **GitHub no creó ninguna ejecución**. El workflow no tiene
+filtro de rutas y la rama encaja con `feature/**`, así que debía dispararse.
+
+Lo que sí se pudo comprobar, y descarta las explicaciones fáciles:
+
+| Comprobación | Resultado |
+|---|---|
+| Estado del workflow | `active` |
+| Repositorio | **público** → minutos de Actions gratuitos e ilimitados |
+| `archived` / `disabled` | `false` / `false` |
+| HEAD remoto == HEAD local | sí (`1954755`) |
+| Filtro de rutas en el disparador | ninguno |
+
+Es decir: **no es facturación ni minutos agotados** —lo di por posible antes de
+comprobarlo y era falso— ni un workflow apagado ni un push que no llegó. Los
+repositorios públicos tiran del grupo compartido de runners alojados, que es
+exactamente lo que nombra el mensaje de error. Todo apunta a una degradación de
+capacidad del lado de GitHub, y no hay nada en esta rama que la sortee.
+
 ---
 
 # Evidencia recogida
