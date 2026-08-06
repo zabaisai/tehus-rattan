@@ -16,8 +16,8 @@ reanudarse sin releer la conversación.
 
 | Suite | Antes | Después |
 |---|---|---|
-| Backend unitarias | 116 suites / 1928 | 120 suites / **2004** |
-| Backend E2E | 48 suites / 712 | 54 suites / **790** |
+| Backend unitarias | 116 suites / 1928 | 120 suites / **1999** |
+| Backend E2E | 48 suites / 712 | 55 suites / **805** |
 | Frontend | 55 archivos / 401 | 58 archivos / **422** |
 
 Todo verde en ambos extremos. Lint, typecheck y build verdes en backend y
@@ -109,6 +109,7 @@ por columna nueva + backfill. Está escrito en la propia migración.
 | `515e149` | `feat(cotizaciones)`: impuestos, transporte, descuento por línea y ciclo de vida |
 | `b228108` | `chore(deps)`: cerrar las vulnerabilidades que se arreglan sin romper nada |
 | `f232f17` | `fix(api)`: los importes salían como `{"s":..}` y el tablero mostraba `$ NaN` |
+| `e41ca9e` | `feat(productos)`: importación en streaming con estado durable |
 
 ## Secciones del encargo: qué está hecho y qué no
 
@@ -120,7 +121,7 @@ por columna nueva + backfill. Está escrito en la propia migración.
 | 10 | Renombrar a TAKTO Pulso | **Completo** |
 | 9 | Cotizaciones | **Completo** |
 | 12 | Barrido general | **Completo** |
-| 8 | Importación de productos | **Parcial**: seguridad, CSV y límite configurable hechos; falta streaming a disco, cola, progreso, cancelación y reanudación |
+| 8 | Importación de productos | **Completo** salvo el límite de red (Caddy, 55 MB) |
 | 6 | Panel lateral y navegación Pipeline ↔ Chat | **Completo** |
 | 7 | Tareas con aprobación (`TaskSuggestion`) | **Completo** |
 | 11 | Importar/exportar Pulsos | **Completo** |
@@ -172,18 +173,25 @@ la API como su representación interna, que en el navegador es `NaN`.
 donde el valor sigue siendo un `Decimal` correcto. El fallo solo existe al otro
 lado de HTTP. Apareció al levantar el producto y mirar el tablero.
 
+## Estado final
+
+**Las doce secciones están cerradas.** La auditoría de trazabilidad, requisito
+por requisito y con la prueba que lo demuestra, está en
+`TAKTO-FUNCTIONAL-HARDENING-AUDIT.md`.
+
+Lo único que no alcanza lo pedido literalmente son los 500 MB de subida: el
+procesamiento ya no tiene ese techo —probado a 145 MB con la memoria plana—
+pero `request_body max_size` de Caddy corta en 55 MB, y subirlo exige tocar la
+configuración del VPS, que está fuera del alcance de este encargo.
+
 ## Reanudación
 
-Rama `feature/takto-functional-hardening`, publicada. Lo único que queda del
-encargo es la parte de **§8** que exige arquitectura nueva: carga por fragmentos
-a disco, procesamiento en el worker con cola, progreso, cancelación y
-reanudación. Lo demás está cerrado.
+No queda trabajo pendiente de este encargo. Para retomar la rama:
 
-Punto exacto de entrada:
-`apps/backend/src/modules/products/products-import.service.ts` lee hoy el
-archivo entero en memoria (`workbook.xlsx.load(buffer)`). El primer paso es
-cambiar `FileInterceptor` por almacenamiento en disco y sustituir esa lectura
-por `workbook.xlsx.read(stream)`.
+```bash
+git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-hardening
+git -C C:/Users/Usuario/Desktop/Tehus_Rattan pull --ff-only
+```
 
 ```bash
 git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-hardening
