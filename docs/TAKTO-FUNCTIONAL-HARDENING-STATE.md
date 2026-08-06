@@ -16,8 +16,8 @@ reanudarse sin releer la conversación.
 
 | Suite | Antes | Después |
 |---|---|---|
-| Backend unitarias | 116 suites / 1928 | 118 suites / **1975** |
-| Backend E2E | 48 suites / 712 | 53 suites / **775** |
+| Backend unitarias | 116 suites / 1928 | 120 suites / **2004** |
+| Backend E2E | 48 suites / 712 | 54 suites / **790** |
 | Frontend | 55 archivos / 401 | 58 archivos / **422** |
 
 Todo verde en ambos extremos. Lint, typecheck y build verdes en backend y
@@ -105,6 +105,10 @@ por columna nueva + backfill. Está escrito en la propia migración.
 | `0160502` | `feat(tareas)`: un bot propone, una persona decide |
 | `39d9d70` | `feat(pulso)`: importar y exportar en `.taktoflow.json` |
 | `8cc73bd` | `fix(pulso)`: un campo entrante objeto no puede acabar como `[object Object]` |
+| `4b8cda1` | `docs`: §6, §7 y §11 cerrados |
+| `515e149` | `feat(cotizaciones)`: impuestos, transporte, descuento por línea y ciclo de vida |
+| `b228108` | `chore(deps)`: cerrar las vulnerabilidades que se arreglan sin romper nada |
+| `f232f17` | `fix(api)`: los importes salían como `{"s":..}` y el tablero mostraba `$ NaN` |
 
 ## Secciones del encargo: qué está hecho y qué no
 
@@ -114,12 +118,12 @@ por columna nueva + backfill. Está escrito en la propia migración.
 | 4 | Contactos: archivo, papelera, eliminación | **Completo** |
 | 5 | Embudos: CRUD y retiro seguro | **Completo** |
 | 10 | Renombrar a TAKTO Pulso | **Completo** |
-| 8 | Importación de productos | **Parcial**: seguridad y CSV hechos; falta streaming a disco, cola, progreso, cancelación y reanudación |
-| 9 | Cotizaciones | **Parcial**: Decimal y numeración hechos; faltan impuestos, transporte, descuento por línea, revisiones y pipeline de cotizaciones |
+| 9 | Cotizaciones | **Completo** |
+| 12 | Barrido general | **Completo** |
+| 8 | Importación de productos | **Parcial**: seguridad, CSV y límite configurable hechos; falta streaming a disco, cola, progreso, cancelación y reanudación |
 | 6 | Panel lateral y navegación Pipeline ↔ Chat | **Completo** |
 | 7 | Tareas con aprobación (`TaskSuggestion`) | **Completo** |
 | 11 | Importar/exportar Pulsos | **Completo** |
-| 12 | Barrido general de botones y menús | **Pendiente** |
 
 ## Limitaciones conocidas
 
@@ -135,10 +139,14 @@ por columna nueva + backfill. Está escrito en la propia migración.
 3. **`og:image` en staging apunta a localhost.** Es un defecto de build
    (`NEXT_PUBLIC_APP_URL` ausente al construir), no de código. No se corrigió
    porque tocarlo implica redesplegar staging, que está fuera de alcance.
-4. **La QA responsive de este encargo no se ha rehecho.** La de la sesión
-   anterior (40 capturas, 5 anchos, 0 desbordamientos) cubre las pantallas
-   previas; las nuevas —papelera de contactos, diálogo de retiro de embudos—
-   están cubiertas por pruebas de interfaz pero no por capturas.
+4. **Dependencias.** Quedan 2 moderadas en el backend (`uuid`, arrastrada por
+   `exceljs`) y 3 altas en el frontend (`sharp`, por `libvips`). Ambas exigen
+   `npm audit fix --force`, y en el caso de `sharp` eso subiría Next fuera del
+   rango declarado. Todas son **heredadas**: las dependencias declaradas son
+   idénticas a las de `main`.
+5. **La QA responsive se rehizo contra el producto levantado en local**: 39
+   capturas, 5 anchos, 0 desbordamientos, 0 errores de consola, 0 controles sin
+   nombre. No se repitió contra staging, que no se ha tocado.
 
 ## Hallazgos añadidos en esta sesión
 
@@ -149,15 +157,33 @@ por columna nueva + backfill. Está escrito en la propia migración.
 | 18 | M | Navegación | La conversación abierta vivía en estado local: sin deep link, y recargar perdía el chat | **Corregido** |
 | 19 | A | Pulso | El analizador de importación convertía con `String(valor)`: un campo objeto habría entrado como `[object Object]` | **Corregido** |
 | 20 | B | Perfil | Un campo personalizado numérico habría salido como `[object Object]` si el tipo se aflojaba | **Corregido** |
+| 21 | **A** | API | Los importes salían por HTTP como `{"s":1,"e":6,"d":[...]}` y el tablero mostraba **`$ NaN`** | **Corregido** |
+| 22 | M | Productos | Los botones de editar y retirar eran iconos sin nombre accesible | **Corregido** |
+| 23 | M | QA | El arnés de QA daba 39 capturas «verdes» de la pantalla de error del navegador | **Corregido** |
+
+### El hallazgo 21, en detalle
+
+`ClassSerializerInterceptor` usa `instanceToPlain`, que enumera las propiedades
+**propias** del objeto en vez de llamar a su `toJSON`. Las de un `Decimal` son
+`s`, `e` y `d`. Al migrar el dinero a `Decimal`, cada importe empezó a salir por
+la API como su representación interna, que en el navegador es `NaN`.
+
+**Ninguna prueba lo detectó, y no por descuido**: todas comprueban el servicio,
+donde el valor sigue siendo un `Decimal` correcto. El fallo solo existe al otro
+lado de HTTP. Apareció al levantar el producto y mirar el tablero.
 
 ## Reanudación
 
-Rama `feature/takto-functional-hardening`, publicada. Falta **§12** (barrido
-general) y completar **§8** (streaming de importación) y **§9** (impuestos,
-transporte, descuento por línea, revisiones y pipeline de cotizaciones).
+Rama `feature/takto-functional-hardening`, publicada. Lo único que queda del
+encargo es la parte de **§8** que exige arquitectura nueva: carga por fragmentos
+a disco, procesamiento en el worker con cola, progreso, cancelación y
+reanudación. Lo demás está cerrado.
 
-Siguiente bloque recomendado: **§9**, porque el cálculo ya está en Decimal y lo
-que queda es ampliar el modelo de la cotización sobre esa base.
+Punto exacto de entrada:
+`apps/backend/src/modules/products/products-import.service.ts` lee hoy el
+archivo entero en memoria (`workbook.xlsx.load(buffer)`). El primer paso es
+cambiar `FileInterceptor` por almacenamiento en disco y sustituir esa lectura
+por `workbook.xlsx.read(stream)`.
 
 ```bash
 git -C C:/Users/Usuario/Desktop/Tehus_Rattan checkout feature/takto-functional-hardening
