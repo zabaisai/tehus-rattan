@@ -25,6 +25,17 @@ describe('QuotesService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      // La cotización se lleva CONGELADOS los ajustes de la empresa: cómo
+      // redondea y cómo cobra el impuesto. Cambiarlos mañana no puede
+      // recalcular un documento que ya se envió.
+      company: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          currency: 'COP',
+          quoteRoundingDecimals: 0,
+          defaultTaxRate: 0,
+          taxIncluded: false,
+        }),
+      },
       // El siguiente numero lo calcula la base con un MAX, no el proceso
       // trayendose todas las cotizaciones de la empresa.
       $queryRaw: jest.fn().mockResolvedValue([{ maximo: null }]),

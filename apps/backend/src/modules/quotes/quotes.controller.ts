@@ -17,6 +17,11 @@ import { AuthGuard } from '@nestjs/passport';
 import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { QuotesService } from './quotes.service';
 import { QuotePdfService } from './quote-pdf.service';
+import { QuoteCicloService } from './quote-ciclo.service';
+import {
+  DecisionCotizacionDto,
+  EnviarCotizacionDto,
+} from './dto/ciclo-cotizacion.dto';
 import { CreateQuoteFromLeadDto } from './dto/create-quote-from-lead.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { aNumeroParaMostrar } from '../../common/dinero/dinero';
@@ -27,7 +32,59 @@ export class QuotesController {
   constructor(
     private quotesService: QuotesService,
     private pdfService: QuotePdfService,
+    private ciclo: QuoteCicloService,
   ) {}
+
+  /**
+   * Marca la cotizacion como ENVIADA y mueve la oportunidad al embudo de
+   * cotizaciones configurado.
+   *
+   * La clave de idempotencia es OBLIGATORIA: reintentar un envio no puede
+   * mandarle al cliente la misma cotizacion dos veces.
+   */
+  @Post(':id/enviar')
+  enviar(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: EnviarCotizacionDto,
+  ) {
+    return this.ciclo.enviar(id, req.user.companyId, body.idempotencyKey);
+  }
+
+  /**
+   * Crea una REVISION.
+   *
+   * Una cotizacion enviada no se edita: se revisa. Editar el documento que el
+   * cliente ya tiene en la mano hace que dos personas miren cifras distintas
+   * creyendo que miran la misma cotizacion.
+   */
+  @Post(':id/revision')
+  revisar(@Param('id') id: string, @Request() req: any) {
+    return this.ciclo.crearRevision(id, req.user.companyId, req.user.sub);
+  }
+
+  @Post(':id/aceptar')
+  aceptar(@Param('id') id: string, @Request() req: any) {
+    return this.ciclo.aceptar(id, req.user.companyId);
+  }
+
+  @Post(':id/rechazar')
+  rechazar(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: DecisionCotizacionDto,
+  ) {
+    return this.ciclo.rechazar(id, req.user.companyId, body.motivo);
+  }
+
+  @Post(':id/cancelar')
+  cancelar(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body() body: DecisionCotizacionDto,
+  ) {
+    return this.ciclo.cancelar(id, req.user.companyId, body.motivo);
+  }
 
   @Get()
   findAll(

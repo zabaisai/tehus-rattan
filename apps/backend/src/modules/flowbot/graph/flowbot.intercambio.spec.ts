@@ -337,9 +337,7 @@ describe('Intercambio de Pulsos — importar', () => {
             config: {},
           },
         ],
-        edges: [
-          { id: 'e', from: 'a', fromPort: { raro: 1 }, to: 'a' },
-        ],
+        edges: [{ id: 'e', from: 'a', fromPort: { raro: 1 }, to: 'a' }],
       },
     };
 

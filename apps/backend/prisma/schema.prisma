@@ -46,9 +46,25 @@ model Company {
   // `businessHours` queda nullable a propósito: "sin horario definido" es un
   // estado distinto de "horario vacío", y las reglas de asignación deben
   // poder distinguirlos.
-  timezone      String @default("America/Bogota")
-  currency      String @default("COP")
-  locale        String @default("es-CO")
+  timezone String @default("America/Bogota")
+  currency String @default("COP")
+  locale   String @default("es-CO")
+
+  /// Decimales a los que se redondea el dinero AL PRESENTARLO.
+  ///
+  /// El peso colombiano no usa centavos, asi que 0 es lo normal aqui; una
+  /// empresa que facture en dolares querra 2. El almacenamiento sigue siendo
+  /// numeric(18,4) pase lo que pase: esto es presentacion, no precision.
+  quoteRoundingDecimals Int @default(0)
+
+  /// Impuesto por defecto de las cotizaciones, en unidades humanas (19 = 19 %).
+  defaultTaxRate Decimal @default(0) @db.Decimal(7, 4)
+
+  /// Si el precio unitario YA lleva el impuesto dentro.
+  ///
+  /// Cambia el calculo entero: con IVA incluido el impuesto se EXTRAE de la
+  /// base en vez de sumarse encima, y confundirlo desvia el total un 19 %.
+  taxIncluded   Boolean @default(false)
   businessHours Json?
 
   // Asignación automática de conversaciones y oportunidades entrantes.
@@ -122,6 +138,7 @@ model Company {
 }
 
 model User {
+  cotizacionesAsignadas Quote[]          @relation("CotizacionAsesor")
   sugerenciasPropuestas TaskSuggestion[] @relation("SugerenciaAsesor")
   sugerenciasDecididas  TaskSuggestion[] @relation("SugerenciaDecisor")
   id                    String           @id @default(cuid())
@@ -194,6 +211,7 @@ model User {
 
 model Contact {
   taskSuggestions TaskSuggestion[]
+  quotes          Quote[]
   id              String           @id @default(cuid())
   phone           String
   name            String?
@@ -244,6 +262,7 @@ model Contact {
 
 model Conversation {
   taskSuggestions TaskSuggestion[]
+  quotes          Quote[]
   id              String             @id @default(cuid())
   status          ConversationStatus @default(OPEN)
   stage           String?
@@ -519,7 +538,8 @@ model Pipeline {
   // Prisma no soporta índices parciales. Se crea como SQL en la migración
   // (`pipelines_one_default_per_company`) y se refuerza en el servicio dentro
   // de una transacción. Ver la nota en el propio migration.sql.
-  leadSettingsUsing CompanyLeadSettings[] @relation("LeadSettingsPipeline")
+  leadSettingsUsing  CompanyLeadSettings[] @relation("LeadSettingsPipeline")
+  quoteSettingsUsing CompanyLeadSettings[] @relation("QuotePipeline")
 
   @@index([companyId, isArchived, order])
   @@map("pipelines")
@@ -556,10 +576,11 @@ model PipelineStage {
   // sigue siendo la fuente de verdad hasta que la transición se complete.
   type StageType @default(OPEN)
 
-  pipelineId        String
-  pipeline          Pipeline              @relation(fields: [pipelineId], references: [id])
-  leads             Lead[]
-  leadSettingsUsing CompanyLeadSettings[] @relation("LeadSettingsStage")
+  pipelineId         String
+  pipeline           Pipeline              @relation(fields: [pipelineId], references: [id])
+  leads              Lead[]
+  leadSettingsUsing  CompanyLeadSettings[] @relation("LeadSettingsStage")
+  quoteSettingsUsing CompanyLeadSettings[] @relation("QuoteStage")
 
   @@index([pipelineId, order])
   @@map("pipeline_stages")
@@ -870,10 +891,10 @@ model Product {
 // COTIZACIONES
 // ─────────────────────────────────────────────
 model Quote {
-  id         String      @id @default(cuid())
-  number     String
-  title      String?
-  status     QuoteStatus @default(DRAFT)
+  id       String      @id @default(cuid())
+  number   String
+  title    String?
+  status   QuoteStatus @default(DRAFT)
   // subtotal/total are computed and stored by the backend on every write —
   // never trust a client-supplied value for either.
   /// Decimal, nunca Float.
@@ -882,22 +903,82 @@ model Quote {
   /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
   /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
   /// y quien lo mira concluye —con razon— que el sistema calcula mal.
-  subtotal   Decimal     @default(0) @db.Decimal(18, 4)
-  discount   Decimal     @default(0) @db.Decimal(18, 4)
-  total      Decimal     @default(0) @db.Decimal(18, 4)
+  subtotal Decimal     @default(0) @db.Decimal(18, 4)
+  discount Decimal     @default(0) @db.Decimal(18, 4)
+  total    Decimal     @default(0) @db.Decimal(18, 4)
+
+  /// Suma de los descuentos POR LINEA. Aparte del general, para que el
+  /// documento pueda decir de donde sale cada rebaja.
+  lineDiscountTotal Decimal @default(0) @db.Decimal(18, 4)
+
+  /// Ajuste manual. Positivo o NEGATIVO: un redondeo comercial a la baja es
+  /// tan legitimo como un recargo, y obligar a meterlo como descuento
+  /// mezclaria dos cosas distintas en el mismo renglon.
+  adjustment      Decimal @default(0) @db.Decimal(18, 4)
+  adjustmentLabel String?
+
+  /// Transporte. Se suma DESPUES del descuento general y ANTES del impuesto.
+  shipping Decimal @default(0) @db.Decimal(18, 4)
+
+  /// Impuesto en unidades humanas: 19 = 19 %.
+  taxRate  Decimal @default(0) @db.Decimal(7, 4)
+  taxTotal Decimal @default(0) @db.Decimal(18, 4)
+
+  /// Si los precios de las lineas YA llevan el impuesto dentro.
+  ///
+  /// Se guarda EN LA COTIZACION y no solo en la empresa: cambiar el ajuste de
+  /// la empresa no puede recalcular en silencio un documento que ya se envio a
+  /// un cliente.
+  taxIncluded Boolean @default(false)
+
+  /// Moneda y decimales congelados en el momento de crearla, por lo mismo.
+  currency         String @default("COP")
+  roundingDecimals Int    @default(0)
+
+  /// Revision. Una cotizacion enviada no se edita: se revisa.
+  revision      Int     @default(1)
+  parentQuoteId String?
+  parentQuote   Quote?  @relation("RevisionDeCotizacion", fields: [parentQuoteId], references: [id], onDelete: SetNull)
+  revisions     Quote[] @relation("RevisionDeCotizacion")
+
+  /// Ciclo de vida. Fechas y no solo el estado: «¿cuando se envio?» es la
+  /// primera pregunta cuando un cliente dice que no la recibio.
+  sentAt          DateTime?
+  acceptedAt      DateTime?
+  rejectedAt      DateTime?
+  cancelledAt     DateTime?
+  rejectionReason String?
+
+  /// Reintentar un envio NO manda dos veces la misma cotizacion al cliente.
+  sendIdempotencyKey String? @unique
+
   notes      String?
+  /// Condiciones comerciales que salen impresas.
+  terms      String?
   validUntil DateTime?
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   leadId String
   lead   Lead   @relation(fields: [leadId], references: [id])
+
+  /// Vinculos directos. La cotizacion se puede abrir desde la conversacion en
+  /// la que se acordo, sin pasar por la oportunidad.
+  contactId String?
+  contact   Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
+
+  conversationId String?
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
   createdById String?
   createdBy   User?   @relation(fields: [createdById], references: [id])
+
+  /// Asesor responsable. Puede no ser quien la creo.
+  assignedTo String?
+  agent      User?   @relation("CotizacionAsesor", fields: [assignedTo], references: [id], onDelete: SetNull)
 
   items QuoteItem[]
 
@@ -916,7 +997,7 @@ enum QuoteStatus {
 }
 
 model QuoteItem {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   // Full snapshot of the LeadProduct/Product at the moment the quote was
   // created — name/description/category/unitPrice never follow later
   // catalog edits, so a sent quote always reflects what the client saw.
@@ -930,11 +1011,22 @@ model QuoteItem {
   /// sumar lineas de una cotizacion acumula error: 1000 lineas de 0,1 no dan
   /// 100. En dinero eso es un total que no cuadra con la suma de sus partes,
   /// y quien lo mira concluye —con razon— que el sistema calcula mal.
-  unitPrice   Decimal  @db.Decimal(18, 4)
-  subtotal    Decimal  @db.Decimal(18, 4)
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  unitPrice   Decimal @db.Decimal(18, 4)
+
+  /// Descuento de ESTA linea, como importe ya calculado.
+  ///
+  /// Importe y no porcentaje en el almacenamiento: el porcentaje se aplica al
+  /// capturar y lo que hay que conservar es la cifra exacta que se rebajo, no
+  /// una regla que al recalcular podria dar otra por redondeo.
+  lineDiscount        Decimal  @default(0) @db.Decimal(18, 4)
+  /// El porcentaje pedido, si se capturo asi. Solo para poder mostrarlo.
+  lineDiscountPercent Decimal? @db.Decimal(7, 4)
+
+  /// `cantidad x precio - descuento`. Sin impuesto.
+  subtotal  Decimal  @db.Decimal(18, 4)
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   quoteId String
   quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
@@ -2258,6 +2350,18 @@ model CompanyLeadSettings {
   /// Se puede apagar por empresa, pero apagarlo es una decision explicita: el
   /// valor seguro es el que viene de fabrica.
   requireTaskApproval Boolean @default(true)
+
+  /// Embudo y etapa a los que se mueve la oportunidad al cotizar.
+  ///
+  /// POR ID Y NUNCA POR NOMBRE. Buscar un embudo llamado «Cotizaciones» rompe
+  /// el dia que alguien lo renombra, y renombrarlo es algo que puede hacer
+  /// cualquiera cualquier dia. Si no estan configurados, el producto lo dice y
+  /// explica donde ponerlos en vez de adivinar.
+  quotePipelineId String?
+  quotePipeline   Pipeline? @relation("QuotePipeline", fields: [quotePipelineId], references: [id], onDelete: SetNull)
+
+  quoteStageId String?
+  quoteStage   PipelineStage? @relation("QuoteStage", fields: [quoteStageId], references: [id], onDelete: SetNull)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

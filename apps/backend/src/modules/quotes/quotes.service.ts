@@ -6,16 +6,14 @@ import {
 } from '@nestjs/common';
 import { Prisma, QuoteStatus } from '@prisma/client';
 import {
-  type Dinero,
   dinero,
-  suma,
   resta,
-  multiplica,
   redondea,
   noNegativo,
   mayorQue,
 } from '../../common/dinero/dinero';
 import { PrismaService } from '../../prisma/prisma.service';
+import { calcularCotizacion } from './quote-calculo';
 
 const LEAD_SELECT = { id: true, title: true, status: true };
 
@@ -38,28 +36,6 @@ const COMPANY_IDENTITY_SELECT = {
   logoUrl: true,
   quoteFooter: true,
 } as const;
-
-/**
- * El calculo del dinero vive en el SERVIDOR y en Decimal.
- *
- * El navegador puede calcular para que el usuario vea el total al instante,
- * pero lo que se guarda es esto: si las dos cifras discrepan, manda esta. Un
- * total que llega del cliente es un total que el cliente puede cambiar.
- */
-function calcularTotales(
-  lineas: Array<{ quantity: number; unitPrice: Prisma.Decimal.Value }>,
-  descuentoGeneral: Prisma.Decimal.Value,
-): { subtotal: Dinero; descuento: Dinero; total: Dinero } {
-  const subtotal = redondea(
-    suma(...lineas.map((l) => multiplica(l.quantity, l.unitPrice))),
-  );
-  // El descuento no puede superar al subtotal: un total negativo no es un
-  // cobro, es un error de captura.
-  const descuento = redondea(
-    mayorQue(descuentoGeneral, subtotal) ? subtotal : dinero(descuentoGeneral),
-  );
-  return { subtotal, descuento, total: redondea(resta(subtotal, descuento)) };
-}
 
 @Injectable()
 export class QuotesService {
@@ -132,6 +108,10 @@ export class QuotesService {
       notes?: string;
       validUntil?: string;
       discount?: number;
+      shipping?: number;
+      adjustment?: number;
+      taxRate?: number;
+      taxIncluded?: boolean;
     },
   ) {
     const lead = await this.prisma.lead.findFirst({
@@ -154,22 +134,53 @@ export class QuotesService {
       );
     }
 
-    const itemsData = leadProducts.map((lp) => ({
+    // La empresa decide cómo se redondea y cómo se cobra el impuesto; la
+    // cotización se lleva esos valores CONGELADOS, para que cambiar el ajuste
+    // de la empresa mañana no recalcule en silencio un documento ya enviado.
+    const empresa = await this.prisma.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: {
+        currency: true,
+        quoteRoundingDecimals: true,
+        defaultTaxRate: true,
+        taxIncluded: true,
+      },
+    });
+
+    const taxRate = data.taxRate ?? empresa.defaultTaxRate;
+    const taxIncluded = data.taxIncluded ?? empresa.taxIncluded;
+    const roundingDecimals = empresa.quoteRoundingDecimals;
+
+    const calculo = calcularCotizacion({
+      lineas: leadProducts.map((lp) => ({
+        quantity: lp.quantity,
+        unitPrice: lp.unitPrice,
+      })),
+      discount: data.discount ?? 0,
+      shipping: data.shipping ?? 0,
+      adjustment: data.adjustment ?? 0,
+      taxRate,
+      taxIncluded,
+      roundingDecimals,
+    });
+
+    const itemsData = leadProducts.map((lp, i) => ({
       productId: lp.productId,
       name: lp.product.name,
       description: lp.product.description,
       category: lp.product.category,
       quantity: lp.quantity,
       unitPrice: lp.unitPrice,
-      subtotal: redondea(multiplica(lp.quantity, lp.unitPrice)),
+      lineDiscount: calculo.lineas[i].descuento,
+      subtotal: calculo.lineas[i].subtotal,
       notes: lp.notes,
     }));
 
-    const { subtotal, descuento, total } = calcularTotales(
-      leadProducts,
-      data.discount ?? 0,
-    );
-    const discount = descuento;
+    const { subtotal, discount, total } = {
+      subtotal: calculo.subtotal,
+      discount: calculo.discount,
+      total: calculo.total,
+    };
     const number = await this.generateNextNumber(companyId);
 
     try {
@@ -182,6 +193,14 @@ export class QuotesService {
           subtotal,
           discount,
           total,
+          lineDiscountTotal: calculo.lineDiscountTotal,
+          shipping: calculo.shipping,
+          adjustment: calculo.adjustment,
+          taxRate,
+          taxTotal: calculo.taxTotal,
+          taxIncluded,
+          currency: empresa.currency,
+          roundingDecimals,
           companyId,
           leadId,
           createdById: userId,
