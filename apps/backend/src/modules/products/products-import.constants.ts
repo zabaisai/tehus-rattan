@@ -35,10 +35,26 @@ export const MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES =
 
 export const FILE_TOO_LARGE_MESSAGE = `El archivo supera el tamaño máximo permitido de ${MAX_PRODUCT_IMPORT_FILE_SIZE_MB}MB.`;
 
-// MVP ceiling on data rows per import — protects the request from running
-// for an unbounded amount of time (and the DB from an unbounded write burst)
-// if someone uploads a catalog far larger than any real company's.
-export const MAX_PRODUCT_IMPORT_ROWS = 10000;
+/**
+ * Filas de datos por importacion.
+ *
+ * ESTE TOPE EXISTIA POR LA ARQUITECTURA ANTERIOR, no por el negocio: con el
+ * archivo entero en memoria, diez mil filas ya era todo lo que el proceso
+ * aguantaba. Leyendo en streaming la memoria no depende del numero de filas,
+ * asi que el limite pasa a ser lo que de verdad protege: que una importacion
+ * no ocupe el worker durante horas.
+ *
+ * Configurable, porque «grande» significa cosas distintas segun el catalogo.
+ */
+function leerTopeDeFilas(): number {
+  const crudo = process.env.PRODUCT_IMPORT_MAX_ROWS;
+  if (!crudo) return 500_000;
+  const n = Number(crudo);
+  // Un valor invalido NO sube el tope en silencio.
+  return Number.isInteger(n) && n > 0 && n <= 5_000_000 ? n : 500_000;
+}
+
+export const MAX_PRODUCT_IMPORT_ROWS = leerTopeDeFilas();
 
 export const TOO_MANY_ROWS_MESSAGE = `El archivo tiene demasiadas filas. Máximo permitido: ${MAX_PRODUCT_IMPORT_ROWS.toLocaleString('es-CO')} productos por importación.`;
 
@@ -62,3 +78,57 @@ export const MAX_EMBEDDED_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
 // with very few data rows but many/huge embedded images shouldn't be able
 // to blow up memory before a single row is even processed.
 export const MAX_TOTAL_EMBEDDED_IMAGES_BYTES = 100 * 1024 * 1024;
+
+// ── limites de la importacion en streaming ─────────────────────
+
+/**
+ * Columnas por archivo.
+ *
+ * Un catalogo real no pasa de veinte; mil columnas es un archivo construido
+ * para que el procesamiento por fila cueste mil veces mas de lo normal.
+ */
+export const MAX_COLUMNAS = 200;
+
+/**
+ * Longitud de una celda.
+ *
+ * Sin tope, una sola celda de cien megas cabe en un XLSX de pocos kilobytes
+ * comprimido, y basta una para dejar sin memoria al proceso.
+ */
+export const MAX_LONGITUD_CELDA = 4096;
+
+/**
+ * Cuanto puede crecer un archivo al descomprimirse antes de considerarlo un
+ * ataque.
+ *
+ * Un XLSX comprime bien —texto repetido— asi que 200 veces es holgado para un
+ * catalogo legitimo y sigue cortando una zip bomb, que busca ratios de miles.
+ */
+export const RATIO_MAXIMO_DESCOMPRESION = 200;
+
+/**
+ * Filas por lote que se escriben juntas.
+ *
+ * Ni una a una —seria un viaje a la base por producto— ni el archivo entero,
+ * que es justo lo que esta arquitectura evita.
+ */
+export const FILAS_POR_LOTE = 500;
+
+/**
+ * Importaciones simultaneas por empresa.
+ *
+ * Una. Dos a la vez sobre el mismo catalogo compiten por los mismos SKU y el
+ * resultado depende de quien gane la carrera.
+ */
+export const MAX_IMPORTACIONES_SIMULTANEAS = 1;
+
+/**
+ * Espacio libre en disco que se exige ANTES de aceptar una subida.
+ *
+ * Aceptar un archivo que no cabe llena el disco del servidor y se lleva por
+ * delante a todo lo demas, no solo a la importacion.
+ */
+export const MARGEN_DISCO_BYTES = 2 * 1024 * 1024 * 1024;
+
+/** Errores por fila que se guardan. Mas alla, se cuentan pero no se detallan. */
+export const MAX_ERRORES_DETALLADOS = 500;

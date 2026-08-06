@@ -15,10 +15,9 @@ import {
   createProduct,
   updateProduct,
   deactivateProduct,
-  importProductsFromExcel,
   PRODUCT_CATEGORIES,
 } from "@/lib/products";
-import { Product, ProductImportSummary } from "@/types";
+import { Product } from "@/types";
 import { getMyCompany } from "@/lib/companies";
 import {
   ProductModal,
@@ -105,10 +104,8 @@ export default function ProductsPage() {
     await queryClient.invalidateQueries({ queryKey: ["products"] });
   }
 
-  async function handleImport(file: File): Promise<ProductImportSummary> {
-    const summary = await importProductsFromExcel(file);
+  async function refrescarCatalogo() {
     await queryClient.invalidateQueries({ queryKey: ["products"] });
-    return summary;
   }
 
   return (
@@ -273,7 +270,7 @@ export default function ProductsPage() {
       {importModalOpen && (
         <ProductImportModal
           onClose={() => setImportModalOpen(false)}
-          onImport={handleImport}
+          onFinished={() => void refrescarCatalogo()}
         />
       )}
     </div>

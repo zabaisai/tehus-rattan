@@ -266,6 +266,52 @@ export interface ProductImportIssue {
   rawName?: string;
 }
 
+export type EstadoDeImportacion =
+  | "PENDING"
+  | "RUNNING"
+  | "CANCELLING"
+  | "CANCELLED"
+  | "COMPLETED"
+  | "FAILED";
+
+/**
+ * Una importación de catálogo con su estado DURABLE.
+ *
+ * Durable y no en memoria: un catálogo grande tarda minutos, el worker se
+ * puede reiniciar a mitad y quien la lanzó cierra la pestaña.
+ */
+export interface Importacion {
+  id: string;
+  status: EstadoDeImportacion;
+  fileName: string;
+  fileSize: number;
+  totalRows: number;
+  processedRows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  porcentaje?: number;
+  errorMessage: string | null;
+  issues?: Array<{ fila: number; motivo: string; nombre?: string }> | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+/** campo -> índice de columna. */
+export interface MapeoDeColumnas {
+  campos: Record<string, number>;
+  sinAsignar: Array<{ indice: number; cabecera: string }>;
+}
+
+export interface VistaPreviaDeImportacion {
+  cabeceras: string[];
+  filas: string[][];
+  mapeoPropuesto: MapeoDeColumnas;
+  camposReconocidos: string[];
+  camposDisponibles: string[];
+}
+
 export interface ProductImportSummary {
   totalRows: number;
   created: number;

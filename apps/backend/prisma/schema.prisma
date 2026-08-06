@@ -8,6 +8,7 @@ datasource db {
 }
 
 model Company {
+  productImports  ProductImport[]
   taskSuggestions TaskSuggestion[]
   id              String           @id @default(cuid())
   name            String
@@ -138,6 +139,7 @@ model Company {
 }
 
 model User {
+  importaciones         ProductImport[]  @relation("ImportacionAutor")
   cotizacionesAsignadas Quote[]          @relation("CotizacionAsesor")
   sugerenciasPropuestas TaskSuggestion[] @relation("SugerenciaAsesor")
   sugerenciasDecididas  TaskSuggestion[] @relation("SugerenciaDecisor")
@@ -858,6 +860,80 @@ enum TaskStatus {
 // ─────────────────────────────────────────────
 // PRODUCTOS
 // ─────────────────────────────────────────────
+/// Estado de una importacion de catalogo.
+///
+/// CANCELLING existe aparte de CANCELLED porque cancelar no es instantaneo: el
+/// worker esta a mitad de un lote y hay que pedirle que pare, no fingir que ya
+/// paro. Sin ese estado intermedio, la pantalla diria «cancelada» mientras
+/// siguen entrando productos.
+enum ProductImportStatus {
+  PENDING
+  RUNNING
+  CANCELLING
+  CANCELLED
+  COMPLETED
+  FAILED
+}
+
+/// Una importacion de catalogo, con su estado DURABLE.
+///
+/// Durable y no en memoria: un catalogo grande tarda minutos, el worker se
+/// puede reiniciar a mitad y quien lo lanzo cierra la pestaña. Si el progreso
+/// viviera en el proceso, un reinicio dejaria la pantalla esperando para
+/// siempre una respuesta que nadie va a dar.
+model ProductImport {
+  id     String              @id @default(cuid())
+  status ProductImportStatus @default(PENDING)
+
+  /// Nombre original, solo para que la persona reconozca su archivo.
+  fileName String
+  fileSize Int
+  /// Ruta del temporal en disco. Se borra al terminar, pase lo que pase.
+  tempPath String?
+
+  /// Cuantas filas de datos tiene el archivo, si ya se pudo contar.
+  totalRows     Int @default(0)
+  processedRows Int @default(0)
+  created       Int @default(0)
+  updated       Int @default(0)
+  skipped       Int @default(0)
+  failed        Int @default(0)
+
+  /// Ultima fila TERMINADA. Es el punto por el que se reanuda.
+  ///
+  /// Se guarda despues de confirmar el lote, no antes: si se guardara antes,
+  /// un reinicio a mitad se saltaria filas que nunca se escribieron.
+  lastCommittedRow Int @default(0)
+
+  /// Que columna del archivo alimenta que campo. Lo confirma la persona tras
+  /// ver la vista previa; sin esto habria que adivinar, y adivinar mal mete
+  /// precios en el campo del stock.
+  columnMapping Json?
+
+  /// Errores por fila. Acotado: un archivo con 200.000 filas malas no puede
+  /// convertir esta fila en un documento de cien megas.
+  issues Json?
+
+  errorMessage String?
+
+  /// Reintentar la MISMA subida no arranca dos importaciones.
+  idempotencyKey String? @unique
+
+  startedAt  DateTime?
+  finishedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdById String?
+  createdBy   User?   @relation("ImportacionAutor", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, status, createdAt])
+  @@map("product_imports")
+}
+
 model Product {
   id          String   @id @default(cuid())
   code        String?
