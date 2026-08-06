@@ -47,8 +47,17 @@ export class DecimalInterceptor implements NestInterceptor {
 /**
  * Recorre la respuesta sustituyendo Decimals.
  *
- * `Buffer` y `Date` se dejan en paz: el PDF de una cotizacion es un Buffer, y
- * recorrerlo byte a byte lo destruiria ademas de costar una eternidad.
+ * SOLO SE RECONSTRUYEN OBJETOS PLANOS Y LISTAS.
+ *
+ * Reconstruir una instancia de clase la destruye: se copian sus propiedades
+ * pero se pierde su prototipo, y con el todo lo que sabia hacer. El PDF de una
+ * cotizacion se devuelve como `StreamableFile`; al rehacerlo aqui, Nest
+ * recibia un objeto plano donde esperaba un flujo y el endpoint contestaba 500
+ * con `Cannot read properties of undefined (reading 'destroyed')`.
+ *
+ * Un Decimal se convierte porque sabemos exactamente que es. Cualquier otra
+ * instancia —Buffer, Date, StreamableFile, un flujo— pasa intacta: no hay que
+ * tocar lo que no se entiende.
  */
 function convertir(valor: unknown, profundidad = 0): unknown {
   // Un tope de profundidad evita que una estructura ciclica —o absurdamente
@@ -57,19 +66,15 @@ function convertir(valor: unknown, profundidad = 0): unknown {
 
   if (valor instanceof Prisma.Decimal) return valor.toNumber();
 
-  if (
-    valor === null ||
-    valor === undefined ||
-    typeof valor !== 'object' ||
-    valor instanceof Date ||
-    Buffer.isBuffer(valor)
-  ) {
+  if (valor === null || valor === undefined || typeof valor !== 'object') {
     return valor;
   }
 
   if (Array.isArray(valor)) {
     return valor.map((v) => convertir(v, profundidad + 1));
   }
+
+  if (!esObjetoPlano(valor)) return valor;
 
   // Se construye un objeto NUEVO en vez de mutar el que llega: mutar la
   // entidad de Prisma la dejaria alterada para cualquier otro uso dentro de
@@ -79,4 +84,15 @@ function convertir(valor: unknown, profundidad = 0): unknown {
     salida[clave] = convertir(v, profundidad + 1);
   }
   return salida;
+}
+
+/**
+ * Un objeto plano es el que sale de `{}`, de `JSON.parse` o de Prisma.
+ *
+ * Lo que tiene otro prototipo es una instancia de algo, y reconstruirla la
+ * rompe.
+ */
+function esObjetoPlano(valor: object): boolean {
+  const proto = Object.getPrototypeOf(valor);
+  return proto === Object.prototype || proto === null;
 }

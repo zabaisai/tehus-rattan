@@ -81,6 +81,56 @@ describe('Serialización de importes en la respuesta', () => {
     expect(r.value).toBeNull();
   });
 
+  /**
+   * LA REGRESION QUE ESTE ARCHIVO NO ATRAPO LA PRIMERA VEZ.
+   *
+   * La version anterior reconstruia CUALQUIER objeto. El PDF de una cotizacion
+   * se devuelve como `StreamableFile`; al rehacerlo, Nest recibia un objeto
+   * plano donde esperaba un flujo y el endpoint contestaba 500 con
+   * «Cannot read properties of undefined (reading 'destroyed')».
+   *
+   * Solo lo detecto pedir el PDF al producto vivo: la prueba de PDF comprueba
+   * el servicio, donde el Buffer todavia esta bien.
+   */
+  it('NO reconstruye una instancia de clase: la devuelve tal cual', async () => {
+    class ArchivoDescargable {
+      constructor(readonly contenido: Buffer) {}
+      get tamaño() {
+        return this.contenido.length;
+      }
+    }
+    const original = new ArchivoDescargable(Buffer.from('%PDF-1.7'));
+
+    const r = await pasar(original);
+
+    // Misma instancia, no una copia: conserva su prototipo y sus métodos.
+    expect(r).toBe(original);
+    expect(r).toBeInstanceOf(ArchivoDescargable);
+    expect((r as ArchivoDescargable).tamaño).toBe(8);
+  });
+
+  it('tampoco reconstruye lo que va DENTRO de un objeto plano', async () => {
+    class Flujo {
+      leer() {
+        return 'datos';
+      }
+    }
+    const flujo = new Flujo();
+
+    const r = (await pasar({
+      archivo: flujo,
+      total: new Prisma.Decimal('10'),
+    })) as {
+      archivo: Flujo;
+      total: number;
+    };
+
+    expect(r.archivo).toBe(flujo);
+    expect(r.archivo.leer()).toBe('datos');
+    // Y el importe de al lado sí se convierte.
+    expect(r.total).toBe(10);
+  });
+
   it('no muta el objeto original', async () => {
     // Mutar la entidad de Prisma la dejaría alterada para cualquier otro uso
     // dentro de la misma petición.

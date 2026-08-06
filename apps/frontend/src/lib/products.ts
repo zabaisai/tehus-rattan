@@ -8,24 +8,52 @@ import {
   MapeoDeColumnas,
 } from "@/types";
 
-export const MAX_PRODUCT_IMPORT_FILE_SIZE_MB = 50;
-export const MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES =
-  MAX_PRODUCT_IMPORT_FILE_SIZE_MB * 1024 * 1024;
-export const MAX_PRODUCT_IMPORT_ROWS = 10000;
+/**
+ * Los límites REALES, tal como los aplica el servidor.
+ *
+ * Estaban escritos a mano aquí —50 MB, 10.000 filas y solo `.xlsx`— y habían
+ * dejado de coincidir con lo que el backend acepta: rechazaba CSV en el
+ * navegador cuando el servidor ya lo importaba. Un límite duplicado a mano
+ * SIEMPRE acaba desviándose, y entonces la pantalla promete una cosa y el
+ * servidor hace otra.
+ */
+export interface LimitesDeImportacion {
+  formatos: string[];
+  tamañoMaximoMb: number;
+  filasMaximas: number;
+  /** Lo que de verdad se puede subir: el menor entre producto y proxy. */
+  subidaMaximaMb: number;
+  limitadoPorElProxy: boolean;
+}
 
-// Frontend-only guardrail so obviously-oversized or wrong-format files fail
-// fast, without a round trip — the backend's own checks remain the real
-// source of truth and run regardless of this.
-export function validateProductImportFile(file: File): string | null {
+export async function getLimitesDeImportacion(): Promise<LimitesDeImportacion> {
+  const { data } = await api.get<LimitesDeImportacion>(
+    "/products/import/limits",
+  );
+  return data;
+}
+
+/**
+ * Aviso rápido en el navegador, con los límites que dijo el servidor.
+ *
+ * No es la defensa: el backend vuelve a comprobarlo todo. Esto solo evita
+ * subir 400 MB para que los rechacen al llegar.
+ */
+export function validateProductImportFile(
+  file: File,
+  limites: LimitesDeImportacion,
+): string | null {
   const name = file.name.toLowerCase();
   const dot = name.lastIndexOf(".");
   const ext = dot >= 0 ? name.slice(dot) : "";
 
-  if (ext !== ".xlsx") {
-    return "Formato de archivo no permitido. Usa un archivo .xlsx";
+  if (!limites.formatos.includes(ext)) {
+    return `Formato no permitido. Usa ${limites.formatos.join(" o ")}.`;
   }
-  if (file.size > MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES) {
-    return `El archivo supera el tamaño máximo permitido de ${MAX_PRODUCT_IMPORT_FILE_SIZE_MB}MB.`;
+  if (file.size > limites.subidaMaximaMb * 1024 * 1024) {
+    return limites.limitadoPorElProxy
+      ? `El archivo supera los ${limites.subidaMaximaMb} MB que admite la subida en este servidor.`
+      : `El archivo supera el tamaño máximo de ${limites.subidaMaximaMb} MB.`;
   }
   return null;
 }

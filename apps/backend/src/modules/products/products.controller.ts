@@ -22,7 +22,11 @@ import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { ProductsService } from './products.service';
 import { ProductImportFileSizeFilter } from './product-import-file-size.filter';
-import { MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES } from './products-import.constants';
+import {
+  MAX_PRODUCT_IMPORT_FILE_SIZE_BYTES,
+  MAX_PRODUCT_IMPORT_FILE_SIZE_MB,
+  MAX_PRODUCT_IMPORT_ROWS,
+} from './products-import.constants';
 import type { Response } from 'express';
 import { unlink } from 'fs/promises';
 import { ImportacionDeProductosService } from './import/importacion.service';
@@ -32,7 +36,10 @@ import {
   comprobarEspacio,
 } from './import/almacenamiento-temporal';
 import { validarMapeo } from './import/mapeo-columnas';
-import { validarArchivoDeImportacion } from './import/validacion-archivo';
+import {
+  EXTENSIONES_PERMITIDAS,
+  validarArchivoDeImportacion,
+} from './import/validacion-archivo';
 import { FijarMapeoDto, SubirImportacionDto } from './import/dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -113,6 +120,34 @@ export class ProductsController {
       ...importacion,
       // Quien sube decide si empieza ya o revisa antes el mapeo de columnas.
       siguientePaso: 'Revisa la vista previa y confirma el mapeo de columnas.',
+    };
+  }
+
+  /**
+   * Los limites REALES de la importacion, tal como los aplica este servidor.
+   *
+   * La interfaz los tenia escritos a mano —50 MB y 10.000 filas— y ya no
+   * coincidian con lo que el backend acepta. Un limite duplicado a mano
+   * SIEMPRE acaba desviandose, y entonces la pantalla promete una cosa y el
+   * servidor hace otra.
+   *
+   * `subidaMaximaReal` puede ser MENOR que el limite del producto: el proxy de
+   * delante tiene su propio tope de cuerpo de peticion, y de nada sirve
+   * ofrecer 500 MB si la subida muere antes de llegar aqui.
+   */
+  @Get('import/limits')
+  limitesDeImportacion() {
+    const topeProxyMb = Number(process.env.PROXY_MAX_BODY_MB) || null;
+    return {
+      formatos: EXTENSIONES_PERMITIDAS,
+      tamañoMaximoMb: MAX_PRODUCT_IMPORT_FILE_SIZE_MB,
+      filasMaximas: MAX_PRODUCT_IMPORT_ROWS,
+      // El menor de los dos manda: es el que de verdad puede subir alguien.
+      subidaMaximaMb: topeProxyMb
+        ? Math.min(topeProxyMb, MAX_PRODUCT_IMPORT_FILE_SIZE_MB)
+        : MAX_PRODUCT_IMPORT_FILE_SIZE_MB,
+      limitadoPorElProxy:
+        !!topeProxyMb && topeProxyMb < MAX_PRODUCT_IMPORT_FILE_SIZE_MB,
     };
   }
 

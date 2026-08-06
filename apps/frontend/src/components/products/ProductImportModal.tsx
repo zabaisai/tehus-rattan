@@ -6,11 +6,13 @@ import {
   arrancarImportacion,
   cancelarImportacion,
   estadoDeImportacion,
+  getLimitesDeImportacion,
   subirImportacion,
   urlDelReporte,
   validateProductImportFile,
   vistaPreviaDeImportacion,
 } from "@/lib/products";
+import { useQuery } from "@tanstack/react-query";
 import type { Importacion, VistaPreviaDeImportacion } from "@/types";
 import { Modal } from "@/components/ui/Modal";
 
@@ -60,6 +62,14 @@ export function ProductImportModal({
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
 
+  // Los límites los dice el SERVIDOR. Escritos a mano aquí se desviaban: la
+  // pantalla rechazaba CSV cuando el backend ya lo importaba.
+  const { data: limites } = useQuery({
+    queryKey: ["import-limites"],
+    queryFn: getLimitesDeImportacion,
+    staleTime: 5 * 60_000,
+  });
+
   /**
    * Sondeo del progreso mientras corre.
    *
@@ -93,8 +103,8 @@ export function ProductImportModal({
 
   function elegir(seleccionado: File | null) {
     setError("");
-    if (seleccionado) {
-      const problema = validateProductImportFile(seleccionado);
+    if (seleccionado && limites) {
+      const problema = validateProductImportFile(seleccionado, limites);
       if (problema) {
         setArchivo(null);
         setError(problema);
@@ -159,9 +169,20 @@ export function ProductImportModal({
       {paso === "elegir" && (
         <div className="space-y-3">
           <p className="text-sm text-neutral-600">
-            Acepta <strong>.xlsx</strong> y <strong>.csv</strong>. Los archivos
-            con macros (.xlsm) no se aceptan.
+            Acepta{" "}
+            <strong>
+              {(limites?.formatos ?? [".xlsx", ".csv"]).join(" y ")}
+            </strong>
+            . Los archivos con macros (.xlsm) no se aceptan.
           </p>
+          {limites && (
+            <p className="text-xs text-neutral-500">
+              Hasta <strong>{limites.subidaMaximaMb} MB</strong> por archivo y{" "}
+              {limites.filasMaximas.toLocaleString("es-CO")} filas.
+              {limites.limitadoPorElProxy &&
+                " Este servidor limita la subida por debajo del máximo del producto."}
+            </p>
+          )}
           <label className="block">
             <span className="text-sm text-neutral-700">Archivo</span>
             <input
