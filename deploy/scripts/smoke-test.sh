@@ -3,14 +3,41 @@
 # and never calls Meta. Safe to run against staging after every deploy.
 #
 # Config (env or defaults for a local run):
+#   BASE_URL          atajo: fija FRONTEND_URL=$BASE_URL y API_URL=$BASE_URL/api
 #   API_URL           default http://localhost:3001/api
 #   FRONTEND_URL      default http://localhost:3000
 #   ALLOWED_ORIGIN    default = FRONTEND_URL   (expected CORS origin)
 #   EXPECTED_RELEASE  optional git SHA to assert /health/version matches
 #   CURL_OPTS         optional extra curl flags (e.g. -k for a staging cert)
 #
+# CONTRA STAGING HAY QUE PASAR EL DOMINIO PUBLICO, no localhost:
+#
+#   BASE_URL=https://crm-staging.tehusrattan.com ./smoke-test.sh
+#
+# Los puertos 3000/3001 NO estan publicados en el VPS: el unico punto de
+# entrada es Caddy en 80/443. Ejecutarlo con los valores por defecto contra
+# staging producia quince fallos con codigo 000 —«conexion rechazada»— que
+# parecian quince funciones rotas y en realidad eran una URL equivocada. Por
+# eso ahora hay una comprobacion previa de alcanzabilidad que se detiene y lo
+# explica en vez de dejar correr el resto.
+#
+# BASE_URL deriva la API al SUBDOMINIO, no a una ruta: Caddy sirve el frontend
+# en `crm-staging…` y el backend en `api.crm-staging…`. Derivarla como
+# `$BASE_URL/api` —lo obvio— da 404 en todo, porque quien responde ahi es
+# Next.js con su propia pagina de «no encontrado»; y como esa pagina llega con
+# 404 y no con un error de red, las comprobaciones fallaban acusando al backend
+# de estar caido cuando estaba perfectamente vivo en otro dominio.
+#
 # Exit code is the number of failed checks (0 = all passed).
 set -uo pipefail
+
+if [ -n "${BASE_URL:-}" ]; then
+  base="${BASE_URL%/}"
+  esquema="${base%%://*}"
+  host="${base#*://}"
+  FRONTEND_URL="${FRONTEND_URL:-$base}"
+  API_URL="${API_URL:-$esquema://api.$host/api}"
+fi
 
 API_URL="${API_URL:-http://localhost:3001/api}"
 FRONTEND_URL="${FRONTEND_URL:-http://localhost:3000}"
@@ -28,6 +55,35 @@ headers() { curl $CURL_OPTS -s -D - -o /dev/null "$@"; }
 body()    { curl $CURL_OPTS -s "$@"; }
 
 echo "Smoke test: API=$API_URL FRONTEND=$FRONTEND_URL"
+
+# 0. Alcanzabilidad. Un 000 es «no hubo respuesta HTTP»: DNS, puerto cerrado o
+#    TLS. Seguir adelante desde ahi solo genera ruido, asi que se para aqui con
+#    el diagnostico concreto en vez de veinte lineas rojas indistinguibles.
+inalcanzable=0
+for destino in "$FRONTEND_URL/login" "$API_URL/health/live"; do
+  if [ "$(code "$destino")" = 000 ]; then
+    printf '  \033[1;31mSIN RESPUESTA\033[0m %s\n' "$destino"
+    inalcanzable=1
+  fi
+done
+if [ "$inalcanzable" = 1 ]; then
+  cat >&2 <<'DIAGNOSTICO'
+
+No hay servicio HTTP en esas direcciones. Antes de buscar el fallo en el
+producto, comprueba la URL:
+
+  · Contra STAGING pasa el dominio publico. Los puertos 3000 y 3001 no estan
+    publicados en el VPS; la unica entrada es Caddy.
+
+      BASE_URL=https://crm-staging.tehusrattan.com ./deploy/scripts/smoke-test.sh
+
+  · En LOCAL, levanta antes el entorno y usa los puertos que expongas.
+
+Este script no ha comprobado nada todavia: los fallos que verias serian de la
+conexion, no de la aplicacion.
+DIAGNOSTICO
+  exit 1
+fi
 
 # 1. Frontend responds
 c=$(code "$FRONTEND_URL/login"); [ "$c" = 200 ] && ok "frontend /login → $c" || bad "frontend /login → $c (want 200)"

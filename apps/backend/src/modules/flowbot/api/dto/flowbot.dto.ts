@@ -240,3 +240,24 @@ export class EntradaSimulacionBodyDto {
   @IsBoolean()
   forzarTimeout?: boolean;
 }
+
+/**
+ * Un `.taktoflow.json` entrante.
+ *
+ * Llega como TEXTO y no como objeto a proposito: asi la validacion del formato
+ * la hace el analizador, entera y en un solo sitio, en vez de repartirse entre
+ * `class-validator` y el codigo. El tope de aqui es la primera barrera; el
+ * analizador vuelve a comprobarlo.
+ */
+export class ImportarPulsoDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(2 * 1024 * 1024)
+  contenido!: string;
+
+  /** Nombre con el que guardarlo. Si no viene, se usa el del archivo. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nombre?: string;
+}

@@ -1,5 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  type Dinero,
+  multiplica,
+  redondea,
+  aNumeroParaMostrar,
+} from '../../common/dinero/dinero';
 
 const PRODUCT_SELECT = {
   id: true,
@@ -16,7 +22,7 @@ type LeadProductWithProduct = {
   leadId: string;
   productId: string;
   quantity: number;
-  unitPrice: number;
+  unitPrice: Dinero;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -25,15 +31,15 @@ type LeadProductWithProduct = {
     name: string;
     category: string | null;
     imageUrl: string | null;
-    price: number;
+    price: Dinero;
     sku: string | null;
     code: string | null;
   };
 };
 
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+// El subtotal se calcula en Decimal y solo se convierte al salir. Con
+// `number`, cantidad x precio de mil lineas acumula el error de la coma
+// flotante y el total deja de cuadrar con sus partes.
 
 @Injectable()
 export class LeadProductsService {
@@ -160,12 +166,17 @@ export class LeadProductsService {
       leadId: item.leadId,
       productId: item.productId,
       quantity: item.quantity,
-      unitPrice: item.unitPrice,
-      subtotal: round2(item.quantity * item.unitPrice),
+      unitPrice: aNumeroParaMostrar(item.unitPrice),
+      subtotal: aNumeroParaMostrar(
+        redondea(multiplica(item.quantity, item.unitPrice)),
+      ),
       notes: item.notes,
       createdAt: item.createdAt,
       updatedAt: item.updatedAt,
-      product: item.product,
+      product: {
+        ...item.product,
+        price: aNumeroParaMostrar(item.product.price),
+      },
     };
   }
 }

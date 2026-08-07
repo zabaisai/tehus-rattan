@@ -119,6 +119,14 @@ export const fallo = (
 export interface ContextoNodo {
   companyId: string;
   executionId: string;
+  /**
+   * De que bot viene esta ejecucion.
+   *
+   * Hace falta para poder rastrear una propuesta de tarea hasta la regla que
+   * la genero: sin eso, «este bot propone cosas que no sirven» no se puede ni
+   * comprobar ni corregir.
+   */
+  flowBotId: string | null;
   correlationId: string;
   conversationId: string | null;
   contactId: string | null;
@@ -298,6 +306,14 @@ export interface PuertoCrm {
     motivo?: string;
   }): Promise<void>;
 
+  /**
+   * Crear una tarea desde el bot.
+   *
+   * Si la empresa exige aprobacion —que es lo predeterminado— esto NO crea una
+   * tarea: registra una PROPUESTA y devuelve `propuesta: true`. Una tarea que
+   * aparece sola en la lista de una persona es trabajo que nadie acepto, y una
+   * lista con trabajo que nadie acepto deja de mirarse.
+   */
   crearTarea(input: {
     companyId: string;
     titulo: string;
@@ -308,7 +324,35 @@ export interface PuertoCrm {
     venceEn?: Date;
     prioridad?: string;
     idempotencyKey: string;
-  }): Promise<{ taskId: string }>;
+    flowBotId?: string | null;
+    motivo?: string;
+    extracto?: string;
+  }): Promise<{
+    taskId: string | null;
+    suggestionId: string | null;
+    propuesta: boolean;
+  }>;
+
+  /**
+   * PROPONER una tarea, pase lo que pase.
+   *
+   * Distinto de `crearTarea`: aqui el autor del bot ha decidido que esto se
+   * revisa siempre, sin depender del ajuste de la empresa.
+   */
+  sugerirTarea(input: {
+    companyId: string;
+    titulo: string;
+    conversationId: string | null;
+    contactId: string | null;
+    leadId: string | null;
+    assignedTo?: string;
+    venceEn?: Date;
+    prioridad?: string;
+    idempotencyKey: string;
+    flowBotId?: string | null;
+    motivo?: string;
+    extracto?: string;
+  }): Promise<{ suggestionId: string }>;
 
   notaInterna(input: {
     companyId: string;

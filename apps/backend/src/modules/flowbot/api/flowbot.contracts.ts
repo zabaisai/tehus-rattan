@@ -312,6 +312,12 @@ const DESCRIPCIONES: Record<
     tipo: 'identificador',
     ejemplo: 'tsk_ejemplo',
   },
+  'suggestion.id': {
+    grupo: 'Ejecución',
+    etiqueta: 'Identificador de la tarea propuesta',
+    tipo: 'identificador',
+    ejemplo: 'sug_ejemplo',
+  },
   'ai.intent': {
     grupo: 'IA',
     etiqueta: 'Intención detectada',

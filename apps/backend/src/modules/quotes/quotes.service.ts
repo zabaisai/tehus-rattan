@@ -5,7 +5,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, QuoteStatus } from '@prisma/client';
+import {
+  dinero,
+  resta,
+  redondea,
+  noNegativo,
+  mayorQue,
+} from '../../common/dinero/dinero';
 import { PrismaService } from '../../prisma/prisma.service';
+import { calcularCotizacion } from './quote-calculo';
 
 const LEAD_SELECT = { id: true, title: true, status: true };
 
@@ -28,10 +36,6 @@ const COMPANY_IDENTITY_SELECT = {
   logoUrl: true,
   quoteFooter: true,
 } as const;
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
 
 @Injectable()
 export class QuotesService {
@@ -104,6 +108,10 @@ export class QuotesService {
       notes?: string;
       validUntil?: string;
       discount?: number;
+      shipping?: number;
+      adjustment?: number;
+      taxRate?: number;
+      taxIncluded?: boolean;
     },
   ) {
     const lead = await this.prisma.lead.findFirst({
@@ -126,22 +134,53 @@ export class QuotesService {
       );
     }
 
-    const itemsData = leadProducts.map((lp) => ({
+    // La empresa decide cómo se redondea y cómo se cobra el impuesto; la
+    // cotización se lleva esos valores CONGELADOS, para que cambiar el ajuste
+    // de la empresa mañana no recalcule en silencio un documento ya enviado.
+    const empresa = await this.prisma.company.findUniqueOrThrow({
+      where: { id: companyId },
+      select: {
+        currency: true,
+        quoteRoundingDecimals: true,
+        defaultTaxRate: true,
+        taxIncluded: true,
+      },
+    });
+
+    const taxRate = data.taxRate ?? empresa.defaultTaxRate;
+    const taxIncluded = data.taxIncluded ?? empresa.taxIncluded;
+    const roundingDecimals = empresa.quoteRoundingDecimals;
+
+    const calculo = calcularCotizacion({
+      lineas: leadProducts.map((lp) => ({
+        quantity: lp.quantity,
+        unitPrice: lp.unitPrice,
+      })),
+      discount: data.discount ?? 0,
+      shipping: data.shipping ?? 0,
+      adjustment: data.adjustment ?? 0,
+      taxRate,
+      taxIncluded,
+      roundingDecimals,
+    });
+
+    const itemsData = leadProducts.map((lp, i) => ({
       productId: lp.productId,
       name: lp.product.name,
       description: lp.product.description,
       category: lp.product.category,
       quantity: lp.quantity,
       unitPrice: lp.unitPrice,
-      subtotal: round2(lp.quantity * lp.unitPrice),
+      lineDiscount: calculo.lineas[i].descuento,
+      subtotal: calculo.lineas[i].subtotal,
       notes: lp.notes,
     }));
 
-    const subtotal = round2(
-      itemsData.reduce((sum, item) => sum + item.subtotal, 0),
-    );
-    const discount = data.discount ?? 0;
-    const total = Math.max(0, round2(subtotal - discount));
+    const { subtotal, discount, total } = {
+      subtotal: calculo.subtotal,
+      discount: calculo.discount,
+      total: calculo.total,
+    };
     const number = await this.generateNextNumber(companyId);
 
     try {
@@ -154,6 +193,14 @@ export class QuotesService {
           subtotal,
           discount,
           total,
+          lineDiscountTotal: calculo.lineDiscountTotal,
+          shipping: calculo.shipping,
+          adjustment: calculo.adjustment,
+          taxRate,
+          taxTotal: calculo.taxTotal,
+          taxIncluded,
+          currency: empresa.currency,
+          roundingDecimals,
           companyId,
           leadId,
           createdById: userId,
@@ -197,8 +244,15 @@ export class QuotesService {
     });
     if (!quote) throw new NotFoundException('Cotización no encontrada');
 
-    const discount = data.discount ?? quote.discount;
-    const total = Math.max(0, round2(quote.subtotal - discount));
+    // El descuento nunca puede dejar el total por debajo de cero, y se acota
+    // al subtotal en vez de recortar el total a 0: asi lo que queda guardado
+    // como descuento es lo que de verdad se aplico, y no una cifra mayor que
+    // el documento no refleja.
+    const pedido = dinero(data.discount ?? quote.discount);
+    const discount = redondea(
+      mayorQue(pedido, quote.subtotal) ? quote.subtotal : pedido,
+    );
+    const total = redondea(noNegativo(resta(quote.subtotal, discount)));
 
     return this.prisma.quote.update({
       where: { id },
@@ -236,21 +290,27 @@ export class QuotesService {
     return { id };
   }
 
+  /**
+   * Siguiente numero de cotizacion.
+   *
+   * Antes se traian TODAS las cotizaciones de la empresa a memoria solo para
+   * quedarse con el maximo: con mil cotizaciones son mil filas por cada
+   * documento nuevo, y crece para siempre. Ahora el maximo lo calcula la base
+   * y vuelve un unico entero.
+   *
+   * Sigue habiendo carrera —dos peticiones simultaneas pueden leer el mismo
+   * maximo— y por eso NO se confia en esto para la unicidad: el indice unico
+   * `(companyId, number)` es quien la garantiza, y `createFromLead` traduce su
+   * violacion en un 409 que se puede reintentar.
+   */
   private async generateNextNumber(companyId: string): Promise<string> {
-    const quotes = await this.prisma.quote.findMany({
-      where: { companyId },
-      select: { number: true },
-    });
+    const filas = await this.prisma.$queryRaw<Array<{ maximo: number | null }>>`
+      SELECT MAX(NULLIF(regexp_replace("number", '^.*?(\\d+)$', '\\1'), "number")::bigint) AS maximo
+      FROM "quotes"
+      WHERE "companyId" = ${companyId}
+    `;
 
-    let max = 0;
-    for (const quote of quotes) {
-      const match = quote.number.match(/(\d+)$/);
-      if (match) {
-        const parsed = parseInt(match[1], 10);
-        if (parsed > max) max = parsed;
-      }
-    }
-
+    const max = Number(filas[0]?.maximo ?? 0);
     return `COT-${String(max + 1).padStart(4, '0')}`;
   }
 }

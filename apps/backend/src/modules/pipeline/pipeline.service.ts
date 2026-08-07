@@ -2,8 +2,10 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { suma, aNumeroParaMostrar } from '../../common/dinero/dinero';
 
 @Injectable()
 export class PipelineService {
@@ -84,6 +86,18 @@ export class PipelineService {
     });
   }
 
+  /**
+   * Elimina un embudo VACIO. Todo lo demas se bloquea con el motivo concreto.
+   *
+   * Antes solo miraba las etapas y decia «elimina primero las etapas», que es
+   * verdad pero no es la razon: lo que impide borrar un embudo en uso son las
+   * OPORTUNIDADES que tiene dentro, y ese mensaje mandaba a borrar etapas una
+   * a una hasta chocar con la que si las tenia. Ahora se dice lo que pasa y
+   * hacia donde ir.
+   *
+   * Va todo en una transaccion: si entra una oportunidad entre el conteo y el
+   * borrado, se deshace en vez de dejarla apuntando a un embudo inexistente.
+   */
   async remove(id: string, companyId: string) {
     const actual = await this.findById(id, companyId);
 
@@ -93,16 +107,43 @@ export class PipelineService {
       );
     }
 
-    const stageCount = await this.prisma.pipelineStage.count({
-      where: { pipelineId: id },
-    });
-    if (stageCount > 0) {
-      throw new BadRequestException(
-        'No se puede eliminar un pipeline que tiene etapas. Elimina primero las etapas.',
-      );
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const leadCount = await tx.lead.count({
+        where: { pipelineId: id, companyId },
+      });
+      if (leadCount > 0) {
+        throw new BadRequestException(
+          `No se puede eliminar un embudo con ${leadCount} ${
+            leadCount === 1 ? 'oportunidad' : 'oportunidades'
+          }. Trasládalas a otro embudo primero, o archiva este para conservarlas donde están.`,
+        );
+      }
 
-    return this.prisma.pipeline.delete({ where: { id } });
+      const enConfiguracion = await tx.companyLeadSettings.count({
+        where: { companyId, defaultPipelineId: id },
+      });
+      if (enConfiguracion > 0) {
+        throw new BadRequestException(
+          'La configuración de oportunidades de la empresa apunta a este embudo. Cámbiala antes de eliminarlo.',
+        );
+      }
+
+      // Las etapas de un embudo sin oportunidades no son datos del negocio:
+      // son la forma del embudo que se esta retirando, y obligar a borrarlas
+      // de una en una no protege nada.
+      await tx.pipelineStage.deleteMany({ where: { pipelineId: id } });
+
+      const borrados = await tx.pipeline.deleteMany({
+        where: { id, companyId, isDefault: false },
+      });
+      if (borrados.count === 0) {
+        throw new ConflictException(
+          'El embudo cambió mientras se eliminaba. Vuelve a intentarlo.',
+        );
+      }
+
+      return { id, eliminado: true };
+    });
   }
 
   // ───────────────────────────────────────────
@@ -290,7 +331,7 @@ export class PipelineService {
       name: stage.name,
       order: stage.order,
       color: stage.color,
-      totalValue: stage.leads.reduce((sum, lead) => sum + (lead.value || 0), 0),
+      totalValue: aNumeroParaMostrar(suma(...stage.leads.map((l) => l.value))),
       leadCount: stage.leads.length,
       leads: stage.leads,
     }));

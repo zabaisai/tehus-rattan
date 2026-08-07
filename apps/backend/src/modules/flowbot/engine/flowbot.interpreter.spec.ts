@@ -555,7 +555,17 @@ describe('intérprete de FlowBot', () => {
       expect(efectos.vecesDe('crearOportunidad')).toBe(1);
       expect(efectos.vecesDe('crearTarea')).toBe(1);
       expect(r.variables.lead).toMatchObject({ id: expect.any(String) });
-      expect(r.variables.task).toMatchObject({ id: expect.any(String) });
+
+      // «Crear tarea» NO crea una tarea cuando la empresa exige aprobación, y
+      // exigirla es lo predeterminado: deja una PROPUESTA. El bot no puede
+      // meter trabajo en la lista de una persona sin que esa persona lo
+      // acepte, así que aquí `task.id` es null a propósito y lo que existe es
+      // `suggestion.id`.
+      expect(r.variables.task).toMatchObject({ id: null });
+      expect(r.variables.suggestion).toMatchObject({
+        id: expect.any(String),
+        propuesta: true,
+      });
     });
 
     it('el round-robin sin asesores disponibles NO corta la conversación', async () => {

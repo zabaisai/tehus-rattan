@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { EstadoOperativo } from '@/lib/flowbots';
 import { useAuthStore } from '@/store/auth.store';
 import { EstadoTransporte } from './EstadoTransporte';
+import { NOMBRE_PULSO } from '@/lib/producto';
 
 const estadoOperativo = vi.fn();
 
@@ -50,7 +51,7 @@ function pintar(rol: 'ADMIN' | 'AGENT' = 'ADMIN') {
   );
 }
 
-describe('Estado del transporte de FlowBot', () => {
+describe('Estado del transporte de Pulso', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     estadoOperativo.mockResolvedValue(estado());
@@ -81,7 +82,7 @@ describe('Estado del transporte de FlowBot', () => {
     pintar();
 
     expect(
-      await screen.findByText('FlowBot está enviando mensajes reales'),
+      await screen.findByText(`${NOMBRE_PULSO} está enviando mensajes reales`),
     ).toBeInTheDocument();
   });
 

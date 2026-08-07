@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { suma, aNumeroParaMostrar } from '../../common/dinero/dinero';
 
 @Injectable()
 export class AnalyticsService {
@@ -28,9 +29,16 @@ export class AnalyticsService {
       }),
     ]);
 
-    const openValue = openLeads.reduce((sum, l) => sum + (l.value || 0), 0);
-    const wonValue = wonLeads.reduce((sum, l) => sum + (l.value || 0), 0);
-    const lostValue = lostLeads.reduce((sum, l) => sum + (l.value || 0), 0);
+    // Se suma en Decimal y se convierte al final. Sumar en `number` acumula
+    // el error de la coma flotante y el panel acaba enseñando un total que no
+    // es la suma de las oportunidades que lo componen.
+    const openValue = aNumeroParaMostrar(
+      suma(...openLeads.map((l) => l.value)),
+    );
+    const wonValue = aNumeroParaMostrar(suma(...wonLeads.map((l) => l.value)));
+    const lostValue = aNumeroParaMostrar(
+      suma(...lostLeads.map((l) => l.value)),
+    );
     const closedCount = wonLeads.length + lostLeads.length;
     const conversionRate =
       closedCount > 0 ? (wonLeads.length / closedCount) * 100 : 0;
@@ -73,7 +81,7 @@ export class AnalyticsService {
       stageId: stage.id,
       stageName: stage.name,
       count: stage.leads.length,
-      totalValue: stage.leads.reduce((sum, l) => sum + (l.value || 0), 0),
+      totalValue: aNumeroParaMostrar(suma(...stage.leads.map((l) => l.value))),
     }));
   }
 
@@ -103,7 +111,7 @@ export class AnalyticsService {
           agentName: agent.name,
           openLeads: assigned,
           wonCount: won.length,
-          wonValue: won.reduce((sum, l) => sum + (l.value || 0), 0),
+          wonValue: aNumeroParaMostrar(suma(...won.map((l) => l.value))),
           lostCount: lost,
         };
       }),

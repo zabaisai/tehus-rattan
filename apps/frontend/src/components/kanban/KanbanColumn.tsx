@@ -19,7 +19,7 @@ export function KanbanColumn({
 }: {
   stage: KanbanStage;
   stages: { id: string; name: string }[];
-  onLeadClick: (leadId: string) => void;
+  onLeadClick: (leadId: string, contactId: string) => void;
   onMoveStage: (leadId: string, newStageId: string) => void;
 }) {
   return (

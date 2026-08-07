@@ -316,7 +316,9 @@ describe('ContactsService (normalización E.164 y aislamiento)', () => {
     it('update no permite cambiar el teléfono (no está en el contrato)', async () => {
       await service.update(CONTACT_A, COMPANY_A, { name: 'Nuevo' });
 
-      expect(prisma.contact.update.mock.calls[0][0].data.phone).toBeUndefined();
+      expect(
+        prisma.contact.updateMany.mock.calls[0][0].data.phone,
+      ).toBeUndefined();
     });
 
     it('update no permite reasignar la empresa', async () => {
@@ -328,15 +330,32 @@ describe('ContactsService (normalización E.164 y aislamiento)', () => {
       // El servicio pasa `data` tal cual: la defensa real está en el DTO con
       // forbidNonWhitelisted. Se fija aquí para que un cambio futuro en el
       // servicio no elimine silenciosamente esa dependencia.
-      const enviado = prisma.contact.update.mock.calls[0][0].data;
+      const enviado = prisma.contact.updateMany.mock.calls[0][0].data;
       expect(enviado.companyId ?? COMPANY_B).toBe(COMPANY_B);
+    });
+
+    /**
+     * La escritura filtra por companyId ADEMÁS de por id.
+     *
+     * Antes se validaba con `findFirst` y se escribía con `where: { id }` a
+     * secas. Entre las dos hay una ventana —estrecha, pero real— en la que el
+     * contacto puede dejar de pertenecer a esta empresa. Meter el companyId en
+     * el propio `updateMany` la cierra sin depender de la lectura previa.
+     */
+    it('update escribe acotando por empresa, no solo por id', async () => {
+      await service.update(CONTACT_A, COMPANY_A, { name: 'Nuevo' });
+
+      expect(prisma.contact.updateMany.mock.calls[0][0].where).toEqual({
+        id: CONTACT_A,
+        companyId: COMPANY_A,
+      });
     });
 
     it('block marca isBlocked sin borrar el contacto', async () => {
       await service.block(CONTACT_A, COMPANY_A);
 
-      expect(prisma.contact.update).toHaveBeenCalledWith({
-        where: { id: CONTACT_A },
+      expect(prisma.contact.updateMany).toHaveBeenCalledWith({
+        where: { id: CONTACT_A, companyId: COMPANY_A },
         data: { isBlocked: true },
       });
       expect(prisma.contact.delete).not.toHaveBeenCalled();

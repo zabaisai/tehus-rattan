@@ -38,6 +38,7 @@ export const VARIABLES_SISTEMA: readonly string[] = [
   'message.text',
   'message.choice',
   'task.id',
+  'suggestion.id',
   'ai.intent',
   'ai.confidence',
   'ai.reply',

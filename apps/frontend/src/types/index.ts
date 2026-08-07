@@ -33,6 +33,34 @@ export interface Contact {
   tags: string[];
   isBlocked: boolean;
   createdAt: string;
+  /** Archivado: fuera de las listas de trabajo, con su historia intacta. */
+  archivedAt?: string | null;
+  archivedReason?: string | null;
+  /** Se ejerció una supresión de datos: ya no conserva datos personales. */
+  anonymizedAt?: string | null;
+}
+
+/** Lo que una eliminación definitiva afectaría. Se consulta antes de decidir. */
+export interface ImpactoDeContacto {
+  contactId: string;
+  nombre: string | null;
+  archivado: boolean;
+  anonimizado: boolean;
+  relaciones: {
+    conversaciones: number;
+    mensajes: number;
+    oportunidades: number;
+    tareas: number;
+    cotizaciones: number;
+    notas: number;
+    camposPersonalizados: number;
+    ejecucionesDePulso: number;
+    auditorias: number;
+  };
+  totalRelaciones: number;
+  vacio: boolean;
+  accionPropuesta: "borrado" | "anonimizado";
+  seConservan: string[];
 }
 
 export interface PipelineStage {
@@ -236,6 +264,52 @@ export interface ProductImportIssue {
   rowNumber: number;
   reason: string;
   rawName?: string;
+}
+
+export type EstadoDeImportacion =
+  | "PENDING"
+  | "RUNNING"
+  | "CANCELLING"
+  | "CANCELLED"
+  | "COMPLETED"
+  | "FAILED";
+
+/**
+ * Una importación de catálogo con su estado DURABLE.
+ *
+ * Durable y no en memoria: un catálogo grande tarda minutos, el worker se
+ * puede reiniciar a mitad y quien la lanzó cierra la pestaña.
+ */
+export interface Importacion {
+  id: string;
+  status: EstadoDeImportacion;
+  fileName: string;
+  fileSize: number;
+  totalRows: number;
+  processedRows: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+  porcentaje?: number;
+  errorMessage: string | null;
+  issues?: Array<{ fila: number; motivo: string; nombre?: string }> | null;
+  createdAt: string;
+  finishedAt: string | null;
+}
+
+/** campo -> índice de columna. */
+export interface MapeoDeColumnas {
+  campos: Record<string, number>;
+  sinAsignar: Array<{ indice: number; cabecera: string }>;
+}
+
+export interface VistaPreviaDeImportacion {
+  cabeceras: string[];
+  filas: string[][];
+  mapeoPropuesto: MapeoDeColumnas;
+  camposReconocidos: string[];
+  camposDisponibles: string[];
 }
 
 export interface ProductImportSummary {

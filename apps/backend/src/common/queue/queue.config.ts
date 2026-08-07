@@ -15,6 +15,8 @@ export const QUEUE_NAMES = {
   MEDIA: 'takto.media',
   /** Pasos de ejecucion de FlowBot, incluidas las reanudaciones por tiempo. */
   FLOWBOT: 'takto.flowbot',
+  /** Importacion de catalogos de productos, que tarda minutos. */
+  PRODUCT_IMPORT: 'takto.product-import',
 } as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[keyof typeof QUEUE_NAMES];

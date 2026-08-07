@@ -8,3 +8,10 @@ scratchpad/
 
 # PostgreSQL dumps produced by deploy/scripts/backup-postgres.sh on the VPS.
 /backups/
+
+# El paquete de marca NO se versiona aqui.
+#
+# Entro por error en d3bc633 con un `git add -A` y son 208 archivos y 4,4 MB
+# que no pertenecen al repositorio del producto. Esta linea evita que vuelva a
+# colarse en el proximo `add -A`.
+brand/

@@ -1,11 +1,18 @@
 import { Module } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
+import { ContactsEliminacionService } from './contacts-eliminacion.service';
+import { PerfilComercialService } from './perfil-comercial.service';
 import { ContactsController } from './contacts.controller';
 import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
 
 @Module({
   controllers: [ContactsController],
-  providers: [ContactsService, PlatformAuditLogService],
+  providers: [
+    ContactsService,
+    ContactsEliminacionService,
+    PerfilComercialService,
+    PlatformAuditLogService,
+  ],
   exports: [ContactsService],
 })
 export class ContactsModule {}

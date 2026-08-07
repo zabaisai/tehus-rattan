@@ -5,6 +5,7 @@ import { FlaskConical, OctagonX, Send, Unplug } from 'lucide-react';
 import { flowbots } from '@/lib/flowbots';
 import { permisosDe } from '@/lib/flowbot-permisos';
 import { useAuthStore } from '@/store/auth.store';
+import { NOMBRE_PULSO } from '@/lib/producto';
 
 /**
  * Si FlowBot está mandando mensajes de verdad, dicho sin rodeos.
@@ -64,7 +65,7 @@ export function EstadoTransporte({ compacto = false }: { compacto?: boolean }) {
         tono="real"
         icono={Send}
         compacto={compacto}
-        titulo="FlowBot está enviando mensajes reales"
+        titulo={`${NOMBRE_PULSO} está enviando mensajes reales`}
         detalle="Lo que responda el bot le llega al cliente por WhatsApp."
       />
     );
@@ -76,7 +77,7 @@ export function EstadoTransporte({ compacto = false }: { compacto?: boolean }) {
         tono="aviso"
         icono={FlaskConical}
         compacto={compacto}
-        titulo="Modo de prueba: FlowBot no está enviando mensajes reales"
+        titulo={`Modo de prueba: ${NOMBRE_PULSO} no está enviando mensajes reales`}
         detalle="Se prepara todo el envío y no sale nada hacia WhatsApp."
       />
     );
@@ -87,7 +88,7 @@ export function EstadoTransporte({ compacto = false }: { compacto?: boolean }) {
       tono="neutral"
       icono={Unplug}
       compacto={compacto}
-      titulo="FlowBot no está conectado a WhatsApp"
+      titulo={`${NOMBRE_PULSO} no está conectado a WhatsApp`}
       detalle="Los bots funcionan y no sale ningún mensaje."
     />
   );

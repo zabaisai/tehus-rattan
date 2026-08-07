@@ -355,6 +355,14 @@ export class CrmAdapter implements PuertoCrm {
     });
   }
 
+  /**
+   * Crear una tarea desde el bot.
+   *
+   * Si la empresa exige aprobacion —lo predeterminado— esto PROPONE en vez de
+   * crear. Una tarea que aparece sola en la lista de una persona es trabajo
+   * que nadie acepto, y una lista con trabajo que nadie acepto deja de
+   * mirarse.
+   */
   async crearTarea(input: {
     titulo: string;
     conversationId: string | null;
@@ -364,15 +372,27 @@ export class CrmAdapter implements PuertoCrm {
     venceEn?: Date;
     prioridad?: string;
     idempotencyKey: string;
-  }): Promise<{ taskId: string }> {
-    // Las relaciones se comprueban: una tarea colgada de una conversación de
-    // otra empresa la haría visible desde su bandeja.
-    const conversationId = await this.siEsDeLaEmpresa(
-      'conversation',
-      input.conversationId,
-    );
-    const contactId = await this.siEsDeLaEmpresa('contact', input.contactId);
-    const leadId = await this.siEsDeLaEmpresa('lead', input.leadId);
+    flowBotId?: string | null;
+    motivo?: string;
+    extracto?: string;
+  }): Promise<{
+    taskId: string | null;
+    suggestionId: string | null;
+    propuesta: boolean;
+  }> {
+    const ajustes = await this.prisma.companyLeadSettings.findUnique({
+      where: { companyId: this.companyId },
+      select: { requireTaskApproval: true },
+    });
+    // Sin fila de configuracion se exige aprobacion: la ausencia de una
+    // decision no puede significar «haz lo que quieras con la lista de otro».
+    if (ajustes?.requireTaskApproval ?? true) {
+      const { suggestionId } = await this.sugerirTarea(input);
+      return { taskId: null, suggestionId, propuesta: true };
+    }
+
+    const { conversationId, contactId, leadId } =
+      await this.relacionesPropias(input);
 
     const tarea = await this.prisma.task.create({
       data: {
@@ -387,7 +407,68 @@ export class CrmAdapter implements PuertoCrm {
       },
       select: { id: true },
     });
-    return { taskId: tarea.id };
+    return { taskId: tarea.id, suggestionId: null, propuesta: false };
+  }
+
+  /** Propone una tarea. Idempotente por `idempotencyKey`. */
+  async sugerirTarea(input: {
+    titulo: string;
+    conversationId: string | null;
+    contactId: string | null;
+    leadId: string | null;
+    assignedTo?: string;
+    venceEn?: Date;
+    prioridad?: string;
+    idempotencyKey: string;
+    flowBotId?: string | null;
+    motivo?: string;
+    extracto?: string;
+  }): Promise<{ suggestionId: string }> {
+    const { conversationId, contactId, leadId } =
+      await this.relacionesPropias(input);
+
+    const datos = {
+      companyId: this.companyId,
+      source: 'flowbot',
+      title: input.titulo,
+      reason: input.motivo ?? null,
+      excerpt: input.extracto?.slice(0, 280) ?? null,
+      conversationId,
+      contactId,
+      leadId,
+      flowBotId: input.flowBotId ?? null,
+      suggestedAssignee: input.assignedTo ?? null,
+      dueAt: input.venceEn ?? null,
+      ...(input.prioridad ? { priority: input.prioridad as never } : {}),
+      idempotencyKey: input.idempotencyKey,
+    };
+
+    // Un reintento del worker sobre el mismo mensaje NO propone dos veces: el
+    // asesor veria lo mismo duplicado sin saber cual atender.
+    const propuesta = await this.prisma.taskSuggestion.upsert({
+      where: { idempotencyKey: input.idempotencyKey },
+      create: datos,
+      update: {},
+      select: { id: true },
+    });
+    return { suggestionId: propuesta.id };
+  }
+
+  /**
+   * Las relaciones se comprueban: una tarea colgada de una conversacion de
+   * otra empresa la haria visible desde su bandeja.
+   */
+  private async relacionesPropias(input: {
+    conversationId: string | null;
+    contactId: string | null;
+    leadId: string | null;
+  }) {
+    const [conversationId, contactId, leadId] = await Promise.all([
+      this.siEsDeLaEmpresa('conversation', input.conversationId),
+      this.siEsDeLaEmpresa('contact', input.contactId),
+      this.siEsDeLaEmpresa('lead', input.leadId),
+    ]);
+    return { conversationId, contactId, leadId };
   }
 
   async notaInterna(input: {

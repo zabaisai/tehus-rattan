@@ -7,6 +7,7 @@ import { getTasks, createTask, updateTask, completeTask, deleteTask } from '@/li
 import { Task } from '@/types';
 import { TaskModal, TaskFormData } from '@/components/tasks/TaskModal';
 import { ListState } from '@/components/ui/ListState';
+import { SugerenciasDeTarea } from '@/components/tasks/SugerenciasDeTarea';
 import { intervaloDeRefresco, useRealtime } from '@/lib/use-realtime';
 
 const priorityColors: Record<string, string> = {
@@ -228,6 +229,13 @@ export default function TasksPage() {
           <Plus size={16} />
           Nueva tarea
         </button>
+      </div>
+
+      {/* Las propuestas van ARRIBA: son lo que espera una decisión, y una
+          decisión pendiente es más urgente que una lista de trabajo ya
+          aceptado. */}
+      <div className="mb-4">
+        <SugerenciasDeTarea />
       </div>
 
       <ListState

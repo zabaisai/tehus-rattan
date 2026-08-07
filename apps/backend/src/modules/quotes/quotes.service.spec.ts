@@ -1,6 +1,13 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { QuotesService } from './quotes.service';
 
+/**
+ * Los importes son Decimal, no `number`: comparar con `toBe(80)` falla porque
+ * un Decimal se serializa como "80". Lo que importa es el VALOR, y esta ayuda
+ * lo compara sin volver a introducir coma flotante en la propia prueba.
+ */
+const importe = (v: unknown) => Number(v);
+
 describe('QuotesService', () => {
   const companyId = 'company-a';
   const leadId = 'lead-a';
@@ -18,6 +25,20 @@ describe('QuotesService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      // La cotización se lleva CONGELADOS los ajustes de la empresa: cómo
+      // redondea y cómo cobra el impuesto. Cambiarlos mañana no puede
+      // recalcular un documento que ya se envió.
+      company: {
+        findUniqueOrThrow: jest.fn().mockResolvedValue({
+          currency: 'COP',
+          quoteRoundingDecimals: 0,
+          defaultTaxRate: 0,
+          taxIncluded: false,
+        }),
+      },
+      // El siguiente numero lo calcula la base con un MAX, no el proceso
+      // trayendose todas las cotizaciones de la empresa.
+      $queryRaw: jest.fn().mockResolvedValue([{ maximo: null }]),
     };
     service = new QuotesService(prisma);
   });
@@ -89,43 +110,41 @@ describe('QuotesService', () => {
         {},
       );
 
-      expect(prisma.quote.create).toHaveBeenCalledWith(
+      const guardado = prisma.quote.create.mock.calls[0][0].data;
+      expect(guardado).toEqual(
         expect.objectContaining({
-          data: expect.objectContaining({
-            number: 'COT-0001',
-            companyId,
-            leadId,
-            createdById: 'user-a',
-            subtotal: 500,
-            discount: 0,
-            total: 500,
-            items: {
-              create: [
-                expect.objectContaining({
-                  productId: 'product-a',
-                  name: 'Sala Primavera',
-                  description: 'Ratán natural',
-                  category: 'Salas',
-                  quantity: 2,
-                  unitPrice: 100,
-                  subtotal: 200,
-                  notes: null,
-                }),
-                expect.objectContaining({
-                  productId: 'product-b',
-                  name: 'Silla Colonial',
-                  description: null,
-                  category: 'Sillas',
-                  quantity: 1,
-                  unitPrice: 300,
-                  subtotal: 300,
-                  notes: 'Color natural',
-                }),
-              ],
-            },
-          }),
+          number: 'COT-0001',
+          companyId,
+          leadId,
+          createdById: 'user-a',
         }),
       );
+      expect(importe(guardado.subtotal)).toBe(500);
+      expect(importe(guardado.discount)).toBe(0);
+      expect(importe(guardado.total)).toBe(500);
+
+      const lineas = guardado.items.create;
+      expect(lineas[0]).toEqual(
+        expect.objectContaining({
+          productId: 'product-a',
+          name: 'Sala Primavera',
+          description: 'Ratán natural',
+          category: 'Salas',
+          quantity: 2,
+          notes: null,
+        }),
+      );
+      expect(importe(lineas[0].subtotal)).toBe(200);
+      expect(lineas[1]).toEqual(
+        expect.objectContaining({
+          productId: 'product-b',
+          name: 'Silla Colonial',
+          category: 'Sillas',
+          quantity: 1,
+          notes: 'Color natural',
+        }),
+      );
+      expect(importe(lineas[1].subtotal)).toBe(300);
       expect(result.number).toBe('COT-0001');
     });
 
@@ -141,16 +160,14 @@ describe('QuotesService', () => {
         discount: 500,
       });
 
-      expect(prisma.quote.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            subtotal: 200,
-            discount: 500,
-            total: 0,
-          }),
-        }),
-      );
-      expect(result.total).toBe(0);
+      const guardado = prisma.quote.create.mock.calls[0][0].data;
+      expect(importe(guardado.subtotal)).toBe(200);
+      // El descuento se ACOTA al subtotal en vez de guardarse tal cual: lo que
+      // queda registrado es lo que de verdad se aplicó, no una cifra que el
+      // documento no refleja.
+      expect(importe(guardado.discount)).toBe(200);
+      expect(importe(guardado.total)).toBe(0);
+      expect(importe(result.total)).toBe(0);
     });
 
     it('applies a partial discount correctly', async () => {
@@ -165,19 +182,16 @@ describe('QuotesService', () => {
         discount: 50,
       });
 
-      expect(result.subtotal).toBe(200);
-      expect(result.discount).toBe(50);
-      expect(result.total).toBe(150);
+      expect(importe(result.subtotal)).toBe(200);
+      expect(importe(result.discount)).toBe(50);
+      expect(importe(result.total)).toBe(150);
     });
 
     it('generates the next sequential number based on the highest existing number', async () => {
       prisma.lead.findFirst.mockResolvedValue({ id: leadId });
       prisma.leadProduct.findMany.mockResolvedValue([leadProductFixture()]);
-      prisma.quote.findMany.mockResolvedValue([
-        { number: 'COT-0001' },
-        { number: 'COT-0003' },
-        { number: 'COT-0002' },
-      ]);
+      // El maximo lo devuelve la base, no el proceso.
+      prisma.$queryRaw.mockResolvedValue([{ maximo: 3 }]);
       prisma.quote.create.mockImplementation((args: any) =>
         Promise.resolve({ id: 'quote-4', ...args.data }),
       );
@@ -325,16 +339,11 @@ describe('QuotesService', () => {
         status: 'SENT',
       });
 
-      expect(prisma.quote.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: { id: 'quote-1' },
-          data: expect.objectContaining({
-            status: 'SENT',
-            discount: 0,
-            total: 200,
-          }),
-        }),
-      );
+      const args = prisma.quote.update.mock.calls[0][0];
+      expect(args.where).toEqual({ id: 'quote-1' });
+      expect(args.data.status).toBe('SENT');
+      expect(importe(args.data.discount)).toBe(0);
+      expect(importe(args.data.total)).toBe(200);
       expect(result.status).toBe('SENT');
     });
 
@@ -352,8 +361,8 @@ describe('QuotesService', () => {
         discount: 80,
       });
 
-      expect(result.discount).toBe(80);
-      expect(result.total).toBe(120);
+      expect(importe(result.discount)).toBe(80);
+      expect(importe(result.total)).toBe(120);
     });
 
     it('keeps total at 0 when discount exceeds subtotal', async () => {
@@ -370,7 +379,9 @@ describe('QuotesService', () => {
         discount: 999,
       });
 
-      expect(result.total).toBe(0);
+      expect(importe(result.total)).toBe(0);
+      // El descuento guardado es el que cabe, no el pedido.
+      expect(importe(result.discount)).toBe(200);
     });
 
     it('rejects updating a quote belonging to another company', async () => {

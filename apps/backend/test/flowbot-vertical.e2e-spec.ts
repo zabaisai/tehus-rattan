@@ -403,6 +403,9 @@ describe('vertical completa de FlowBot (e2e, base real)', () => {
     await prisma.outboxEvent.deleteMany({
       where: { companyId: { in: empresas } },
     });
+    await prisma.taskSuggestion.deleteMany({
+      where: { companyId: { in: empresas } },
+    });
     await prisma.task.deleteMany({ where: { companyId: { in: empresas } } });
     await prisma.note.deleteMany({ where: { companyId: { in: empresas } } });
     await prisma.message.deleteMany({
@@ -797,14 +800,30 @@ describe('vertical completa de FlowBot (e2e, base real)', () => {
       expect(cambio?.actorUserId).toBeNull();
     });
 
-    it('14. se crea la tarea', async () => {
+    /**
+     * ESTO CAMBIÓ A PROPÓSITO.
+     *
+     * El nodo «Crear tarea» ya NO crea una tarea cuando la empresa exige
+     * aprobación, y exigirla es lo predeterminado: deja una PROPUESTA. Un bot
+     * que mete trabajo en la lista de una persona sin que esa persona lo
+     * acepte convierte la lista en un vertedero que nadie mira.
+     */
+    it('14. el nodo de tarea deja una PROPUESTA, no una tarea', async () => {
       const r = await recorridoCompleto('+573001110033');
 
       const tarea = await prisma.task.findFirst({
         where: { companyId: empresaA, leadId: r.leadId },
         orderBy: { createdAt: 'desc' },
       });
-      expect(tarea).not.toBeNull();
+      expect(tarea).toBeNull();
+
+      const propuesta = await prisma.taskSuggestion.findFirst({
+        where: { companyId: empresaA, leadId: r.leadId },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(propuesta).not.toBeNull();
+      expect(propuesta!.status).toBe('PENDING');
+      expect(propuesta!.source).toBe('flowbot');
     });
 
     it('15. mover de etapa deja historial', async () => {

@@ -113,11 +113,27 @@ export class ContactsService {
       tags?: string[];
     },
   ) {
-    await this.findById(id, companyId);
-    return this.prisma.contact.update({
-      where: { id },
+    const actual = await this.findById(id, companyId);
+
+    // Devolverle nombre o correo a un contacto anonimizado deshace en un clic
+    // lo que se hizo para atender una supresion de datos. Se bloquea.
+    if (actual.anonymizedAt) {
+      throw new BadRequestException(
+        'Este contacto fue anonimizado; sus datos personales no se pueden volver a rellenar.',
+      );
+    }
+
+    // `updateMany` con companyId en el filtro y no `update` con el id suelto:
+    // entre el `findById` de arriba y la escritura hay una ventana, estrecha
+    // pero real, en la que el id podria dejar de pertenecer a esta empresa.
+    const actualizados = await this.prisma.contact.updateMany({
+      where: { id, companyId },
       data,
     });
+    if (actualizados.count === 0) {
+      throw new NotFoundException('Contacto no encontrado');
+    }
+    return this.findById(id, companyId);
   }
 
   /**
@@ -158,7 +174,16 @@ export class ContactsService {
 
   /** Devuelve un contacto archivado a las listas de trabajo. */
   async restore(id: string, companyId: string) {
-    await this.findById(id, companyId);
+    const actual = await this.findById(id, companyId);
+
+    // Un contacto anonimizado ya no tiene nombre, telefono ni correo: sacarlo
+    // a la lista de trabajo solo pondria una fila llamada «Contacto
+    // anonimizado» que nadie puede usar para nada.
+    if (actual.anonymizedAt) {
+      throw new BadRequestException(
+        'Un contacto anonimizado no se puede restaurar: ya no conserva datos de contacto.',
+      );
+    }
 
     const actualizados = await this.prisma.contact.updateMany({
       where: { id, companyId, archivedAt: { not: null } },
@@ -173,10 +198,14 @@ export class ContactsService {
 
   async block(id: string, companyId: string) {
     await this.findById(id, companyId);
-    return this.prisma.contact.update({
-      where: { id },
+    const actualizados = await this.prisma.contact.updateMany({
+      where: { id, companyId },
       data: { isBlocked: true },
     });
+    if (actualizados.count === 0) {
+      throw new NotFoundException('Contacto no encontrado');
+    }
+    return this.findById(id, companyId);
   }
 
   private parsePagination(limit?: string, offset?: string) {

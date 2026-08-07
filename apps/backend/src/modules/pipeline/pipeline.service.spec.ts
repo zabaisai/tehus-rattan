@@ -42,6 +42,7 @@ describe('PipelineService (caracterización pre-reforma)', () => {
         ),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
         delete: jest.fn().mockResolvedValue(pipelineRow),
+        deleteMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       pipelineStage: {
         findMany: jest.fn().mockResolvedValue([]),
@@ -53,9 +54,11 @@ describe('PipelineService (caracterización pre-reforma)', () => {
           Promise.resolve({ id: args.where.id, ...args.data }),
         ),
         delete: jest.fn().mockResolvedValue({ id: 'stage-1' }),
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
         count: jest.fn().mockResolvedValue(0),
       },
       lead: { count: jest.fn().mockResolvedValue(0) },
+      companyLeadSettings: { count: jest.fn().mockResolvedValue(0) },
       // Soporta las dos formas de $transaction que usa el servicio: el lote
       // de operaciones (reorderStages) y el callback interactivo (create /
       // update, que necesitan leer y escribir dentro de la misma transacción).
@@ -144,31 +147,58 @@ describe('PipelineService (caracterización pre-reforma)', () => {
       expect(args.include.stages.orderBy).toEqual({ order: 'asc' });
     });
 
-    it('remove rechaza borrar un pipeline que todavía tiene etapas', async () => {
+    /**
+     * ESTO CAMBIÓ A PROPÓSITO.
+     *
+     * Antes `remove` solo miraba las ETAPAS y respondía «elimina primero las
+     * etapas». Era verdad y no servía de nada: lo que impide retirar un embudo
+     * en uso son las OPORTUNIDADES que hay dentro, y aquel mensaje mandaba a
+     * borrar etapas una a una hasta chocar con la primera que sí las tenía.
+     * Ahora se bloquea por la razón real y se dice a dónde ir.
+     */
+    it('remove rechaza borrar un embudo CON oportunidades y lo dice', async () => {
       prisma.pipeline.findFirst.mockResolvedValue({
         ...pipelineRow,
         isDefault: false,
       });
-      prisma.pipelineStage.count.mockResolvedValue(3);
+      prisma.lead.count.mockResolvedValue(3);
+
+      await expect(service.remove(PIPELINE_A, COMPANY_A)).rejects.toThrow(
+        /3 oportunidades/i,
+      );
+
+      expect(prisma.pipeline.deleteMany).not.toHaveBeenCalled();
+      expect(prisma.pipelineStage.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('remove rechaza borrar el embudo al que apunta la configuración', async () => {
+      prisma.pipeline.findFirst.mockResolvedValue({
+        ...pipelineRow,
+        isDefault: false,
+      });
+      prisma.lead.count.mockResolvedValue(0);
+      prisma.companyLeadSettings.count.mockResolvedValue(1);
 
       await expect(
         service.remove(PIPELINE_A, COMPANY_A),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect(prisma.pipeline.delete).not.toHaveBeenCalled();
+      expect(prisma.pipeline.deleteMany).not.toHaveBeenCalled();
     });
 
-    it('remove borra un pipeline NO predeterminado sin etapas', async () => {
+    it('remove borra un embudo NO predeterminado y SIN oportunidades', async () => {
       prisma.pipeline.findFirst.mockResolvedValue({
         ...pipelineRow,
         isDefault: false,
       });
-      prisma.pipelineStage.count.mockResolvedValue(0);
+      prisma.lead.count.mockResolvedValue(0);
 
       await service.remove(PIPELINE_A, COMPANY_A);
 
-      expect(prisma.pipeline.delete).toHaveBeenCalledWith({
-        where: { id: PIPELINE_A },
+      // Filtra por companyId Y por isDefault en la propia escritura: si algo
+      // cambió desde la lectura, no borra en vez de borrar lo que no debe.
+      expect(prisma.pipeline.deleteMany).toHaveBeenCalledWith({
+        where: { id: PIPELINE_A, companyId: COMPANY_A, isDefault: false },
       });
     });
 

@@ -11,6 +11,7 @@ import { AppModule } from './app.module';
 import { applySecurityHeaders } from './common/security/security.setup';
 import { buildCorsOptions } from './common/security/cors.options';
 import { RELEASE_INFO } from './common/release/release.info';
+import { DecimalInterceptor } from './common/serializacion/decimal.interceptor';
 import {
   RedisIoAdapter,
   usaPuenteRedis,
@@ -78,7 +79,19 @@ async function bootstrap() {
     }),
   );
 
-  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
+  // EL ORDEN IMPORTA Y ES ESTE.
+  //
+  // En Nest la respuesta atraviesa los interceptores en orden INVERSO al de
+  // registro, asi que el de Decimal —registrado el ultimo— se ejecuta el
+  // PRIMERO de vuelta y convierte los importes antes de que
+  // `ClassSerializerInterceptor` los aplane. Al reves, el serializador de
+  // clases enumeraria las propiedades internas del Decimal y cada importe
+  // saldria por la API como {"s":1,"e":6,"d":[...]}, que en el navegador es
+  // NaN.
+  app.useGlobalInterceptors(
+    new ClassSerializerInterceptor(app.get(Reflector)),
+    new DecimalInterceptor(),
+  );
 
   // Flush in-flight requests and disconnect Prisma cleanly on SIGTERM/SIGINT
   // (container stop / redeploy) instead of dropping connections abruptly.
