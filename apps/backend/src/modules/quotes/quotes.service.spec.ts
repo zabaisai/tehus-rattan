@@ -25,6 +25,10 @@ describe('QuotesService', () => {
         update: jest.fn(),
         delete: jest.fn(),
       },
+      // Las lineas y la cabecera se guardan juntas: un total que no cuadre con
+      // sus lineas es peor que no haber guardado nada.
+      quoteItem: { update: jest.fn() },
+      $transaction: jest.fn().mockResolvedValue([]),
       // La cotización se lleva CONGELADOS los ajustes de la empresa: cómo
       // redondea y cómo cobra el impuesto. Cambiarlos mañana no puede
       // recalcular un documento que ya se envió.
@@ -328,10 +332,28 @@ describe('QuotesService', () => {
 
   describe('update', () => {
     it('updates the status of an owned quote', async () => {
+      // `update` ahora recalcula desde las LINEAS PERSISTIDAS, no desde el
+      // subtotal guardado: el servidor es la autoridad del total y no se fia
+      // de una cifra que podria haber quedado desalineada.
       prisma.quote.findFirst.mockResolvedValue({
         id: 'quote-1',
+        status: 'DRAFT',
         subtotal: 200,
         discount: 0,
+        shipping: 0,
+        adjustment: 0,
+        taxRate: 0,
+        taxIncluded: false,
+        roundingDecimals: 0,
+        items: [
+          {
+            id: 'item-1',
+            quantity: 1,
+            unitPrice: 200,
+            lineDiscount: 0,
+            lineDiscountPercent: null,
+          },
+        ],
       });
       prisma.quote.update.mockResolvedValue({ id: 'quote-1', status: 'SENT' });
 
@@ -348,10 +370,28 @@ describe('QuotesService', () => {
     });
 
     it('recalculates total when discount changes', async () => {
+      // `update` ahora recalcula desde las LINEAS PERSISTIDAS, no desde el
+      // subtotal guardado: el servidor es la autoridad del total y no se fia
+      // de una cifra que podria haber quedado desalineada.
       prisma.quote.findFirst.mockResolvedValue({
         id: 'quote-1',
+        status: 'DRAFT',
         subtotal: 200,
         discount: 0,
+        shipping: 0,
+        adjustment: 0,
+        taxRate: 0,
+        taxIncluded: false,
+        roundingDecimals: 0,
+        items: [
+          {
+            id: 'item-1',
+            quantity: 1,
+            unitPrice: 200,
+            lineDiscount: 0,
+            lineDiscountPercent: null,
+          },
+        ],
       });
       prisma.quote.update.mockImplementation((args: any) =>
         Promise.resolve({ id: 'quote-1', ...args.data }),
@@ -366,10 +406,28 @@ describe('QuotesService', () => {
     });
 
     it('keeps total at 0 when discount exceeds subtotal', async () => {
+      // `update` ahora recalcula desde las LINEAS PERSISTIDAS, no desde el
+      // subtotal guardado: el servidor es la autoridad del total y no se fia
+      // de una cifra que podria haber quedado desalineada.
       prisma.quote.findFirst.mockResolvedValue({
         id: 'quote-1',
+        status: 'DRAFT',
         subtotal: 200,
         discount: 0,
+        shipping: 0,
+        adjustment: 0,
+        taxRate: 0,
+        taxIncluded: false,
+        roundingDecimals: 0,
+        items: [
+          {
+            id: 'item-1',
+            quantity: 1,
+            unitPrice: 200,
+            lineDiscount: 0,
+            lineDiscountPercent: null,
+          },
+        ],
       });
       prisma.quote.update.mockImplementation((args: any) =>
         Promise.resolve({ id: 'quote-1', ...args.data }),

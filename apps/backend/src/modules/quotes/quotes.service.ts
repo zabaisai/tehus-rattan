@@ -5,13 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, QuoteStatus } from '@prisma/client';
-import {
-  dinero,
-  resta,
-  redondea,
-  noNegativo,
-  mayorQue,
-} from '../../common/dinero/dinero';
+import { resta, suma } from '../../common/dinero/dinero';
 import { PrismaService } from '../../prisma/prisma.service';
 import { calcularCotizacion } from './quote-calculo';
 
@@ -227,6 +221,18 @@ export class QuotesService {
     }
   }
 
+  /**
+   * Recalcula la cotizacion entera con el SERVIDOR como autoridad.
+   *
+   * Antes solo se recalculaba el descuento general: transporte, impuesto y
+   * ajuste se guardaban tal cual —cuando el DTO los hubiera dejado pasar, que
+   * no era el caso— y el total quedaba desalineado con sus propias partes.
+   *
+   * El total NUNCA llega del cliente. Se vuelve a calcular desde las lineas
+   * PERSISTIDAS y los parametros vigentes, de modo que quien manipule el cuerpo
+   * de la peticion no puede imponer un total distinto del que sale de las
+   * cuentas.
+   */
   async update(
     id: string,
     companyId: string,
@@ -236,23 +242,121 @@ export class QuotesService {
       notes?: string;
       validUntil?: string;
       discount?: number;
+      shipping?: number;
+      adjustment?: number;
+      adjustmentLabel?: string;
+      taxRate?: number;
+      taxIncluded?: boolean;
+      lineas?: Array<{
+        id: string;
+        quantity?: number;
+        unitPrice?: number;
+        lineDiscount?: number;
+        lineDiscountPercent?: number;
+      }>;
     },
   ) {
     const quote = await this.prisma.quote.findFirst({
       where: { id, companyId },
-      select: { id: true, subtotal: true, discount: true },
+      include: { items: { orderBy: { createdAt: 'asc' } } },
     });
     if (!quote) throw new NotFoundException('Cotización no encontrada');
 
-    // El descuento nunca puede dejar el total por debajo de cero, y se acota
-    // al subtotal en vez de recortar el total a 0: asi lo que queda guardado
-    // como descuento es lo que de verdad se aplico, y no una cifra mayor que
-    // el documento no refleja.
-    const pedido = dinero(data.discount ?? quote.discount);
-    const discount = redondea(
-      mayorQue(pedido, quote.subtotal) ? quote.subtotal : pedido,
+    const tocaLaEconomia =
+      (data.lineas !== undefined && data.lineas.length > 0) ||
+      data.discount !== undefined ||
+      data.shipping !== undefined ||
+      data.adjustment !== undefined ||
+      data.taxRate !== undefined ||
+      data.taxIncluded !== undefined;
+
+    // Una cotizacion ya enviada es un documento que alguien tiene en la mano.
+    // Cambiarle los numeros por debajo la convierte en otra cosa con el mismo
+    // numero; para eso existe `POST /quotes/:id/revision`, que crea una nueva.
+    if (tocaLaEconomia && quote.status !== 'DRAFT') {
+      throw new ConflictException(
+        'Esta cotización ya no es un borrador. Crea una revisión para cambiar sus importes.',
+      );
+    }
+
+    // Los cambios de linea se aplican SOBRE lo persistido, no lo sustituyen:
+    // enviar solo `lineDiscount` de una linea no puede borrar su cantidad.
+    //
+    // Una linea que no pertenece a esta cotizacion se rechaza en vez de
+    // ignorarse en silencio: ignorarla devolveria un 200 y un total que no es
+    // el que quien la mando esperaba.
+    const cambiosPorLinea = new Map((data.lineas ?? []).map((l) => [l.id, l]));
+    for (const clave of cambiosPorLinea.keys()) {
+      if (!quote.items.some((i) => i.id === clave)) {
+        throw new BadRequestException(
+          'Una de las líneas enviadas no pertenece a esta cotización.',
+        );
+      }
+    }
+
+    const lineasFinales = quote.items.map((i) => {
+      const cambio = cambiosPorLinea.get(i.id);
+      return {
+        id: i.id,
+        quantity: cambio?.quantity ?? i.quantity,
+        unitPrice: cambio?.unitPrice ?? i.unitPrice,
+        lineDiscount: cambio?.lineDiscount ?? i.lineDiscount,
+        lineDiscountPercent:
+          cambio?.lineDiscountPercent ?? i.lineDiscountPercent,
+      };
+    });
+
+    const calculo = calcularCotizacion({
+      lineas: lineasFinales.map((l) => ({
+        quantity: l.quantity,
+        unitPrice: l.unitPrice,
+        lineDiscount: l.lineDiscount,
+        lineDiscountPercent: l.lineDiscountPercent,
+      })),
+      discount: data.discount ?? quote.discount,
+      shipping: data.shipping ?? quote.shipping,
+      adjustment: data.adjustment ?? quote.adjustment,
+      taxRate: data.taxRate ?? quote.taxRate,
+      taxIncluded: data.taxIncluded ?? quote.taxIncluded,
+      roundingDecimals: quote.roundingDecimals,
+    });
+
+    // UN AJUSTE QUE SE COME EL DOCUMENTO SE RECHAZA, NO SE RECORTA.
+    //
+    // El motor acota la base a cero —`noNegativo`— para que ningun total salga
+    // negativo. Eso esta bien como ultima red, pero convierte un ajuste de
+    // -500.000 sobre una cotizacion de 100.000 en un total de 0 sin decir nada,
+    // y quien lo escribio casi siempre puso el signo al reves.
+    //
+    // Por eso se mira la base ANTES del recorte: si es negativa, es un 400 con
+    // un mensaje, no un documento que cobra cero.
+    const baseAntesDelRecorte = suma(
+      resta(calculo.subtotal, calculo.discount),
+      calculo.shipping,
+      calculo.adjustment,
     );
-    const total = redondea(noNegativo(resta(quote.subtotal, discount)));
+    if (baseAntesDelRecorte.isNegative()) {
+      throw new BadRequestException(
+        'El ajuste deja el total por debajo de cero. Revisa su signo o su importe.',
+      );
+    }
+
+    // Las lineas y la cabecera se guardan en UNA transaccion: un total que no
+    // cuadre con sus lineas es peor que no haber guardado nada.
+    await this.prisma.$transaction(
+      lineasFinales.map((l, i) =>
+        this.prisma.quoteItem.update({
+          where: { id: l.id },
+          data: {
+            quantity: l.quantity,
+            unitPrice: l.unitPrice,
+            lineDiscount: calculo.lineas[i].descuento,
+            lineDiscountPercent: l.lineDiscountPercent,
+            subtotal: calculo.lineas[i].subtotal,
+          },
+        }),
+      ),
+    );
 
     return this.prisma.quote.update({
       where: { id },
@@ -260,11 +364,23 @@ export class QuotesService {
         ...(data.title !== undefined ? { title: data.title } : {}),
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        ...(data.adjustmentLabel !== undefined
+          ? { adjustmentLabel: data.adjustmentLabel }
+          : {}),
         ...(data.validUntil !== undefined
           ? { validUntil: new Date(data.validUntil) }
           : {}),
-        discount,
-        total,
+        ...(data.taxIncluded !== undefined
+          ? { taxIncluded: data.taxIncluded }
+          : {}),
+        subtotal: calculo.subtotal,
+        lineDiscountTotal: calculo.lineDiscountTotal,
+        discount: calculo.discount,
+        shipping: calculo.shipping,
+        adjustment: calculo.adjustment,
+        taxRate: data.taxRate ?? quote.taxRate,
+        taxTotal: calculo.taxTotal,
+        total: calculo.total,
       },
       include: {
         lead: { select: LEAD_SELECT },
