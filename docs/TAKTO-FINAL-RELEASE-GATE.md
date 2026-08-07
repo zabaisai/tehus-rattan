@@ -239,10 +239,26 @@ Por eso importa ser preciso sobre **qué** está verificado remotamente:
 
 Es decir: **todo el código que se fusionaría está cubierto por la ejecución
 verde.** Lo que quedó sin ejecución propia es un cambio de documentación que no
-entra en ningún build ni en ninguna prueba. No se reintenta en bucle: cada
+entra en ningún build ni en ninguna prueba. No se reintenta a ciegas: cada
 reintento exige un commit nuevo, y encadenarlos solo produce ruido en la
 historia y cancela ejecuciones que iban avanzando —que es exactamente lo que le
 pasó a la de `172beee`, cancelada por mi propio push—.
+
+### Por qué algunos pushes no generaban ni ejecución
+
+A las 20:34Z el incidente añadió el dato que lo explica:
+
+> Webhook triggers are currently throttled to help with recovery and we are
+> processing approximately **15% of webhooks**, so many events such as pushes
+> and pull requests are not triggering workflows.
+
+Con el 85% de los webhooks descartados, `1954755` y `4330ced` simplemente no
+dispararon nada, y `8abc0d1` sí disparó pero se quedó sin runner —cero pasos en
+los dos trabajos—.
+
+Por eso se dejó de reintentar durante la caída y se esperó a que el componente
+`Actions` volviera a `operational` antes de lanzar la ejecución final sobre el
+SHA de HEAD, que es lo que el gate exige.
 
 ---
 
