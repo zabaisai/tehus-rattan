@@ -214,6 +214,19 @@ subir el archivo. No hay pérdida de datos: los productos ya importados quedan.
 
 ---
 
+## Defecto 4 — La rama no disparaba el CI
+
+El workflow se ejecuta en `develop`, `main`, `feature/**` y `hotfix/**`. Esta
+rama se llama `fix/...`, que **no encajaba en ningún patrón**: se publicó y
+GitHub no creó ninguna ejecución. Una rama sin verificar no se nota hasta que
+alguien la fusiona.
+
+El repositorio ya había aprendido esto una vez —el comentario del propio
+workflow explica que `hotfix/**` se añadió tras quedarse una rama urgente sin
+verificar—. Se añade `fix/**` por lo mismo.
+
+---
+
 ## Limitaciones conocidas
 
 **La suite `flowbot-transporte.e2e-spec.ts` es frágil bajo carga paralela.**
