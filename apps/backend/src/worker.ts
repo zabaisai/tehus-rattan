@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
+import { avisoDeAlmacenamiento } from './modules/products/import/almacenamiento-importaciones';
 import { AppModule } from './app.module';
 import { RELEASE_INFO } from './common/release/release.info';
 
@@ -26,6 +27,12 @@ async function bootstrapWorker() {
   });
 
   app.enableShutdownHooks();
+
+  // El worker es quien LEE los archivos de importacion. Si no comparte
+  // almacenamiento con el backend no encontrara ninguno, y eso tiene que verse
+  // en el arranque y no cuando alguien suba un catalogo de 50 MB.
+  const aviso = avisoDeAlmacenamiento();
+  if (aviso) logger.warn(aviso);
 
   logger.log(
     `Worker de cola iniciado (release ${RELEASE_INFO.sha}, built ${RELEASE_INFO.builtAt})`,

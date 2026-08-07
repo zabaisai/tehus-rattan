@@ -1,11 +1,12 @@
 import {
   ConflictException,
+  Inject,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma, ProductImportStatus } from '@prisma/client';
-import * as fs from 'fs';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   FILAS_POR_LOTE,
@@ -14,6 +15,13 @@ import {
 } from '../products-import.constants';
 import { FilaCruda, leerEnStreaming } from './lector-streaming';
 import { MapeoDeColumnas, mapearCabeceras, CAMPOS } from './mapeo-columnas';
+import {
+  ALMACENAMIENTO_DE_IMPORTACIONES,
+  AlmacenamientoEnDirectorioCompartido,
+} from './almacenamiento-importaciones';
+// `import type` obligatorio: el tipo aparece en una firma decorada y con
+// `emitDecoratorMetadata` TypeScript intentaria emitirlo como valor.
+import type { AlmacenamientoDeImportaciones } from './almacenamiento-importaciones';
 
 export interface IncidenciaDeFila {
   fila: number;
@@ -28,7 +36,20 @@ const TERMINALES: ProductImportStatus[] = ['COMPLETED', 'FAILED', 'CANCELLED'];
 export class ImportacionDeProductosService {
   private readonly logger = new Logger(ImportacionDeProductosService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    /**
+     * El archivo NO vive en el `/tmp` de este proceso.
+     *
+     * Quien lo escribe es el backend y quien lo lee es el worker, que es otro
+     * contenedor. Lo que se guarda en la base es una CLAVE que cada proceso
+     * resuelve contra su raiz configurada —el mismo volumen montado en el mismo
+     * sitio en ambos—. Ver `almacenamiento-importaciones.ts`.
+     */
+    @Optional()
+    @Inject(ALMACENAMIENTO_DE_IMPORTACIONES)
+    private readonly almacenamiento: AlmacenamientoDeImportaciones = new AlmacenamientoEnDirectorioCompartido(),
+  ) {}
 
   /**
    * Registra la importacion. NO la procesa: eso lo hace el worker.
@@ -40,7 +61,7 @@ export class ImportacionDeProductosService {
   async registrar(
     companyId: string,
     userId: string | undefined,
-    archivo: { nombre: string; tamaño: number; rutaTemporal: string },
+    archivo: { nombre: string; tamaño: number; clave: string },
     idempotencyKey?: string,
   ) {
     if (idempotencyKey) {
@@ -50,7 +71,7 @@ export class ImportacionDeProductosService {
       if (yaExiste) {
         // Reintentar la MISMA subida no arranca dos importaciones. El archivo
         // recien subido sobra: se borra para no dejarlo huerfano en disco.
-        await this.borrarTemporal(archivo.rutaTemporal);
+        await this.almacenamiento.eliminar(archivo.clave);
         if (yaExiste.companyId !== companyId) {
           throw new ConflictException(
             'Esa clave de importación ya se usó en otra empresa.',
@@ -67,7 +88,7 @@ export class ImportacionDeProductosService {
       },
     });
     if (enCurso >= MAX_IMPORTACIONES_SIMULTANEAS) {
-      await this.borrarTemporal(archivo.rutaTemporal);
+      await this.almacenamiento.eliminar(archivo.clave);
       throw new ConflictException(
         'Ya hay una importación en curso para esta empresa. Espera a que termine o cancélala.',
       );
@@ -79,7 +100,9 @@ export class ImportacionDeProductosService {
         createdById: userId,
         fileName: archivo.nombre.slice(0, 255),
         fileSize: archivo.tamaño,
-        tempPath: archivo.rutaTemporal,
+        // Clave relativa, NUNCA una ruta absoluta: la ruta de un proceso no
+        // significa nada en el otro.
+        tempPath: archivo.clave,
         status: 'PENDING',
         idempotencyKey: idempotencyKey || null,
       },
@@ -94,7 +117,7 @@ export class ImportacionDeProductosService {
    */
   async vistaPrevia(id: string, companyId: string, filas = 5) {
     const imp = await this.buscar(id, companyId);
-    if (!imp.tempPath || !fs.existsSync(imp.tempPath)) {
+    if (!imp.tempPath || !(await this.almacenamiento.existe(imp.tempPath))) {
       throw new NotFoundException(
         'El archivo de esta importación ya no está disponible.',
       );
@@ -102,7 +125,7 @@ export class ImportacionDeProductosService {
 
     const muestra: FilaCruda[] = [];
     const { cabeceras } = await leerEnStreaming(
-      imp.tempPath,
+      this.almacenamiento.rutaFisica(imp.tempPath),
       imp.fileName,
       async (fila) => {
         if (muestra.length < filas) muestra.push(fila);
@@ -196,8 +219,12 @@ export class ImportacionDeProductosService {
     const imp = await this.prisma.productImport.findUnique({ where: { id } });
     if (!imp) return;
     if (TERMINALES.includes(imp.status)) return;
-    if (!imp.tempPath || !fs.existsSync(imp.tempPath)) {
-      await this.terminar(id, 'FAILED', 'El archivo temporal ya no existe.');
+    if (!imp.tempPath || !(await this.almacenamiento.existe(imp.tempPath))) {
+      await this.terminar(
+        id,
+        'FAILED',
+        'El archivo de esta importación ya no está disponible.',
+      );
       return;
     }
 
@@ -237,7 +264,7 @@ export class ImportacionDeProductosService {
 
     try {
       const { cabeceras, cancelada } = await leerEnStreaming(
-        imp.tempPath,
+        this.almacenamiento.rutaFisica(imp.tempPath),
         imp.fileName,
         async (fila, numero) => {
           const activo = mapeo ?? mapearCabeceras(cabecerasDe(fila.length));
@@ -525,14 +552,10 @@ export class ImportacionDeProductosService {
       select: { tempPath: true },
     });
     if (!f?.tempPath) return;
-    await this.borrarTemporal(f.tempPath);
+    await this.almacenamiento.eliminar(f.tempPath);
     await this.prisma.productImport
       .update({ where: { id }, data: { tempPath: null } })
       .catch(() => undefined);
-  }
-
-  private async borrarTemporal(ruta: string): Promise<void> {
-    await fs.promises.unlink(ruta).catch(() => undefined);
   }
 
   private async buscar(id: string, companyId: string) {

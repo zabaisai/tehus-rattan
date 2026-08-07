@@ -1,12 +1,14 @@
-import {
-  IsString,
-  IsOptional,
-  IsNumber,
-  IsDateString,
-  Min,
-} from 'class-validator';
+import { IsString, IsOptional, IsDateString } from 'class-validator';
+import { EconomiaDeCotizacionDto } from './economia-cotizacion.dto';
 
-export class CreateQuoteFromLeadDto {
+/**
+ * Hereda los campos economicos en vez de repetirlos.
+ *
+ * Repetirlos es como empezo este defecto: el dominio soportaba transporte,
+ * impuesto y ajuste, y los DTO se quedaron atras porque eran otra lista escrita
+ * a mano. Una sola definicion no puede desviarse de si misma.
+ */
+export class CreateQuoteFromLeadDto extends EconomiaDeCotizacionDto {
   @IsOptional()
   @IsString()
   title?: string;
@@ -18,9 +20,4 @@ export class CreateQuoteFromLeadDto {
   @IsOptional()
   @IsDateString({}, { message: 'La fecha de vigencia no es válida' })
   validUntil?: string;
-
-  @IsOptional()
-  @IsNumber({}, { message: 'El descuento debe ser un número' })
-  @Min(0, { message: 'El descuento no puede ser negativo' })
-  discount?: number;
 }

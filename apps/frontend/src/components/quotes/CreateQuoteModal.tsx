@@ -23,6 +23,10 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
   const [discount, setDiscount] = useState('');
+  const [shipping, setShipping] = useState('');
+  const [adjustment, setAdjustment] = useState('');
+  const [taxRate, setTaxRate] = useState('');
+  const [taxIncluded, setTaxIncluded] = useState(false);
   const [validUntil, setValidUntil] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -36,6 +40,10 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
         title: title.trim() || undefined,
         notes: notes.trim() || undefined,
         discount: discount ? Number(discount) : undefined,
+        shipping: shipping ? Number(shipping) : undefined,
+        adjustment: adjustment ? Number(adjustment) : undefined,
+        taxRate: taxRate ? Number(taxRate) : undefined,
+        taxIncluded,
         validUntil: validUntil ? new Date(validUntil).toISOString() : undefined,
       });
       onCreated(quote);
@@ -90,6 +98,64 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
                 className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
             </div>
+          </div>
+
+          <div className="mb-3 grid grid-cols-2 gap-2">
+            <div>
+              <label htmlFor="nueva-transporte" className="mb-1 block text-xs font-medium text-neutral-600">
+                Transporte (opcional)
+              </label>
+              <input
+                id="nueva-transporte"
+                type="number"
+                min={0}
+                step="0.01"
+                value={shipping}
+                onChange={(e) => setShipping(e.target.value)}
+                placeholder="0"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="nueva-iva" className="mb-1 block text-xs font-medium text-neutral-600">
+                IVA % (opcional)
+              </label>
+              <input
+                id="nueva-iva"
+                type="number"
+                min={0}
+                max={100}
+                step="0.01"
+                value={taxRate}
+                onChange={(e) => setTaxRate(e.target.value)}
+                placeholder="0"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+              />
+            </div>
+            <div>
+              <label htmlFor="nueva-ajuste" className="mb-1 block text-xs font-medium text-neutral-600">
+                Ajuste (opcional)
+              </label>
+              <input
+                id="nueva-ajuste"
+                type="number"
+                step="0.01"
+                value={adjustment}
+                onChange={(e) => setAdjustment(e.target.value)}
+                placeholder="0"
+                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+              />
+              <p className="mt-1 text-[10px] text-neutral-400">Puede ser negativo.</p>
+            </div>
+            <label className="flex items-end gap-2 pb-2 text-xs text-neutral-600">
+              <input
+                type="checkbox"
+                checked={taxIncluded}
+                onChange={(e) => setTaxIncluded(e.target.checked)}
+                className="h-4 w-4 rounded border-neutral-300"
+              />
+              El precio ya incluye IVA
+            </label>
           </div>
 
           <div className="mb-4">

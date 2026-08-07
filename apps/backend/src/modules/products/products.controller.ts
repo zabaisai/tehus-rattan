@@ -109,10 +109,14 @@ export class ProductsController {
       throw error;
     }
 
+    // `file.filename` es la CLAVE que genero el servidor, no una ruta.
+    //
+    // Guardar `file.path` —una ruta absoluta de ESTE contenedor— es lo que hacia
+    // que el worker, que es otro contenedor, no encontrara nunca el archivo.
     const importacion = await this.importaciones.registrar(
       req.user.companyId,
       req.user.sub,
-      { nombre: file.originalname, tamaño: file.size, rutaTemporal: file.path },
+      { nombre: file.originalname, tamaño: file.size, clave: file.filename },
       body?.idempotencyKey,
     );
 

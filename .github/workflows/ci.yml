@@ -11,7 +11,12 @@ on:
     # `hotfix/**` se anadio despues de que una rama de correccion urgente se
     # quedara SIN verificar por no encajar en el patron: precisamente la clase
     # de rama que mas prisa lleva y que menos conviene fusionar a ciegas.
-    branches: [develop, main, "feature/**", "hotfix/**"]
+    #
+    # `fix/**` se anade por lo MISMO, y la segunda vez duele mas: la rama que
+    # corregia los dos defectos encontrados en staging se publico y no disparo
+    # nada, porque su nombre no encajaba. Una rama sin verificar no se nota
+    # hasta que alguien la fusiona.
+    branches: [develop, main, "feature/**", "fix/**", "hotfix/**"]
   pull_request:
 
 # Cancel superseded runs on the same ref to save CI minutes.

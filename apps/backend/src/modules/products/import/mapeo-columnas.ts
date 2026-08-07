@@ -127,22 +127,39 @@ export function mapearCabeceras(cabeceras: string[]): MapeoDeColumnas {
  *
  * Sin nombre, codigo ni SKU no hay forma de saber que producto es cada fila, y
  * la importacion crearia miles de filas indistinguibles.
+ *
+ * SE COMPRUEBA LA FORMA ANTES DE MIRAR EL CONTENIDO.
+ *
+ * `@IsObject()` acepta `{}` y cualquier objeto sin `campos`; esta funcion
+ * entraba entonces a `mapeo.campos.name` sobre `undefined` y el endpoint
+ * contestaba **500** a una peticion que solo estaba mal escrita. Un cuerpo mal
+ * formado es culpa de quien lo manda: eso es un 400 con un mensaje que diga
+ * como arreglarlo, no un error del servidor.
  */
 export function validarMapeo(
-  mapeo: MapeoDeColumnas,
+  mapeo: MapeoDeColumnas | null | undefined,
   totalColumnas: number,
 ): string | null {
+  if (!mapeo || typeof mapeo !== 'object') {
+    return 'Falta el mapeo de columnas. Envía un objeto con la forma {"campos": {"name": 0}}.';
+  }
+
+  const campos = mapeo.campos;
+  if (!campos || typeof campos !== 'object' || Array.isArray(campos)) {
+    return 'El mapeo debe incluir un objeto «campos» que asocie cada campo con el número de columna, por ejemplo {"campos": {"name": 0, "sku": 1}}.';
+  }
+
   const tieneIdentificador =
-    mapeo.campos.name !== undefined ||
-    mapeo.campos.code !== undefined ||
-    mapeo.campos.sku !== undefined;
+    campos.name !== undefined ||
+    campos.code !== undefined ||
+    campos.sku !== undefined;
 
   if (!tieneIdentificador) {
     return 'Hay que asignar al menos una columna a Nombre, Código o SKU.';
   }
 
   const conocidos = new Set(CAMPOS.map((c) => c.campo));
-  for (const [campo, indice] of Object.entries(mapeo.campos)) {
+  for (const [campo, indice] of Object.entries(campos)) {
     if (!conocidos.has(campo)) return `El campo «${campo}» no existe.`;
     if (!Number.isInteger(indice) || indice < 0 || indice >= totalColumnas) {
       return `La columna asignada a «${campo}» no existe en el archivo.`;
