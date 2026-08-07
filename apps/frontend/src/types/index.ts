@@ -404,6 +404,9 @@ export interface QuoteItem {
   category: string | null;
   quantity: number;
   unitPrice: number;
+  /** Descuento de la línea, como importe ya resuelto por el servidor. */
+  lineDiscount: number;
+  lineDiscountPercent: number | null;
   subtotal: number;
   notes: string | null;
   createdAt: string;
@@ -418,7 +421,19 @@ export interface Quote {
   title: string | null;
   status: QuoteStatus;
   subtotal: number;
+  /** Suma de los descuentos POR LÍNEA. Distinto del descuento general. */
+  lineDiscountTotal: number;
   discount: number;
+  shipping: number;
+  adjustment: number;
+  adjustmentLabel: string | null;
+  /** Porcentaje en unidades humanas: 19 significa 19 %. */
+  taxRate: number;
+  taxTotal: number;
+  /** `true` si el precio unitario YA lleva el impuesto dentro. */
+  taxIncluded: boolean;
+  currency: string;
+  roundingDecimals: number;
   total: number;
   notes: string | null;
   validUntil: string | null;
@@ -435,11 +450,24 @@ export interface Quote {
   company?: QuoteCompanyIdentity;
 }
 
+export interface QuoteLineaPayload {
+  id: string;
+  quantity?: number;
+  unitPrice?: number;
+  lineDiscount?: number;
+  lineDiscountPercent?: number;
+}
+
 export interface CreateQuoteFromLeadPayload {
   title?: string;
   notes?: string;
   validUntil?: string;
   discount?: number;
+  shipping?: number;
+  adjustment?: number;
+  adjustmentLabel?: string;
+  taxRate?: number;
+  taxIncluded?: boolean;
 }
 
 export interface UpdateQuotePayload {
@@ -448,6 +476,13 @@ export interface UpdateQuotePayload {
   notes?: string;
   validUntil?: string;
   discount?: number;
+  shipping?: number;
+  adjustment?: number;
+  adjustmentLabel?: string;
+  taxRate?: number;
+  taxIncluded?: boolean;
+  /** Solo las líneas que cambian, identificadas por su id. */
+  lineas?: QuoteLineaPayload[];
 }
 
 export type WhatsAppIntegrationStatus =

@@ -1,5 +1,6 @@
 'use client';
 
+import { filasDelDesglose } from '@/components/quotes/DesgloseEconomico';
 import { PrintableDocumentShell } from './PrintableDocumentShell';
 import { DocumentHeader } from './DocumentHeader';
 import { DocumentClientInfo } from './DocumentClientInfo';
@@ -98,12 +99,10 @@ export function QuotePrintableDocument({ quote, lead }: QuotePrintableDocumentPr
       <DocumentItemsEditor readOnly items={items} onChange={noop} />
 
       <DocumentTotalsBlock
-        rows={[
-          { label: 'Subtotal', value: quote.subtotal },
-          { label: 'Abono', value: 0 },
-          { label: 'Descuento', value: quote.discount },
-          { label: 'Total restante', value: quote.total, emphasize: true },
-        ]}
+        // Las MISMAS filas que la pantalla de detalle: dos listas escritas a
+        // mano acaban enseñando cifras distintas del mismo documento. El
+        // «Abono» que había aquí no existe en el modelo y siempre valía cero.
+        rows={filasDelDesglose(quote)}
       />
 
       {quote.notes && (
