@@ -143,9 +143,7 @@ export function generarClave(nombreOriginal: string): string {
  * worker. La interfaz de arriba es lo que permitira cambiarlo por almacenamiento
  * de objetos sin tocar el motor de importacion.
  */
-export class AlmacenamientoEnDirectorioCompartido
-  implements AlmacenamientoDeImportaciones
-{
+export class AlmacenamientoEnDirectorioCompartido implements AlmacenamientoDeImportaciones {
   constructor(private readonly raiz: string = carpetaDeAlmacenamiento()) {}
 
   rutaFisica(clave: string): string {
@@ -176,7 +174,10 @@ export class AlmacenamientoEnDirectorioCompartido
    * medio catalogo importado y ningun error. Con el rename, o esta entero o no
    * esta.
    */
-  async guardar(origen: Readable | string, nombreOriginal: string): Promise<string> {
+  async guardar(
+    origen: Readable | string,
+    nombreOriginal: string,
+  ): Promise<string> {
     await this.asegurarRaiz();
     const clave = generarClave(nombreOriginal);
     const destino = this.rutaFisica(clave);
@@ -285,7 +286,8 @@ export function avisoDeAlmacenamiento(
   env: NodeJS.ProcessEnv = process.env,
 ): string | null {
   const configurada =
-    env.PRODUCT_IMPORT_STORAGE_DIR?.trim() || env.PRODUCT_IMPORT_TMP_DIR?.trim();
+    env.PRODUCT_IMPORT_STORAGE_DIR?.trim() ||
+    env.PRODUCT_IMPORT_TMP_DIR?.trim();
   if (configurada) return null;
   if (env.NODE_ENV !== 'production') return null;
   return (

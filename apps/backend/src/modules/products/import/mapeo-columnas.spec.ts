@@ -30,6 +30,8 @@ describe('validarMapeo con cuerpos mal formados', () => {
   });
 
   it('un mapeo correcto sigue pasando', () => {
-    expect(validarMapeo({ campos: { name: 0, sku: 1 } } as never, 4)).toBeNull();
+    expect(
+      validarMapeo({ campos: { name: 0, sku: 1 } } as never, 4),
+    ).toBeNull();
   });
 });

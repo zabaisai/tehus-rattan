@@ -49,7 +49,11 @@ describe('Economía de cotizaciones (e2e, base real)', () => {
     empresaAjena = otra.id;
 
     const c = await prisma.contact.create({
-      data: { companyId: empresa, name: `${PREFIJO} Cliente`, phone: '+573000000111' },
+      data: {
+        companyId: empresa,
+        name: `${PREFIJO} Cliente`,
+        phone: '+573000000111',
+      },
     });
     contacto = c.id;
 
@@ -90,7 +94,9 @@ describe('Economía de cotizaciones (e2e, base real)', () => {
     await prisma.pipelineStage.deleteMany({
       where: { pipeline: { companyId: { in: empresas } } },
     });
-    await prisma.pipeline.deleteMany({ where: { companyId: { in: empresas } } });
+    await prisma.pipeline.deleteMany({
+      where: { companyId: { in: empresas } },
+    });
     await prisma.contact.deleteMany({ where: { companyId: { in: empresas } } });
     await prisma.company.deleteMany({ where: { id: { in: empresas } } });
     await prisma.$disconnect();
@@ -113,7 +119,6 @@ describe('Economía de cotizaciones (e2e, base real)', () => {
         productId: producto,
         quantity: unidades,
         unitPrice: precio,
-
       },
     });
     return lead.id;

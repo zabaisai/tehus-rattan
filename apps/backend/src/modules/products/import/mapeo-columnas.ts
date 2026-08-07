@@ -144,7 +144,7 @@ export function validarMapeo(
     return 'Falta el mapeo de columnas. Envía un objeto con la forma {"campos": {"name": 0}}.';
   }
 
-  const campos = (mapeo as MapeoDeColumnas).campos;
+  const campos = mapeo.campos;
   if (!campos || typeof campos !== 'object' || Array.isArray(campos)) {
     return 'El mapeo debe incluir un objeto «campos» que asocie cada campo con el número de columna, por ejemplo {"campos": {"name": 0, "sku": 1}}.';
   }

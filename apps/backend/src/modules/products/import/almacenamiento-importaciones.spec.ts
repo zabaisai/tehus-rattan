@@ -56,7 +56,10 @@ describe('Almacenamiento de importaciones', () => {
 
       // El worker solo recibe la CLAVE, igual que la recibe por la cola.
       expect(await worker.existe(clave)).toBe(true);
-      const leido = await fs.promises.readFile(worker.rutaFisica(clave), 'utf8');
+      const leido = await fs.promises.readFile(
+        worker.rutaFisica(clave),
+        'utf8',
+      );
       expect(leido).toContain('Silla,S-1');
     });
 
@@ -209,7 +212,7 @@ describe('Almacenamiento de importaciones', () => {
 
   describe('aviso de configuración', () => {
     it('avisa en producción cuando no hay directorio configurado', () => {
-      expect(avisoDeAlmacenamiento({ NODE_ENV: 'production' } as never)).toMatch(
+      expect(avisoDeAlmacenamiento({ NODE_ENV: 'production' })).toMatch(
         /PRODUCT_IMPORT_STORAGE_DIR/,
       );
     });
@@ -219,14 +222,12 @@ describe('Almacenamiento de importaciones', () => {
         avisoDeAlmacenamiento({
           NODE_ENV: 'production',
           PRODUCT_IMPORT_STORAGE_DIR: '/var/lib/takto/importaciones',
-        } as never),
+        }),
       ).toBeNull();
     });
 
     it('calla en desarrollo, donde backend y worker son el mismo proceso', () => {
-      expect(
-        avisoDeAlmacenamiento({ NODE_ENV: 'development' } as never),
-      ).toBeNull();
+      expect(avisoDeAlmacenamiento({ NODE_ENV: 'development' })).toBeNull();
     });
   });
 });

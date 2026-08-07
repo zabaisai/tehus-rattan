@@ -110,9 +110,9 @@ describe('DTO económico de cotizaciones', () => {
     });
 
     it('exige el id de la línea', () => {
-      expect(propiedades(UpdateQuoteDto, { lineas: [{ quantity: 2 }] })).toEqual(
-        ['lineas'],
-      );
+      expect(
+        propiedades(UpdateQuoteDto, { lineas: [{ quantity: 2 }] }),
+      ).toEqual(['lineas']);
     });
 
     it('rechaza cantidad cero o fraccionaria', () => {
@@ -134,9 +134,9 @@ describe('DTO económico de cotizaciones', () => {
 
     it('rechaza un cuerpo con demasiadas líneas', () => {
       const muchas = Array.from({ length: 501 }, (_, i) => ({ id: `it${i}` }));
-      expect(
-        propiedades(UpdateQuoteDto, { lineas: muchas }),
-      ).toContain('lineas');
+      expect(propiedades(UpdateQuoteDto, { lineas: muchas })).toContain(
+        'lineas',
+      );
     });
   });
 
