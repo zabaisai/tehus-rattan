@@ -12,6 +12,13 @@
  *   node scripts/importacion-gate-500mb.mjs [MB objetivo]
  */
 import { PrismaClient } from '@prisma/client';
+// El backend real no guarda rutas: guarda una clave en el almacenamiento
+// compartido, y el worker la resuelve contra SU raiz. Los scripts hacen lo
+// mismo para medir el camino de verdad.
+const { AlmacenamientoEnDirectorioCompartido } = await import(
+  '../dist/src/modules/products/import/almacenamiento-importaciones.js'
+);
+const almacen = new AlmacenamientoEnDirectorioCompartido();
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -89,7 +96,7 @@ async function main() {
   const imp = await servicio.registrar(empresa.id, undefined, {
     nombre: 'catalogo.csv',
     tamaño,
-    rutaTemporal: ruta,
+    clave: await almacen.guardar(ruta, 'catalogo.csv'),
   });
   const previa = await servicio.vistaPrevia(imp.id, empresa.id, 1);
   await servicio.fijarMapeo(imp.id, empresa.id, mapearCabeceras(previa.cabeceras));

@@ -89,6 +89,11 @@ services:
         condition: service_healthy
     volumes:
       - backend_uploads:/app/uploads
+      # Mismo volumen y MISMA ruta que el worker: es lo unico que hace que el
+      # archivo subido aqui se pueda leer alli.
+      - product_imports:/var/lib/takto/importaciones
+    environment:
+      PRODUCT_IMPORT_STORAGE_DIR: /var/lib/takto/importaciones
     networks:
       - internal
       - proxy
@@ -158,6 +163,9 @@ services:
       - .env.staging
     environment:
       WORKER_ROLE: "queue"
+      # MISMA ruta que el backend. Si estas dos difieren, el worker vuelve a no
+      # encontrar el archivo y la importacion muere igual que en staging.
+      PRODUCT_IMPORT_STORAGE_DIR: /var/lib/takto/importaciones
     # Healthcheck PROPIO. Sin esto hereda el de la imagen del backend, que
     # consulta `http://127.0.0.1:3001/api/health` — y el worker no expone HTTP
     # por diseño, asi que figuraba `unhealthy` estando perfectamente vivo.
@@ -194,6 +202,9 @@ services:
         condition: service_started
     volumes:
       - backend_uploads:/app/uploads
+      # El MISMO volumen y la MISMA ruta que el backend: aqui se LEE lo que
+      # aquel escribio.
+      - product_imports:/var/lib/takto/importaciones
     networks:
       - internal
     logging:
@@ -237,5 +248,14 @@ volumes:
   postgres_data:
   redis_data:
   backend_uploads:
+  # EL ARCHIVO DE UNA IMPORTACION LO ESCRIBE EL BACKEND Y LO LEE EL WORKER.
+  #
+  # Antes vivia en el `/tmp` de cada contenedor, que son sistemas de archivos
+  # distintos: el worker no encontraba nunca lo que subia el backend y toda
+  # importacion moria con «El archivo temporal ya no existe» y cero filas.
+  #
+  # Este volumen se monta en la MISMA ruta en backend y worker, y en ningun
+  # otro servicio: ni frontend, ni postgres, ni caddy, ni redis lo necesitan.
+  product_imports:
   caddy_data:
   caddy_config:

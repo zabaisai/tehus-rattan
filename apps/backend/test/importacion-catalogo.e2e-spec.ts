@@ -5,6 +5,7 @@ import * as path from 'path';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { ImportacionDeProductosService } from '../src/modules/products/import/importacion.service';
 import { mapearCabeceras } from '../src/modules/products/import/mapeo-columnas';
+import { AlmacenamientoEnDirectorioCompartido } from '../src/modules/products/import/almacenamiento-importaciones';
 
 /**
  * IMPORTACION DE CATALOGO — contra la base real.
@@ -19,28 +20,47 @@ const prisma = new PrismaClient();
 const PREFIJO = 'E2E-IMP';
 
 describe('Importación de catálogo (e2e, base real)', () => {
-  const servicio = new ImportacionDeProductosService(
-    prisma as unknown as PrismaService,
-  );
+  /**
+   * DOS INSTANCIAS, COMO EN PRODUCCION.
+   *
+   * `backend` recibe y guarda; `worker` lee y procesa. Cada una tiene su PROPIO
+   * objeto de almacenamiento, igual que en el despliegue son procesos distintos,
+   * y lo unico que comparten es la carpeta —el equivalente al volumen de Docker—.
+   *
+   * La version anterior usaba UN servicio y pasaba rutas absolutas, asi que no
+   * podia detectar que el worker no encontraba el archivo del backend. Ese fallo
+   * llego a staging y tumbo la importacion entera.
+   */
+  let almacenBackend: AlmacenamientoEnDirectorioCompartido;
+  let almacenWorker: AlmacenamientoEnDirectorioCompartido;
+  let servicio: ImportacionDeProductosService;
+  let servicioWorker: ImportacionDeProductosService;
 
   let empresaA: string;
   let empresaB: string;
   let carpeta: string;
   let n = 0;
 
+  /**
+   * Genera el CSV y lo entrega AL ALMACENAMIENTO DEL BACKEND, que es lo que
+   * hace multer en producción. Devuelve la CLAVE, nunca una ruta: si esto
+   * devolviera una ruta, la prueba volvería a no poder ver el fallo de staging.
+   */
   async function csv(filas: string[][], cabecera = 'Nombre,SKU,Precio') {
-    const ruta = path.join(carpeta, `cat-${n++}.csv`);
+    const origen = path.join(carpeta, `origen-${n++}.csv`);
     const contenido = [cabecera, ...filas.map((f) => f.join(','))].join('\n');
-    await fs.promises.writeFile(ruta, contenido, 'utf8');
-    return ruta;
+    await fs.promises.writeFile(origen, contenido, 'utf8');
+    const clave = await almacenBackend.guardar(origen, 'catalogo.csv');
+    await fs.promises.unlink(origen).catch(() => undefined);
+    return clave;
   }
 
-  async function registrar(ruta: string, companyId = empresaA) {
-    const info = await fs.promises.stat(ruta);
+  async function registrar(clave: string, companyId = empresaA) {
+    const info = await fs.promises.stat(almacenBackend.rutaFisica(clave));
     const imp = await servicio.registrar(companyId, undefined, {
-      nombre: path.basename(ruta),
+      nombre: 'catalogo.csv',
       tamaño: info.size,
-      rutaTemporal: ruta,
+      clave,
     });
     // El mapeo se fija siempre: en producción lo confirma una persona tras
     // ver la vista previa.
@@ -54,6 +74,21 @@ describe('Importación de catálogo (e2e, base real)', () => {
     carpeta = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), 'takto-e2e-imp-'),
     );
+
+    // El equivalente al volumen compartido: dos almacenamientos INDEPENDIENTES
+    // apuntando a la misma raíz. Ninguno conoce las rutas del otro; lo único
+    // que viaja entre ellos es la clave.
+    almacenBackend = new AlmacenamientoEnDirectorioCompartido(carpeta);
+    almacenWorker = new AlmacenamientoEnDirectorioCompartido(carpeta);
+    servicio = new ImportacionDeProductosService(
+      prisma as unknown as PrismaService,
+      almacenBackend,
+    );
+    servicioWorker = new ImportacionDeProductosService(
+      prisma as unknown as PrismaService,
+      almacenWorker,
+    );
+
     const a = await prisma.company.create({
       data: { name: `${PREFIJO}-A`, status: 'ACTIVE' },
     });
@@ -89,7 +124,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
     ]);
     const imp = await registrar(ruta);
 
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
     const estado = await servicio.estado(imp.id, empresaA);
     expect(estado.status).toBe('COMPLETED');
@@ -118,7 +153,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
     ]);
     const imp = await registrar(ruta);
 
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
     const p = await prisma.product.findMany({
       where: { companyId: empresaA },
@@ -137,12 +172,12 @@ describe('Importación de catálogo (e2e, base real)', () => {
    */
   it('el mismo SKU ACTUALIZA en vez de duplicar', async () => {
     const primera = await registrar(await csv([['Silla', 'SKU-X', '100000']]));
-    await servicio.procesar(primera.id);
+    await servicioWorker.procesar(primera.id);
 
     const segunda = await registrar(
       await csv([['Silla renovada', 'SKU-X', '150000']]),
     );
-    await servicio.procesar(segunda.id);
+    await servicioWorker.procesar(segunda.id);
 
     const productos = await prisma.product.findMany({
       where: { companyId: empresaA },
@@ -160,11 +195,11 @@ describe('Importación de catálogo (e2e, base real)', () => {
     const enA = await registrar(
       await csv([['Silla A', 'SKU-COMPARTIDO', '1']]),
     );
-    await servicio.procesar(enA.id);
+    await servicioWorker.procesar(enA.id);
 
     const rutaB = await csv([['Silla B', 'SKU-COMPARTIDO', '2']]);
     const enB = await registrar(rutaB, empresaB);
-    await servicio.procesar(enB.id);
+    await servicioWorker.procesar(enB.id);
 
     const a = await prisma.product.findFirst({
       where: { companyId: empresaA },
@@ -191,7 +226,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
     ]);
     const imp = await registrar(ruta);
 
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
     const estado = await servicio.estado(imp.id, empresaA);
     expect(estado.created).toBe(2);
@@ -212,7 +247,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
     const r = await servicio.cancelar(imp.id, empresaA);
 
     expect(r.estado).toBe('CANCELLED');
-    expect(fs.existsSync(ruta)).toBe(false);
+    expect(await almacenBackend.existe(ruta)).toBe(false);
   });
 
   it('cancelar una EN CURSO pide parar, no miente diciendo que ya paró', async () => {
@@ -242,7 +277,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
       data: { status: 'CANCELLING' },
     });
 
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
     const estado = await servicio.estado(imp.id, empresaA);
     expect(estado.status).toBe('CANCELLED');
@@ -283,7 +318,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
       data: { lastCommittedRow: 4, processedRows: 4, created: 4 },
     });
 
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
     const total = await prisma.product.count({
       where: { companyId: empresaA },
@@ -300,41 +335,41 @@ describe('Importación de catálogo (e2e, base real)', () => {
     await registrar(await csv([['A', 'S-1', '1']]));
 
     const otra = await csv([['B', 'S-2', '2']]);
-    const info = await fs.promises.stat(otra);
+    const info = await fs.promises.stat(almacenBackend.rutaFisica(otra));
     await expect(
       servicio.registrar(empresaA, undefined, {
         nombre: 'otra.csv',
         tamaño: info.size,
-        rutaTemporal: otra,
+        clave: otra,
       }),
     ).rejects.toThrow(/importación en curso/i);
 
     // Y el archivo rechazado NO se queda ocupando disco.
-    expect(fs.existsSync(otra)).toBe(false);
+    expect(await almacenBackend.existe(otra)).toBe(false);
   });
 
   it('la misma clave de idempotencia no arranca dos importaciones', async () => {
     const clave = `${PREFIJO}-clave-${Date.now()}`;
     const r1 = await csv([['A', 'S-1', '1']]);
-    const i1 = await fs.promises.stat(r1);
+    const i1 = await fs.promises.stat(almacenBackend.rutaFisica(r1));
     const primera = await servicio.registrar(
       empresaA,
       undefined,
-      { nombre: 'a.csv', tamaño: i1.size, rutaTemporal: r1 },
+      { nombre: 'a.csv', tamaño: i1.size, clave: r1 },
       clave,
     );
 
     const r2 = await csv([['B', 'S-2', '2']]);
-    const i2 = await fs.promises.stat(r2);
+    const i2 = await fs.promises.stat(almacenBackend.rutaFisica(r2));
     const segunda = await servicio.registrar(
       empresaA,
       undefined,
-      { nombre: 'b.csv', tamaño: i2.size, rutaTemporal: r2 },
+      { nombre: 'b.csv', tamaño: i2.size, clave: r2 },
       clave,
     );
 
     expect(segunda.id).toBe(primera.id);
-    expect(fs.existsSync(r2)).toBe(false);
+    expect(await almacenBackend.existe(r2)).toBe(false);
   });
 
   // ── limpieza y aislamiento ───────────────────────────────────
@@ -343,9 +378,9 @@ describe('Importación de catálogo (e2e, base real)', () => {
     const ruta = await csv([['A', 'S-1', '1']]);
     const imp = await registrar(ruta);
 
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
-    expect(fs.existsSync(ruta)).toBe(false);
+    expect(await almacenBackend.existe(ruta)).toBe(false);
     const estado = await servicio.estado(imp.id, empresaA);
     expect(estado.tempPath).toBeNull();
   });
@@ -357,7 +392,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
     // limpiamente y no dejar rastro.
     await fs.promises.unlink(ruta);
 
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
     const estado = await servicio.estado(imp.id, empresaA);
     expect(estado.status).toBe('FAILED');
@@ -373,7 +408,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
 
   it('los productos importados quedan SOLO en la empresa que importó', async () => {
     const imp = await registrar(await csv([['Exclusivo', 'S-EX', '1']]));
-    await servicio.procesar(imp.id);
+    await servicioWorker.procesar(imp.id);
 
     expect(
       await prisma.product.count({

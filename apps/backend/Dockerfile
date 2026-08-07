@@ -60,6 +60,17 @@ COPY --from=builder /app/prisma ./prisma
 # Docker seeds a fresh volume from the image directory's contents/owner.
 RUN mkdir -p /app/uploads && chown -R nestjs:nodeapp /app/uploads
 
+# CARPETA DE IMPORTACIONES, CREADA Y CON DUEÑO ANTES DE MONTAR EL VOLUMEN.
+#
+# Un volumen nombrado nuevo nace vacio y propiedad de root; el contenedor corre
+# como `nestjs`, asi que no podria escribir en el. Docker inicializa el volumen
+# copiando lo que la imagen tenga en ese punto de montaje —contenido Y dueño—,
+# de modo que crearla aqui es lo que hace que backend y worker puedan escribir.
+#
+# Sin esto el arreglo del volumen compartido no serviria de nada: el archivo
+# seguiria sin llegar al worker, ahora por permisos en vez de por ruta.
+RUN mkdir -p /var/lib/takto/importaciones  && chown -R nestjs:nodeapp /var/lib/takto/importaciones
+
 USER nestjs
 
 EXPOSE 3001

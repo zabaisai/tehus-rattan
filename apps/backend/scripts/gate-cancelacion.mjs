@@ -6,6 +6,13 @@
  * sin duplicar lo ya escrito.
  */
 import { PrismaClient } from '@prisma/client';
+// El backend real no guarda rutas: guarda una clave en el almacenamiento
+// compartido, y el worker la resuelve contra SU raiz. Los scripts hacen lo
+// mismo para medir el camino de verdad.
+const { AlmacenamientoEnDirectorioCompartido } = await import(
+  '../dist/src/modules/products/import/almacenamiento-importaciones.js'
+);
+const almacen = new AlmacenamientoEnDirectorioCompartido();
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -34,7 +41,7 @@ async function main() {
   const s = new ImportacionDeProductosService(prisma);
 
   // ── 1. CANCELACION a mitad ──────────────────────────────────
-  const imp = await s.registrar(empresa.id, undefined, { nombre: 'c.csv', tamaño, rutaTemporal: ruta });
+  const imp = await s.registrar(empresa.id, undefined, { nombre: 'c.csv', tamaño, clave: await almacen.guardar(ruta, 'catalogo.csv') });
   const previa = await s.vistaPrevia(imp.id, empresa.id, 1);
   await s.fijarMapeo(imp.id, empresa.id, mapearCabeceras(previa.cabeceras));
 
@@ -59,7 +66,7 @@ async function main() {
   if (!fs.existsSync(ruta2)) await generar(ruta2);
   const t2 = (await fs.promises.stat(ruta2)).size;
 
-  const imp2 = await s.registrar(empresa.id, undefined, { nombre: 'c2.csv', tamaño: t2, rutaTemporal: ruta2 });
+  const imp2 = await s.registrar(empresa.id, undefined, { nombre: 'c2.csv', tamaño: t2, clave: await almacen.guardar(ruta2, 'catalogo.csv') });
   const p2 = await s.vistaPrevia(imp2.id, empresa.id, 1);
   await s.fijarMapeo(imp2.id, empresa.id, mapearCabeceras(p2.cabeceras));
 
