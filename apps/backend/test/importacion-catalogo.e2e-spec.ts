@@ -390,7 +390,7 @@ describe('Importación de catálogo (e2e, base real)', () => {
     const imp = await registrar(ruta);
     // El archivo desaparece antes de procesar: la importación debe fallar
     // limpiamente y no dejar rastro.
-    await fs.promises.unlink(ruta);
+    await almacenBackend.eliminar(ruta);
 
     await servicioWorker.procesar(imp.id);
 
