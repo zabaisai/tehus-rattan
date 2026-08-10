@@ -119,8 +119,20 @@ export class QuotesController {
       status: cotizacion.status,
       // El PDF es presentacion: recibe numeros ya redondeados a la moneda.
       // El calculo exacto ya ocurrio en el servicio, en Decimal.
+      // TODOS los componentes economicos, no solo tres.
+      //
+      // Pasar unicamente subtotal, descuento y total es lo que produjo en
+      // staging un documento donde 400.000 - 25.000 daba 487.900: el total
+      // era correcto y el desglose que deberia justificarlo, no.
       subtotal: aNumeroParaMostrar(cotizacion.subtotal),
+      lineDiscountTotal: aNumeroParaMostrar(cotizacion.lineDiscountTotal),
       discount: aNumeroParaMostrar(cotizacion.discount),
+      shipping: aNumeroParaMostrar(cotizacion.shipping),
+      adjustment: aNumeroParaMostrar(cotizacion.adjustment),
+      adjustmentLabel: cotizacion.adjustmentLabel,
+      taxRate: aNumeroParaMostrar(cotizacion.taxRate),
+      taxTotal: aNumeroParaMostrar(cotizacion.taxTotal),
+      taxIncluded: cotizacion.taxIncluded,
       total: aNumeroParaMostrar(cotizacion.total),
       notes: cotizacion.notes,
       validUntil: cotizacion.validUntil,

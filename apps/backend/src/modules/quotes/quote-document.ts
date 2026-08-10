@@ -8,15 +8,25 @@
  * exactamente las que salen mal en un documento que se manda a un cliente.
  *
  * Aquí no se importa PDFKit a propósito: es una función pura.
+ *
+ * EL DESGLOSE ECONÓMICO NO SE DECIDE AQUÍ. Vive en `quote-desglose.ts`, que es
+ * el único sitio donde se decide qué conceptos aparecen y con qué signo. Este
+ * módulo solo los formatea. Tener esa lista escrita a mano aquí es lo que
+ * produjo un documento que no cuadraba: enseñaba subtotal, descuento y total, y
+ * se comía el transporte, el ajuste y el impuesto.
  */
+import {
+  desgloseCuadra,
+  filasDeDesglose,
+  type EconomiaDeCotizacion,
+} from './quote-desglose';
 
-export interface DatosCotizacion {
+export type { EconomiaDeCotizacion } from './quote-desglose';
+
+export interface DatosCotizacion extends EconomiaDeCotizacion {
   number: string;
   title?: string | null;
   status: string;
-  subtotal: number;
-  discount: number;
-  total: number;
   notes?: string | null;
   validUntil?: Date | null;
   createdAt: Date;
@@ -120,22 +130,28 @@ export function construirDocumento(
     company.website,
   ].filter((x): x is string => Boolean(x && x.trim()));
 
-  const totales: FilaTotal[] = [
-    { etiqueta: 'Subtotal', valor: formatearDinero(datos.subtotal, company) },
-  ];
-  // Solo si lo hay: un "Descuento: 0" invita a preguntar por qué no hay
-  // descuento, que es una conversación que nadie quería tener.
-  if (datos.discount > 0) {
-    totales.push({
-      etiqueta: 'Descuento',
-      valor: `- ${formatearDinero(datos.discount, company)}`,
+  // El desglose lo decide `quote-desglose.ts`; aquí solo se le pone formato de
+  // moneda y signo. Los negativos se imprimen con su signo delante para que
+  // una resta se lea como una resta.
+  const desglose = filasDeDesglose(datos);
+  const totales: FilaTotal[] = desglose.map((f) => ({
+    etiqueta: f.etiqueta,
+    valor:
+      f.valor < 0
+        ? `- ${formatearDinero(Math.abs(f.valor), company)}`
+        : formatearDinero(f.valor, company),
+    destacada: f.destacada,
+  }));
+
+  // RED DE SEGURIDAD: si el desglose deja de cuadrar, se dice en el documento
+  // en vez de emitir un papel que un cliente no puede reconstruir. Es
+  // preferible una línea incómoda a un total que nadie sabe justificar.
+  if (!desgloseCuadra(desglose)) {
+    totales.splice(totales.length - 1, 0, {
+      etiqueta: 'Revisar: el desglose no cuadra con el total',
+      valor: '',
     });
   }
-  totales.push({
-    etiqueta: 'TOTAL',
-    valor: formatearDinero(datos.total, company),
-    destacada: true,
-  });
 
   return {
     titulo: `Cotización ${datos.number}`,

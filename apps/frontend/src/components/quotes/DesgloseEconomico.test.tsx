@@ -60,24 +60,72 @@ describe('Desglose económico de una cotización', () => {
   it('enseña cada concepto que tiene valor, en orden', () => {
     const etiquetas = filasDelDesglose({
       ...base,
-      lineDiscountTotal: 20000,
+      subtotal: 400000,
+      lineDiscountTotal: 100000,
       discount: 25000,
       shipping: 50000,
-      adjustment: 5000,
+      adjustment: -15000,
+      adjustmentLabel: 'Rebaja acordada',
       taxRate: 19,
-      taxTotal: 100700,
-      total: 630700,
+      taxTotal: 77900,
+      total: 487900,
     }).map((f) => f.label);
 
     expect(etiquetas).toEqual([
-      'Subtotal',
+      'Subtotal bruto',
       'Descuentos por línea',
       'Descuento general',
       'Transporte',
-      'Ajuste',
+      'Rebaja acordada',
       'IVA 19%',
       'Total',
     ]);
+  });
+
+  /**
+   * EL CASO EXACTO DE STAGING, EN LA PANTALLA.
+   *
+   * Lo que se comprueba no es que aparezcan los conceptos, sino que quien mire
+   * la pantalla pueda SUMAR lo que ve y llegar al total. El PDF tiene su propia
+   * prueba con la misma exigencia, y las etiquetas de ambos coinciden.
+   */
+  it('el desglose de la pantalla suma el total (caso de staging)', () => {
+    const filas = filasDelDesglose({
+      ...base,
+      subtotal: 400000,
+      lineDiscountTotal: 100000,
+      discount: 25000,
+      shipping: 50000,
+      adjustment: -15000,
+      adjustmentLabel: 'QA_HOTFIX_ rebaja',
+      taxRate: 19,
+      taxTotal: 77900,
+      total: 487900,
+    });
+
+    const suma = filas
+      .filter((f) => !f.emphasize && !f.informativa)
+      .reduce((acc, f) => acc + f.value, 0);
+
+    expect(suma).toBe(487900);
+    expect(filas.find((f) => f.emphasize)!.value).toBe(487900);
+  });
+
+  it('con IVA incluido la fila es informativa y no altera el total', () => {
+    const filas = filasDelDesglose({
+      ...base,
+      taxRate: 19,
+      taxTotal: 79832,
+      taxIncluded: true,
+      total: 500000,
+    });
+    const iva = filas.find((f) => f.label.includes('IVA'))!;
+
+    expect(iva.informativa).toBe(true);
+    const suma = filas
+      .filter((f) => !f.emphasize && !f.informativa)
+      .reduce((acc, f) => acc + f.value, 0);
+    expect(suma).toBe(500000);
   });
 
   it('los descuentos se pintan como resta', () => {

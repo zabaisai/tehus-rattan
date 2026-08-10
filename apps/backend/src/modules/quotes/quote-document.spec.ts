@@ -10,6 +10,13 @@ const base: DatosCotizacion = {
   status: 'SENT',
   subtotal: 1_000_000,
   discount: 0,
+  lineDiscountTotal: 0,
+  shipping: 0,
+  adjustment: 0,
+  adjustmentLabel: null,
+  taxRate: 0,
+  taxTotal: 0,
+  taxIncluded: false,
   total: 1_000_000,
   notes: null,
   validUntil: new Date('2026-09-30T00:00:00Z'),
@@ -118,13 +125,20 @@ describe('construirDocumento', () => {
       expect(etiquetas).toEqual(['Subtotal', 'TOTAL']);
     });
 
-    it('con descuento aparece, y en negativo', () => {
+    /**
+     * La etiqueta pasa de «Descuento» a «Descuento general» a proposito: desde
+     * que existen descuentos POR LINEA, «Descuento» a secas es ambiguo en un
+     * documento que puede llevar los dos.
+     */
+    it('con descuento general aparece, y en negativo', () => {
       const d = construirDocumento({
         ...base,
         discount: 50_000,
         total: 950_000,
       });
-      const descuento = d.totales.find((t) => t.etiqueta === 'Descuento');
+      const descuento = d.totales.find(
+        (t) => t.etiqueta === 'Descuento general',
+      );
 
       expect(descuento).toBeDefined();
       expect(descuento!.valor.startsWith('- ')).toBe(true);

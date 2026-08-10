@@ -106,6 +106,7 @@ export class QuotesService {
       adjustment?: number;
       taxRate?: number;
       taxIncluded?: boolean;
+      adjustmentLabel?: string;
     },
   ) {
     const lead = await this.prisma.lead.findFirst({
@@ -140,6 +141,14 @@ export class QuotesService {
         taxIncluded: true,
       },
     });
+
+    // MISMA normalizacion que en `update`: crear y editar tienen que dejar el
+    // documento igual. Que la etiqueta sobreviviera solo por un camino era el
+    // segundo defecto encontrado en staging.
+    const adjustmentLabel = normalizarEtiqueta(
+      data.adjustmentLabel,
+      data.adjustment ?? 0,
+    );
 
     const taxRate = data.taxRate ?? empresa.defaultTaxRate;
     const taxIncluded = data.taxIncluded ?? empresa.taxIncluded;
@@ -190,6 +199,7 @@ export class QuotesService {
           lineDiscountTotal: calculo.lineDiscountTotal,
           shipping: calculo.shipping,
           adjustment: calculo.adjustment,
+          adjustmentLabel,
           taxRate,
           taxTotal: calculo.taxTotal,
           taxIncluded,
@@ -365,7 +375,12 @@ export class QuotesService {
         ...(data.status !== undefined ? { status: data.status } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
         ...(data.adjustmentLabel !== undefined
-          ? { adjustmentLabel: data.adjustmentLabel }
+          ? {
+              adjustmentLabel: normalizarEtiqueta(
+                data.adjustmentLabel,
+                Number(calculo.adjustment),
+              ),
+            }
           : {}),
         ...(data.validUntil !== undefined
           ? { validUntil: new Date(data.validUntil) }
@@ -429,4 +444,26 @@ export class QuotesService {
     const max = Number(filas[0]?.maximo ?? 0);
     return `COT-${String(max + 1).padStart(4, '0')}`;
   }
+}
+
+/**
+ * Normaliza la etiqueta del ajuste.
+ *
+ * Los espacios de mas se colapsan: «Rebaja   acordada» y «Rebaja acordada» son
+ * lo mismo, y dejarlos tal cual hace que dos documentos identicos se vean
+ * distintos.
+ *
+ * SIN AJUSTE NO HAY ETIQUETA. Guardar un concepto para un ajuste de cero deja
+ * en el documento una linea que no explica nada, y en la base un dato que nadie
+ * puede interpretar despues.
+ */
+function normalizarEtiqueta(
+  etiqueta: string | undefined,
+  ajuste: number,
+): string | null {
+  if (etiqueta === undefined) return null;
+  const limpia = etiqueta.replace(/\s+/g, ' ').trim();
+  if (!limpia) return null;
+  if (ajuste === 0) return null;
+  return limpia.slice(0, 80);
 }
