@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { BotResumen } from '@/lib/flowbots';
@@ -137,6 +137,53 @@ describe('Pantalla de FlowBot', () => {
 
     const activar = await screen.findByRole('button', { name: /Activar/ });
     expect(activar).toBeDisabled();
+  });
+
+  /**
+   * ACTIVAR NO ES UNA PRUEBA INOCUA.
+   *
+   * El interruptor de emergencia solo detiene los envios de WhatsApp. Un bot
+   * activo sigue creando oportunidades, moviendo etapas, asignando y creando
+   * tareas: el adaptador de CRM no consulta el interruptor en ningun punto.
+   * Presentarlo como si no pasara nada es lo que hace que alguien lo pulse «a
+   * ver que hace» sobre datos reales.
+   */
+  it('activar pide confirmacion y explica que hay efectos en el CRM', async () => {
+    const usuario = userEvent.setup();
+    listar.mockResolvedValue([
+      bot({ estado: 'DRAFT', versionPublicada: 1 }),
+    ]);
+    pintar();
+
+    await usuario.click(await screen.findByRole('button', { name: /Activar/ }));
+
+    expect(
+      await screen.findByText(/puede ejecutar acciones en el CRM/i),
+    ).toBeInTheDocument();
+    // NO se promete que sea una simulacion, porque no lo es.
+    expect(screen.queryByText(/es una simulación/i)).toBeNull();
+    // Y se dice que WhatsApp sigue bloqueado, sin insinuar que eso lo cubra todo.
+    expect(
+      screen.getByText(/mensajes reales de WhatsApp continúan bloqueados/i),
+    ).toBeInTheDocument();
+    // Nada ha cambiado todavia: la confirmacion no se ha aceptado.
+    expect(cambiarEstado).not.toHaveBeenCalled();
+  });
+
+  it('el bot solo se activa tras confirmar', async () => {
+    const usuario = userEvent.setup();
+    listar.mockResolvedValue([
+      bot({ estado: 'DRAFT', versionPublicada: 1 }),
+    ]);
+    pintar();
+
+    await usuario.click(await screen.findByRole('button', { name: /Activar/ }));
+    const dialogo = await screen.findByRole('dialog');
+    await usuario.click(
+      within(dialogo).getByRole('button', { name: /^Activar$/ }),
+    );
+
+    expect(cambiarEstado).toHaveBeenCalledWith(expect.any(String), 'ACTIVE');
   });
 
   it('un AGENT no ve crear, editar ni archivar', async () => {
