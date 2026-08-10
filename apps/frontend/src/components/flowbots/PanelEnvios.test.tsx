@@ -91,7 +91,13 @@ describe('Panel de estado de los envíos', () => {
   it('enseña el estado de cada número', async () => {
     pintar();
     expect(await screen.findByText('Ventas')).toBeInTheDocument();
-    expect(screen.getByText('Enviando')).toBeInTheDocument();
+    // «CLOSED» significa SIN FALLOS, no «enviando». Decirlo en verde bajo una
+    // alerta de envios parados era la contradiccion que se corrigio.
+    expect(screen.getByText('Sin fallos')).toBeInTheDocument();
+    expect(screen.queryByText('Enviando')).toBeNull();
+    // Y se separan las tres preguntas: conexion, permiso de salida y salud.
+    expect(screen.getByText('Número conectado')).toBeInTheDocument();
+    expect(screen.getByText('Envíos reales bloqueados')).toBeInTheDocument();
   });
 
   it('un número en pausa se ve, con la causa y cuándo reintenta', async () => {
@@ -114,7 +120,7 @@ describe('Panel de estado de los envíos', () => {
     );
     pintar();
 
-    expect(await screen.findByText('En pausa')).toBeInTheDocument();
+    expect(await screen.findByText('En pausa por fallos')).toBeInTheDocument();
     expect(screen.getByText('meta-caido')).toBeInTheDocument();
     expect(screen.getByText(/reintenta/)).toBeInTheDocument();
   });
@@ -205,7 +211,7 @@ describe('Panel de estado de los envíos', () => {
     );
     pintar('MANAGER');
 
-    expect(await screen.findByText('En pausa')).toBeInTheDocument();
+    expect(await screen.findByText('En pausa por fallos')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Reintentar ya/ })).toBeNull();
   });
 

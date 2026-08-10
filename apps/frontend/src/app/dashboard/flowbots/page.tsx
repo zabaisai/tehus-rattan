@@ -62,7 +62,7 @@ export default function FlowBotsPage() {
   const [errorAccion, setErrorAccion] = useState<string | null>(null);
   const [confirmando, setConfirmando] = useState<{
     bot: BotResumen;
-    accion: 'archivar' | 'restaurar';
+    accion: 'archivar' | 'restaurar' | 'activar';
   } | null>(null);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -268,12 +268,11 @@ export default function FlowBotsPage() {
               bot={bot}
               permisos={permisos}
               onDuplicar={() => void duplicar(bot)}
-              onActivar={() =>
-                void conAviso(
-                  () => flowbots.cambiarEstado(bot.id, 'ACTIVE'),
-                  'No se pudo activar el bot.',
-                )
-              }
+              // ACTIVAR NO ES UNA PRUEBA INOCUA. El interruptor de emergencia
+              // solo detiene los envíos de WhatsApp; un bot activo sigue
+              // creando oportunidades, moviendo etapas, asignando y creando
+              // tareas en el CRM. Se pregunta antes.
+              onActivar={() => setConfirmando({ bot, accion: 'activar' })}
               onPausar={() =>
                 void conAviso(
                   () => flowbots.cambiarEstado(bot.id, 'PAUSED'),
@@ -319,17 +318,27 @@ export default function FlowBotsPage() {
           title={
             confirmando.accion === 'archivar'
               ? 'Archivar este bot'
-              : 'Restaurar este bot'
+              : confirmando.accion === 'restaurar'
+                ? 'Restaurar este bot'
+                : 'Activar este bot'
           }
           message={
             confirmando.accion === 'archivar'
               ? // Se dice qué pasa con lo que ya está corriendo: archivar sin
                 // avisar deja a alguien esperando una respuesta que no llega.
                 'Dejará de atender conversaciones nuevas. Las que ya empezaron siguen su curso y el historial se conserva. Puedes restaurarlo cuando quieras.'
-              : 'Volverá a la lista como borrador. No se activa solo: tendrás que encenderlo cuando esté listo.'
+              : confirmando.accion === 'restaurar'
+                ? 'Volverá a la lista como borrador. No se activa solo: tendrás que encenderlo cuando esté listo.'
+                : // NO se promete que sea una simulación: no lo es. El bloqueo
+                  // de WhatsApp no alcanza al CRM.
+                  'Este bot puede ejecutar acciones en el CRM. Los mensajes reales de WhatsApp continúan bloqueados. Si solo quieres ver qué haría, usa Simular.'
           }
           confirmLabel={
-            confirmando.accion === 'archivar' ? 'Archivar' : 'Restaurar'
+            confirmando.accion === 'archivar'
+              ? 'Archivar'
+              : confirmando.accion === 'restaurar'
+                ? 'Restaurar'
+                : 'Activar'
           }
           onClose={() => setConfirmando(null)}
           onConfirm={async () => {
@@ -337,7 +346,11 @@ export default function FlowBotsPage() {
               () =>
                 flowbots.cambiarEstado(
                   confirmando.bot.id,
-                  confirmando.accion === 'archivar' ? 'ARCHIVED' : 'DRAFT',
+                  confirmando.accion === 'archivar'
+                    ? 'ARCHIVED'
+                    : confirmando.accion === 'restaurar'
+                      ? 'DRAFT'
+                      : 'ACTIVE',
                 ),
               'No se pudo cambiar el estado del bot.',
             );

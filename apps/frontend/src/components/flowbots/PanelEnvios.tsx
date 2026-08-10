@@ -10,6 +10,11 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { mensajeDeError } from '@/components/ui/ListState';
+import {
+  estadoDeIntegracion,
+  estadoDeSalud,
+  vistaOperativa,
+} from '@/lib/flowbot-estado-operativo';
 
 /**
  * Por qué no está saliendo un mensaje.
@@ -49,6 +54,8 @@ export function PanelEnvios() {
   const abiertos = (data.numeros ?? []).filter(
     (n) => n.breaker.estado !== 'CLOSED',
   );
+  // La MISMA conclusión que muestra el aviso de arriba: un solo sitio decide.
+  const vista = vistaOperativa(data);
 
   return (
     <section className="space-y-3 rounded-lg border border-neutral-200 bg-white p-3">
@@ -103,6 +110,16 @@ export function PanelEnvios() {
                 className="flex flex-wrap items-center gap-2 rounded-md bg-neutral-50 px-2 py-1.5 text-[11px]"
               >
                 <span className="flex-1 text-neutral-800">{n.etiqueta}</span>
+                {/* Tres preguntas distintas, tres etiquetas: si está
+                    conectado, si se permite enviar y si el número está sano.
+                    Juntarlas fue lo que produjo «Enviando» bajo una alerta de
+                    envíos parados. */}
+                <Badge tone={estadoDeIntegracion(n.estadoIntegracion).conectado ? 'success' : 'neutral'}>
+                  {estadoDeIntegracion(n.estadoIntegracion).etiqueta}
+                </Badge>
+                <Badge tone={vista.puedeSalirUnMensaje ? 'success' : 'neutral'}>
+                  {vista.etiquetaSalida}
+                </Badge>
                 <EstadoDelBreaker foto={n.breaker} />
                 {n.breaker.ultimaCausa && (
                   <span className="text-neutral-500">
@@ -251,12 +268,14 @@ export function PanelEnvios() {
   );
 }
 
+/**
+ * SALUD del número, que NO es lo mismo que si se está enviando.
+ *
+ * `CLOSED` significa «este número no acumula fallos». Decía «Enviando» en
+ * verde, y con el interruptor activo y el transporte en falso eso contradecia
+ * a la alerta de arriba: un numero sano en un entorno donde no sale nada.
+ */
 function EstadoDelBreaker({ foto }: { foto: FotoBreaker }) {
-  if (foto.estado === 'CLOSED') {
-    return <Badge tone="success">Enviando</Badge>;
-  }
-  if (foto.estado === 'HALF_OPEN') {
-    return <Badge tone="warning">Probando</Badge>;
-  }
-  return <Badge tone="error">En pausa</Badge>;
+  const { etiqueta, tono } = estadoDeSalud(foto.estado);
+  return <Badge tone={tono}>{etiqueta}</Badge>;
 }
