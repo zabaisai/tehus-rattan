@@ -148,6 +148,49 @@ describe('Economía de cotizaciones (e2e, base real)', () => {
     expect(n(q.total)).toBe(630700);
   });
 
+  /**
+   * LA ETIQUETA DEL AJUSTE SE ACEPTABA Y SE PERDIA.
+   *
+   * El DTO la declara, asi que la peticion pasa la validacion y devuelve 201,
+   * pero `createFromLead` no la guardaba: quien la escribia al crear veia un
+   * ajuste sin concepto en el documento y no habia forma de saber por que.
+   *
+   * Editar despues si funcionaba, lo que lo hacia aun mas confuso.
+   */
+  it('la etiqueta del ajuste se PERSISTE al crear, no solo al editar', async () => {
+    const lead = await conProducto(1, 100000);
+
+    const q = await quotes.createFromLead(lead, empresa, undefined, {
+      adjustment: -10000,
+      adjustmentLabel: 'Rebaja acordada',
+    });
+
+    expect(q.adjustmentLabel).toBe('Rebaja acordada');
+  });
+
+  it('crear y editar dejan la etiqueta igual', async () => {
+    const lead = await conProducto(1, 100000);
+    const creada = await quotes.createFromLead(lead, empresa, undefined, {
+      adjustment: -5000,
+      adjustmentLabel: '  Rebaja  con  espacios  ',
+    });
+    const editada = await quotes.update(creada.id, empresa, {
+      adjustmentLabel: '  Rebaja  con  espacios  ',
+    });
+
+    // Mismo valor por los dos caminos, y con los espacios ya normalizados.
+    expect(creada.adjustmentLabel).toBe(editada.adjustmentLabel);
+    expect(creada.adjustmentLabel).toBe('Rebaja con espacios');
+  });
+
+  it('sin ajuste no se guarda etiqueta: no hay nada que etiquetar', async () => {
+    const lead = await conProducto(1, 100000);
+    const q = await quotes.createFromLead(lead, empresa, undefined, {
+      adjustmentLabel: 'Etiqueta huérfana',
+    });
+    expect(q.adjustmentLabel).toBeNull();
+  });
+
   it('con IVA INCLUIDO el impuesto se extrae, no se suma', async () => {
     const lead = await conProducto(1, 119000);
 

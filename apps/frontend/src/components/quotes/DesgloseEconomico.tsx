@@ -15,21 +15,40 @@ import type { Quote } from '@/types';
  * TODAS LAS CIFRAS VIENEN DEL SERVIDOR. Aquí no se calcula nada: el backend es
  * la autoridad del total y esto solo lo pinta. Si esta función sumara por su
  * cuenta, tarde o temprano diría algo distinto del PDF.
+ *
+ * SIGUE LAS MISMAS REGLAS QUE `quote-desglose.ts` DEL BACKEND, que es el
+ * contrato del que sale el PDF. No se puede importar —son dos aplicaciones—,
+ * así que la garantía es una prueba de paridad que compara las dos listas para
+ * los mismos datos. En staging, tres listas escritas a mano produjeron un PDF
+ * que no cuadraba con la pantalla.
  */
 export function filasDelDesglose(
   quote: Quote,
-): Array<{ label: string; value: number; emphasize?: boolean }> {
-  const filas: Array<{ label: string; value: number; emphasize?: boolean }> = [
-    { label: 'Subtotal', value: quote.subtotal },
+): Array<{ label: string; value: number; emphasize?: boolean; informativa?: boolean }> {
+  // SE PARTE DEL BRUTO Y SE RESTA, igual que en el servidor.
+  //
+  // `subtotal` ya lleva descontados los descuentos de línea; enseñarlo como
+  // primera fila y ADEMÁS restarlos los contaría dos veces. Partir del bruto
+  // deja todas las filas sumables, que es lo que permite cuadrar el documento
+  // a mano.
+  const bruto = quote.subtotal + quote.lineDiscountTotal;
+
+  const filas: Array<{
+    label: string;
+    value: number;
+    emphasize?: boolean;
+    informativa?: boolean;
+  }> = [
+    {
+      label: quote.lineDiscountTotal > 0 ? 'Subtotal bruto' : 'Subtotal',
+      value: bruto,
+    },
   ];
 
   // Solo se enseña lo que tiene valor. Una lista con cinco ceros esconde las
   // dos cifras que de verdad importan.
   if (quote.lineDiscountTotal > 0) {
-    filas.push({
-      label: 'Descuentos por línea',
-      value: -quote.lineDiscountTotal,
-    });
+    filas.push({ label: 'Descuentos por línea', value: -quote.lineDiscountTotal });
   }
   if (quote.discount > 0) {
     filas.push({ label: 'Descuento general', value: -quote.discount });
@@ -44,14 +63,20 @@ export function filasDelDesglose(
     });
   }
   if (quote.taxRate > 0) {
-    filas.push({
-      // Se dice si va incluido o encima: es la diferencia entre cobrar el
-      // 19 % o no cobrarlo, y en el papel tiene que quedar escrito.
-      label: quote.taxIncluded
-        ? `IVA ${quote.taxRate}% (incluido)`
-        : `IVA ${quote.taxRate}%`,
-      value: quote.taxTotal,
-    });
+    const tasa = Number.isInteger(quote.taxRate)
+      ? String(quote.taxRate)
+      : String(quote.taxRate).replace('.', ',');
+    filas.push(
+      quote.taxIncluded
+        ? {
+            // Con impuesto incluido el total NO cambia: ya está dentro de los
+            // precios. Sumarlo otra vez desviaría la pantalla un 19 % entero.
+            label: `IVA ${tasa}% incluido en los precios`,
+            value: quote.taxTotal,
+            informativa: true,
+          }
+        : { label: `IVA ${tasa}%`, value: quote.taxTotal },
+    );
   }
 
   filas.push({ label: 'Total', value: quote.total, emphasize: true });
