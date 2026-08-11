@@ -97,6 +97,13 @@
   --color-status-warning-surface: #fff4e0;
   --color-status-error: #c42b2b;
   --color-status-error-surface: #fceaea;
+  /* DERIVADO, no viene del paquete de marca: es #C42B2B oscurecido para el
+     estado `hover` del botón destructivo. Existe porque ese botón usaba
+     `secondary-800` (#963900) al pasar el ratón, que es NARANJA OSCURO: el
+     botón de borrar pasaba de rojo a marrón. El paquete no define un hover de
+     error, así que este valor debe confirmarse con marca antes de darlo por
+     oficial; mientras tanto es preferible a cambiar de tono al pasar. */
+  --color-status-error-hover: #a32323;
   --color-status-info: #2a5fd6;
   --color-status-info-surface: #e8effd;
 

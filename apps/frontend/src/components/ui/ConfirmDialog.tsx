@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Modal } from './Modal';
+import { Button } from './Button';
 
 interface ConfirmDialogProps {
   title: string;
@@ -12,14 +13,12 @@ interface ConfirmDialogProps {
   onConfirm: () => Promise<void>;
 }
 
-const DEFAULT_CONFIRM_CLASS = 'bg-red-600 hover:bg-red-700';
-
 /** Confirmation gate for destructive platform actions (session/device revocation, etc). */
 export function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Confirmar',
-  confirmClassName = DEFAULT_CONFIRM_CLASS,
+  confirmClassName = '',
   onClose,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -39,27 +38,30 @@ export function ConfirmDialog({
 
   return (
     <Modal title={title} onClose={onClose} maxWidth="sm" stackedZIndex>
-      <div className="text-sm text-neutral-600">{message}</div>
+      <div className="text-sm text-content-secondary">{message}</div>
 
-      {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
+      {/* `role="alert"`: el fallo aparece después de pulsar confirmar, y sin
+          esto un lector de pantalla no lo menciona nunca. */}
+      {error && (
+        <p role="alert" className="mt-3 text-xs font-medium text-status-error">
+          {error}
+        </p>
+      )}
 
       <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={saving}
-          className="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-50"
-        >
+        <Button variant="quiet" onClick={onClose} disabled={saving}>
           Cancelar
-        </button>
-        <button
-          type="button"
+        </Button>
+        {/* Destructivo por defecto: este diálogo solo aparece delante de
+            acciones que no se pueden deshacer. */}
+        <Button
+          variant="danger"
           onClick={handleConfirm}
           disabled={saving}
-          className={`rounded-md px-3 py-2 text-sm font-medium text-white disabled:opacity-50 ${confirmClassName}`}
+          className={confirmClassName}
         >
           {saving ? 'Procesando...' : confirmLabel}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

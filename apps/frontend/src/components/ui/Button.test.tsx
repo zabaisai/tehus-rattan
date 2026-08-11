@@ -30,6 +30,16 @@ describe('Button', () => {
 
       expect(screen.getByRole('button').className).toContain('bg-status-error');
     });
+
+    it('el destructivo NO cambia de tono al pasar el ratón', () => {
+      // Su hover era `secondary-800`, que es naranja oscuro: el botón de
+      // borrar pasaba de rojo a marrón justo al apuntarlo.
+      render(<Button variant="danger">Eliminar</Button>);
+
+      const clases = screen.getByRole('button').className;
+      expect(clases).toContain('hover:bg-status-error-hover');
+      expect(clases).not.toContain('secondary');
+    });
   });
 
   describe('accesibilidad', () => {

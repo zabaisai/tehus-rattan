@@ -31,9 +31,11 @@ const VARIANTES: Record<VarianteBoton, string> = {
     'border border-neutral-300 bg-white text-neutral-700 hover:bg-neutral-50 disabled:text-neutral-400',
   quiet:
     'text-neutral-600 hover:bg-neutral-100 disabled:text-neutral-400 disabled:hover:bg-transparent',
-  // Rojo de estado, no un rojo cualquiera.
+  // Rojo de estado, no un rojo cualquiera. El hover oscurece ESE rojo: antes
+  // era `secondary-800`, naranja oscuro, así que el botón de borrar cambiaba
+  // de tono —de rojo a marrón— justo al apuntarlo.
   danger:
-    'bg-status-error text-white hover:bg-secondary-800 disabled:bg-neutral-300',
+    'bg-status-error text-white hover:bg-status-error-hover disabled:bg-neutral-300',
 };
 
 const TAMANOS: Record<TamanoBoton, string> = {

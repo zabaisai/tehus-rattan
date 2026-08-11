@@ -47,19 +47,27 @@ export function ListState({
 
   if (isError) {
     return (
+      // Rojo de ESTADO de la marca, no el `red-*` de Tailwind: es el mismo
+      // rojo que usan el badge de error y el botón destructivo, y así "algo
+      // falló" se ve igual en toda la aplicación.
       <div
         role="alert"
-        className="flex flex-col items-center gap-2 rounded-lg border border-red-200 bg-red-50 py-10 text-center"
+        className="flex flex-col items-center gap-2 rounded-lg border border-status-error/20 bg-status-error-surface py-10 text-center"
       >
-        <AlertTriangle size={24} className="text-red-600" strokeWidth={1.5} />
-        <p className="text-sm font-medium text-red-800">
+        <AlertTriangle
+          size={24}
+          aria-hidden="true"
+          className="text-status-error"
+          strokeWidth={1.5}
+        />
+        <p className="text-sm font-medium text-status-error">
           {mensajeDeError(error)}
         </p>
         {onRetry && (
           <button
             type="button"
             onClick={onRetry}
-            className="rounded-md border border-red-300 bg-white px-2.5 py-1.5 text-xs text-red-800 hover:bg-red-100"
+            className="rounded-md border border-status-error/30 bg-surface-default px-2.5 py-1.5 text-xs text-status-error outline-none transition-colors hover:bg-status-error-surface focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1"
           >
             Reintentar
           </button>
