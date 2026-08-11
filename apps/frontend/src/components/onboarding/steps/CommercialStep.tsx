@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
 
 export interface CommercialState {
   sellsProducts: boolean;
@@ -39,13 +42,15 @@ function ToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between rounded-md border border-[#0B0F10]/10 bg-white px-3.5 py-3">
-      <span className="text-sm text-[#0B0F10]">{label}</span>
+    <label className="flex cursor-pointer items-center justify-between rounded-md border border-line-default bg-surface-default px-3.5 py-3">
+      <span className="text-sm text-content-primary">{label}</span>
+      {/* `accent-color` navy: la casilla marcada usa el color de marca en vez
+          del azul del sistema, que es de otra familia. */}
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 accent-[#A57014]"
+        className="h-4 w-4 accent-brand-primary"
       />
     </label>
   );
@@ -72,10 +77,21 @@ export function CommercialStep({ value, onChange }: CommercialStepProps) {
     setCustomCategory("");
   }
 
+  // Naranja de FONDO con texto navy: la regla del manual. Al revés —naranja
+  // como texto, o blanco sobre naranja— no alcanza el contraste mínimo.
+  const chipSeleccionado = "bg-brand-secondary text-brand-primary";
+  const chipSuelto =
+    "border border-neutral-300 text-content-secondary hover:bg-neutral-50";
+  const chipBase =
+    "rounded-full px-3 py-1.5 text-xs font-medium transition-colors " +
+    "outline-none focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1";
+
   return (
     <div>
-      <h3 className="text-lg font-semibold text-[#0B0F10]">Configuración comercial</h3>
-      <p className="mt-1.5 text-sm text-[#0B0F10]/70">
+      <h3 className="text-lg font-semibold text-content-primary">
+        Configuración comercial
+      </h3>
+      <p className="mt-1.5 text-sm text-content-secondary">
         Ayúdanos a entender cómo opera tu empresa.
       </p>
 
@@ -108,9 +124,12 @@ export function CommercialStep({ value, onChange }: CommercialStepProps) {
       </div>
 
       <div className="mt-6">
-        <label className="mb-2 block text-xs font-medium text-[#0B0F10]/70">
+        <p className="mb-2 block text-sm font-medium text-neutral-700">
           Categorías principales
-        </label>
+        </p>
+
+        {/* `aria-pressed`: el chip es un interruptor, y sin esto su estado
+            solo existe como color. */}
         <div className="flex flex-wrap gap-2">
           {SUGGESTED_CATEGORIES.map((category) => {
             const selected = value.categories.includes(category);
@@ -118,12 +137,9 @@ export function CommercialStep({ value, onChange }: CommercialStepProps) {
               <button
                 key={category}
                 type="button"
+                aria-pressed={selected}
                 onClick={() => toggleCategory(category)}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-                  selected
-                    ? "bg-[#A57014] text-white"
-                    : "border border-[#0B0F10]/15 text-[#0B0F10]/70 hover:bg-[#F4EFE6]"
-                }`}
+                className={`${chipBase} ${selected ? chipSeleccionado : chipSuelto}`}
               >
                 {category}
               </button>
@@ -133,36 +149,42 @@ export function CommercialStep({ value, onChange }: CommercialStepProps) {
             <button
               key={category}
               type="button"
+              aria-label={`Quitar categoría ${category}`}
               onClick={() => toggleCategory(category)}
-              className="flex items-center gap-1 rounded-full bg-[#A57014] px-3 py-1.5 text-xs font-medium text-white"
+              className={`${chipBase} ${chipSeleccionado} flex items-center gap-1`}
             >
               {category}
-              <X size={12} />
+              <X size={12} aria-hidden="true" />
             </button>
           ))}
         </div>
 
-        <div className="mt-3 flex gap-2">
-          <input
-            type="text"
-            value={customCategory}
-            onChange={(e) => setCustomCategory(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addCustomCategory();
-              }
-            }}
-            placeholder="Categoría personalizada"
-            className="w-full rounded-md border border-[#0B0F10]/15 px-3 py-2 text-sm outline-none focus:border-[#A57014] focus:ring-1 focus:ring-[#A57014]"
-          />
-          <button
-            type="button"
+        <div className="mt-3 flex items-start gap-2">
+          <Field
+            label="Categoría personalizada"
+            labelOculta
+            className="w-full"
+          >
+            <Input
+              type="text"
+              value={customCategory}
+              onChange={(e) => setCustomCategory(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomCategory();
+                }
+              }}
+              placeholder="Categoría personalizada"
+            />
+          </Field>
+          <Button
+            variant="secondary"
             onClick={addCustomCategory}
-            className="shrink-0 rounded-md border border-[#0B0F10]/15 px-3 py-2 text-sm text-[#0B0F10] hover:bg-[#F4EFE6]"
+            className="shrink-0"
           >
             Agregar
-          </button>
+          </Button>
         </div>
       </div>
     </div>

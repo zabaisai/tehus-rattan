@@ -1,5 +1,10 @@
+import { Card } from "@/components/ui/Card";
 import { CommercialState } from "./CommercialStep";
 import { PipelineState } from "./PipelineStep";
+
+/** Colores por defecto de la EMPRESA, no de TAKTO. Ver `BrandingStep`. */
+const COLOR_EMPRESA_POR_DEFECTO = "#A57014";
+const ACENTO_EMPRESA_POR_DEFECTO = "#FDDC7F";
 
 interface ConfirmationStepProps {
   companyName: string;
@@ -20,20 +25,22 @@ interface ConfirmationStepProps {
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1.5 text-sm">
-      <span className="text-[#0B0F10]/50">{label}</span>
-      <span className="text-right font-medium text-[#0B0F10]">{value}</span>
+      <span className="text-content-secondary">{label}</span>
+      <span className="text-right font-medium text-content-primary">{value}</span>
     </div>
   );
 }
 
 function SummaryCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-[#0B0F10]/10 bg-white p-4">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[#A57014]">
+    <Card padding="sm" flat>
+      {/* Navy y no naranja: es texto fino sobre fondo claro, justo el uso que
+          el manual prohíbe para #FF6A00 por contraste. */}
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-primary">
         {title}
       </p>
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -62,8 +69,8 @@ export function ConfirmationStep({
 
   return (
     <div>
-      <h3 className="text-lg font-semibold text-[#0B0F10]">Confirmación</h3>
-      <p className="mt-1.5 text-sm text-[#0B0F10]/70">
+      <h3 className="text-lg font-semibold text-content-primary">Confirmación</h3>
+      <p className="mt-1.5 text-sm text-content-secondary">
         Revisa la información antes de crear tu empresa.
       </p>
 
@@ -77,15 +84,26 @@ export function ConfirmationStep({
         <SummaryCard title="Branding">
           <SummaryRow label="Logo principal" value={hasLogo ? "Incluido" : "No incluido"} />
           <SummaryRow label="Logo secundario" value={hasSecondaryLogo ? "Incluido" : "No incluido"} />
-          <div className="mt-2 flex items-center gap-2">
-            <span
-              className="h-5 w-5 rounded-full border border-[#0B0F10]/10"
-              style={{ backgroundColor: primaryColor || "#A57014" }}
-            />
-            <span
-              className="h-5 w-5 rounded-full border border-[#0B0F10]/10"
-              style={{ backgroundColor: accentColor || "#FDDC7F" }}
-            />
+          {/* Muestras de los colores DE LA EMPRESA. El nombre va en texto y no
+              solo en el color: dos discos sin etiqueta no dicen nada a quien
+              usa lector de pantalla ni a quien no distingue esos dos tonos. */}
+          <div className="mt-2 flex items-center gap-4">
+            <span className="flex items-center gap-2 text-xs text-content-secondary">
+              <span
+                aria-hidden="true"
+                className="h-5 w-5 rounded-full border border-line-default"
+                style={{ backgroundColor: primaryColor || COLOR_EMPRESA_POR_DEFECTO }}
+              />
+              Principal
+            </span>
+            <span className="flex items-center gap-2 text-xs text-content-secondary">
+              <span
+                aria-hidden="true"
+                className="h-5 w-5 rounded-full border border-line-default"
+                style={{ backgroundColor: accentColor || ACENTO_EMPRESA_POR_DEFECTO }}
+              />
+              Acento
+            </span>
           </div>
         </SummaryCard>
 

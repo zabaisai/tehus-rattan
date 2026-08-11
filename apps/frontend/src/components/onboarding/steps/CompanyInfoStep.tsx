@@ -1,3 +1,7 @@
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
+
 export interface CompanyInfoState {
   name: string;
   businessType: string;
@@ -14,105 +18,92 @@ interface CompanyInfoStepProps {
   onChange: (patch: Partial<CompanyInfoState>) => void;
 }
 
-const inputClass =
-  "w-full rounded-md border border-[#0B0F10]/15 px-3 py-2.5 text-sm outline-none focus:border-[#A57014] focus:ring-1 focus:ring-[#A57014]";
-const labelClass = "mb-1.5 block text-xs font-medium text-[#0B0F10]/70";
-
 export function CompanyInfoStep({ value, onChange }: CompanyInfoStepProps) {
   return (
     <div>
-      <h3 className="text-lg font-semibold text-[#0B0F10]">Datos de tu empresa</h3>
-      <p className="mt-1.5 text-sm text-[#0B0F10]/70">
+      <h3 className="text-lg font-semibold text-content-primary">
+        Datos de tu empresa
+      </h3>
+      <p className="mt-1.5 text-sm text-content-secondary">
         Estos datos son informativos. No son datos legales, fiscales ni de
         facturación.
       </p>
 
       <div className="mt-6 space-y-4">
-        <div>
-          <label className={labelClass}>Nombre comercial *</label>
-          <input
+        <Field label="Nombre comercial" required>
+          <Input
             type="text"
             required
             value={value.name}
             onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Tehus Rattan"
-            className={inputClass}
           />
-        </div>
+        </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className={labelClass}>Tipo de negocio</label>
-            <input
+          <Field label="Tipo de negocio">
+            <Input
               type="text"
               value={value.businessType}
               onChange={(e) => onChange({ businessType: e.target.value })}
               placeholder="Muebles y decoración"
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Teléfono comercial</label>
-            <input
-              type="text"
+          </Field>
+
+          <Field label="Teléfono comercial">
+            <Input
+              type="tel"
               value={value.phone}
               onChange={(e) => onChange({ phone: e.target.value })}
               placeholder="+57 300 000 0000"
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Ciudad</label>
-            <input
+          </Field>
+
+          <Field label="Ciudad">
+            <Input
               type="text"
               value={value.city}
               onChange={(e) => onChange({ city: e.target.value })}
               placeholder="Medellín"
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>País</label>
-            <input
+          </Field>
+
+          <Field label="País">
+            <Input
               type="text"
               value={value.country}
               onChange={(e) => onChange({ country: e.target.value })}
               placeholder="Colombia"
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Email comercial</label>
-            <input
+          </Field>
+
+          <Field label="Email comercial">
+            <Input
               type="email"
               value={value.email}
               onChange={(e) => onChange({ email: e.target.value })}
               placeholder="contacto@empresa.com"
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Sitio web o Instagram</label>
-            <input
+          </Field>
+
+          <Field label="Sitio web o Instagram">
+            <Input
               type="text"
               value={value.website}
               onChange={(e) => onChange({ website: e.target.value })}
               placeholder="instagram.com/tuempresa"
-              className={inputClass}
             />
-          </div>
+          </Field>
         </div>
 
-        <div>
-          <label className={labelClass}>Descripción corta</label>
-          <textarea
+        <Field label="Descripción corta">
+          <Textarea
             value={value.description}
             onChange={(e) => onChange({ description: e.target.value })}
             rows={3}
             placeholder="Una breve descripción de tu empresa"
-            className={inputClass}
           />
-        </div>
+        </Field>
       </div>
     </div>
   );

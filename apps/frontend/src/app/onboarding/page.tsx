@@ -14,6 +14,8 @@ import { AdminStep, AdminState } from "@/components/onboarding/steps/AdminStep";
 import { AgentsStep, AgentDraft } from "@/components/onboarding/steps/AgentsStep";
 import { ConfirmationStep } from "@/components/onboarding/steps/ConfirmationStep";
 import { SuccessScreen } from "@/components/onboarding/SuccessScreen";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
 import {
   createCompanyOnboarding,
   validateLogoFile,
@@ -289,11 +291,13 @@ export default function OnboardingPage() {
   const isLastStep = step === STEP_LABELS.length - 1;
 
   return (
-    <div className="flex min-h-screen flex-1 flex-col bg-[#FAF8F3] lg:flex-row">
+    // El alta de una empresa ocurre ANTES de que exista esa empresa: aquí no
+    // hay identidad de cliente que respetar todavía, así que manda TAKTO.
+    <div className="flex min-h-screen flex-1 flex-col bg-neutral-50 lg:flex-row">
       <OnboardingProgress current={step} labels={STEP_LABELS} />
 
       <div className="flex flex-1 items-start justify-center px-4 py-8 sm:px-8">
-        <div className="w-full max-w-xl rounded-xl border border-[#0B0F10]/10 bg-white p-6 shadow-sm sm:p-8">
+        <Card padding="lg" className="w-full max-w-xl">
           {step === 0 && <InviteCodeStep value={inviteCode} onChange={setInviteCode} />}
           {step === 1 && <CompanyInfoStep value={company} onChange={patchCompany} />}
           {step === 2 && (
@@ -328,39 +332,44 @@ export default function OnboardingPage() {
             />
           )}
 
-          {stepError && <p className="mt-4 text-sm text-red-600">{stepError}</p>}
-          {submitError && <p className="mt-4 text-sm text-red-600">{submitError}</p>}
+          {/* `role="alert"`: el error aparece al intentar avanzar, y sin esto
+              un lector de pantalla no lo menciona nunca. */}
+          {stepError && (
+            <p role="alert" className="mt-4 text-sm text-status-error">
+              {stepError}
+            </p>
+          )}
+          {submitError && (
+            <p role="alert" className="mt-4 text-sm text-status-error">
+              {submitError}
+            </p>
+          )}
 
-          <div className="mt-8 flex items-center justify-between border-t border-[#0B0F10]/10 pt-5">
-            <button
-              type="button"
+          <div className="mt-8 flex items-center justify-between border-t border-line-default pt-5">
+            <Button
+              variant="quiet"
               onClick={goBack}
               disabled={step === 0 || submitting}
-              className="rounded-md px-4 py-2 text-sm font-medium text-[#0B0F10]/60 hover:bg-[#F4EFE6] disabled:cursor-not-allowed disabled:opacity-40"
+              className="px-4 py-2"
             >
               Atrás
-            </button>
+            </Button>
 
             {isLastStep ? (
-              <button
-                type="button"
+              <Button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="rounded-md bg-[#A57014] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#8c5f10] disabled:opacity-50"
+                className="px-6 py-2.5"
               >
                 {submitting ? "Creando empresa..." : "Crear empresa"}
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={goNext}
-                className="rounded-md bg-[#A57014] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#8c5f10]"
-              >
+              <Button onClick={goNext} className="px-6 py-2.5">
                 Siguiente
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
 
 export interface PipelineState {
   name: string;
@@ -30,62 +33,82 @@ export function PipelineStep({ value, onChange }: PipelineStepProps) {
 
   return (
     <div>
-      <h3 className="text-lg font-semibold text-[#0B0F10]">Pipeline inicial</h3>
-      <p className="mt-1.5 text-sm text-[#0B0F10]/70">
+      <h3 className="text-lg font-semibold text-content-primary">
+        Pipeline inicial
+      </h3>
+      <p className="mt-1.5 text-sm text-content-secondary">
         Define las etapas por las que pasa un lead en tu proceso de venta.
         Puedes ajustarlas después dentro del CRM.
       </p>
 
-      <div className="mt-6">
-        <label className="mb-1.5 block text-xs font-medium text-[#0B0F10]/70">
-          Nombre del pipeline *
-        </label>
-        <input
+      <Field label="Nombre del pipeline" required className="mt-6">
+        <Input
           type="text"
           required
           value={value.name}
           onChange={(e) => onChange({ name: e.target.value })}
-          className="w-full rounded-md border border-[#0B0F10]/15 px-3 py-2.5 text-sm outline-none focus:border-[#A57014] focus:ring-1 focus:ring-[#A57014]"
         />
-      </div>
+      </Field>
 
       <div className="mt-5">
-        <label className="mb-2 block text-xs font-medium text-[#0B0F10]/70">
-          Etapas *
-        </label>
+        <p className="mb-2 block text-sm font-medium text-neutral-700">
+          Etapas
+          <span aria-hidden="true" className="ml-0.5 text-status-error">
+            *
+          </span>
+        </p>
+
         <div className="space-y-2">
           {value.stages.map((stage, index) => (
             <div key={index} className="flex items-center gap-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F4EFE6] text-xs font-medium text-[#0B0F10]/60">
+              {/* El número ya está en la etiqueta del campo; repetirlo en voz
+                  alta solo alarga la lectura. */}
+              <span
+                aria-hidden="true"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-xs font-medium text-content-secondary"
+              >
                 {index + 1}
               </span>
-              <input
-                type="text"
-                required
-                value={stage}
-                onChange={(e) => updateStage(index, e.target.value)}
-                placeholder="Nombre de la etapa"
-                className="w-full rounded-md border border-[#0B0F10]/15 px-3 py-2 text-sm outline-none focus:border-[#A57014] focus:ring-1 focus:ring-[#A57014]"
-              />
-              <button
-                type="button"
+
+              {/* Etiqueta oculta y no solo `placeholder`: el marcador de
+                  posición desaparece al escribir y no es un nombre accesible,
+                  así que sin esto el campo se anuncia como "cuadro de edición"
+                  sin decir cuál de las etapas es. */}
+              <Field
+                label={`Etapa ${index + 1}`}
+                labelOculta
+                className="w-full"
+              >
+                <Input
+                  type="text"
+                  required
+                  value={stage}
+                  onChange={(e) => updateStage(index, e.target.value)}
+                  placeholder="Nombre de la etapa"
+                />
+              </Field>
+
+              <Button
+                variant="quiet"
                 onClick={() => removeStage(index)}
                 disabled={value.stages.length <= 1}
-                className="shrink-0 rounded-md p-2 text-[#0B0F10]/40 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-[#0B0F10]/40"
+                aria-label={`Quitar etapa ${index + 1}`}
+                className="shrink-0 p-2 hover:bg-status-error-surface hover:text-status-error"
               >
-                <Trash2 size={15} />
-              </button>
+                <Trash2 size={15} aria-hidden="true" />
+              </Button>
             </div>
           ))}
         </div>
 
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={addStage}
-          className="mt-3 flex items-center gap-1.5 rounded-md border border-dashed border-[#0B0F10]/20 px-3 py-2 text-xs font-medium text-[#0B0F10]/70 hover:bg-[#F4EFE6]"
+          className="mt-3 border-dashed"
         >
-          <Plus size={14} /> Agregar etapa
-        </button>
+          <Plus size={14} aria-hidden="true" /> Agregar etapa
+        </Button>
       </div>
     </div>
   );

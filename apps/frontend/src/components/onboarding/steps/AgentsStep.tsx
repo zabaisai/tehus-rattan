@@ -1,6 +1,10 @@
 "use client";
 
 import { Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
 
 export interface AgentDraft {
   name: string;
@@ -12,9 +16,6 @@ interface AgentsStepProps {
   value: AgentDraft[];
   onChange: (agents: AgentDraft[]) => void;
 }
-
-const inputClass =
-  "w-full rounded-md border border-[#0B0F10]/15 px-3 py-2 text-sm outline-none focus:border-[#A57014] focus:ring-1 focus:ring-[#A57014]";
 
 export function AgentsStep({ value, onChange }: AgentsStepProps) {
   function addAgent() {
@@ -31,15 +32,15 @@ export function AgentsStep({ value, onChange }: AgentsStepProps) {
 
   return (
     <div>
-      <h3 className="text-lg font-semibold text-[#0B0F10]">Asesores</h3>
-      <p className="mt-1.5 text-sm text-[#0B0F10]/70">
+      <h3 className="text-lg font-semibold text-content-primary">Asesores</h3>
+      <p className="mt-1.5 text-sm text-content-secondary">
         Puedes agregar asesores ahora o hacerlo después dentro del CRM. Todos
         se crean con rol Asesor.
       </p>
 
       {value.length === 0 && (
-        <div className="mt-6 rounded-lg border border-dashed border-[#0B0F10]/15 bg-[#F4EFE6] px-4 py-6 text-center">
-          <p className="text-sm text-[#0B0F10]/60">
+        <div className="mt-6 rounded-lg border border-dashed border-line-strong bg-surface-subtle px-4 py-6 text-center">
+          <p className="text-sm text-content-secondary">
             Aún no has agregado asesores. Puedes continuar sin ninguno.
           </p>
         </div>
@@ -47,53 +48,70 @@ export function AgentsStep({ value, onChange }: AgentsStepProps) {
 
       <div className="mt-4 space-y-4">
         {value.map((agent, index) => (
-          <div key={index} className="rounded-lg border border-[#0B0F10]/10 bg-white p-4">
+          <Card key={index} padding="sm" flat>
             <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-medium text-[#0B0F10]/50">
+              <p className="text-xs font-medium text-content-secondary">
                 Asesor {index + 1} · Rol: Asesor
               </p>
-              <button
-                type="button"
+              <Button
+                variant="quiet"
+                size="sm"
                 onClick={() => removeAgent(index)}
-                className="rounded p-1 text-[#0B0F10]/40 hover:bg-red-50 hover:text-red-600"
+                aria-label={`Quitar asesor ${index + 1}`}
+                className="p-1 hover:bg-status-error-surface hover:text-status-error"
               >
-                <Trash2 size={14} />
-              </button>
+                <Trash2 size={14} aria-hidden="true" />
+              </Button>
             </div>
+
+            {/* Los tres campos llevaban solo `placeholder`, que desaparece al
+                escribir y no es un nombre accesible: con varios asesores en
+                pantalla no había forma de saber a cuál pertenecía cada uno. */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <input
-                type="text"
-                placeholder="Nombre"
-                value={agent.name}
-                onChange={(e) => updateAgent(index, { name: e.target.value })}
-                className={inputClass}
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={agent.email}
-                onChange={(e) => updateAgent(index, { email: e.target.value })}
-                className={inputClass}
-              />
-              <input
-                type="password"
-                placeholder="Contraseña temporal"
-                value={agent.password}
-                onChange={(e) => updateAgent(index, { password: e.target.value })}
-                className={inputClass}
-              />
+              <Field label={`Nombre del asesor ${index + 1}`} labelOculta>
+                <Input
+                  type="text"
+                  placeholder="Nombre"
+                  value={agent.name}
+                  onChange={(e) => updateAgent(index, { name: e.target.value })}
+                />
+              </Field>
+
+              <Field label={`Email del asesor ${index + 1}`} labelOculta>
+                <Input
+                  type="email"
+                  placeholder="Email"
+                  value={agent.email}
+                  onChange={(e) => updateAgent(index, { email: e.target.value })}
+                />
+              </Field>
+
+              <Field
+                label={`Contraseña temporal del asesor ${index + 1}`}
+                labelOculta
+              >
+                <Input
+                  type="password"
+                  placeholder="Contraseña temporal"
+                  value={agent.password}
+                  onChange={(e) =>
+                    updateAgent(index, { password: e.target.value })
+                  }
+                />
+              </Field>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="sm"
         onClick={addAgent}
-        className="mt-4 flex items-center gap-1.5 rounded-md border border-dashed border-[#0B0F10]/20 px-3 py-2 text-xs font-medium text-[#0B0F10]/70 hover:bg-[#F4EFE6]"
+        className="mt-4 border-dashed"
       >
-        <Plus size={14} /> Agregar asesor
-      </button>
+        <Plus size={14} aria-hidden="true" /> Agregar asesor
+      </Button>
     </div>
   );
 }
