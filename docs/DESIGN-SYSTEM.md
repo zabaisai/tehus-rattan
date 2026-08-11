@@ -87,10 +87,8 @@ activo del menú. Va como borde y no como fondo porque el naranja a pantalla
 completa compite con el contenido, y porque así convive con el color propio de
 cada empresa sin taparlo.
 
-**La escala `stone` es un puente.** Apunta a los neutrales de marca desde
-`@theme`, lo que rebautizó 929 usos de una vez sin tocar componentes. Las
-pantallas nuevas usan `neutral-*`; cuando no quede ningún `stone-*` el bloque
-se borra y no cambia nada.
+**El puente `stone` ya no existe.** Sirvió para rebautizar los usos de una vez
+sin tocar componentes; se retiró cuando no quedó ninguno. Todo es `neutral-*`.
 
 ## Tipografía
 
@@ -119,6 +117,20 @@ cualquier `.outline-none` la anularía, que es justo el caso que cubre.
 Curvas y duraciones en `@theme`. Todo se apaga con
 `prefers-reduced-motion: reduce`: ninguna animación del producto es
 informativa, así que quitarlas no quita nada.
+
+## Iconos
+
+El producto usa **`lucide-react`**: 74 archivos, 68 iconos distintos, trazo 2.
+
+El paquete de marca trae 20 iconos de dominio (`funnel`, `pipeline`, `quote`,
+`won`, `lost`, `whatsapp`…) con **trazo 1,75**, y su manual dice que *no se
+mezclan familias ni se cambia el grosor de trazo*. Por eso **no se ha
+integrado ninguno todavía**: meter veinte al lado de sesenta y ocho crearía
+justo la mezcla que el manual prohíbe.
+
+La adopción completa —con `strokeWidth={1.75}` en los lucide que se conserven—
+es un trabajo transversal con su propia QA. El inventario y la asignación
+semántica están en `TAKTO-BRANDING-ESTADO-2026-08-11.md`, sección 6.
 
 ## Qué NO hay
 

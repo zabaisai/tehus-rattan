@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { retryBootstrap } from '@/lib/auth-bootstrap';
+import { TaktoLogo } from '@/components/ui/TaktoLogo';
+import { Button } from '@/components/ui/Button';
 
 // Shown when the initial session bootstrap could not reach the server
 // (429 / network / timeout / 5xx). The session may still be valid, so this is
@@ -24,22 +26,26 @@ export function ConnectionUnavailable() {
 
   return (
     <div className="flex h-screen items-center justify-center bg-neutral-50 px-4">
-      <div className="w-full max-w-sm text-center">
-        <h1 className="text-lg font-semibold text-neutral-900">
+      {/* `role="status"` con `aria-live`: la pantalla sustituye a la que se
+          esperaba, y sin esto un lector de pantalla no anuncia el cambio. */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex w-full max-w-sm flex-col items-center text-center"
+      >
+        {/* Con el servidor caído esto es lo único que se ve del producto. Sin
+            logotipo parecía una página de error de cualquier sitio. */}
+        <TaktoLogo height={28} />
+        <h1 className="mt-5 text-lg font-semibold text-content-primary">
           No pudimos conectar con el servidor
         </h1>
-        <p className="mt-2 text-sm text-neutral-500">
+        <p className="mt-2 text-sm text-content-secondary">
           Tu sesión sigue activa. Es un problema temporal de conexión — no
           necesitas volver a iniciar sesión.
         </p>
-        <button
-          type="button"
-          onClick={handleRetry}
-          disabled={retrying}
-          className="mt-6 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900 disabled:opacity-50"
-        >
+        <Button onClick={handleRetry} disabled={retrying} className="mt-6 px-4">
           {retrying ? 'Reintentando...' : 'Reintentar'}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -128,95 +128,245 @@ Corregido con `--color-status-error-hover: #a32323`.
 
 ---
 
-## 4. Pantallas terminadas y pendientes
 
-### Terminadas
+## 3.5 Segundo bloque (11 de agosto) — barrido de color y QA autenticada
 
-- Página raíz `/`
-- Onboarding completo (8 pasos + progreso + éxito)
-- Primitivas `Field` / `Input` / `Select` / `Textarea` / `Card`
-- `Button`, `Badge`, `ConfirmDialog`, `ListState`, `EmptyState`, `Modal`, `TaktoLogo`
+**Base del bloque:** `5917f89` · **CI verde** sobre ese SHA y sobre `d5f09aa`.
 
-### Pendientes
+> `d5f09aa` era ya el HEAD real al empezar: un cuarto commit, solo de
+> documentación, publicado tras el CI del bloque anterior.
 
-1. **Barrido de colores de estado.** Quedan **62 archivos** con la paleta por
-   defecto de Tailwind donde deberían ir los tokens semánticos:
-   `text-red-600` (76 usos), `bg-red-50` (42), `text-red-700` (29),
-   `bg-amber-50` (21), `bg-emerald-50` (16), `text-emerald-*`, `bg-sky-50`,
-   `bg-blue-50`, `bg-green-*`, `bg-orange-50`. Es el hueco más grande que queda.
-2. **Login, recuperación y restablecimiento.** Usan `Input` crudo con foco
-   `neutral-500` y colores `green-*`/`red-*` sueltos; deben pasar a las
-   primitivas nuevas.
-3. **Migrar los 60 archivos con `<input>` crudo** a `Field`+`Input`.
-4. **Primitivas que siguen sin existir:** `Table`, `Drawer`, `Tooltip`, `Tabs`,
-   `Spinner`, `Toast`. Hay 16 archivos con `<table>` a mano.
-5. **Botones de chrome en oro suelto:** `dashboard/quotes/[id]/print/page.tsx:55`
-   y `components/quotes/QuoteDetailModal.tsx:264` usan `bg-[#A57014]`. Son
-   controles del producto, no del documento: deben ser navy.
-6. **20 iconos de dominio del pack** sin integrar (`funnel`, `pipeline`, `quote`,
-   `won`, `lost`, `whatsapp`…). Hoy todo es `lucide-react`. Decidir si se
-   sustituyen en los puntos de dominio o se mantiene lucide.
-7. **QA visual en cinco anchos** (1440, 1280, 1024, 768, 390) autenticada y no
-   autenticada. **No ejecutada todavía.**
-8. **Panel de plataforma/superadministrador**: revisar que no mezcle identidad
-   de empresas.
+### Decisiones aprobadas, aplicadas
 
----
+1. **`#A32323` aceptado como token semántico.** Cumple las cinco condiciones:
+   se llama `status-error-hover`, se usa solo en el hover destructivo, no
+   pertenece a la paleta primaria ni secundaria, existe **una sola vez** en
+   `@theme` y ningún componente lo escribe literal (verificado por `grep`).
+   **Contraste con texto blanco: 7,44:1 — pasa AA y AAA.** Es además mayor que
+   el 5,63:1 del estado en reposo: el botón gana legibilidad al apuntarlo.
+2. **La tarjeta «Login» de `BrandingStep` corregida.** Pasa a «Identidad de tu
+   empresa» con el texto aprobado. Las muestras se rotulan «Menú lateral» y
+   «Cotizaciones» —donde el logotipo del cliente aparece de verdad— y se
+   retira toda promesa de branding de empresa en el acceso general.
 
-## 5. Qué NO se tocó, a propósito
+### Barrido de color: 255 usos, 0 clases genéricas restantes
 
-- **`components/documents/*`** (9 archivos): plantillas imprimibles de
-  cotización, remisión, reparación y factura. Su paleta beige/oro
-  (`#E7D7C9`, `#F4EFE6`, `#0B0F10`) es la **identidad del documento de la
-  empresa emisora**. El manual prohíbe sustituirla por TAKTO.
-- **Colores por defecto de una empresa nueva** (`#A57014`, `#FDDC7F`,
-  `#FAF8F3`) en `BrandingStep`, `ConfirmationStep` y `settings/company`. Son
-  identidad de la empresa cliente, no de la plataforma. Se movieron a
-  constantes con nombre y comentario, sin cambiar los valores.
-- Backend, Prisma, migraciones, datos, WhatsApp real, Meta, DNS, credenciales
-  y producción.
+No fue sustitución global. Medir el contraste antes de tocar cambió el
+resultado en dos categorías enteras:
 
----
+| Token | Como texto (blanco / su superficie) | Decisión |
+|---|---|---|
+| `status-error` | 5,63:1 / 4,85:1 ✅ | migrado tal cual |
+| `status-info` | 5,67:1 / 4,91:1 ✅ | migrado tal cual |
+| `status-success` | **4,36:1 / 3,87:1 ❌** | solo icono, borde y relleno |
+| `status-warning` | **4,24:1 / 3,89:1 ❌** | solo icono, borde y relleno |
 
-## 6. Decisión pendiente para el usuario
+Migrar `text-emerald-700` (5,21:1 hoy) al token oficial habría sido una
+**regresión medible**. Como icono o relleno los oficiales sí cumplen (3:1).
 
-La vista previa de `BrandingStep` muestra el logotipo **de la empresa** sobre
-una tarjeta rotulada **«Login»**. Eso contradice la decisión ya desplegada en
-`3f7cb04`: *en el login manda TAKTO; la identidad de la empresa vive dentro de
-su espacio de trabajo*.
+De ahí los dos tokens nuevos, aprobados: **`status-success-strong` `#0C734F`**
+y **`status-warning-strong` `#945800`**, derivados con el mismo factor ×0,83
+que produjo `#A32323`. Quedan en 5,86:1 y 5,75:1 sobre blanco.
 
-No se cambió porque el rótulo describe **dónde aparece el logotipo**, y
-corregirlo es una decisión de producto, no de color. Opciones: renombrar la
-tarjeta a la superficie donde sí manda la empresa, o retirarla de la vista
-previa.
+Esto corrige además el **`Badge` ya desplegado desde `3f7cb04`**, que llevaba
+ese texto a 10px con 3,87:1.
+
+### Botones de éxito y aviso: relleno claro, texto oscuro
+
+Rellenos sólidos con texto blanco daban 3,19:1 y 3,77:1 con los genéricos, y
+seguirían fallando con los oficiales (4,24:1 y 4,36:1). Nuevas variantes
+`success` y `warning` de `Button`: superficie de estado con el tono `*-strong`
+encima, hover al 10 % (al 20 % el texto caía a 4,11:1).
+
+`ConfirmDialog` cambia `confirmClassName` por `confirmVariant`. Pasar `bg-…`
+en crudo competía con el `bg-…` de la variante y ganaba el que quedara más
+abajo en el CSS compilado, no el que se escribiera después.
 
 ---
 
-## 7. Verificación de esta sesión
+## 4. Clasificación aplicada a cada uso
+
+| Categoría | Tratamiento |
+|---|---|
+| Superficie de plataforma | tokens `surface-*` |
+| Texto | `content-primary` / `content-secondary` / `content-disabled` |
+| Borde | `line-default` / `line-strong` |
+| Foco | `line-focus`, siempre el mismo |
+| Acción primaria | `brand-primary` |
+| Acción secundaria | `Button variant="secondary"` |
+| Éxito · advertencia | superficie + `*-strong` |
+| Error · información | tokens oficiales |
+| Acción destructiva | `status-error` + `status-error-hover` |
+| **Color dinámico de empresa** | **intacto** |
+| **Color de documentos del cliente** | **intacto** |
+| **Colores de etapa de pipeline** | **intactos** (`pipeline-*`, son datos) |
+
+---
+
+## 5. QA autenticada local
+
+Producto levantado entero: Postgres en Docker, backend NestJS, frontend Next.
+**56 migraciones aplicadas, 0 pendientes** en la base local.
+
+Datos QA por los **endpoints oficiales**, nunca por escritura directa:
+`platform:create-super-admin` → `POST /admin/invitation-codes` →
+`POST /onboarding/company`. Todo con prefijo `QA_BRAND_` y correos `@qa.invalid`.
+Ninguna credencial se imprimió, se guardó en el repo ni aparece en el diff.
+
+### Recorrido autenticado — 14 pantallas × 5 anchos
+
+Inicio, Contactos, Pipeline, Conversaciones, TAKTO Pulso, Tareas, Productos,
+Cotizaciones, Documentos, Automatizaciones, WhatsApp, Empresa, Datos y
+Notificaciones, en 1440 / 1280 / 1024 / 768 / 390 px.
+
+**Resultado final: cero desbordes, cero errores de consola, cero campos sin
+etiqueta, cero botones sin nombre y cero clases de color genéricas en el DOM.**
+
+Lo que encontró la primera pasada, y se corrigió:
+
+- **Productos**: buscador y filtro con solo `placeholder`, que no es nombre accesible.
+- **Empresa**: quince `<label>` **sin `htmlFor`** — pulsarlas no enfocaba nada.
+- **Empresa**: el subidor de logo con `className="hidden"`, lo que lo sacaba del orden de tabulación: no se alcanzaba por teclado.
+- **Documentos**: celdas de tabla, fechas, nombre de recibido, totales editables y las tres observaciones, con la etiqueta solo como texto al lado.
+- **Documentos**: papelera de fila sin nombre accesible.
+
+### Recorrido sin autenticar — 6 rutas × 5 anchos
+
+Raíz, login, onboarding, recuperación, restablecer sin token y con token
+inválido. Cero desbordes, cero campos sin etiqueta, cero colores genéricos y
+**logotipo TAKTO presente en todas**.
+
+El único error de consola es `401 POST /api/auth/refresh`: el arranque de
+sesión de un visitante anónimo. Es el comportamiento correcto, no un defecto.
+
+### Estado de desconexión
+
+Probado bloqueando la API desde el navegador. `ConnectionUnavailable` no
+llevaba logotipo: con el servidor caído es lo único que se ve del producto y
+parecía una página de error de cualquier sitio. Ahora lleva marca,
+`role="status"` con `aria-live` y el botón del sistema.
+
+### Limpieza
+
+Borrado **por ID exacto** en una transacción: 2 empresas, 3 usuarios, 5 códigos
+y sus 2 pipelines con 8 etapas.
+
+**Las auditorías NO se borraron.** Sus claves foráneas son `SET NULL`, así que
+los 7 registros de la actividad QA sobreviven al borrado, como exige la regla.
+
+Baseline comprobado: antes 10 empresas / 14 usuarios / 14 contactos / 3 códigos;
+después **exactamente los mismos**. Auditorías 335 → 342.
+
+---
+
+## 6. Iconos del brand pack — inventario y decisión
+
+20 iconos en `10-CRM-EXPORT/assets/icons`, todos 24×24 y **trazo 1,75**:
+`bell calendar company contact dashboard funnel lost message next-step
+opportunity phone pipeline quote search send settings tag task-check whatsapp won`.
+
+El `whatsapp.svg` **no es el logotipo de Meta**: es línea propia en la retícula
+TAKTO, así que no hay problema de marca de terceros.
+
+**Integrados en este bloque: ninguno.** La razón está en el propio manual
+(`04-ICONOGRAFIA/iconografia.md`): *«No mezclar con iconos de otras familias
+ni cambiar el grosor de trazo»*. El producto usa `lucide-react` en **74
+archivos con 68 iconos distintos**, con trazo 2. Meter 20 iconos de trazo 1,75
+al lado crearía exactamente la mezcla que el manual prohíbe, y sustituir solo
+algunos es peor que no sustituir ninguno.
+
+Asignación semántica preparada para la fase siguiente:
+
+| Icono oficial | Cubre hoy | Nota |
+|---|---|---|
+| `whatsapp` | `MessageCircle` | el caso más claro: lucide no tiene icono de WhatsApp |
+| `pipeline` | `KanbanSquare` | |
+| `opportunity` | `Target` | |
+| `won` / `lost` | `CheckCircle2` / `XCircle` | |
+| `quote` | `FileText` | |
+| `task-check` | `CheckSquare` | |
+| `funnel` | `Filter` | |
+| `contact` / `company` | `Users` / — | no hay icono de edificio en uso |
+| `bell` `search` `send` `settings` `phone` `calendar` `tag` `dashboard` `message` `next-step` | equivalentes lucide | |
+
+**Recomendación:** adopción completa en un bloque propio, fijando
+`strokeWidth={1.75}` en los iconos lucide que se conserven para que las dos
+familias coincidan. Es un cambio transversal y merece su propia QA.
+
+`99-NO-USAR` **no se abrió en ningún momento**.
+
+---
+
+## 7. Verificación final
 
 | Comprobación | Resultado |
 |---|---|
 | `tsc --noEmit` | ✅ sin errores |
-| `eslint` | ✅ 0 errores (1 warning **previo**, en `EstadoTransporte.test.tsx` de `9120b89`, archivo no tocado) |
-| `vitest run` | ✅ **62 archivos, 478 pruebas** (477 antes + 1 nueva del hover destructivo) |
-| `next build` | ✅ compila; todas las rutas generadas |
-| QA visual real (Chrome headless, `/`, `/onboarding`, `/login` × 1440/1280/1024/768/390) | ✅ **0 desbordes horizontales** en los 15 combos |
-| Backend | **no tocado** — 0 archivos modificados, 0 en Prisma/migraciones |
-| **CI de rama** sobre `5917f89` | ✅ Backend `success` · Frontend `success` |
+| `eslint` | ✅ 0 errores (1 warning **previo**, en `EstadoTransporte.test.tsx` de `9120b89`) |
+| `vitest run` | ✅ **62 archivos, 481 pruebas** |
+| `next build` | ✅ compila, todas las rutas |
+| QA autenticada | ✅ 14 pantallas × 5 anchos, sin hallazgos |
+| QA anónima | ✅ 6 rutas × 5 anchos, sin hallazgos |
+| Backend / Prisma / migraciones | **0 archivos tocados** |
+| `brand/` y `99-NO-USAR` | **0 archivos tocados** |
+| Secretos o datos QA en el diff | **ninguno** (verificado por `grep`) |
 
-La QA visual se hizo con el frontend solo, sin backend: los
-`ERR_CONNECTION_REFUSED` de consola son el arranque de sesión contra
-`:3001` y no una regresión visual. **La QA autenticada sigue pendiente.**
+### Una prueba intermitente, no una regresión
+
+`src/lib/axios.test.ts` falló dos veces **mientras la máquina ejecutaba Docker,
+backend, frontend y Chrome a la vez**. Son pruebas con `timeout` de 5 s.
+Aislada pasa **17/17, cinco veces seguidas**, y el archivo **no se tocó en toda
+la rama**. Con la máquina descargada, la suite completa pasa 481/481.
 
 ---
 
-## 8. Próximo comando seguro
+## 7.5 Pantallas terminadas, y lo que se dejó intacto a propósito
+
+### Terminadas y verificadas
+
+| Superficie | Estado |
+|---|---|
+| Raíz `/`, login, recuperación, restablecer | ✅ marca, primitivas y QA |
+| Onboarding completo (8 pasos, progreso, éxito) | ✅ |
+| Estado de desconexión | ✅ |
+| Inicio, Contactos, Pipeline, Conversaciones | ✅ tokens y QA |
+| TAKTO Pulso, Tareas, Productos, Cotizaciones | ✅ |
+| Documentos, Automatizaciones, WhatsApp | ✅ |
+| Empresa, Datos, Notificaciones | ✅ |
+| Primitivas `Button` `Badge` `Field` `Input` `Select` `Textarea` `Card` `Modal` `ConfirmDialog` `ListState` `EmptyState` `TaktoLogo` | ✅ |
+
+### Intacto a propósito
+
+- **`components/documents/*`** — las plantillas imprimibles conservan su paleta
+  beige/oro (`#E7D7C9`, `#F4EFE6`, `#0B0F10`). Es la **identidad del documento
+  de la empresa emisora**; el manual prohíbe sustituirla por TAKTO. Solo se les
+  añadieron nombres accesibles, que no cambian un píxel.
+- **Colores por defecto de una empresa nueva** (`#A57014`, `#FDDC7F`, `#FAF8F3`)
+  en `BrandingStep`, `ConfirmationStep` y `settings/company`. Son identidad del
+  cliente, no de la plataforma. Viven en constantes con nombre y comentario.
+- **Colores de etapa de pipeline** (`pipeline-*`): son datos, no branding.
+- **Colores que cada empresa configura** y que se pintan por `style`.
+- Backend, Prisma, migraciones, datos reales, WhatsApp real, Meta, DNS,
+  credenciales y producción.
+
+---
+
+## 8. Deuda visual que queda
+
+1. **Iconos del brand pack sin integrar** (sección 6): decisión tomada, trabajo pendiente.
+2. **Primitivas que siguen sin existir:** `Table`, `Drawer`, `Tooltip`, `Tabs`, `Spinner`, `Toast`. Quedan 16 archivos con `<table>` a mano.
+3. **Formularios aún sin migrar a `Field`:** los modales de contactos, productos, cotizaciones, tareas y plataforma. No tienen defectos de accesibilidad detectados —el recorrido no abre modales—, pero repiten estilos.
+4. **Modales y drawers no se abrieron en la QA automática:** el recorrido cubre pantallas, no interacciones. Verificarlos es el siguiente paso natural.
+5. **Los tres tonos derivados esperan confirmación de marca.**
+6. **Tema oscuro:** sigue sin existir, y sigue siendo trabajo aparte.
+
+---
+
+## 9. Próximo comando seguro
 
 ```bash
 git checkout feature/takto-brand-ui-integration
 git pull --ff-only
 ```
-
-Y a continuación, el hueco mayor: el barrido de colores de estado del punto 4.1.
 
 **No fusionar, no desplegar y no activar producción** sin autorización separada.
