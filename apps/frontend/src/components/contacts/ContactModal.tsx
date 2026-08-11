@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { Contact } from "@/types";
 import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
 
 type ApiError = {
   response?: {
@@ -51,64 +54,53 @@ const [phone, setPhone] = useState(contact?.phone ?? '');
   return (
     <Modal title={contact ? "Editar contacto" : "Nuevo contacto"} onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Teléfono
-            </label>
-            <input
-              type="text"
+          <Field
+            label="Teléfono"
+            required
+            className="mb-3"
+            hint={contact ? "El teléfono identifica al contacto y no se edita." : undefined}
+          >
+            <Input
+              type="tel"
               required
               disabled={!!contact}
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+573001234567"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100 disabled:text-neutral-500"
             />
-          </div>
+          </Field>
 
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Nombre
-            </label>
-            <input
+          <Field label="Nombre" className="mb-3">
+            <Input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Nombre del contacto"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-          </div>
+          </Field>
 
-          <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Correo
-            </label>
-            <input
+          <Field label="Correo" className="mb-4">
+            <Input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="correo@ejemplo.com"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-          </div>
+          </Field>
 
-          {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
+          {error && (
+            <p role="alert" className="mb-3 text-xs text-status-error">
+              {error}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
-            >
+            <Button variant="quiet" onClick={onClose} className="px-3 py-1.5">
               Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" disabled={saving} className="px-3 py-1.5">
               {saving ? "Guardando..." : "Guardar"}
-            </button>
+            </Button>
           </div>
         </form>
     </Modal>

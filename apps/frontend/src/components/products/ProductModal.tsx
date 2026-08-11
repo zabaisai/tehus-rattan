@@ -4,6 +4,11 @@ import { useState } from "react";
 import { Product } from "@/types";
 import { PRODUCT_CATEGORIES } from "@/lib/products";
 import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 
 type ApiError = {
   response?: {
@@ -73,29 +78,21 @@ export function ProductModal({
       maxWidth="sm"
     >
       <form onSubmit={handleSubmit}>
-        <div className="mb-3">
-          <label className="mb-1 block text-xs font-medium text-neutral-600">
-            Nombre
-          </label>
-          <input
+        <Field label="Nombre" required className="mb-3">
+          <Input
             type="text"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Sala Primavera"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
-        </div>
+        </Field>
 
         <div className="mb-3 grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Categoría
-            </label>
-            <select
+          <Field label="Categoría">
+            <Select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
               <option value="">Sin categoría</option>
               {PRODUCT_CATEGORIES.map((c) => (
@@ -103,13 +100,10 @@ export function ProductModal({
                   {c}
                 </option>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Precio base
-            </label>
-            <input
+            </Select>
+          </Field>
+          <Field label="Precio base" required>
+            <Input
               type="number"
               required
               min={0}
@@ -117,39 +111,31 @@ export function ProductModal({
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="11700000"
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-          </div>
+          </Field>
         </div>
 
-        <div className="mb-3">
-          <label className="mb-1 block text-xs font-medium text-neutral-600">
-            Descripción
-          </label>
-          <textarea
+        <Field
+          label="Descripción"
+          hint="Incluye material y medidas como parte de la descripción."
+          className="mb-3"
+        >
+          <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             placeholder="Material: Ratán natural. Medidas: Sofá 230x93x63, poltronas 117x93."
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
-          <p className="mt-1 text-[11px] text-neutral-400">
-            Incluye material y medidas como parte de la descripción.
-          </p>
-        </div>
+        </Field>
 
-        <div className="mb-3">
-          <label className="mb-1 block text-xs font-medium text-neutral-600">
-            Imagen (URL)
-          </label>
-          <input
-            type="text"
+        <Field label="Imagen (URL)" className="mb-3">
+          <Input
+            type="url"
             value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
             placeholder="https://..."
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
-        </div>
+        </Field>
 
         {isEditing && (
           <label className="mb-4 flex items-center gap-2 text-xs font-medium text-neutral-600">
@@ -157,29 +143,25 @@ export function ProductModal({
               type="checkbox"
               checked={isActive}
               onChange={(e) => setIsActive(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-neutral-300"
+              className="h-3.5 w-3.5 rounded border-neutral-300 accent-brand-primary"
             />
             Producto activo
           </label>
         )}
 
-        {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
+        {error && (
+          <p role="alert" className="mb-3 text-xs text-status-error">
+            {error}
+          </p>
+        )}
 
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
-          >
+          <Button variant="quiet" onClick={onClose} className="px-3 py-1.5">
             Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={saving} className="px-3 py-1.5">
             {saving ? "Guardando..." : "Guardar"}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

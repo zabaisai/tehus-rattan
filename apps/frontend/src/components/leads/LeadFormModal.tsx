@@ -7,6 +7,10 @@ import { getCompanyUsers } from '@/lib/users';
 import { createLead } from '@/lib/leads';
 import { PipelineStage } from '@/types';
 import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 
 type ApiError = {
   response?: {
@@ -84,26 +88,22 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
   return (
     <Modal title="Nuevo lead" onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Título</label>
-            <input
+          <Field label="Título" required className="mb-3">
+            <Input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Venta de muebles de rattan"
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-          </div>
+          </Field>
 
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Contacto</label>
-            <select
+          <Field label="Contacto" required className="mb-3">
+            <Select
               required
               value={contactId}
               onChange={(e) => setContactId(e.target.value)}
               disabled={loadingContacts}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
             >
               <option value="">
                 {loadingContacts ? 'Cargando contactos...' : 'Selecciona un contacto'}
@@ -113,55 +113,47 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
                   {c.name || c.phone}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
 
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Etapa</label>
-            <select
+          <Field label="Etapa" required className="mb-3">
+            <Select
               required
               value={stageId}
               onChange={(e) => setStageId(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
               {sortedStages.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
                 </option>
               ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
 
           <div className="mb-3 grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Valor</label>
-              <input
+            <Field label="Valor">
+              <Input
                 type="number"
                 min="0"
                 step="0.01"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="0"
-                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-neutral-600">Cierre esperado</label>
-              <input
+            </Field>
+            <Field label="Cierre esperado">
+              <Input
                 type="date"
                 value={expectedCloseDate}
                 onChange={(e) => setExpectedCloseDate(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="mb-4">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">Responsable</label>
-            <select
+          <Field label="Responsable" className="mb-4">
+            <Select
               value={assignedTo}
               onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
               <option value="">Sin asignar</option>
               {users
@@ -171,26 +163,22 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
                     {u.name}
                   </option>
                 ))}
-            </select>
-          </div>
+            </Select>
+          </Field>
 
-          {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
+          {error && (
+            <p role="alert" className="mb-3 text-xs text-status-error">
+              {error}
+            </p>
+          )}
 
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
-            >
+            <Button variant="quiet" onClick={onClose} className="px-3 py-1.5">
               Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
-            >
+            </Button>
+            <Button type="submit" disabled={saving} className="px-3 py-1.5">
               {saving ? 'Guardando...' : 'Guardar'}
-            </button>
+            </Button>
           </div>
         </form>
     </Modal>

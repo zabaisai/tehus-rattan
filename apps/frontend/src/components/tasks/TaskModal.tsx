@@ -7,6 +7,11 @@ import { getContacts } from "@/lib/contacts";
 import { getCompanyUsers } from "@/lib/users";
 import { Task } from "@/types";
 import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
+import { Textarea } from "@/components/ui/Textarea";
 
 type ApiError = {
   response?: {
@@ -123,95 +128,65 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
       maxWidth="sm"
     >
       <form onSubmit={handleSubmit}>
-        <div className="mb-3">
-          <label className="mb-1 block text-xs font-medium text-neutral-600">
-            Título
-          </label>
-          <input
+        <Field label="Título" required className="mb-3">
+          <Input
             type="text"
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Llamar al cliente"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
-        </div>
+        </Field>
 
-        <div className="mb-3">
-          <label className="mb-1 block text-xs font-medium text-neutral-600">
-            Descripción
-          </label>
-          <textarea
+        <Field label="Descripción" className="mb-3">
+          <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={2}
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
-        </div>
+        </Field>
 
         <div className="mb-3 grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Fecha límite
-            </label>
-            <input
+          <Field label="Fecha límite">
+            <Input
               type="datetime-local"
               value={dueDate}
               onChange={(e) => setDueDate(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Prioridad
-            </label>
-            <select
+          </Field>
+          <Field label="Prioridad">
+            <Select
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             >
               <option value="LOW">Baja</option>
               <option value="MEDIUM">Media</option>
               <option value="HIGH">Alta</option>
               <option value="URGENT">Urgente</option>
-            </select>
-          </div>
+            </Select>
+          </Field>
         </div>
 
         {!isEditing && (
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Tipo
-            </label>
-            <select
-              value={type}
-              disabled
-              className="w-full rounded-md border border-neutral-300 bg-neutral-100 px-2 py-2 text-sm text-neutral-500 outline-none"
-            >
+          <Field label="Tipo" className="mb-3">
+            <Select value={type} disabled>
               <option value="TASK">Tarea</option>
               <option value="FOLLOW_UP">Seguimiento</option>
               <option value="CALL">Llamada</option>
               <option value="MEETING">Reunión</option>
-            </select>
-          </div>
+            </Select>
+          </Field>
         )}
 
         {isEditing && (
-          <div className="mb-3">
-            <label className="mb-1 block text-xs font-medium text-neutral-600">
-              Estado
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-            >
+          <Field label="Estado" className="mb-3">
+            <Select value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="PENDING">Pendiente</option>
               <option value="IN_PROGRESS">En progreso</option>
               <option value="COMPLETED">Completada</option>
               <option value="CANCELLED">Cancelada</option>
-            </select>
-          </div>
+            </Select>
+          </Field>
         )}
 
         {isEditing ? (
@@ -241,20 +216,16 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
           </div>
         ) : (
           <>
-            <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-neutral-600">
-                Lead relacionado
-              </label>
-              {leadsError ? (
-                <p className="text-xs text-status-error">
-                  No se pudieron cargar los leads.
-                </p>
-              ) : (
-                <select
+            {leadsError ? (
+              <p role="alert" className="mb-3 text-xs text-status-error">
+                No se pudieron cargar los leads.
+              </p>
+            ) : (
+              <Field label="Lead relacionado" className="mb-3">
+                <Select
                   value={leadId}
                   onChange={(e) => handleLeadChange(e.target.value)}
                   disabled={loadingLeads}
-                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
                 >
                   <option value="">
                     {loadingLeads
@@ -266,24 +237,20 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
                       {l.title}
                     </option>
                   ))}
-                </select>
-              )}
-            </div>
+                </Select>
+              </Field>
+            )}
 
-            <div className="mb-3">
-              <label className="mb-1 block text-xs font-medium text-neutral-600">
-                Contacto relacionado
-              </label>
-              {contactsError ? (
-                <p className="text-xs text-status-error">
-                  No se pudieron cargar los contactos.
-                </p>
-              ) : (
-                <select
+            {contactsError ? (
+              <p role="alert" className="mb-3 text-xs text-status-error">
+                No se pudieron cargar los contactos.
+              </p>
+            ) : (
+              <Field label="Contacto relacionado" className="mb-3">
+                <Select
                   value={contactId}
                   onChange={(e) => setContactId(e.target.value)}
                   disabled={loadingContacts}
-                  className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 disabled:bg-neutral-100"
                 >
                   <option value="">
                     {loadingContacts
@@ -295,26 +262,23 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
                       {c.name || c.phone}
                     </option>
                   ))}
-                </select>
-              )}
-            </div>
+                </Select>
+              </Field>
+            )}
           </>
         )}
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-neutral-600">
-            Responsable
-          </label>
           {usersError ? (
-            <p className="text-xs text-status-error">
+            <p role="alert" className="text-xs text-status-error">
               No se pudieron cargar los usuarios.
             </p>
           ) : (
-            <select
-              value={assignedTo}
-              onChange={(e) => setAssignedTo(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-            >
+            <Field label="Responsable">
+              <Select
+                value={assignedTo}
+                onChange={(e) => setAssignedTo(e.target.value)}
+              >
               <option value="">Sin asignar</option>
               {users
                 ?.filter((u) => u.isActive)
@@ -323,7 +287,8 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
                     {u.name}
                   </option>
                 ))}
-            </select>
+              </Select>
+            </Field>
           )}
           {isEditing && !assignedTo && task?.assignedTo && (
             <p className="mt-1 text-[11px] text-neutral-400">
@@ -333,23 +298,19 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
           )}
         </div>
 
-        {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
+        {error && (
+          <p role="alert" className="mb-3 text-xs text-status-error">
+            {error}
+          </p>
+        )}
 
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
-          >
+          <Button variant="quiet" onClick={onClose} className="px-3 py-1.5">
             Cancelar
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white hover:bg-primary-900 disabled:opacity-50"
-          >
+          </Button>
+          <Button type="submit" disabled={saving} className="px-3 py-1.5">
             {saving ? "Guardando..." : "Guardar"}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>
