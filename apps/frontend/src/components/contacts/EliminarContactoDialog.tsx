@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, X } from "lucide-react";
 import { getImpactoContacto, eliminarContactoDefinitivo } from "@/lib/contacts";
 import { Contact } from "@/types";
+import { useDialogoModal } from "@/components/ui/useDialogoModal";
 
 /** La frase exacta. El servidor la vuelve a comprobar. */
 const FRASE = "ELIMINAR DEFINITIVAMENTE";
@@ -41,6 +42,9 @@ export function EliminarContactoDialog({
   const [motivo, setMotivo] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useDialogoModal({ activo: true, onCerrar: onClose, refPanel: panelRef });
 
   const {
     data: impacto,
@@ -81,13 +85,19 @@ export function EliminarContactoDialog({
     : [];
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-950/50 p-0 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="titulo-eliminar-contacto"
-    >
-      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-950/50 p-0 sm:items-center sm:p-4">
+      {/* `role`/`aria-modal` van en el PANEL, no en la capa de fondo: es el
+          panel lo que el lector debe describir como diálogo. Y con ellos va el
+          comportamiento que faltaba —fondo bloqueado, Escape, foco atrapado y
+          devuelto—, que hasta ahora este diálogo prometía sin cumplir. */}
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-eliminar-contacto"
+        tabIndex={-1}
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 outline-none sm:max-w-lg sm:rounded-xl"
+      >
         <div className="flex items-start justify-between gap-3">
           <h3
             id="titulo-eliminar-contacto"

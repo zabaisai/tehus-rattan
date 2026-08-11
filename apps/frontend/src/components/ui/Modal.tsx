@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useId, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useDialogoModal } from './useDialogoModal';
 
 const MAX_WIDTH_CLASSES = {
   sm: 'sm:max-w-sm',
@@ -48,24 +49,10 @@ export function Modal({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [onClose]);
-
-  useEffect(() => {
-    panelRef.current?.focus();
-  }, []);
+  // Fondo bloqueado, Escape, foco atrapado y foco devuelto, en un solo sitio.
+  // Antes esto vivía aquí a medias: el foco se escapaba al cuerpo de la página
+  // tras siete tabulaciones y al cerrar no volvía a quien había abierto.
+  useDialogoModal({ activo: true, onCerrar: onClose, refPanel: panelRef });
 
   return (
     <div

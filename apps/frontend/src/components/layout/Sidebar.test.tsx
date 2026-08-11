@@ -34,10 +34,33 @@ describe('Sidebar', () => {
     currentPathname = '/dashboard';
   });
 
-  it('renders the mobile drawer closed (translated off-screen) by default', () => {
-    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
-    const drawer = screen.getByRole('dialog', { name: 'Navegación principal' });
-    expect(drawer.className).toContain('-translate-x-full');
+  it('cerrado: fuera de pantalla, y NO es un diálogo', () => {
+    // Esta prueba exigía antes que el cajón cerrado siguiera anunciándose como
+    // `role="dialog"`. Fijaba el defecto: el cajón se queda montado para poder
+    // animarse, así que con el menú cerrado había un diálogo permanente en el
+    // árbol de accesibilidad, con `aria-modal="true"` —que le dice al lector de
+    // pantalla que el resto de la página no existe— y catorce enlaces
+    // enfocables fuera de la vista. En móvil bastaban dos tabulaciones para
+    // caer dentro de un menú invisible.
+    const { container } = renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(
+      screen.queryByRole('dialog', { name: 'Navegación principal' }),
+    ).not.toBeInTheDocument();
+
+    const cajon = container.querySelector('[inert]') as HTMLElement;
+    expect(cajon).not.toBeNull();
+    expect(cajon.className).toContain('-translate-x-full');
+  });
+
+  it('cerrado: sus enlaces no se pueden tabular', () => {
+    const { container } = renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    // `inert` saca el subárbol del orden de tabulación Y del árbol de
+    // accesibilidad, sin romper la transición.
+    const cajon = container.querySelector('[inert]') as HTMLElement;
+    expect(cajon.querySelectorAll('a[href],button').length).toBeGreaterThan(0);
+    expect(cajon.hasAttribute('inert')).toBe(true);
   });
 
   it('renders the mobile drawer open (on-screen) when mobileOpen is true', () => {

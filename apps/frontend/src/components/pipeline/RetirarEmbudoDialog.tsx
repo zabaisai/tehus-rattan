@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, ArrowRight, Loader2, X } from "lucide-react";
 import {
@@ -10,6 +10,7 @@ import {
   archivarPipeline,
   deletePipeline,
 } from "@/lib/pipeline";
+import { useDialogoModal } from "@/components/ui/useDialogoModal";
 import { Pipeline } from "@/types";
 
 /**
@@ -34,6 +35,9 @@ export function RetirarEmbudoDialog({
   const [destinoEtapa, setDestinoEtapa] = useState("");
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useDialogoModal({ activo: true, onCerrar: onClose, refPanel: panelRef });
 
   const resumen = useQuery({
     queryKey: ["pipeline-retiro", pipeline.id],
@@ -72,13 +76,19 @@ export function RetirarEmbudoDialog({
   const r = resumen.data;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-950/50 p-0 sm:items-center sm:p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="titulo-retirar-embudo"
-    >
-      <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-neutral-950/50 p-0 sm:items-center sm:p-4">
+      {/* `role`/`aria-modal` en el PANEL, no en la capa de fondo, y con ellos
+          el comportamiento que faltaba: fondo bloqueado, Escape, foco atrapado
+          y devuelto. Este dialogo retira un embudo entero; salirse de el por
+          accidente no deberia ser posible. */}
+      <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="titulo-retirar-embudo"
+        tabIndex={-1}
+        className="max-h-[92vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 outline-none sm:max-w-lg sm:rounded-xl"
+      >
         <div className="flex items-start justify-between gap-3">
           <h3
             id="titulo-retirar-embudo"

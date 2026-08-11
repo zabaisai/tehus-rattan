@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -26,6 +26,7 @@ import {
   Database,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
+import { useDialogoModal } from '@/components/ui/useDialogoModal';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
 import { NOMBRE_PULSO } from '@/lib/producto';
 
@@ -36,6 +37,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
+  const cajonRef = useRef<HTMLDivElement>(null);
   const user = useAuthStore((s) => s.user);
   const canManageWhatsApp =
     user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
@@ -58,21 +60,13 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
-  useEffect(() => {
-    if (!mobileOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') onMobileClose();
-    }
-    document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [mobileOpen, onMobileClose]);
+  // El cajón se queda montado para que la transición pueda animarse, así que
+  // abierto y cerrado son estados del MISMO elemento. Ver el `inert` de abajo.
+  useDialogoModal({
+    activo: mobileOpen,
+    onCerrar: onMobileClose,
+    refPanel: cajonRef,
+  });
 
   const platformNavItems = [
     { href: '/dashboard/platform/companies', label: 'Empresas', icon: Building2 },
@@ -241,10 +235,26 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             mobileOpen ? 'opacity-100' : 'opacity-0'
           }`}
         />
+        {/* CERRADO NO ES INVISIBLE.
+            El cajón se queda montado para poder animar la entrada, y así
+            estaba: `display:flex`, `visibility:visible`, sin `aria-hidden` y
+            con catorce enlaces enfocables fuera de pantalla. En móvil, con el
+            menú cerrado, bastaban DOS tabulaciones para caer dentro de un menú
+            que no se ve.
+
+            `inert` lo saca del orden de tabulación Y del árbol de
+            accesibilidad sin tocar la transición. `role`/`aria-modal` solo se
+            declaran cuando de verdad hay un diálogo: anunciarlo siempre le
+            decía al lector de pantalla que el resto de la página no existe. */}
         <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Navegación principal"
+          ref={cajonRef}
+          {...(mobileOpen
+            ? {
+                role: 'dialog' as const,
+                'aria-modal': true,
+                'aria-label': 'Navegación principal',
+              }
+            : { inert: true })}
           className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-200 ease-out ${
             mobileOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
