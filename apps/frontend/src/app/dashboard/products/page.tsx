@@ -25,6 +25,9 @@ import {
 } from "@/components/products/ProductModal";
 import { ProductImportModal } from "@/components/products/ProductImportModal";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 
 const currencyFormatter = new Intl.NumberFormat("es-CO", {
   style: "currency",
@@ -134,32 +137,40 @@ export default function ProductsPage() {
       </div>
 
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="relative w-full flex-1 sm:max-w-xs">
+        {/* Etiqueta oculta y no solo `placeholder`: el marcador desaparece al
+            escribir y no es un nombre accesible. */}
+        <Field
+          label="Buscar productos"
+          labelOculta
+          className="relative w-full flex-1 sm:max-w-xs"
+        >
           <Search
             size={15}
-            className="absolute left-2.5 top-2.5 text-neutral-400"
+            aria-hidden="true"
+            className="pointer-events-none absolute left-2.5 top-2.5 z-10 text-neutral-400"
           />
-          <input
-            type="text"
+          <Input
+            type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar productos"
-            className="w-full rounded-md border border-neutral-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+            className="pl-8"
           />
-        </div>
+        </Field>
 
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="w-full rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 sm:w-auto"
-        >
-          <option value="">Todas las categorías</option>
-          {PRODUCT_CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+        <Field label="Filtrar por categoría" labelOculta className="w-full sm:w-auto">
+          <Select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">Todas las categorías</option>
+            {PRODUCT_CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </div>
 
       {isLoading && (

@@ -98,6 +98,7 @@ export function RepairTemplate({
           Observaciones de reparación
         </div>
         <textarea
+          aria-label="Observaciones de reparación"
           value={meta.observations}
           onChange={(e) => onMetaChange({ ...meta, observations: e.target.value })}
           rows={3}

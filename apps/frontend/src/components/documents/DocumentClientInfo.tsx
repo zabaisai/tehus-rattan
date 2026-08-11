@@ -30,6 +30,7 @@ function InfoInput({ field, readOnly }: { field: DocumentInfoField; readOnly?: b
         <input
           type={field.type ?? 'text'}
           value={field.value}
+          aria-label={field.label}
           onChange={(e) => field.onChange(e.target.value)}
           className="w-full flex-1 bg-[#E7D7C9] px-2 py-1 text-xs outline-none"
         />

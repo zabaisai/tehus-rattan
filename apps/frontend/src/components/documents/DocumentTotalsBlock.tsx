@@ -53,6 +53,7 @@ export function DocumentTotalsBlock({ rows }: DocumentTotalsBlockProps) {
                     min={0}
                     step="0.01"
                     value={row.value}
+                    aria-label={row.label}
                     onChange={(e) => row.onChange?.(Number(e.target.value) || 0)}
                     className="w-full bg-transparent text-right outline-none"
                   />

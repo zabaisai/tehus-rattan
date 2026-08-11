@@ -102,6 +102,7 @@ export function SaleInvoiceTemplate({
           Observaciones
         </div>
         <textarea
+          aria-label="Observaciones"
           value={meta.observations}
           onChange={(e) => onMetaChange({ ...meta, observations: e.target.value })}
           rows={2}

@@ -11,6 +11,9 @@ al producto. Los valores no se retocan: salen tal cual de `takto-tokens.json`.
 | Logotipo | `src/components/ui/TaktoLogo.tsx` |
 | Botones | `src/components/ui/Button.tsx` |
 | Etiquetas de estado | `src/components/ui/Badge.tsx` |
+| Campos de formulario | `src/components/ui/Field.tsx` + `Input` / `Select` / `Textarea` |
+| Superficie elevada | `src/components/ui/Card.tsx` |
+| Estados de lista y confirmaciones | `src/components/ui/ListState.tsx`, `ConfirmDialog.tsx` |
 | Fuentes autoalojadas | `src/app/fonts/`, cargadas en `layout.tsx` |
 | Iconos de navegador, manifiesto, OG | `apps/frontend/public/` |
 
@@ -40,6 +43,43 @@ alguien las recuerde.
 | Texto sobre acento | `brand-primary` | `#131C4A` |
 | Éxito / aviso / error / información | `status-*` y `status-*-surface` | ver `@theme` |
 | Grises | `neutral-50…950` | azulados, de la familia del navy |
+
+**No queda ni una clase de color genérica de Tailwind** en el frontend. Si
+aparece un `red-600` o un `emerald-50` en una revisión, es que alguien se
+saltó el sistema.
+
+### Los tres tonos derivados
+
+No vienen del paquete de marca. Existen porque el paquete no cubre estos tres
+casos, y están aquí —una sola definición, en `@theme`— para que ningún
+componente los escriba literales.
+
+| Token | Valor | Para qué | Contraste |
+|---|---|---|---|
+| `status-error-hover` | `#A32323` | Hover de acciones destructivas | 7,44:1 con blanco (AAA) |
+| `status-success-strong` | `#0C734F` | Texto de éxito | 5,86:1 blanco · 5,21:1 superficie |
+| `status-warning-strong` | `#945800` | Texto de aviso | 5,75:1 blanco · 5,27:1 superficie |
+
+Los tres salen de aplicar el **mismo factor ×0,83** al tono oficial, para que
+los estados se oscurezcan igual entre sí. **Pendientes de confirmar con marca.**
+
+**Por qué existen los dos `*-strong`.** Los tonos oficiales `status-success`
+(#0E8A5F) y `status-warning` (#B26A00) dan 4,36:1 y 4,24:1 sobre blanco, y
+3,87:1 y 3,89:1 sobre su propia superficie: por debajo del mínimo para texto.
+Como icono, borde o relleno **sí** cumplen —piden 3:1— y ahí se siguen usando
+los oficiales. El problema es solo el texto. `status-error` y `status-info` no
+lo tienen (4,85:1 y 4,91:1), así que se usan tal cual.
+
+Es el mismo principio que el paquete ya aplica al naranja: `#FF6A00` para
+relleno, `secondary-700` para texto.
+
+### Acciones de éxito y aviso: relleno claro, texto oscuro
+
+Igual que el botón naranja, y por el mismo motivo. Rellenar con
+`status-success` y poner texto blanco encima da 4,36:1. Las variantes
+`success` y `warning` de `Button` usan la superficie de estado con el tono
+`*-strong` encima, y tiñen el fondo un 10 % al pasar el ratón —un 20 % ya
+bajaba el texto a 4,11:1—.
 
 **Dónde aparece el acento.** Deliberadamente poco: el contador de mensajes sin
 leer, la etiqueta «Sin asignar», y una barra a la izquierda del elemento

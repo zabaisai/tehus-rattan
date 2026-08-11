@@ -67,6 +67,7 @@ export function DocumentHeader({ title, fields, company, readOnly }: DocumentHea
                   <input
                     type={field.type ?? 'text'}
                     value={field.value}
+                    aria-label={field.label}
                     onChange={(e) => field.onChange(e.target.value)}
                     className="w-32 bg-transparent px-2 py-1 text-xs outline-none"
                   />

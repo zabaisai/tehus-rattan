@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Upload } from "lucide-react";
 import { getMyCompany, updateMyCompany, uploadCompanyLogo, resolveCompanyAssetUrl } from "@/lib/companies";
 import { validateLogoFile } from "@/lib/onboarding";
 import { Company, UpdateCompanyPayload } from "@/types";
 import { useAuthStore } from "@/store/auth.store";
+import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
+import { Textarea } from "@/components/ui/Textarea";
 
 type ApiError = {
   response?: {
@@ -30,9 +33,50 @@ function mapCompanyError(err: unknown): string {
   return readable || "Ocurrió un error. Intenta de nuevo.";
 }
 
-const inputClass =
-  "w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500";
-const labelClass = "mb-1.5 block text-xs font-medium text-neutral-600";
+const labelClass = "mb-1.5 block text-sm font-medium text-neutral-700";
+
+/**
+ * Muestra de color + campo hexadecimal para el MISMO dato.
+ *
+ * La etiqueta visible apunta a la muestra; el campo de texto lleva la suya
+ * oculta, porque dos controles no pueden compartir una etiqueta y sin ella el
+ * hexadecimal se anunciaba como un cuadro de texto sin nombre.
+ */
+function SelectorDeColor({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const idMuestra = useId();
+
+  return (
+    <div>
+      <label htmlFor={idMuestra} className={labelClass}>
+        {label}
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          id={idMuestra}
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
+        />
+        <Field label={`${label} en hexadecimal`} labelOculta className="w-full">
+          <Input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </Field>
+      </div>
+    </div>
+  );
+}
 
 function LogoUploader({
   label,
@@ -94,10 +138,14 @@ function LogoUploader({
             <span className="px-2 text-[10px] text-neutral-400">PNG, JPG o WEBP</span>
           </>
         )}
+        {/* `sr-only` y no `hidden`: un `display:none` saca al campo del orden
+            de tabulación, así que la zona de subida dejaba de alcanzarse por
+            teclado. Con `aria-label` además tiene nombre propio. */}
         <input
           type="file"
+          aria-label={label}
           accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-          className="hidden"
+          className="sr-only"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) handleSelect(file);
@@ -206,81 +254,65 @@ function CompanySettingsForm({ company }: { company: Company }) {
         </p>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className={labelClass}>Nombre comercial *</label>
-            <input
+          <Field label="Nombre comercial" required>
+            <Input
               type="text"
               required
               value={form.name}
               onChange={(e) => patch({ name: e.target.value })}
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Tipo de negocio</label>
-            <input
+          </Field>
+          <Field label="Tipo de negocio">
+            <Input
               type="text"
               value={form.businessType}
               onChange={(e) => patch({ businessType: e.target.value })}
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Ciudad</label>
-            <input
+          </Field>
+          <Field label="Ciudad">
+            <Input
               type="text"
               value={form.city}
               onChange={(e) => patch({ city: e.target.value })}
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>País</label>
-            <input
+          </Field>
+          <Field label="País">
+            <Input
               type="text"
               value={form.country}
               onChange={(e) => patch({ country: e.target.value })}
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Teléfono</label>
-            <input
-              type="text"
+          </Field>
+          <Field label="Teléfono">
+            <Input
+              type="tel"
               value={form.phone}
               onChange={(e) => patch({ phone: e.target.value })}
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Email</label>
-            <input
+          </Field>
+          <Field label="Email">
+            <Input
               type="email"
               value={form.email}
               onChange={(e) => patch({ email: e.target.value })}
-              className={inputClass}
             />
-          </div>
-          <div>
-            <label className={labelClass}>Sitio web o Instagram</label>
-            <input
+          </Field>
+          <Field label="Sitio web o Instagram">
+            <Input
               type="text"
               value={form.website}
               onChange={(e) => patch({ website: e.target.value })}
-              className={inputClass}
             />
-          </div>
+          </Field>
         </div>
 
-        <div className="mt-4">
-          <label className={labelClass}>Descripción corta</label>
-          <textarea
+        <Field label="Descripción corta" className="mt-4">
+          <Textarea
             value={form.description}
             onChange={(e) => patch({ description: e.target.value })}
             rows={3}
-            className={inputClass}
           />
-        </div>
+        </Field>
 
         <div className="mt-8 border-t border-neutral-100 pt-6">
           <h3 className="mb-1 text-sm font-semibold text-neutral-800">
@@ -293,101 +325,60 @@ function CompanySettingsForm({ company }: { company: Company }) {
           </p>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className={labelClass}>Razón social (opcional)</label>
-              <input
+            <Field label="Razón social (opcional)">
+              <Input
                 type="text"
                 value={form.legalName}
                 onChange={(e) => patch({ legalName: e.target.value })}
-                className={inputClass}
               />
-            </div>
-            <div>
-              <label className={labelClass}>NIT / Identificación fiscal (opcional)</label>
-              <input
+            </Field>
+            <Field label="NIT / Identificación fiscal (opcional)">
+              <Input
                 type="text"
                 value={form.taxId}
                 onChange={(e) => patch({ taxId: e.target.value })}
-                className={inputClass}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="mt-4">
-            <label className={labelClass}>Dirección (opcional)</label>
-            <input
+          <Field label="Dirección (opcional)" className="mt-4">
+            <Input
               type="text"
               value={form.address}
               onChange={(e) => patch({ address: e.target.value })}
-              className={inputClass}
             />
-          </div>
+          </Field>
 
-          <div className="mt-4">
-            <label className={labelClass}>
-              Condiciones / texto del pie de cotización (opcional)
-            </label>
-            <textarea
+          <Field
+            label="Condiciones / texto del pie de cotización (opcional)"
+            className="mt-4"
+          >
+            <Textarea
               value={form.quoteFooter}
               onChange={(e) => patch({ quoteFooter: e.target.value })}
               rows={3}
-              className={inputClass}
             />
-          </div>
+          </Field>
         </div>
 
+        {/* Colores DE LA EMPRESA, no de TAKTO: aquí la plataforma solo pone el
+            armazón. Lo que se elige dentro es identidad del cliente. */}
         <div className="mt-8 grid grid-cols-1 gap-4 border-t border-neutral-100 pt-6 sm:grid-cols-3">
-          <div>
-            <label className={labelClass}>Color principal</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={form.primaryColor}
-                onChange={(e) => patch({ primaryColor: e.target.value })}
-                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
-              />
-              <input
-                type="text"
-                value={form.primaryColor}
-                onChange={(e) => patch({ primaryColor: e.target.value })}
-                className={inputClass}
-              />
-            </div>
-          </div>
-          <div>
-            <label className={labelClass}>Color de acento</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={form.accentColor}
-                onChange={(e) => patch({ accentColor: e.target.value })}
-                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
-              />
-              <input
-                type="text"
-                value={form.accentColor}
-                onChange={(e) => patch({ accentColor: e.target.value })}
-                className={inputClass}
-              />
-            </div>
-          </div>
-          <div>
-            <label className={labelClass}>Fondo claro</label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={form.backgroundColor}
-                onChange={(e) => patch({ backgroundColor: e.target.value })}
-                className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
-              />
-              <input
-                type="text"
-                value={form.backgroundColor}
-                onChange={(e) => patch({ backgroundColor: e.target.value })}
-                className={inputClass}
-              />
-            </div>
-          </div>
+          <SelectorDeColor
+            label="Color principal"
+            value={form.primaryColor}
+            onChange={(v) => patch({ primaryColor: v })}
+          />
+          <SelectorDeColor
+            label="Color de acento"
+            value={form.accentColor}
+            onChange={(v) => patch({ accentColor: v })}
+          />
+          <SelectorDeColor
+            label="Fondo claro"
+            value={form.backgroundColor}
+            onChange={(v) => patch({ backgroundColor: v })}
+          />
         </div>
 
         {error && <p className="mt-4 text-xs text-status-error">{error}</p>}

@@ -37,6 +37,7 @@ export function DocumentSignatureBlock({
             </span>
             <input
               value={receiverName ?? ''}
+              aria-label="Nombre de quien recibe"
               onChange={(e) => onReceiverNameChange?.(e.target.value)}
               className="w-full flex-1 bg-[#E7D7C9] px-2 py-1 text-xs outline-none"
             />

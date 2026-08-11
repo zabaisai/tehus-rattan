@@ -66,7 +66,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
           </tr>
         </thead>
         <tbody>
-          {items.map((item) => (
+          {items.map((item, index) => (
             <tr key={item.id}>
               <td className="border border-neutral-800 p-0">
                 {readOnly ? (
@@ -74,6 +74,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                 ) : (
                   <input
                     value={item.code}
+                    aria-label={`Código de la fila ${index + 1}`}
                     onChange={(e) => updateItem(item.id, { code: e.target.value })}
                     className="w-full bg-transparent px-1.5 py-1 outline-none"
                   />
@@ -85,6 +86,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                 ) : (
                   <input
                     value={item.description}
+                    aria-label={`Descripción de la fila ${index + 1}`}
                     onChange={(e) => updateItem(item.id, { description: e.target.value })}
                     className="w-full bg-transparent px-1.5 py-1 outline-none"
                   />
@@ -99,6 +101,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                     min={0}
                     step={1}
                     value={item.quantity}
+                    aria-label={`Unidades de la fila ${index + 1}`}
                     onChange={(e) => updateItem(item.id, { quantity: Number(e.target.value) || 0 })}
                     className="w-full bg-transparent px-1.5 py-1 text-right outline-none"
                   />
@@ -115,6 +118,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                     min={0}
                     step="0.01"
                     value={item.unitPrice}
+                    aria-label={`Valor unitario de la fila ${index + 1}`}
                     onChange={(e) => updateItem(item.id, { unitPrice: Number(e.target.value) || 0 })}
                     className="w-full bg-transparent px-1.5 py-1 text-right outline-none"
                   />
@@ -128,9 +132,10 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                   <button
                     type="button"
                     onClick={() => removeRow(item.id)}
-                    className="p-1 text-neutral-400 hover:text-status-error"
+                    aria-label={`Quitar fila ${index + 1}`}
+                    className="rounded p-1 text-neutral-400 outline-none hover:text-status-error focus-visible:ring-2 focus-visible:ring-line-focus"
                   >
-                    <Trash2 size={13} />
+                    <Trash2 size={13} aria-hidden="true" />
                   </button>
                 </td>
               )}
