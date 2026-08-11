@@ -14,6 +14,7 @@ al producto. Los valores no se retocan: salen tal cual de `takto-tokens.json`.
 | Campos de formulario | `src/components/ui/Field.tsx` + `Input` / `Select` / `Textarea` |
 | Superficie elevada | `src/components/ui/Card.tsx` |
 | Estados de lista y confirmaciones | `src/components/ui/ListState.tsx`, `ConfirmDialog.tsx` |
+| Comportamiento de todo diálogo modal | `src/components/ui/useDialogoModal.ts` |
 | Fuentes autoalojadas | `src/app/fonts/`, cargadas en `layout.tsx` |
 | Iconos de navegador, manifiesto, OG | `apps/frontend/public/` |
 
@@ -117,6 +118,24 @@ cualquier `.outline-none` la anularía, que es justo el caso que cubre.
 Curvas y duraciones en `@theme`. Todo se apaga con
 `prefers-reduced-motion: reduce`: ninguna animación del producto es
 informativa, así que quitarlas no quita nada.
+
+## Diálogos
+
+Todo lo que se anuncie como diálogo debe usar `useDialogoModal`. El hook da
+fondo bloqueado, Escape, **foco atrapado** y foco devuelto al disparador.
+
+No es opcional: `aria-modal="true"` le dice al lector de pantalla que el resto
+de la página no existe. Un diálogo que lo declara y deja escapar el tabulador
+manda al usuario fuera de un contenido que su lector sigue describiendo como el
+único que hay. Había cuatro implementaciones y ninguna lo cumplía entera.
+
+Los diálogos se apilan: Escape solo cierra el de arriba, y el fondo sigue
+bloqueado mientras quede alguno abierto.
+
+**Un panel que se queda montado para animarse no está cerrado.** El cajón
+lateral móvil lo aprendió por las malas: seguía visible para el navegador, con
+catorce enlaces tabulables fuera de pantalla. Cuando esté cerrado va con
+`inert`, y `role`/`aria-modal` solo se declaran si de verdad está abierto.
 
 ## Iconos
 

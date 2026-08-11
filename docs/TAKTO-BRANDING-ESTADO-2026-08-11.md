@@ -351,18 +351,152 @@ la rama**. Con la máquina descargada, la suite completa pasa 481/481.
 
 ---
 
-## 8. Deuda visual que queda
+## 10. Tercer bloque (11 de agosto) — QA de interacciones
 
-1. **Iconos del brand pack sin integrar** (sección 6): decisión tomada, trabajo pendiente.
-2. **Primitivas que siguen sin existir:** `Table`, `Drawer`, `Tooltip`, `Tabs`, `Spinner`, `Toast`. Quedan 16 archivos con `<table>` a mano.
-3. **Formularios aún sin migrar a `Field`:** los modales de contactos, productos, cotizaciones, tareas y plataforma. No tienen defectos de accesibilidad detectados —el recorrido no abre modales—, pero repiten estilos.
-4. **Modales y drawers no se abrieron en la QA automática:** el recorrido cubre pantallas, no interacciones. Verificarlos es el siguiente paso natural.
-5. **Los tres tonos derivados esperan confirmación de marca.**
-6. **Tema oscuro:** sigue sin existir, y sigue siendo trabajo aparte.
+**Base:** `b42c91b` · CI verde. **Tokens derivados: APROBADOS** por el usuario
+como tokens semánticos de accesibilidad, no colores centrales de TAKTO.
+
+Verificado que cumplen las condiciones: definidos **una sola vez** en `@theme`,
+**ningún componente** escribe los hexadecimales literales (`grep` sin
+resultados), y solo aparecen en usos de estado o destructivos — nunca como
+primario, secundario, decoración o identidad. Contrastes documentados en
+`DESIGN-SYSTEM.md` y en el propio `globals.css`.
+
+### Lo que encontró abrir los diálogos de verdad
+
+El recorrido por pantallas del bloque anterior no podía ver nada de esto.
+Todo lo de abajo está **medido en el navegador**, no deducido del código:
+
+| Defecto | Medida |
+|---|---|
+| `Modal`: el foco se escapaba al cuerpo de la página | tras **7 tabulaciones** llegaba a `BODY` |
+| `Modal`: al cerrar, el foco no volvía al disparador | quedaba en `BODY` |
+| Cajón lateral **cerrado**: seguía siendo un diálogo | `display:flex`, `visibility:visible`, sin `aria-hidden`, `aria-modal="true"` permanente, **14 enlaces enfocables** fuera de pantalla |
+| Cajón cerrado: alcanzable por teclado | **2 tabulaciones** bastaban para caer dentro de un menú invisible |
+| Cajón **abierto**: el foco nunca entraba | quedaba en el botón hamburguesa; se escapaba a la **1.ª** tabulación |
+| `EliminarContactoDialog` y `RetirarEmbudoDialog` | `aria-modal="true"` **sin** bloqueo de fondo, **sin** Escape, **sin** gestión de foco |
+| 5 modales de formulario | **18 `<label>` y 0 `htmlFor`** |
+
+`aria-modal="true"` le dice al lector de pantalla que el resto de la página no
+existe. Si el tabulador sí puede salir, la promesa es falsa.
+
+### Un falso positivo que casi reporto
+
+La primera pasada acusó «Escape no cierra» y «el foco está fuera» en **todos**
+los diálogos. Era mi sonda: el cajón lateral **también** es `[role=dialog]`, y
+`querySelector` devolvía ese en vez del modal. Comprobado a mano antes de
+tocar nada — Escape **sí** funcionaba, y el bloqueo de fondo también.
+
+Que la sonda encontrara el cajón fue, precisamente, cómo apareció el defecto
+grande del cajón cerrado.
+
+### Primitiva creada: un hook, no un componente
+
+`useDialogoModal` reúne fondo bloqueado, Escape, foco atrapado y foco devuelto.
+
+Cumple el criterio pedido: **cuatro** implementaciones repetidas,
+**comportamiento inconsistente** entre ellas y **defecto de accesibilidad**
+demostrado. Es un hook y no un `Drawer`/`Dialog` nuevo porque los cuatro sitios
+ya tenían su maquetación y reescribirla no habría arreglado nada.
+
+**La pila.** Escape se escuchaba en `document` desde cada diálogo, así que con
+uno anidado —«Agregar producto» dentro de una oportunidad— una sola pulsación
+disparaba los dos `onCerrar`. Ahora solo responde el último, y el fondo sigue
+bloqueado mientras quede alguno abierto. Cubierto por prueba unitaria, que es
+más determinista que arrastrar el navegador hasta ese estado.
+
+**`Table`, `Tooltip`, `Tabs`, `Spinner` y `Toast` NO se crearon.** La QA no
+encontró ni tres implementaciones repetidas ni defectos en ellos. Crearlos solo
+para tachar la lista habría sido trabajo sin beneficio demostrado.
+
+### Interacciones cubiertas
+
+Con datos QA `QA_BRANDING_INTERACCION_`: 1 empresa, 3 contactos, 2 productos,
+2 oportunidades, 2 tareas y su embudo, todo por endpoints oficiales.
+
+| Interacción | Anchos | Resultado |
+|---|---|---|
+| Contactos · nuevo contacto | 1440/1280/1024/768/390 | ✅ |
+| Contactos · editar (icono de fila) | 390 | ✅ |
+| Contactos · archivar | 390 | ✅ |
+| Contactos · papelera | 1440/768 | ✅ |
+| Tareas · nueva tarea | 1440/1280/1024/768/390 | ✅ |
+| Productos · nuevo producto | 1440/1280/1024/768/390 | ✅ |
+| Productos · **modal de importación** | 1440/1280/1024/768/390 | ✅ |
+| Pipeline · nuevo lead | 1440/768 | ✅ |
+| Pipeline · embudos | 1440/768 | ✅ |
+| Menú móvil (cajón) abierto y cerrado | 390 | ✅ |
+| Modal anidado + pila de Escape | prueba unitaria | ✅ |
+
+En cada uno se comprobó: nombre accesible del diálogo, `aria-modal`, scroll de
+fondo bloqueado y restaurado, diálogo dentro de la pantalla, sin desborde del
+documento, foco inicial dentro, **foco atrapado** (tabulando más veces que
+elementos hay), Escape, foco devuelto al disparador, campos con etiqueta,
+botones con nombre y ausencia de colores genéricos.
+
+**Resultado final: cero hallazgos en los dos pases.**
+
+### Lo que NO se pudo conducir automáticamente
+
+Honestamente, esto queda sin cubrir por la QA automática:
+
+- **Tarjeta de oportunidad → `LeadDetailModal`.** El clic sintético no abre la
+  tarjeta del tablero; con ella quedan fuera «Agregar producto» y «Crear
+  cotización» **en el navegador** (la pila de Escape sí está cubierta por
+  prueba unitaria).
+- **Cotizaciones** no tiene botón de crear: se crean **desde una oportunidad**,
+  así que dependen del punto anterior. No es un hueco de la interfaz.
+- **TAKTO Pulso y Automatizaciones**: «Nuevo» navega a una página, no abre un
+  modal. No se creó ni activó ningún bot, como se pidió.
+- **Editar/archivar contacto a ≥768 px**: los iconos de fila aparecen al pasar
+  el ratón y el clic sintético no los revela. Sí se verificaron a 390 px.
+- **Menús desplegables, tooltips y toasts**: no se localizó ninguno con
+  `role=menu`/`role=tooltip`/`role=status` en las pantallas recorridas.
+
+### Limpieza
+
+Borrado **por ID exacto** en una transacción: 1 empresa, 2 usuarios, 1 código,
+3 contactos, 2 productos, 2 oportunidades, 2 tareas, 1 embudo y 4 etapas.
+
+**Auditorías conservadas** (342 → 344). Baseline comprobado: 10 empresas,
+14 usuarios, 14 contactos, 13 leads, 10 tareas, 20 productos, 11 cotizaciones
+y 3 códigos, **idéntico al inicio**. Las 4 empresas cuyo nombre empieza por
+«QA» son preexistentes (23 jul – 6 ago) y no se tocaron.
+
+Servidores de desarrollo detenidos; credenciales QA borradas del scratchpad.
+Los contenedores Docker se dejan como estaban al empezar el bloque.
+
+### Verificación
+
+| Comprobación | Resultado |
+|---|---|
+| `tsc --noEmit` | ✅ |
+| `eslint` | ✅ 0 errores (1 warning previo de `9120b89`) |
+| `vitest run` | ✅ **63 archivos, 490 pruebas** (481 + 9 nuevas) |
+| `next build` | ✅ |
+| Backend / Prisma / migraciones / `brand/` | **0 archivos** |
+| Secretos o datos QA en el diff | **ninguno** |
+
+> El lint marcó un error real en el hook: escribía una ref durante el render,
+> lo que rompe el renderizado concurrente de React. Corregido con un efecto.
 
 ---
 
-## 9. Próximo comando seguro
+## 11. Deuda restante
+
+1. **Iconos del brand pack** — decisión tomada (sección 6), sin empezar.
+2. **`LeadDetailModal` y sus modales anidados** sin QA en navegador (ver arriba).
+3. **`Table`, `Drawer`, `Tooltip`, `Tabs`, `Spinner`, `Toast`** siguen sin
+   existir, **deliberadamente**: la QA no demostró que hagan falta. Quedan 16
+   archivos con `<table>` a mano, sin defectos detectados.
+4. **Modales de plataforma y cotizaciones** aún con formularios a mano.
+5. **Tema oscuro:** sigue siendo trabajo aparte.
+6. `src/lib/axios.test.ts` es **intermitente bajo carga** (timeouts de 5 s).
+   Aislada pasa siempre; el archivo no se ha tocado en toda la rama.
+
+---
+
+## 12. Próximo paso seguro
 
 ```bash
 git checkout feature/takto-brand-ui-integration
