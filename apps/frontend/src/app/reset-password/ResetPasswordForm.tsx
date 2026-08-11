@@ -6,6 +6,11 @@ import Link from 'next/link';
 import { resetPassword } from '@/lib/auth';
 import { isStrongPassword } from '@/lib/password-policy';
 import { PasswordRequirements } from '@/components/auth/PasswordRequirements';
+import { TaktoLogo } from '@/components/ui/TaktoLogo';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Field } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
 
 type ApiError = { response?: { data?: { message?: string | string[] } } };
 
@@ -60,115 +65,100 @@ export function ResetPasswordForm() {
     }
   }
 
-  const inputClass =
-    'w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500';
-
   // No token in the URL at all → the link is malformed/incomplete.
   if (!token) {
     return (
       <Shell title="Enlace inválido">
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+        <Card>
           <p role="alert" className="text-sm leading-relaxed text-neutral-700">
             El enlace de recuperación es inválido o está incompleto.
           </p>
-          <Link
-            href="/forgot-password"
-            className="mt-6 inline-block text-sm text-neutral-500 transition-colors hover:text-neutral-700"
-          >
+          <Link href="/forgot-password" className={ENLACE}>
             Solicitar un nuevo enlace
           </Link>
-        </div>
+        </Card>
       </Shell>
     );
   }
 
   return (
     <Shell title="Restablecer contraseña">
-      <form
-        onSubmit={handleSubmit}
-        className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm"
-      >
-        <div className="mb-4">
-          <label
-            htmlFor="password"
-            className="mb-1.5 block text-sm font-medium text-neutral-700"
-          >
-            Nueva contraseña
+      <Card>
+        <form onSubmit={handleSubmit}>
+          <Field label="Nueva contraseña" required className="mb-4">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              required
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              // Explícito: gana al `aria-describedby` que genera `Field`, y es
+              // el que apunta a la lista de requisitos, que es lo que hay que
+              // oír al entrar en el campo.
+              aria-describedby="password-requirements"
+              placeholder="••••••••"
+            />
+            <div id="password-requirements">
+              <PasswordRequirements password={password} />
+            </div>
+          </Field>
+
+          <Field label="Confirmar contraseña" required className="mb-3">
+            <Input
+              type={showPassword ? 'text' : 'password'}
+              required
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              placeholder="••••••••"
+            />
+          </Field>
+
+          <label className="mb-5 flex items-center gap-2 text-sm text-content-secondary">
+            <input
+              type="checkbox"
+              checked={showPassword}
+              onChange={(e) => setShowPassword(e.target.checked)}
+              className="h-4 w-4 rounded border-neutral-300 accent-brand-primary"
+            />
+            Mostrar contraseña
           </label>
-          <input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            aria-describedby="password-requirements"
-            className={inputClass}
-            placeholder="••••••••"
-          />
-          <div id="password-requirements">
-            <PasswordRequirements password={password} />
-          </div>
-        </div>
 
-        <div className="mb-3">
-          <label
-            htmlFor="confirm"
-            className="mb-1.5 block text-sm font-medium text-neutral-700"
-          >
-            Confirmar contraseña
-          </label>
-          <input
-            id="confirm"
-            type={showPassword ? 'text' : 'password'}
-            required
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            className={inputClass}
-            placeholder="••••••••"
-          />
-        </div>
+          {error && (
+            <p
+              role="alert"
+              aria-live="assertive"
+              className="mb-4 text-sm text-status-error"
+            >
+              {error}
+            </p>
+          )}
 
-        <label className="mb-5 flex items-center gap-2 text-sm text-neutral-600">
-          <input
-            type="checkbox"
-            checked={showPassword}
-            onChange={(e) => setShowPassword(e.target.checked)}
-            className="h-4 w-4 rounded border-neutral-300"
-          />
-          Mostrar contraseña
-        </label>
+          <Button type="submit" disabled={loading} className="w-full py-2">
+            {loading ? 'Guardando...' : 'Cambiar contraseña'}
+          </Button>
 
-        {error && (
-          <p role="alert" aria-live="assertive" className="mb-4 text-sm text-status-error">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full rounded-md bg-brand-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900 disabled:opacity-50"
-        >
-          {loading ? 'Guardando...' : 'Cambiar contraseña'}
-        </button>
-
-        <Link
-          href="/forgot-password"
-          className="mt-4 block text-center text-sm text-neutral-500 transition-colors hover:text-neutral-700"
-        >
-          Solicitar un nuevo enlace
-        </Link>
-      </form>
+          <Link href="/forgot-password" className={`mt-4 block ${ENLACE}`}>
+            Solicitar un nuevo enlace
+          </Link>
+        </form>
+      </Card>
     </Shell>
   );
 }
+
+const ENLACE =
+  'rounded text-center text-sm text-content-secondary outline-none transition-colors ' +
+  'hover:text-content-primary focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1';
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+        {/* Restablecer también es la puerta del producto: manda TAKTO. */}
+        <div className="mb-8 flex flex-col items-center text-center">
+          <TaktoLogo height={30} />
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-content-primary">
             {title}
           </h1>
         </div>

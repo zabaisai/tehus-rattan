@@ -3,6 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { forgotPassword } from '@/lib/auth';
+import { TaktoLogo } from '@/components/ui/TaktoLogo';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Field } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
 
 // Always shows the SAME generic message after submitting — success OR error — so
 // the page never confirms whether an account exists.
@@ -28,17 +33,21 @@ export function ForgotPasswordForm() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
+        {/* Recuperar el acceso sigue siendo la puerta del producto, así que
+            aquí manda TAKTO igual que en el login. Antes esta pantalla no
+            llevaba logotipo y se veía como de otro sitio. */}
+        <div className="mb-8 flex flex-col items-center text-center">
+          <TaktoLogo height={30} />
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight text-content-primary">
             Recuperar contraseña
           </h1>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-content-secondary">
             Te enviaremos un enlace para restablecerla.
           </p>
         </div>
 
         {sent ? (
-          <div className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm">
+          <Card>
             <p
               role="status"
               aria-live="polite"
@@ -48,49 +57,36 @@ export function ForgotPasswordForm() {
             </p>
             <Link
               href="/login"
-              className="mt-6 inline-block text-sm text-neutral-500 transition-colors hover:text-neutral-700"
+              className="mt-6 inline-block rounded text-sm text-content-secondary outline-none transition-colors hover:text-content-primary focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1"
             >
               Volver a iniciar sesión
             </Link>
-          </div>
+          </Card>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm"
-          >
-            <div className="mb-5">
-              <label
-                htmlFor="email"
-                className="mb-1.5 block text-sm font-medium text-neutral-700"
+          <Card>
+            <form onSubmit={handleSubmit}>
+              <Field label="Correo" required className="mb-5">
+                <Input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@correo.com"
+                />
+              </Field>
+
+              <Button type="submit" disabled={loading} className="w-full py-2">
+                {loading ? 'Enviando...' : 'Enviar instrucciones'}
+              </Button>
+
+              <Link
+                href="/login"
+                className="mt-4 block rounded text-center text-sm text-content-secondary outline-none transition-colors hover:text-content-primary focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1"
               >
-                Correo
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-                placeholder="tu@correo.com"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full rounded-md bg-brand-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900 disabled:opacity-50"
-            >
-              {loading ? 'Enviando...' : 'Enviar instrucciones'}
-            </button>
-
-            <Link
-              href="/login"
-              className="mt-4 block text-center text-sm text-neutral-500 transition-colors hover:text-neutral-700"
-            >
-              Volver a iniciar sesión
-            </Link>
-          </form>
+                Volver a iniciar sesión
+              </Link>
+            </form>
+          </Card>
         )}
       </div>
     </div>

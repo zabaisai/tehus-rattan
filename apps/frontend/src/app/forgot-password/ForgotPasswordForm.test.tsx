@@ -16,7 +16,7 @@ describe('ForgotPasswordForm', () => {
 
   it('has an email field, a submit button and a back-to-login link', () => {
     render(<ForgotPasswordForm />);
-    expect(screen.getByLabelText('Correo')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Correo' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Enviar instrucciones/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Volver a iniciar sesión/i })).toHaveAttribute('href', '/login');
   });
@@ -25,7 +25,7 @@ describe('ForgotPasswordForm', () => {
     forgotPassword.mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(<ForgotPasswordForm />);
-    await user.type(screen.getByLabelText('Correo'), 'user@co.test');
+    await user.type(screen.getByRole('textbox', { name: 'Correo' }), 'user@co.test');
     await user.click(screen.getByRole('button', { name: /Enviar instrucciones/i }));
 
     expect(forgotPassword).toHaveBeenCalledWith('user@co.test');

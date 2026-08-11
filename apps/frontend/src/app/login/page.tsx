@@ -7,6 +7,10 @@ import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 import { ConnectionUnavailable } from '@/components/auth/ConnectionUnavailable';
 import { TaktoLogo } from '@/components/ui/TaktoLogo';
+import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
+import { Field } from '@/components/ui/Field';
+import { Input } from '@/components/ui/Input';
 
 type ApiError = {
   response?: {
@@ -121,67 +125,54 @@ export default function LoginPage() {
           </p>
         )}
 
-        <form
-          onSubmit={handleSubmit}
-          className="rounded-lg border border-neutral-200 bg-white p-6 shadow-sm"
-        >
-          <div className="mb-4">
-            <label
-              htmlFor="email"
-              className="mb-1.5 block text-sm font-medium text-neutral-700"
-            >
-              Correo
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-              placeholder="tu@correo.com"
-            />
-          </div>
+        <Card>
+          <form onSubmit={handleSubmit}>
+            <Field label="Correo" required className="mb-4">
+              <Input
+                type="email"
+                required
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@correo.com"
+              />
+            </Field>
 
-          <div className="mb-5">
-            <label
-              htmlFor="password"
-              className="mb-1.5 block text-sm font-medium text-neutral-700"
-            >
-              Contraseña
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-              placeholder="••••••••"
-            />
-          </div>
+            <Field label="Contraseña" required className="mb-5">
+              <Input
+                type="password"
+                required
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </Field>
 
-          <div className="mb-4 -mt-1 text-right">
-            <Link
-              href="/forgot-password"
-              className="text-sm text-neutral-500 transition-colors hover:text-neutral-700"
-            >
-              ¿Olvidaste tu contraseña?
-            </Link>
-          </div>
+            <div className="mb-4 -mt-1 text-right">
+              <Link
+                href="/forgot-password"
+                className="rounded text-sm text-content-secondary outline-none transition-colors hover:text-content-primary focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
 
-          {error && (
-            <p role="alert" aria-live="assertive" className="mb-4 text-sm text-status-error">{error}</p>
-          )}
+            {error && (
+              <p
+                role="alert"
+                aria-live="assertive"
+                className="mb-4 text-sm text-status-error"
+              >
+                {error}
+              </p>
+            )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-brand-primary py-2 text-sm font-medium text-white transition-colors hover:bg-primary-900 disabled:opacity-50"
-          >
-            {loading ? 'Ingresando...' : 'Ingresar'}
-          </button>
-        </form>
+            <Button type="submit" disabled={loading} className="w-full py-2">
+              {loading ? 'Ingresando...' : 'Ingresar'}
+            </Button>
+          </form>
+        </Card>
       </div>
     </div>
   );

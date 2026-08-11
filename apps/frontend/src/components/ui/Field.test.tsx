@@ -96,6 +96,22 @@ describe('Field', () => {
       expect(screen.getByText('*')).toHaveAttribute('aria-hidden', 'true');
     });
 
+    it('el nombre accesible NO incluye el asterisco', () => {
+      // `getByRole` consulta el árbol de accesibilidad —el mismo que lee un
+      // lector de pantalla— y ahí `aria-hidden` sí excluye el asterisco. Esta
+      // prueba existe porque `getByLabelText` mira `textContent` y por tanto
+      // NO habría detectado que el nombre se ensuciara.
+      render(
+        <Field label="Correo" required>
+          <Input required />
+        </Field>,
+      );
+
+      expect(
+        screen.getByRole('textbox', { name: 'Correo' }),
+      ).toBeInTheDocument();
+    });
+
     it('la etiqueta oculta sigue nombrando al campo', () => {
       render(
         <Field label="Buscar" labelOculta>

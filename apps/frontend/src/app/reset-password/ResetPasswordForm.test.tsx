@@ -46,8 +46,8 @@ describe('ResetPasswordForm', () => {
   it('rejects mismatched passwords without calling the API', async () => {
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
-    await user.type(screen.getByLabelText('Nueva contraseña'), STRONG);
-    await user.type(screen.getByLabelText('Confirmar contraseña'), 'Different!2027');
+    await user.type(screen.getByLabelText(/^Nueva contraseña/), STRONG);
+    await user.type(screen.getByLabelText(/^Confirmar contraseña/), 'Different!2027');
     await user.click(screen.getByRole('button', { name: /Cambiar contraseña/i }));
     expect(await screen.findByText(/no coinciden/i)).toBeInTheDocument();
     expect(resetPassword).not.toHaveBeenCalled();
@@ -56,8 +56,8 @@ describe('ResetPasswordForm', () => {
   it('rejects a weak password (policy) without calling the API', async () => {
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
-    await user.type(screen.getByLabelText('Nueva contraseña'), 'weak');
-    await user.type(screen.getByLabelText('Confirmar contraseña'), 'weak');
+    await user.type(screen.getByLabelText(/^Nueva contraseña/), 'weak');
+    await user.type(screen.getByLabelText(/^Confirmar contraseña/), 'weak');
     await user.click(screen.getByRole('button', { name: /Cambiar contraseña/i }));
     expect(await screen.findByText(/no cumple los requisitos/i)).toBeInTheDocument();
     expect(resetPassword).not.toHaveBeenCalled();
@@ -67,8 +67,8 @@ describe('ResetPasswordForm', () => {
     resetPassword.mockResolvedValue(undefined);
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
-    await user.type(screen.getByLabelText('Nueva contraseña'), STRONG);
-    await user.type(screen.getByLabelText('Confirmar contraseña'), STRONG);
+    await user.type(screen.getByLabelText(/^Nueva contraseña/), STRONG);
+    await user.type(screen.getByLabelText(/^Confirmar contraseña/), STRONG);
     await user.click(screen.getByRole('button', { name: /Cambiar contraseña/i }));
 
     await waitFor(() => expect(resetPassword).toHaveBeenCalledWith('the-secret-token', STRONG, STRONG));
@@ -79,8 +79,8 @@ describe('ResetPasswordForm', () => {
     resetPassword.mockRejectedValue({ response: { data: { message: 'El enlace de recuperación es inválido o expiró. Solicita uno nuevo.' } } });
     const user = userEvent.setup();
     render(<ResetPasswordForm />);
-    await user.type(screen.getByLabelText('Nueva contraseña'), STRONG);
-    await user.type(screen.getByLabelText('Confirmar contraseña'), STRONG);
+    await user.type(screen.getByLabelText(/^Nueva contraseña/), STRONG);
+    await user.type(screen.getByLabelText(/^Confirmar contraseña/), STRONG);
     await user.click(screen.getByRole('button', { name: /Cambiar contraseña/i }));
 
     expect(await screen.findByText(/inválido o expiró/i)).toBeInTheDocument();
