@@ -33,7 +33,7 @@ export function MessageThread({ messages }: { messages: Message[] }) {
               <div
                 className={`max-w-[70%] rounded-lg px-3 py-2 text-sm ${
                   isFailed
-                    ? 'border border-red-300 bg-red-50 text-red-700'
+                    ? 'border border-status-error/30 bg-status-error-surface text-status-error'
                     : isOutbound
                       ? 'bg-brand-primary text-white'
                       : 'bg-white text-neutral-800 border border-neutral-200'
@@ -43,7 +43,7 @@ export function MessageThread({ messages }: { messages: Message[] }) {
                 <p
                   className={`mt-1 text-[10px] ${
                     isFailed
-                      ? 'font-medium text-red-600'
+                      ? 'font-medium text-status-error'
                       : isOutbound
                         ? 'text-neutral-300'
                         : 'text-neutral-400'

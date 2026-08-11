@@ -19,8 +19,12 @@ export type TonoBadge =
  */
 const TONOS: Record<TonoBadge, string> = {
   neutral: 'bg-neutral-100 text-neutral-600',
-  success: 'bg-status-success-surface text-status-success',
-  warning: 'bg-status-warning-surface text-status-warning',
+  // Éxito y aviso usan el tono `*-strong`, no el oficial. Con el oficial este
+  // texto daba 3,87:1 y 3,89:1 sobre su propia superficie, por debajo del
+  // mínimo, y encima a 10px. Error e información sí cumplen con el oficial
+  // (4,85:1 y 4,91:1), así que se quedan como estaban.
+  success: 'bg-status-success-surface text-status-success-strong',
+  warning: 'bg-status-warning-surface text-status-warning-strong',
   error: 'bg-status-error-surface text-status-error',
   info: 'bg-status-info-surface text-status-info',
   accent: 'bg-brand-secondary text-brand-primary',

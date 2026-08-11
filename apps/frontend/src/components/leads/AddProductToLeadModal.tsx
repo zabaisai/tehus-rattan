@@ -128,7 +128,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                 <label
                   key={product.id}
                   className={`flex cursor-pointer items-center justify-between gap-2 border-b border-neutral-100 px-3 py-2 text-sm last:border-b-0 hover:bg-neutral-50 ${
-                    selectedProductId === product.id ? 'bg-amber-50' : ''
+                    selectedProductId === product.id ? 'bg-status-warning-surface' : ''
                   }`}
                 >
                   <span className="flex items-center gap-2">
@@ -194,7 +194,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
               </>
             )}
 
-            {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+            {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
 
             <div className="flex justify-end gap-2">
               <button

@@ -204,7 +204,7 @@ export default function PlatformAuditLogsPage() {
 
             {!isLoading && isError && (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-red-600">
+                <td colSpan={9} className="px-4 py-6 text-center text-status-error">
                   No se pudo cargar la auditoría.
                 </td>
               </tr>

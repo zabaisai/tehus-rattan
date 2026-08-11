@@ -133,7 +133,7 @@ export function HistoryImport() {
             {analisis.rechazados.length > 0 && (
               <>
                 {' · '}
-                <span className="text-red-700">
+                <span className="text-status-error">
                   {analisis.rechazados.length.toLocaleString('es-CO')}{' '}
                   rechazadas
                 </span>
@@ -142,7 +142,7 @@ export function HistoryImport() {
           </p>
 
           {analisis.rechazados.length > 0 && (
-            <ul className="mt-1 space-y-0.5 text-[11px] text-red-700">
+            <ul className="mt-1 space-y-0.5 text-[11px] text-status-error">
               {/* Solo las primeras: una lista de miles de errores no se lee y
                   el patrón se ve en las primeras. */}
               {analisis.rechazados.slice(0, 5).map((r) => (
@@ -209,7 +209,7 @@ export function HistoryImport() {
       )}
 
       {resultado && (
-        <div className="mt-3 rounded-md bg-emerald-50 p-2.5 text-xs text-emerald-800">
+        <div className="mt-3 rounded-md bg-status-success-surface p-2.5 text-xs text-status-success-strong">
           Importados {resultado.importados.toLocaleString('es-CO')} mensajes.
           {resultado.duplicados > 0 && (
             <> {resultado.duplicados.toLocaleString('es-CO')} ya estaban.</>
@@ -225,7 +225,7 @@ export function HistoryImport() {
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
+        <p role="alert" className="mt-2 text-xs text-status-error">
           {error}
         </p>
       )}

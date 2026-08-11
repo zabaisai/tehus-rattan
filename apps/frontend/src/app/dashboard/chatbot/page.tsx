@@ -123,7 +123,7 @@ export default function ChatbotPage() {
           {errorLista && (
             <p
               role="alert"
-              className="rounded-md border border-red-200 bg-red-50 px-2.5 py-2 text-xs text-red-700"
+              className="rounded-md border border-status-error/20 bg-status-error-surface px-2.5 py-2 text-xs text-status-error"
             >
               {errorLista}
             </p>

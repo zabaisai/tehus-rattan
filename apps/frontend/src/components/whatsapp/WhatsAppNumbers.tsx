@@ -177,7 +177,7 @@ export function WhatsAppNumbers() {
       </ul>
 
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
+        <p role="alert" className="mt-2 text-xs text-status-error">
           {error}
         </p>
       )}

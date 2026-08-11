@@ -212,7 +212,7 @@ export default function ProductsPage() {
                 </div>
 
                 {product.category && (
-                  <span className="w-fit rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                  <span className="w-fit rounded-full bg-status-warning-surface px-2 py-0.5 text-[10px] font-medium text-status-warning-strong">
                     {product.category}
                   </span>
                 )}
@@ -247,7 +247,7 @@ export default function ProductsPage() {
                     onClick={() => handleDeactivate(product.id)}
                     aria-label={`Retirar ${product.name} del catálogo`}
                     title="Retirar del catálogo"
-                    className="rounded p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded p-1.5 text-neutral-400 hover:bg-status-error-surface hover:text-status-error"
                   >
                     <Trash2 size={14} />
                   </button>

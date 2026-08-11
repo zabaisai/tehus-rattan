@@ -93,7 +93,7 @@ export function ConversationOpportunity({
         >
           {creada ? (
             <>
-              <Check size={13} className="text-emerald-600" />
+              <Check size={13} className="text-status-success-strong" />
               Tarea creada
             </>
           ) : (
@@ -125,7 +125,7 @@ export function ConversationOpportunity({
         </form>
       )}
 
-      {error && <p className="mt-1.5 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1.5 text-xs text-status-error">{error}</p>}
     </div>
   );
 }

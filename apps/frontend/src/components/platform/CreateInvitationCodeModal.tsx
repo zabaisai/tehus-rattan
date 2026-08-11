@@ -132,7 +132,7 @@ export function CreateInvitationCodeModal({
               </p>
             </div>
 
-            {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+            {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
 
             <div className="flex justify-end gap-2">
               <button
@@ -155,9 +155,9 @@ export function CreateInvitationCodeModal({
 
         {created && (
           <div>
-            <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2.5">
-              <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-600" />
-              <p className="text-xs text-amber-800">
+            <div className="mb-3 flex items-start gap-2 rounded-md border border-status-warning/20 bg-status-warning-surface p-2.5">
+              <AlertTriangle size={15} className="mt-0.5 shrink-0 text-status-warning-strong" />
+              <p className="text-xs text-status-warning-strong">
                 Este código completo no podrá consultarse nuevamente. Cópialo y
                 entrégalo ahora a{' '}
                 <span className="font-medium">{created.intendedCompanyName}</span>{' '}
@@ -179,7 +179,7 @@ export function CreateInvitationCodeModal({
               </button>
             </div>
 
-            {copyError && <p className="mb-3 text-xs text-red-600">{copyError}</p>}
+            {copyError && <p className="mb-3 text-xs text-status-error">{copyError}</p>}
 
             <label className="mb-4 flex items-start gap-2 text-xs text-neutral-600">
               <input

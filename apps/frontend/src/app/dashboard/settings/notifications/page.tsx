@@ -82,7 +82,7 @@ export default function NotificationPreferencesPage() {
         {isLoading ? (
           <p className="px-4 py-10 text-center text-sm text-neutral-400">Cargando…</p>
         ) : isError ? (
-          <p className="px-4 py-10 text-center text-sm text-red-600">
+          <p className="px-4 py-10 text-center text-sm text-status-error">
             No se pudieron cargar las preferencias.
           </p>
         ) : (
@@ -139,7 +139,7 @@ export default function NotificationPreferencesPage() {
           {saving ? 'Guardando…' : 'Guardar preferencias'}
         </button>
         {message && (
-          <span className={`text-sm ${message.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+          <span className={`text-sm ${message.ok ? 'text-status-success-strong' : 'text-status-error'}`}>
             {message.text}
           </span>
         )}

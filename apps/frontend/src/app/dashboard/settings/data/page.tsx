@@ -267,10 +267,10 @@ function BloqueRetencion({
       </div>
 
       {resultado && (
-        <p className="mt-2 text-xs text-emerald-700">{resultado}</p>
+        <p className="mt-2 text-xs text-status-success-strong">{resultado}</p>
       )}
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
+        <p role="alert" className="mt-2 text-xs text-status-error">
           {error}
         </p>
       )}
@@ -316,7 +316,7 @@ function BloqueExportacion({ nombreEmpresa }: { nombreEmpresa: string }) {
         {ocupado ? 'Generando…' : 'Descargar mis datos'}
       </Button>
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
+        <p role="alert" className="mt-2 text-xs text-status-error">
           {error}
         </p>
       )}
@@ -366,8 +366,8 @@ function BloqueEliminacion({
   }
 
   return (
-    <section className="rounded-lg border border-red-200 bg-white p-4">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-red-800">
+    <section className="rounded-lg border border-status-error/20 bg-white p-4">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold text-status-error">
         <AlertTriangle size={15} />
         Eliminar todos los datos
       </h3>
@@ -378,7 +378,7 @@ function BloqueEliminacion({
       </p>
 
       {hayPendiente ? (
-        <p className="mt-3 rounded-md bg-amber-50 p-2.5 text-xs text-amber-800">
+        <p className="mt-3 rounded-md bg-status-warning-surface p-2.5 text-xs text-status-warning-strong">
           Ya hay una solicitud en curso. No se puede pedir otra hasta que se
           resuelva.
         </p>
@@ -405,7 +405,7 @@ function BloqueEliminacion({
       )}
 
       {error && (
-        <p role="alert" className="mt-2 text-xs text-red-700">
+        <p role="alert" className="mt-2 text-xs text-status-error">
           {error}
         </p>
       )}

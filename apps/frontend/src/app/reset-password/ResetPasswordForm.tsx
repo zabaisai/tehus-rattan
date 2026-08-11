@@ -139,7 +139,7 @@ export function ResetPasswordForm() {
         </label>
 
         {error && (
-          <p role="alert" aria-live="assertive" className="mb-4 text-sm text-red-600">
+          <p role="alert" aria-live="assertive" className="mb-4 text-sm text-status-error">
             {error}
           </p>
         )}

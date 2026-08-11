@@ -97,14 +97,14 @@ export function KanbanBoard({
   }
 
   if (isError || !data) {
-    return <p className="text-sm text-red-600">No se pudo cargar el pipeline.</p>;
+    return <p className="text-sm text-status-error">No se pudo cargar el pipeline.</p>;
   }
 
   const allStages = data.stages.map((s) => ({ id: s.id, name: s.name }));
 
   return (
     <div>
-      {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mb-3 text-sm text-status-error">{error}</p>}
       <DragDropContext onDragEnd={handleDragEnd}>
         <div className="flex gap-3 overflow-x-auto pb-4">
           {data.stages.map((stage) => (

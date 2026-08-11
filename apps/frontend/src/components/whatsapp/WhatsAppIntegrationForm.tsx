@@ -147,8 +147,8 @@ export function WhatsAppIntegrationForm({
         </p>
       </div>
 
-      {error && <p className="text-xs text-red-600">{error}</p>}
-      {success && <p className="text-xs text-emerald-600">{success}</p>}
+      {error && <p className="text-xs text-status-error">{error}</p>}
+      {success && <p className="text-xs text-status-success-strong">{success}</p>}
 
       <div className="flex justify-end">
         <button

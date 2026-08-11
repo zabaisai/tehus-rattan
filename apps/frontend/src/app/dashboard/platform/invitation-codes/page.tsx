@@ -16,9 +16,9 @@ const statusLabels: Record<InvitationCodeStatus, string> = {
 };
 
 const statusColors: Record<InvitationCodeStatus, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700',
-  USED: 'bg-sky-50 text-sky-700',
-  REVOKED: 'bg-red-50 text-red-700',
+  ACTIVE: 'bg-status-success-surface text-status-success-strong',
+  USED: 'bg-status-info-surface text-status-info',
+  REVOKED: 'bg-status-error-surface text-status-error',
   EXPIRED: 'bg-neutral-100 text-neutral-500',
 };
 
@@ -129,9 +129,9 @@ export default function PlatformInvitationCodesPage() {
       </div>
 
       {successMessage && (
-        <p className="mb-3 text-sm text-emerald-600">{successMessage}</p>
+        <p className="mb-3 text-sm text-status-success-strong">{successMessage}</p>
       )}
-      {revokeError && <p className="mb-3 text-sm text-red-600">{revokeError}</p>}
+      {revokeError && <p className="mb-3 text-sm text-status-error">{revokeError}</p>}
 
       {isLoading && (
         <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-neutral-400 sm:hidden">
@@ -139,7 +139,7 @@ export default function PlatformInvitationCodesPage() {
         </p>
       )}
       {!isLoading && isError && (
-        <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-red-600 sm:hidden">
+        <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-status-error sm:hidden">
           No se pudo cargar el listado de códigos.
         </p>
       )}
@@ -189,7 +189,7 @@ export default function PlatformInvitationCodesPage() {
                 <button
                   onClick={() => handleRevoke(code)}
                   disabled={revokingId === code.id}
-                  className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600 disabled:opacity-50"
+                  className="rounded-md bg-status-error-surface px-2.5 py-1.5 text-xs text-status-error disabled:opacity-50"
                 >
                   {revokingId === code.id ? 'Revocando...' : 'Revocar'}
                 </button>
@@ -225,7 +225,7 @@ export default function PlatformInvitationCodesPage() {
 
             {!isLoading && isError && (
               <tr>
-                <td colSpan={9} className="px-4 py-6 text-center text-red-600">
+                <td colSpan={9} className="px-4 py-6 text-center text-status-error">
                   No se pudo cargar el listado de códigos.
                 </td>
               </tr>
@@ -267,7 +267,7 @@ export default function PlatformInvitationCodesPage() {
                       <button
                         onClick={() => handleRevoke(code)}
                         disabled={revokingId === code.id}
-                        className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        className="rounded-md px-2 py-1 text-xs text-status-error hover:bg-status-error-surface disabled:opacity-50"
                       >
                         {revokingId === code.id ? 'Revocando...' : 'Revocar'}
                       </button>

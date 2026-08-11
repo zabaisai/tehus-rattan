@@ -17,6 +17,7 @@ import { AddProductToLeadModal } from './AddProductToLeadModal';
 import { CreateQuoteModal } from '@/components/quotes/CreateQuoteModal';
 import { PipelineStage, AddLeadProductPayload, Quote } from '@/types';
 import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
 
 type ApiError = {
   response?: {
@@ -58,8 +59,8 @@ const statusLabels: Record<string, string> = {
 
 const statusColors: Record<string, string> = {
   OPEN: 'bg-neutral-100 text-neutral-600',
-  WON: 'bg-green-50 text-green-700',
-  LOST: 'bg-red-50 text-red-700',
+  WON: 'bg-status-success-surface text-status-success-strong',
+  LOST: 'bg-status-error-surface text-status-error',
 };
 
 interface LeadDetailModalProps {
@@ -287,7 +288,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
     <>
       <Modal title="Detalle del lead" onClose={onClose} maxWidth="2xl">
         {isLoading && <p className="text-sm text-neutral-400">Cargando...</p>}
-        {isError && <p className="text-sm text-red-600">No se pudo cargar el lead.</p>}
+        {isError && <p className="text-sm text-status-error">No se pudo cargar el lead.</p>}
 
         {lead && !editing && (
           <div>
@@ -359,7 +360,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                 <button
                   type="button"
                   onClick={() => setAddProductModalOpen(true)}
-                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50"
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-status-warning-strong hover:bg-status-warning-surface"
                 >
                   <Plus size={13} />
                   Agregar producto
@@ -447,7 +448,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                       type="button"
                                       onClick={() => handleSaveProduct(item.id)}
                                       disabled={productSaving}
-                                      className="rounded p-1 text-green-600 hover:bg-green-50 disabled:opacity-50"
+                                      className="rounded p-1 text-status-success-strong hover:bg-status-success-surface disabled:opacity-50"
                                     >
                                       <Check size={13} />
                                     </button>
@@ -471,7 +472,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                     <button
                                       type="button"
                                       onClick={() => handleRemoveProduct(item.id)}
-                                      className="rounded p-1 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                                      className="rounded p-1 text-neutral-400 hover:bg-status-error-surface hover:text-status-error"
                                     >
                                       <Trash2 size={13} />
                                     </button>
@@ -497,7 +498,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                 </div>
               )}
 
-              {productError && <p className="mt-2 text-xs text-red-600">{productError}</p>}
+              {productError && <p className="mt-2 text-xs text-status-error">{productError}</p>}
 
               <p className="mt-2 text-[11px] text-neutral-400">
                 Estos productos servirán como base para una futura cotización.
@@ -522,7 +523,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                 </div>
 
                 {createdQuote && (
-                  <div className="flex items-center gap-2 rounded-md bg-green-50 px-3 py-1.5 text-xs text-green-700">
+                  <div className="flex items-center gap-2 rounded-md bg-status-success-surface px-3 py-1.5 text-xs text-status-success-strong">
                     <span>Cotización {createdQuote.number} creada</span>
                     <button
                       type="button"
@@ -536,8 +537,8 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
               </div>
             </div>
 
-            {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
-            {justSaved && !error && <p className="mt-3 text-xs text-green-600">Cambios guardados</p>}
+            {error && <p className="mt-3 text-xs text-status-error">{error}</p>}
+            {justSaved && !error && <p className="mt-3 text-xs text-status-success-strong">Cambios guardados</p>}
 
             {lostReasonOpen && (
               <div className="mt-3 rounded-md border border-neutral-200 bg-neutral-50 p-3">
@@ -565,7 +566,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                     type="button"
                     onClick={handleConfirmLost}
                     disabled={saving}
-                    className="rounded-md bg-red-600 px-3 py-1.5 text-xs text-white hover:bg-red-700 disabled:opacity-50"
+                    className="rounded-md bg-status-error px-3 py-1.5 text-xs text-white hover:bg-status-error-hover disabled:opacity-50"
                   >
                     {saving ? 'Guardando...' : 'Confirmar pérdida'}
                   </button>
@@ -588,18 +589,18 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                       type="button"
                       onClick={() => setLostReasonOpen(true)}
                       disabled={saving}
-                      className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      className="rounded-md border border-status-error/20 px-3 py-1.5 text-sm text-status-error hover:bg-status-error-surface disabled:opacity-50"
                     >
                       Marcar perdido
                     </button>
-                    <button
-                      type="button"
+                    <Button
+                      variant="success"
                       onClick={handleMarkWon}
                       disabled={saving}
-                      className="rounded-md bg-green-700 px-3 py-1.5 text-sm text-white hover:bg-green-800 disabled:opacity-50"
+                      className="px-3 py-1.5"
                     >
                       Marcar ganado
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -666,7 +667,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
               )}
             </div>
 
-            {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+            {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
 
             <div className="flex justify-end gap-2">
               <button

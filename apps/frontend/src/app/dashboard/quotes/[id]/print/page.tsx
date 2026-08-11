@@ -64,7 +64,7 @@ export default function QuotePrintPage() {
       {quoteLoading && <p className="text-sm text-neutral-400">Cargando cotización...</p>}
 
       {quoteError && (
-        <p className="text-sm text-red-600">
+        <p className="text-sm text-status-error">
           No se pudo cargar la cotización. Puede que no exista o no pertenezca a tu empresa.
         </p>
       )}

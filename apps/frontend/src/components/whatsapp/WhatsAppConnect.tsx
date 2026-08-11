@@ -46,12 +46,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const STATUS_PILL: Record<string, string> = {
-  CONNECTED: 'bg-emerald-50 text-emerald-700',
-  CONNECTING: 'bg-amber-50 text-amber-700',
-  REAUTH_REQUIRED: 'bg-amber-50 text-amber-700',
+  CONNECTED: 'bg-status-success-surface text-status-success-strong',
+  CONNECTING: 'bg-status-warning-surface text-status-warning-strong',
+  REAUTH_REQUIRED: 'bg-status-warning-surface text-status-warning-strong',
   DISCONNECTED: 'bg-neutral-100 text-neutral-600',
-  REVOKED: 'bg-red-50 text-red-700',
-  ERROR: 'bg-red-50 text-red-700',
+  REVOKED: 'bg-status-error-surface text-status-error',
+  ERROR: 'bg-status-error-surface text-status-error',
   NOT_CONNECTED: 'bg-neutral-100 text-neutral-600',
 };
 
@@ -158,7 +158,7 @@ export function WhatsAppConnect() {
   }
   if (isError || !status) {
     return (
-      <p className="text-sm text-red-600">
+      <p className="text-sm text-status-error">
         No se pudo cargar el estado de WhatsApp.
       </p>
     );
@@ -230,7 +230,7 @@ function DisconnectedView({
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-6">
       <div className="flex items-start gap-3">
-        <span className="rounded-full bg-emerald-50 p-2 text-emerald-600">
+        <span className="rounded-full bg-status-success-surface p-2 text-status-success-strong">
           <MessageCircle className="h-5 w-5" aria-hidden />
         </span>
         <div>
@@ -255,7 +255,7 @@ function DisconnectedView({
             return (
               <li key={label} className="flex items-center gap-2 text-sm">
                 {done ? (
-                  <Check className="h-4 w-4 text-emerald-600" aria-hidden />
+                  <Check className="h-4 w-4 text-status-success-strong" aria-hidden />
                 ) : active ? (
                   <Loader2 className="h-4 w-4 animate-spin text-neutral-500" aria-hidden />
                 ) : (
@@ -288,7 +288,7 @@ function DisconnectedView({
       )}
 
       {error && (
-        <p className="mt-4 text-sm text-red-600" role="alert">
+        <p className="mt-4 text-sm text-status-error" role="alert">
           {error}
         </p>
       )}
@@ -336,7 +336,7 @@ function ConnectedView({
       </div>
 
       {status.actionRequired && (
-        <div className="mt-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <div className="mt-4 flex items-start gap-2 rounded-md bg-status-warning-surface px-3 py-2 text-xs text-status-warning-strong">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             La conexión necesita atención. Usa “Reconectar” para volver a
@@ -413,7 +413,7 @@ function ConnectedView({
           type="button"
           onClick={onDisconnect}
           disabled={disconnecting}
-          className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+          className="rounded-md border border-status-error/20 px-3 py-1.5 text-sm text-status-error hover:bg-status-error-surface disabled:opacity-50"
         >
           {disconnecting ? 'Desconectando…' : 'Desconectar'}
         </button>
@@ -430,7 +430,7 @@ function ConnectedView({
         en Meta ni afecta WhatsApp Business App. Los tokens nunca se muestran en
         esta pantalla.
       </p>
-      {actionMsg && <p className="mt-2 text-xs text-emerald-600">{actionMsg}</p>}
+      {actionMsg && <p className="mt-2 text-xs text-status-success-strong">{actionMsg}</p>}
     </div>
   );
 }

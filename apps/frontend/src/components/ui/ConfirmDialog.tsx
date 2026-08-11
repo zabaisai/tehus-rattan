@@ -2,13 +2,19 @@
 
 import { useState } from 'react';
 import { Modal } from './Modal';
-import { Button } from './Button';
+import { Button, VarianteBoton } from './Button';
 
 interface ConfirmDialogProps {
   title: string;
   message: React.ReactNode;
   confirmLabel?: string;
-  confirmClassName?: string;
+  /**
+   * Tono del botón de confirmar. Es una VARIANTE y no una cadena de clases: si
+   * la pantalla pasara `bg-…` suelto, competiría con el `bg-…` de la variante
+   * y ganaría el que quedara más abajo en el CSS compilado, no el que se
+   * escribió después.
+   */
+  confirmVariant?: VarianteBoton;
   onClose: () => void;
   onConfirm: () => Promise<void>;
 }
@@ -18,7 +24,7 @@ export function ConfirmDialog({
   title,
   message,
   confirmLabel = 'Confirmar',
-  confirmClassName = '',
+  confirmVariant = 'danger',
   onClose,
   onConfirm,
 }: ConfirmDialogProps) {
@@ -55,10 +61,9 @@ export function ConfirmDialog({
         {/* Destructivo por defecto: este diálogo solo aparece delante de
             acciones que no se pueden deshacer. */}
         <Button
-          variant="danger"
+          variant={confirmVariant}
           onClick={handleConfirm}
           disabled={saving}
-          className={confirmClassName}
         >
           {saving ? 'Procesando...' : confirmLabel}
         </Button>

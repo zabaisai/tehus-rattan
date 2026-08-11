@@ -243,8 +243,8 @@ function ConversationsContenido() {
                   onClick={handleTogglePause}
                   className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium ${
                     selectedConversation.isPaused
-                      ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                      : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                      ? "bg-status-success-surface text-status-success-strong hover:bg-status-success/10"
+                      : "bg-status-warning-surface text-status-warning-strong hover:bg-status-warning/10"
                   }`}
                 >
                   {selectedConversation.isPaused ? (
@@ -270,7 +270,7 @@ function ConversationsContenido() {
             />
 
             {sendNotice && (
-              <p className="border-b border-red-200 bg-red-50 px-4 py-2 text-xs font-medium text-red-700">
+              <p className="border-b border-status-error/20 bg-status-error-surface px-4 py-2 text-xs font-medium text-status-error">
                 {sendNotice}
               </p>
             )}

@@ -158,7 +158,7 @@ export default function AutomationsPage() {
       )}
 
       {errorAccion && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-status-error">
           {errorAccion}
         </p>
       )}

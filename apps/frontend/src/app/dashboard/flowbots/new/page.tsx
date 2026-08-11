@@ -127,7 +127,7 @@ export default function NuevoBotPage() {
       {error && (
         <p
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+          className="rounded-md border border-status-error/20 bg-status-error-surface px-3 py-2 text-sm text-status-error"
         >
           {error}
         </p>

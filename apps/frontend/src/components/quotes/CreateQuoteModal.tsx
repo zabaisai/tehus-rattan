@@ -171,7 +171,7 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
             />
           </div>
 
-          {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+          {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
 
           <div className="flex justify-end gap-2">
             <button

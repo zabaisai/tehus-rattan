@@ -122,7 +122,7 @@ export default function NotificationsPage() {
           <p className="px-4 py-10 text-center text-sm text-neutral-400">Cargando…</p>
         ) : query.isError ? (
           <div className="px-4 py-10 text-center">
-            <p className="text-sm text-red-600">No se pudieron cargar las notificaciones.</p>
+            <p className="text-sm text-status-error">No se pudieron cargar las notificaciones.</p>
             <button
               type="button"
               onClick={() => query.refetch()}
@@ -142,7 +142,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => open(n)}
-                  className={`flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-neutral-50 ${n.readAt ? '' : 'bg-emerald-50/40'}`}
+                  className={`flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-neutral-50 ${n.readAt ? '' : 'bg-status-success-surface/40'}`}
                 >
                   <span className="mt-0.5 text-neutral-400">
                     <CategoryIcon category={n.category} size={18} />
@@ -151,7 +151,7 @@ export default function NotificationsPage() {
                     <span className="flex items-center gap-2">
                       <span className="text-sm font-medium text-neutral-800">{n.title}</span>
                       {!n.readAt && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label="No leída" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-status-success" aria-label="No leída" />
                       )}
                     </span>
                     {n.bodyPreview && (

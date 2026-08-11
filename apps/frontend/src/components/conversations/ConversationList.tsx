@@ -97,7 +97,7 @@ export function ConversationList({
                   </span>
                 )}
                 {conv.isPaused && (
-                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                  <span className="rounded bg-status-warning-surface px-1.5 py-0.5 text-[10px] font-medium text-status-warning-strong">
                     Pausada
                   </span>
                 )}

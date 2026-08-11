@@ -37,9 +37,9 @@ const activityStatusLabels: Record<CompanyActivityStatus, string> = {
 };
 
 const activityStatusColors: Record<CompanyActivityStatus, string> = {
-  ACTIVE_TODAY: 'bg-emerald-50 text-emerald-700',
-  ACTIVE_WEEK: 'bg-sky-50 text-sky-700',
-  ACTIVE_MONTH: 'bg-amber-50 text-amber-700',
+  ACTIVE_TODAY: 'bg-status-success-surface text-status-success-strong',
+  ACTIVE_WEEK: 'bg-status-info-surface text-status-info',
+  ACTIVE_MONTH: 'bg-status-warning-surface text-status-warning-strong',
   INACTIVE: 'bg-neutral-100 text-neutral-500',
 };
 
@@ -51,9 +51,9 @@ const sessionStatusLabels: Record<UserSessionStatus, string> = {
 };
 
 const sessionStatusColors: Record<UserSessionStatus, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700',
+  ACTIVE: 'bg-status-success-surface text-status-success-strong',
   LOGGED_OUT: 'bg-neutral-100 text-neutral-500',
-  REVOKED: 'bg-red-50 text-red-700',
+  REVOKED: 'bg-status-error-surface text-status-error',
   EXPIRED: 'bg-neutral-100 text-neutral-400',
 };
 
@@ -287,8 +287,8 @@ export default function CompanyActivityDetailPage() {
         ))}
       </div>
 
-      {actionMessage && <p className="mb-3 text-sm text-emerald-600">{actionMessage}</p>}
-      {actionError && <p className="mb-3 text-sm text-red-600">{actionError}</p>}
+      {actionMessage && <p className="mb-3 text-sm text-status-success-strong">{actionMessage}</p>}
+      {actionError && <p className="mb-3 text-sm text-status-error">{actionError}</p>}
 
       {activityLoading && (
         <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-neutral-400">
@@ -296,7 +296,7 @@ export default function CompanyActivityDetailPage() {
         </div>
       )}
       {!activityLoading && activityError && (
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-red-600">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-status-error">
           No se pudo cargar la actividad de esta empresa.
         </div>
       )}
@@ -361,7 +361,7 @@ export default function CompanyActivityDetailPage() {
                         <button
                           onClick={() => setConfirmTarget({ type: 'user', userId: u.id, userName: u.name })}
                           disabled={revokingId === u.id}
-                          className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          className="rounded-md px-2 py-1 text-xs text-status-error hover:bg-status-error-surface disabled:opacity-50"
                         >
                           Cerrar todas sus sesiones
                         </button>
@@ -483,7 +483,7 @@ export default function CompanyActivityDetailPage() {
             <button
               onClick={() => setConfirmTarget({ type: 'company' })}
               disabled={revokingId === 'company'}
-              className="rounded-md px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+              className="rounded-md px-3 py-1.5 text-xs text-status-error hover:bg-status-error-surface disabled:opacity-50"
             >
               Cerrar todas las sesiones de la empresa
             </button>
@@ -515,7 +515,7 @@ export default function CompanyActivityDetailPage() {
                 )}
                 {!sessionsLoading && sessionsError && (
                   <tr>
-                    <td colSpan={10} className="px-4 py-6 text-center text-red-600">
+                    <td colSpan={10} className="px-4 py-6 text-center text-status-error">
                       No se pudo cargar el listado de sesiones.
                     </td>
                   </tr>
@@ -556,7 +556,7 @@ export default function CompanyActivityDetailPage() {
                         <button
                           onClick={() => setConfirmTarget({ type: 'session', sessionId: s.id })}
                           disabled={revokingId === s.id}
-                          className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          className="rounded-md px-2 py-1 text-xs text-status-error hover:bg-status-error-surface disabled:opacity-50"
                         >
                           Revocar
                         </button>

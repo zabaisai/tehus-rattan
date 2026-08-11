@@ -19,9 +19,9 @@ const statusLabels: Record<CompanyStatus, string> = {
 };
 
 const statusColors: Record<CompanyStatus, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700',
-  SUSPENDED: 'bg-amber-50 text-amber-700',
-  DELETED: 'bg-red-50 text-red-700',
+  ACTIVE: 'bg-status-success-surface text-status-success-strong',
+  SUSPENDED: 'bg-status-warning-surface text-status-warning-strong',
+  DELETED: 'bg-status-error-surface text-status-error',
 };
 
 const statusFilterOptions: { value: CompanyStatus | ''; label: string }[] = [
@@ -162,7 +162,7 @@ export default function PlatformCompaniesPage() {
       </div>
 
       {successMessage && (
-        <p className="mb-3 text-sm text-emerald-600">{successMessage}</p>
+        <p className="mb-3 text-sm text-status-success-strong">{successMessage}</p>
       )}
 
       {isLoading && (
@@ -171,7 +171,7 @@ export default function PlatformCompaniesPage() {
         </p>
       )}
       {!isLoading && isError && (
-        <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-red-600 lg:hidden">
+        <p className="rounded-lg border border-neutral-200 bg-white py-6 text-center text-sm text-status-error lg:hidden">
           No se pudo cargar el listado de empresas.
         </p>
       )}
@@ -233,7 +233,7 @@ export default function PlatformCompaniesPage() {
               {company.status === 'ACTIVE' && (
                 <button
                   onClick={() => openStatusChange(company, 'SUSPENDED')}
-                  className="rounded-md bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700"
+                  className="rounded-md bg-status-warning-surface px-2.5 py-1.5 text-xs text-status-warning-strong"
                 >
                   Suspender
                 </button>
@@ -241,7 +241,7 @@ export default function PlatformCompaniesPage() {
               {company.status === 'SUSPENDED' && (
                 <button
                   onClick={() => openStatusChange(company, 'ACTIVE')}
-                  className="rounded-md bg-emerald-50 px-2.5 py-1.5 text-xs text-emerald-700"
+                  className="rounded-md bg-status-success-surface px-2.5 py-1.5 text-xs text-status-success-strong"
                 >
                   Reactivar
                 </button>
@@ -249,7 +249,7 @@ export default function PlatformCompaniesPage() {
               {(company.status === 'ACTIVE' || company.status === 'SUSPENDED') && (
                 <button
                   onClick={() => openStatusChange(company, 'DELETED')}
-                  className="rounded-md bg-red-50 px-2.5 py-1.5 text-xs text-red-600"
+                  className="rounded-md bg-status-error-surface px-2.5 py-1.5 text-xs text-status-error"
                 >
                   Marcar eliminada
                 </button>
@@ -286,7 +286,7 @@ export default function PlatformCompaniesPage() {
 
             {!isLoading && isError && (
               <tr>
-                <td colSpan={10} className="px-4 py-6 text-center text-red-600">
+                <td colSpan={10} className="px-4 py-6 text-center text-status-error">
                   No se pudo cargar el listado de empresas.
                 </td>
               </tr>
@@ -360,7 +360,7 @@ export default function PlatformCompaniesPage() {
                     {company.status === 'ACTIVE' && (
                       <button
                         onClick={() => openStatusChange(company, 'SUSPENDED')}
-                        className="rounded-md px-2 py-1 text-xs text-amber-700 hover:bg-amber-50"
+                        className="rounded-md px-2 py-1 text-xs text-status-warning-strong hover:bg-status-warning-surface"
                       >
                         Suspender
                       </button>
@@ -369,7 +369,7 @@ export default function PlatformCompaniesPage() {
                     {company.status === 'SUSPENDED' && (
                       <button
                         onClick={() => openStatusChange(company, 'ACTIVE')}
-                        className="rounded-md px-2 py-1 text-xs text-emerald-700 hover:bg-emerald-50"
+                        className="rounded-md px-2 py-1 text-xs text-status-success-strong hover:bg-status-success-surface"
                       >
                         Reactivar
                       </button>
@@ -379,7 +379,7 @@ export default function PlatformCompaniesPage() {
                       company.status === 'SUSPENDED') && (
                       <button
                         onClick={() => openStatusChange(company, 'DELETED')}
-                        className="rounded-md px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                        className="rounded-md px-2 py-1 text-xs text-status-error hover:bg-status-error-surface"
                       >
                         Marcar eliminada
                       </button>

@@ -100,7 +100,7 @@ function Panel() {
       {isLoading ? (
         <p className="text-sm text-neutral-500">Cargando…</p>
       ) : isError ? (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-status-error">
           No se pudieron cargar las solicitudes.
         </p>
       ) : !solicitudes?.length ? (
@@ -266,12 +266,12 @@ function Fila({
           )}
 
           {solicitud.status === 'APPROVED' && (
-            <div className="space-y-2 rounded-md border border-red-200 bg-red-50 p-2.5">
-              <p className="flex items-center gap-1.5 text-xs font-medium text-red-800">
+            <div className="space-y-2 rounded-md border border-status-error/20 bg-status-error-surface p-2.5">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-status-error">
                 <AlertTriangle size={13} />
                 Punto sin retorno
               </p>
-              <p className="text-[11px] text-red-700">
+              <p className="text-[11px] text-status-error">
                 Escribe el nombre exacto de la empresa para confirmar:{' '}
                 <span className="font-mono">{nombreExacto}</span>
               </p>
@@ -280,7 +280,7 @@ function Fila({
                 onChange={(e) => setConfirmacion(e.target.value)}
                 placeholder={nombreExacto}
                 aria-label="Nombre exacto de la empresa"
-                className="w-full rounded-md border border-red-300 px-2 py-1.5 text-xs outline-none focus:border-red-500"
+                className="w-full rounded-md border border-status-error/30 px-2 py-1.5 text-xs outline-none focus:border-status-error"
               />
               <Button
                 size="sm"
@@ -309,10 +309,10 @@ function Fila({
           )}
 
           {ejecutado && (
-            <p className="text-xs text-emerald-700">{ejecutado}</p>
+            <p className="text-xs text-status-success-strong">{ejecutado}</p>
           )}
           {error && (
-            <p role="alert" className="text-xs text-red-700">
+            <p role="alert" className="text-xs text-status-error">
               {error}
             </p>
           )}

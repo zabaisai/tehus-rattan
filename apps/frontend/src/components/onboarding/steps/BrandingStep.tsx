@@ -242,9 +242,22 @@ export function BrandingStep({
 
       {/* Vista previa de la identidad DE LA EMPRESA. Los colores salen de lo
           que el usuario acaba de elegir, nunca de los tokens de TAKTO: es lo
-          que se está configurando. */}
+          que se está configurando.
+
+          Esta tarjeta se titulaba «Login» y mostraba el logotipo de la empresa,
+          lo que prometía algo que el producto no hace: la pantalla de acceso es
+          la puerta de TAKTO y conserva la marca de TAKTO. El rótulo nuevo dice
+          dónde aparece de verdad el logotipo del cliente. */}
       <div className="mt-6 rounded-lg border border-line-default bg-surface-subtle p-4">
-        <p className="text-xs font-medium text-content-secondary">Vista previa</p>
+        <p className="text-sm font-medium text-content-primary">
+          Identidad de tu empresa
+        </p>
+        <p className="mt-1 text-xs text-content-secondary">
+          Tu logotipo y colores se utilizarán en cotizaciones, documentos y
+          comunicaciones de tu empresa. La pantalla de acceso conserva la
+          identidad de TAKTO.
+        </p>
+
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2 rounded-md bg-neutral-900 px-3 py-2">
             {logoPreview ? (
@@ -253,7 +266,7 @@ export function BrandingStep({
             ) : (
               <div className="h-6 w-6 rounded bg-white/10" />
             )}
-            <span className="text-xs text-white">Sidebar</span>
+            <span className="text-xs text-white">Menú lateral</span>
           </div>
 
           <div className="flex items-center gap-2 rounded-md border border-line-default bg-surface-default px-3 py-2">
@@ -263,7 +276,7 @@ export function BrandingStep({
             ) : (
               <div className="h-6 w-6 rounded bg-neutral-200" />
             )}
-            <span className="text-xs text-content-primary">Login</span>
+            <span className="text-xs text-content-primary">Cotizaciones</span>
           </div>
 
           <span

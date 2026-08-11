@@ -106,7 +106,7 @@ function LogoUploader({
         />
       </label>
       {uploading && <p className="mt-1 text-xs text-neutral-400">Subiendo...</p>}
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
+      {error && <p className="mt-1 text-xs text-status-error">{error}</p>}
     </div>
   );
 }
@@ -390,8 +390,8 @@ function CompanySettingsForm({ company }: { company: Company }) {
           </div>
         </div>
 
-        {error && <p className="mt-4 text-xs text-red-600">{error}</p>}
-        {success && <p className="mt-4 text-xs text-emerald-600">{success}</p>}
+        {error && <p className="mt-4 text-xs text-status-error">{error}</p>}
+        {success && <p className="mt-4 text-xs text-status-success-strong">{success}</p>}
 
         <div className="mt-5 flex justify-end">
           <button
@@ -437,7 +437,7 @@ export default function CompanySettingsPage() {
         )}
 
         {canManage && isError && (
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-status-error">
             No se pudo cargar la información de la empresa.
           </p>
         )}

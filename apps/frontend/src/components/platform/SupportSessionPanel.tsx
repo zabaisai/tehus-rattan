@@ -29,9 +29,9 @@ const statusLabels: Record<SupportSessionStatus, string> = {
 };
 
 const statusColors: Record<SupportSessionStatus, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700',
+  ACTIVE: 'bg-status-success-surface text-status-success-strong',
   ENDED: 'bg-neutral-100 text-neutral-600',
-  EXPIRED: 'bg-amber-50 text-amber-700',
+  EXPIRED: 'bg-status-warning-surface text-status-warning-strong',
 };
 
 const CONVERSATIONS_LIMIT = 20;
@@ -133,12 +133,12 @@ export function SupportSessionPanel({
 
         {isActive && (
           <div className="mt-3 flex items-center justify-between">
-            {endError && <p className="text-xs text-red-600">{endError}</p>}
+            {endError && <p className="text-xs text-status-error">{endError}</p>}
             <button
               type="button"
               disabled={ending}
               onClick={handleEnd}
-              className="ml-auto rounded-md border border-red-200 px-3 py-1.5 text-xs text-red-600 hover:bg-red-50 disabled:opacity-50"
+              className="ml-auto rounded-md border border-status-error/20 px-3 py-1.5 text-xs text-status-error hover:bg-status-error-surface disabled:opacity-50"
             >
               {ending ? 'Cerrando...' : 'Cerrar sesión de soporte'}
             </button>
@@ -164,7 +164,7 @@ export function SupportSessionPanel({
           )}
 
           {!isLoading && isError && (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-status-error">
               No se pudieron cargar las conversaciones.
             </p>
           )}

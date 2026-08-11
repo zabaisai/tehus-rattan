@@ -38,7 +38,7 @@ export function ManualConnectionSection({ onChanged }: { onChanged: () => void }
 
       {open && (
         <div className="border-t border-neutral-100 px-4 py-4">
-          <div className="mb-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="mb-4 flex items-start gap-2 rounded-md bg-status-warning-surface px-3 py-2 text-xs text-status-warning-strong">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
               Método heredado. Requiere pegar manualmente el Phone Number ID, el

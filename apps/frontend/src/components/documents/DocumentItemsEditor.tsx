@@ -128,7 +128,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                   <button
                     type="button"
                     onClick={() => removeRow(item.id)}
-                    className="p-1 text-neutral-400 hover:text-red-600"
+                    className="p-1 text-neutral-400 hover:text-status-error"
                   >
                     <Trash2 size={13} />
                   </button>
@@ -142,7 +142,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
         <button
           type="button"
           onClick={addRow}
-          className="print-hidden mt-1.5 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50"
+          className="print-hidden mt-1.5 flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-status-warning-strong hover:bg-status-warning-surface"
         >
           <Plus size={13} />
           Agregar fila

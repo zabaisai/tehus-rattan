@@ -82,7 +82,7 @@ export default function PlatformActivityPage() {
       )}
 
       {!isLoading && isError && (
-        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-red-600">
+        <div className="rounded-lg border border-neutral-200 bg-white p-6 text-center text-sm text-status-error">
           No se pudo cargar el resumen de actividad.
         </div>
       )}

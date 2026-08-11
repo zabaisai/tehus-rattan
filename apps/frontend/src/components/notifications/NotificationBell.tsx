@@ -86,7 +86,7 @@ export function NotificationBell() {
         <Bell size={19} aria-hidden />
         {unread > 0 && (
           <span
-            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-red-600 px-1 text-center text-[10px] font-semibold leading-4 text-white"
+            className="absolute -right-0.5 -top-0.5 min-w-[16px] rounded-full bg-status-error px-1 text-center text-[10px] font-semibold leading-4 text-white"
             aria-hidden
           >
             {badge}
@@ -131,7 +131,7 @@ export function NotificationBell() {
                     <button
                       type="button"
                       onClick={() => openItem(n)}
-                      className={`flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-neutral-50 ${n.readAt ? '' : 'bg-emerald-50/40'}`}
+                      className={`flex w-full items-start gap-2.5 px-3 py-2.5 text-left hover:bg-neutral-50 ${n.readAt ? '' : 'bg-status-success-surface/40'}`}
                     >
                       <span className="mt-0.5 text-neutral-400">
                         <CategoryIcon category={n.category} />
@@ -143,7 +143,7 @@ export function NotificationBell() {
                           </span>
                           {!n.readAt && (
                             <span
-                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-success"
                               aria-label="No leída"
                             />
                           )}

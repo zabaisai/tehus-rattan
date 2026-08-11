@@ -12,9 +12,9 @@ const statusLabels: Record<CompanyStatus, string> = {
 };
 
 const statusColors: Record<CompanyStatus, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700',
-  SUSPENDED: 'bg-amber-50 text-amber-700',
-  DELETED: 'bg-red-50 text-red-700',
+  ACTIVE: 'bg-status-success-surface text-status-success-strong',
+  SUSPENDED: 'bg-status-warning-surface text-status-warning-strong',
+  DELETED: 'bg-status-error-surface text-status-error',
 };
 
 function formatDate(value: string | null) {
@@ -47,7 +47,7 @@ export function CompanyDetailModal({
         )}
 
         {!isLoading && isError && (
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-status-error">
             No se pudo cargar el detalle de la empresa.
           </p>
         )}
@@ -173,7 +173,7 @@ export function CompanyDetailModal({
                         <span
                           className={
                             u.isActive
-                              ? 'text-emerald-600'
+                              ? 'text-status-success-strong'
                               : 'text-neutral-400'
                           }
                         >

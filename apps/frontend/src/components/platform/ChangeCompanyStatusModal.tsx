@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import { CompanyStatus } from '@/types';
 import { Modal } from '@/components/ui/Modal';
+import { Button, VarianteBoton } from '@/components/ui/Button';
+import { Field } from '@/components/ui/Field';
+import { Textarea } from '@/components/ui/Textarea';
 
 type ApiError = {
   response?: {
@@ -20,13 +23,17 @@ function extractErrorMessage(err: unknown, fallback: string): string {
   return (Array.isArray(message) ? message[0] : message) || fallback;
 }
 
+// El tono sale de la VARIANTE del botón, no de una cadena de clases suelta.
+// Escrito como clases, `bg-…` de la variante y `bg-…` de la pantalla acaban
+// compitiendo en el CSS compilado y gana el que esté más abajo en el archivo,
+// no el que se escribió después.
 const actionCopy: Record<
   CompanyStatus,
   {
     title: string;
     message: (name: string) => string;
     confirmLabel: string;
-    confirmClass: string;
+    confirmVariant: VarianteBoton;
   }
 > = {
   SUSPENDED: {
@@ -34,20 +41,20 @@ const actionCopy: Record<
     message: (name) =>
       `¿Suspender "${name}"? Sus usuarios no podrán iniciar sesión mientras esté suspendida.`,
     confirmLabel: 'Suspender',
-    confirmClass: 'bg-amber-600 hover:bg-amber-700',
+    confirmVariant: 'warning',
   },
   ACTIVE: {
     title: 'Reactivar empresa',
     message: (name) => `¿Reactivar "${name}"?`,
     confirmLabel: 'Reactivar',
-    confirmClass: 'bg-emerald-600 hover:bg-emerald-700',
+    confirmVariant: 'success',
   },
   DELETED: {
     title: 'Marcar empresa como eliminada',
     message: (name) =>
       `¿Marcar "${name}" como eliminada? No podrá reactivarse después.`,
     confirmLabel: 'Marcar eliminada',
-    confirmClass: 'bg-red-600 hover:bg-red-700',
+    confirmVariant: 'danger',
   },
 };
 
@@ -87,42 +94,38 @@ export function ChangeCompanyStatusModal({
           {copy.message(companyName)}
         </p>
 
-        <div className="mb-4">
-          <label className="mb-1 block text-xs font-medium text-neutral-600">
-            Motivo (opcional)
-          </label>
-          <textarea
+        <Field
+          label="Motivo (opcional)"
+          hint="Queda registrado en la auditoría de la plataforma. Máximo 500 caracteres."
+          className="mb-4"
+        >
+          <Textarea
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             maxLength={500}
             rows={3}
             placeholder="Ej: falta de pago reportada"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
           />
-          <p className="mt-1 text-xs text-neutral-400">
-            Queda registrado en la auditoría de la plataforma. Máximo 500
-            caracteres.
-          </p>
-        </div>
+        </Field>
 
-        {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+        {error && (
+          <p role="alert" className="mb-3 text-xs text-status-error">
+            {error}
+          </p>
+        )}
 
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
-          >
+          <Button variant="quiet" onClick={onClose} className="px-3 py-1.5">
             Cancelar
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant={copy.confirmVariant}
             disabled={saving}
             onClick={handleConfirm}
-            className={`rounded-md px-3 py-1.5 text-sm text-white disabled:opacity-50 ${copy.confirmClass}`}
+            className="px-3 py-1.5"
           >
             {saving ? 'Guardando...' : copy.confirmLabel}
-          </button>
+          </Button>
         </div>
     </Modal>
   );

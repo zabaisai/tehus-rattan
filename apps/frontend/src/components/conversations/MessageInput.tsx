@@ -32,7 +32,7 @@ export function MessageInput({
   return (
     <div className="border-t border-neutral-200 bg-white">
       {error && (
-        <p className="px-3 pt-2 text-xs font-medium text-red-600">{error}</p>
+        <p className="px-3 pt-2 text-xs font-medium text-status-error">{error}</p>
       )}
       <form onSubmit={handleSubmit} className="flex items-center gap-2 p-3">
         <input

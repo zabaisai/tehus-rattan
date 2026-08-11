@@ -31,6 +31,20 @@ describe('Button', () => {
       expect(screen.getByRole('button').className).toContain('bg-status-error');
     });
 
+    it('éxito y aviso van con relleno CLARO y texto oscuro, no al revés', () => {
+      // Rellenos con texto blanco daban 4,36:1 y 4,24:1, por debajo del
+      // mínimo. Es la misma solución que ya usa el botón naranja.
+      for (const variant of ['success', 'warning'] as const) {
+        const { unmount } = render(<Button variant={variant}>X</Button>);
+        const clases = screen.getByRole('button').className;
+
+        expect(clases).toContain(`bg-status-${variant}-surface`);
+        expect(clases).toContain(`text-status-${variant}-strong`);
+        expect(clases).not.toContain('text-white');
+        unmount();
+      }
+    });
+
     it('el destructivo NO cambia de tono al pasar el ratón', () => {
       // Su hover era `secondary-800`, que es naranja oscuro: el botón de
       // borrar pasaba de rojo a marrón justo al apuntarlo.
@@ -134,6 +148,19 @@ describe('Badge', () => {
     const clases = screen.getByText('3').className;
     expect(clases).toContain('bg-brand-secondary');
     expect(clases).toContain('text-brand-primary');
+  });
+
+  it('éxito y aviso usan el tono fuerte, que es el que alcanza contraste', () => {
+    // Con el tono oficial este texto daba 3,87:1 y 3,89:1 sobre su propia
+    // superficie, y encima a 10px.
+    for (const tone of ['success', 'warning'] as const) {
+      const { unmount } = render(<Badge tone={tone}>X</Badge>);
+
+      expect(screen.getByText('X').className).toContain(
+        `text-status-${tone}-strong`,
+      );
+      unmount();
+    }
   });
 
   it('usa los colores semánticos, no una paleta suelta', () => {

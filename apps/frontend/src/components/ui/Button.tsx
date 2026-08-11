@@ -5,7 +5,9 @@ export type VarianteBoton =
   | 'accent'
   | 'secondary'
   | 'quiet'
-  | 'danger';
+  | 'danger'
+  | 'success'
+  | 'warning';
 export type TamanoBoton = 'sm' | 'md';
 
 /**
@@ -36,6 +38,23 @@ const VARIANTES: Record<VarianteBoton, string> = {
   // de tono —de rojo a marrón— justo al apuntarlo.
   danger:
     'bg-status-error text-white hover:bg-status-error-hover disabled:bg-neutral-300',
+
+  // Éxito y aviso van con RELLENO CLARO Y TEXTO OSCURO, no al revés.
+  //
+  // Es la misma solución que ya usa el botón naranja, y por el mismo motivo:
+  // `status-success` y `status-warning` rellenos con texto blanco dan 4,36:1 y
+  // 4,24:1, por debajo del mínimo. Con la superficie de estado y el tono
+  // `*-strong` encima quedan en 5,21:1 y 5,27:1.
+  //
+  // El hover tiñe la superficie un 10% con el color oficial: suficiente para
+  // notarse y poco para no bajar el texto de AA (4,62:1 y 4,69:1). Un 20%
+  // ya lo dejaba en 4,11:1.
+  success:
+    'bg-status-success-surface text-status-success-strong hover:bg-status-success/10 ' +
+    'disabled:bg-neutral-100 disabled:text-neutral-400',
+  warning:
+    'bg-status-warning-surface text-status-warning-strong hover:bg-status-warning/10 ' +
+    'disabled:bg-neutral-100 disabled:text-neutral-400',
 };
 
 const TAMANOS: Record<TamanoBoton, string> = {

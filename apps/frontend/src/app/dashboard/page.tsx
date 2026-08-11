@@ -73,7 +73,7 @@ export default function DashboardHomePage() {
           label="Valor ganado"
           value={overview ? formatCurrency(overview.wonValue) : '—'}
           icon={Trophy}
-          accent="text-emerald-600"
+          accent="text-status-success-strong"
         />
         <StatCard
           label="Conversión"
@@ -84,7 +84,7 @@ export default function DashboardHomePage() {
           label="Tareas vencidas"
           value={String(overdueTasks ?? '—')}
           icon={Clock}
-          accent={overdueTasks && overdueTasks > 0 ? 'text-red-600' : undefined}
+          accent={overdueTasks && overdueTasks > 0 ? 'text-status-error' : undefined}
         />
         <StatCard
           label="Conversaciones pendientes"
@@ -136,7 +136,7 @@ export default function DashboardHomePage() {
                   <span className="truncate text-neutral-700">{agent.agentName}</span>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-neutral-500">
                     <span>{agent.openLeads} abiertos</span>
-                    <span className="text-emerald-600">{agent.wonCount} ganados</span>
+                    <span className="text-status-success-strong">{agent.wonCount} ganados</span>
                     <span className="font-medium text-neutral-800">
                       {formatCurrency(agent.wonValue)}
                     </span>

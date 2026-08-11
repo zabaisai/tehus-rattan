@@ -12,9 +12,9 @@ import { intervaloDeRefresco, useRealtime } from '@/lib/use-realtime';
 
 const priorityColors: Record<string, string> = {
   LOW: 'bg-neutral-100 text-neutral-600',
-  MEDIUM: 'bg-blue-50 text-blue-700',
-  HIGH: 'bg-orange-50 text-orange-700',
-  URGENT: 'bg-red-50 text-red-700',
+  MEDIUM: 'bg-status-info-surface text-status-info',
+  HIGH: 'bg-status-warning-surface text-status-warning-strong',
+  URGENT: 'bg-status-error-surface text-status-error',
 };
 
 const priorityLabels: Record<string, string> = {
@@ -107,7 +107,7 @@ function TaskRow({
       </div>
       <div className="flex shrink-0 items-center gap-2 pl-10 sm:pl-0">
         {statusLabels[task.status] && task.status === 'IN_PROGRESS' && (
-          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+          <span className="rounded-full bg-status-info-surface px-2 py-0.5 text-[10px] font-medium text-status-info">
             {statusLabels[task.status]}
           </span>
         )}
@@ -124,7 +124,7 @@ function TaskRow({
         <button
           onClick={() => onDelete(task.id)}
           aria-label="Eliminar tarea"
-          className="rounded p-1.5 text-neutral-300 hover:bg-red-50 hover:text-red-600"
+          className="rounded p-1.5 text-neutral-300 hover:bg-status-error-surface hover:text-status-error"
         >
           <Trash2 size={13} />
         </button>
@@ -249,7 +249,7 @@ export default function TasksPage() {
         loadingMessage="Cargando..."
       />
 
-      <TaskGroup title="Vencidas" tasks={groups.overdue} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} accent="text-red-600" />
+      <TaskGroup title="Vencidas" tasks={groups.overdue} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} accent="text-status-error" />
       <TaskGroup title="Hoy" tasks={groups.today} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} />
       <TaskGroup title="Esta semana" tasks={groups.thisWeek} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} />
       <TaskGroup title="Más adelante" tasks={groups.later} onComplete={handleComplete} onDelete={handleDelete} onEdit={setEditingTask} />

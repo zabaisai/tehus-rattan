@@ -9,17 +9,17 @@ const ESTADOS: Record<
 > = {
   COMPLETED: {
     etiqueta: 'Completada',
-    clase: 'text-emerald-700 bg-emerald-50',
+    clase: 'text-status-success-strong bg-status-success-surface',
     icono: <CheckCircle2 size={13} />,
   },
   FAILED: {
     etiqueta: 'Con fallos',
-    clase: 'text-red-700 bg-red-50',
+    clase: 'text-status-error bg-status-error-surface',
     icono: <XCircle size={13} />,
   },
   DEAD: {
     etiqueta: 'Agotada',
-    clase: 'text-red-800 bg-red-100',
+    clase: 'text-status-error bg-status-error-surface',
     icono: <Skull size={13} />,
   },
   RUNNING: {
@@ -96,15 +96,15 @@ export function AutomationRuns({
                     className="flex items-center gap-1.5 text-[11px] text-neutral-600"
                   >
                     {paso.ok ? (
-                      <CheckCircle2 size={11} className="text-emerald-600" />
+                      <CheckCircle2 size={11} className="text-status-success-strong" />
                     ) : (
-                      <XCircle size={11} className="text-red-600" />
+                      <XCircle size={11} className="text-status-error" />
                     )}
                     <span>{paso.type}</span>
                     {/* Clasificador, no el mensaje del proveedor: ese arrastra
                         el teléfono del cliente. */}
                     {paso.error && (
-                      <span className="text-red-600">({paso.error})</span>
+                      <span className="text-status-error">({paso.error})</span>
                     )}
                     {paso.durationMs !== undefined && (
                       <span className="text-neutral-400">{paso.durationMs} ms</span>

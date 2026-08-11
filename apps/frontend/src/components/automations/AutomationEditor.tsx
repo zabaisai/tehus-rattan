@@ -336,13 +336,13 @@ export function AutomationEditor({
       {errores.length > 0 && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 p-2.5"
+          className="rounded-md border border-status-error/20 bg-status-error-surface p-2.5"
         >
-          <p className="flex items-center gap-1.5 text-xs font-medium text-red-800">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-status-error">
             <AlertTriangle size={13} />
             Revisa esto antes de guardar
           </p>
-          <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs text-red-700">
+          <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs text-status-error">
             {errores.map((e) => (
               <li key={e}>{e}</li>
             ))}

@@ -159,7 +159,7 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
       maxWidth="2xl"
     >
         {isLoading && <p className="text-sm text-neutral-400">Cargando...</p>}
-        {isError && <p className="text-sm text-red-600">No se pudo cargar la cotización.</p>}
+        {isError && <p className="text-sm text-status-error">No se pudo cargar la cotización.</p>}
 
         {quote && !editing && (
           <div>
@@ -240,14 +240,14 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
               </div>
             )}
 
-            {error && <p className="mt-3 text-xs text-red-600">{error}</p>}
+            {error && <p className="mt-3 text-xs text-status-error">{error}</p>}
 
             <div className="mt-4 flex flex-wrap justify-end gap-2">
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                className="rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                className="rounded-md border border-status-error/20 px-3 py-1.5 text-sm text-status-error hover:bg-status-error-surface disabled:opacity-50"
               >
                 Eliminar
               </button>
@@ -413,7 +413,7 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
               />
             </div>
 
-            {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+            {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
 
             <div className="flex justify-end gap-2">
               <button

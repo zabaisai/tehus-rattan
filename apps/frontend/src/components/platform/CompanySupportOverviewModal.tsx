@@ -22,9 +22,9 @@ const statusLabels: Record<CompanyStatus, string> = {
 };
 
 const statusColors: Record<CompanyStatus, string> = {
-  ACTIVE: 'bg-emerald-50 text-emerald-700',
-  SUSPENDED: 'bg-amber-50 text-amber-700',
-  DELETED: 'bg-red-50 text-red-700',
+  ACTIVE: 'bg-status-success-surface text-status-success-strong',
+  SUSPENDED: 'bg-status-warning-surface text-status-warning-strong',
+  DELETED: 'bg-status-error-surface text-status-error',
 };
 
 function formatDate(value: string | null) {
@@ -93,7 +93,7 @@ export function CompanySupportOverviewModal({
         {isLoading && <p className="text-sm text-neutral-400">Cargando...</p>}
 
         {!isLoading && isError && (
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-status-error">
             No se pudo cargar el overview de soporte.
           </p>
         )}
@@ -235,7 +235,7 @@ export function CompanySupportOverviewModal({
                         </span>
                         <span
                           className={
-                            u.isActive ? 'text-emerald-600' : 'text-neutral-400'
+                            u.isActive ? 'text-status-success-strong' : 'text-neutral-400'
                           }
                         >
                           {u.isActive ? 'Activo' : 'Inactivo'}
@@ -378,7 +378,7 @@ export function CompanySupportOverviewModal({
           title="Configurar WhatsApp manualmente"
           onClose={() => setWhatsappModalOpen(false)}
         >
-          <div className="mb-4 flex items-start gap-2 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <div className="mb-4 flex items-start gap-2 rounded-md bg-status-warning-surface px-3 py-2 text-xs text-status-warning-strong">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <span>
               Vas a conectar WhatsApp para <strong>{overview.company.name}</strong>{' '}

@@ -86,7 +86,7 @@ export function SupportConversationDetailModal({
         )}
 
         {!isLoading && isError && (
-          <p className="text-sm text-red-600">
+          <p className="text-sm text-status-error">
             No se pudo cargar el detalle de la conversación.
           </p>
         )}

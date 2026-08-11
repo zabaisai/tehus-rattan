@@ -115,7 +115,7 @@ export default function LoginPage() {
           <p
             role="status"
             aria-live="polite"
-            className="mb-4 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700"
+            className="mb-4 rounded-md border border-status-success/20 bg-status-success-surface px-3 py-2 text-sm text-status-success-strong"
           >
             {resetNotice}
           </p>
@@ -171,7 +171,7 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <p role="alert" aria-live="assertive" className="mb-4 text-sm text-red-600">{error}</p>
+            <p role="alert" aria-live="assertive" className="mb-4 text-sm text-status-error">{error}</p>
           )}
 
           <button

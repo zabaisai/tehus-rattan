@@ -86,7 +86,7 @@ export function ChatbotFlowEditor({
       {problemas.some((p) => !p.nodeId) && (
         <div
           role="alert"
-          className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-700"
+          className="rounded-md border border-status-error/20 bg-status-error-surface p-2.5 text-xs text-status-error"
         >
           {problemas
             .filter((p) => !p.nodeId)
@@ -106,7 +106,7 @@ export function ChatbotFlowEditor({
             <li
               key={nodo.id}
               className={`rounded-md border bg-white ${
-                suyos.length ? 'border-red-300' : 'border-neutral-200'
+                suyos.length ? 'border-status-error/30' : 'border-neutral-200'
               }`}
             >
               <div className="flex items-center gap-2 p-2">
@@ -132,7 +132,7 @@ export function ChatbotFlowEditor({
                       TIPOS_NODO.find((t) => t.valor === nodo.type)?.etiqueta}
                   </span>
                   {suyos.length > 0 && (
-                    <AlertTriangle size={12} className="shrink-0 text-red-600" />
+                    <AlertTriangle size={12} className="shrink-0 text-status-error" />
                   )}
                 </button>
 
@@ -308,7 +308,7 @@ export function ChatbotFlowEditor({
                   )}
 
                   {suyos.length > 0 && (
-                    <ul className="list-inside list-disc space-y-0.5 text-[11px] text-red-700">
+                    <ul className="list-inside list-disc space-y-0.5 text-[11px] text-status-error">
                       {suyos.map((m) => (
                         <li key={m}>{m}</li>
                       ))}

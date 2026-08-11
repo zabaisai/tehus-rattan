@@ -114,7 +114,7 @@ function QuotesPageContent() {
       </div>
 
       {error && (
-        <p role="alert" className="mb-3 text-sm text-red-600">
+        <p role="alert" className="mb-3 text-sm text-status-error">
           {error}
         </p>
       )}
@@ -176,7 +176,7 @@ function QuotesPageContent() {
                       void abrirQuotePdf(quote.id, quote.number);
                     }}
                     aria-label="Descargar el PDF de la cotización"
-                    className="rounded p-2 text-neutral-400 hover:bg-amber-50 hover:text-amber-700"
+                    className="rounded p-2 text-neutral-400 hover:bg-status-warning-surface hover:text-status-warning-strong"
                   >
                     <Printer size={16} />
                   </button>
@@ -186,7 +186,7 @@ function QuotesPageContent() {
                       handleDelete(quote.id);
                     }}
                     aria-label="Eliminar cotización"
-                    className="rounded p-2 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    className="rounded p-2 text-neutral-400 hover:bg-status-error-surface hover:text-status-error"
                   >
                     <Trash2 size={16} />
                   </button>
@@ -244,7 +244,7 @@ function QuotesPageContent() {
                           void abrirQuotePdf(quote.id, quote.number);
                         }}
                         title="Ver documento imprimible"
-                        className="rounded p-1.5 text-neutral-400 hover:bg-amber-50 hover:text-amber-700"
+                        className="rounded p-1.5 text-neutral-400 hover:bg-status-warning-surface hover:text-status-warning-strong"
                       >
                         <Printer size={14} />
                       </button>
@@ -254,7 +254,7 @@ function QuotesPageContent() {
                           handleDelete(quote.id);
                         }}
                         title="Eliminar"
-                        className="rounded p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                        className="rounded p-1.5 text-neutral-400 hover:bg-status-error-surface hover:text-status-error"
                       >
                         <Trash2 size={14} />
                       </button>

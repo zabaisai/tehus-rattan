@@ -246,7 +246,7 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
                 Lead relacionado
               </label>
               {leadsError ? (
-                <p className="text-xs text-red-600">
+                <p className="text-xs text-status-error">
                   No se pudieron cargar los leads.
                 </p>
               ) : (
@@ -275,7 +275,7 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
                 Contacto relacionado
               </label>
               {contactsError ? (
-                <p className="text-xs text-red-600">
+                <p className="text-xs text-status-error">
                   No se pudieron cargar los contactos.
                 </p>
               ) : (
@@ -306,7 +306,7 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
             Responsable
           </label>
           {usersError ? (
-            <p className="text-xs text-red-600">
+            <p className="text-xs text-status-error">
               No se pudieron cargar los usuarios.
             </p>
           ) : (
@@ -333,7 +333,7 @@ export function TaskModal({ task, onClose, onSubmit }: TaskModalProps) {
           )}
         </div>
 
-        {error && <p className="mb-3 text-xs text-red-600">{error}</p>}
+        {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
 
         <div className="flex justify-end gap-2">
           <button
