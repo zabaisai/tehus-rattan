@@ -199,8 +199,14 @@ previa.
 | `tsc --noEmit` | ✅ sin errores |
 | `eslint` | ✅ 0 errores (1 warning **previo**, en `EstadoTransporte.test.tsx` de `9120b89`, archivo no tocado) |
 | `vitest run` | ✅ **62 archivos, 478 pruebas** (477 antes + 1 nueva del hover destructivo) |
-| `next build` | ver commit |
-| Backend | **no tocado** — 0 archivos modificados |
+| `next build` | ✅ compila; todas las rutas generadas |
+| QA visual real (Chrome headless, `/`, `/onboarding`, `/login` × 1440/1280/1024/768/390) | ✅ **0 desbordes horizontales** en los 15 combos |
+| Backend | **no tocado** — 0 archivos modificados, 0 en Prisma/migraciones |
+| **CI de rama** sobre `5917f89` | ✅ Backend `success` · Frontend `success` |
+
+La QA visual se hizo con el frontend solo, sin backend: los
+`ERR_CONNECTION_REFUSED` de consola son el arranque de sesión contra
+`:3001` y no una regresión visual. **La QA autenticada sigue pendiente.**
 
 ---
 
