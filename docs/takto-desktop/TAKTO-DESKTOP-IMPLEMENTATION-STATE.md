@@ -328,6 +328,8 @@ sobre todo UI y enlaces profundos.
 | 2026-08-12 | 2.2 | `next build` | compila |
 | 2026-08-12 | 2.2 | QA desktop 1920/1440/1280/1024 | **sin hallazgos** |
 | 2026-08-12 | 2.2 | Recientes con y sin recarga | funciona sin recargar; vacío tras `F5` (limitación documentada) |
+| 2026-08-12 | 2.2 | CI sobre `821da8d` | ❌ **Frontend falló** en «Typecheck (incluye tests)» |
+| 2026-08-12 | 2.2 | CI sobre `199bcac` | ver «Cierre del incremento» |
 
 ---
 
@@ -382,6 +384,31 @@ Añadido en este incremento:
 - Los **recientes se pierden al recargar**: viven en memoria para no escribir
   nombres de clientes en el disco. Persistirlos es una decisión de producto.
 - El panel de creación rápida **no se muestra por debajo de `lg`**.
+
+---
+
+## Una lección del CI que conviene no repetir
+
+El CI falló en `821da8d` con las 539 pruebas en verde. El paso que cayó fue
+**«Typecheck (incluye tests)»**: un `vi.fn` tipado como `(...a: unknown[])` con
+`a as []` hace que TypeScript deduzca una tupla de longitud **cero**, y
+entonces `mock.calls[0][0]` no existe.
+
+**Por qué se escapó en local.** Tras crear el último archivo de prueba se
+ejecutaron `vitest`, `eslint` y `next build` —ninguno comprueba los tipos de
+los archivos de prueba— pero no `npm run typecheck`, que es exactamente el paso
+que lo ve.
+
+**Regla para los próximos incrementos:** antes de publicar, reproducir la
+secuencia del CI **en su orden y con sus comandos**:
+
+```bash
+cd apps/frontend
+npm test && npm run typecheck && npm run lint && npm run build
+```
+
+No basta con `npx tsc --noEmit` a mitad del trabajo: hay que volver a
+ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 
 ---
 
