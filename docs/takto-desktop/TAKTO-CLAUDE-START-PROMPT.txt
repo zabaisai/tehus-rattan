@@ -1,0 +1,26 @@
+Trabaja desde la raíz del repositorio TAKTO en la terminal de Visual Studio Code.
+
+Lee COMPLETOS, antes de tocar código:
+1. docs/takto-desktop/TAKTO-DESKTOP-IMPLEMENTATION-MASTER.md
+2. docs/takto-desktop/TAKTO-DESKTOP-IMPLEMENTATION-STATE.md
+3. docs/DESIGN-SYSTEM.md y los documentos de continuidad vigentes que el master indique.
+
+Luego ejecuta el preflight de solo lectura del §2 del master. Verifica rama, HEAD local/remoto, árbol, index.lock, CI del SHA, servicios locales y la existencia de los 26 mockups. No asumas que el repositorio sigue en el estado descrito: registra toda diferencia.
+
+Objetivo: implementar el plan desktop aprobado por incrementos verticales, en el orden de dependencias del §6. Reutiliza lo que ya funciona; no dupliques modelos, endpoints, automatizaciones ni componentes. Antes de cambiar un comportamiento existente, crea o confirma su prueba de caracterización. El diseño debe respetar exactamente las decisiones del §3 y los mockups, sin fotos de perfil ni rostros; iniciales sí, imágenes de producto sí.
+
+En esta sesión:
+- Retoma el primer incremento que figure PENDIENTE o EN_CURSO en el archivo de estado.
+- Haz auditoría del código real para distinguir HECHO/PARCIAL/FALTANTE antes de escribir.
+- Implementa un incremento completo de extremo a extremo, no archivos aislados.
+- Prueba aislamiento multiempresa, permisos, estados vacío/carga/error/éxito, teclado, accesibilidad y responsive desktop según el §8.
+- Si requiere migración, que sea aditiva, revisada a mano, con backfill/rollback documentados y aplicada solo en local.
+- Mantén WhatsApp/FlowBot incapaces de enviar mensajes reales durante desarrollo y simulación.
+- Usa datos QA identificables; bórralos por ID exacto al terminar y conserva auditorías.
+- Actualiza TAKTO-DESKTOP-IMPLEMENTATION-STATE.md con evidencia, decisiones, deuda y siguiente comando seguro.
+- Ejecuta los gates relevantes, crea commits pequeños y publica únicamente feature/takto-brand-ui-integration.
+
+Prohibido: fusionar a main, desplegar, tocar staging/producción/Meta/DNS/credenciales, activar bots o envíos reales, versionar brand/, borrar datos reales, ocultar fallos con mocks o declarar completo algo que no esté demostrado.
+
+Al cerrar, informa: incremento entregado, archivos/contratos cambiados, pruebas y conteos, CI del SHA si es observable, limitaciones reales, rama/HEAD y próximo incremento. Si aparece un bloqueador de datos, seguridad o alcance, detente antes de escribir y pide decisión. En todo lo demás, continúa automáticamente hasta cerrar el incremento actual.
+
