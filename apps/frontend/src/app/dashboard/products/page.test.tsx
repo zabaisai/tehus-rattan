@@ -1,55 +1,125 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ProductsPage from './page';
+import { Product } from '@/types';
 
-const getMyCompany = vi.fn();
-const getProducts = vi.fn();
+// Pruebas de CARACTERIZACIÓN. Esta pantalla no tenía ninguna, y el incremento
+// de búsqueda global necesita que abra la ficha desde `?abrir=`. Antes de
+// añadir eso hay que fijar lo que ya hacía, para saber si se rompe.
 
-vi.mock('@/lib/products', () => ({
-  getProducts: (...args: unknown[]) => getProducts(...args),
-  createProduct: vi.fn(),
-  updateProduct: vi.fn(),
-  deactivateProduct: vi.fn(),
-  importProductsFromExcel: vi.fn(),
-  PRODUCT_CATEGORIES: ['Sillas', 'Mesas'],
+let parametros = new URLSearchParams();
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => parametros,
+  useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
+  usePathname: () => '/dashboard/products',
 }));
+
+const productos: Product[] = [
+  {
+    id: 'p1',
+    name: 'Sala Toscana',
+    code: 'C-001',
+    sku: 'SKU-1',
+    category: 'Salas',
+    price: 2450000,
+    isActive: true,
+  } as Product,
+  {
+    id: 'p2',
+    name: 'Comedor Roble',
+    code: 'C-002',
+    sku: 'SKU-2',
+    category: 'Comedores',
+    price: 3800000,
+    isActive: true,
+  } as Product,
+];
+
+vi.mock('@/lib/products', async () => {
+  const real = await vi.importActual<typeof import('@/lib/products')>('@/lib/products');
+  return {
+    ...real,
+    getProducts: vi.fn(async () => productos),
+    createProduct: vi.fn(),
+    updateProduct: vi.fn(),
+    deleteProduct: vi.fn(),
+  };
+});
 
 vi.mock('@/lib/companies', () => ({
-  getMyCompany: () => getMyCompany(),
+  getMyCompany: vi.fn(async () => ({ id: 'e1', name: 'Muebles del Valle', city: 'Medellín' })),
+  resolveCompanyAssetUrl: (u: string) => u,
 }));
 
-function renderPage() {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+function montar() {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={client}>
       <ProductsPage />
     </QueryClientProvider>,
   );
 }
 
-describe('ProductsPage header (per-company, no hardcoded tenant)', () => {
+describe('Catálogo de productos', () => {
   beforeEach(() => {
-    getProducts.mockResolvedValue([]);
+    parametros = new URLSearchParams();
   });
 
-  it('names the logged-in company and its city in the subtitle', async () => {
-    getMyCompany.mockResolvedValue({ id: 'c1', name: 'Empresa A', city: 'Cali' });
-    renderPage();
+  describe('comportamiento existente (caracterización)', () => {
+    it('lista los productos de la empresa', async () => {
+      montar();
 
-    await waitFor(() =>
-      expect(screen.getByText('Productos activos de Empresa A · Cali')).toBeInTheDocument(),
-    );
-    expect(screen.queryByText(/Tehus/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Medellín/)).not.toBeInTheDocument();
+      expect(await screen.findByText('Sala Toscana')).toBeInTheDocument();
+      expect(screen.getByText('Comedor Roble')).toBeInTheDocument();
+    });
+
+    it('nombra a la empresa conectada, no un inquilino fijo', async () => {
+      montar();
+
+      expect(await screen.findByText(/Muebles del Valle/)).toBeInTheDocument();
+    });
+
+    it('sin parámetros no abre ninguna ficha', async () => {
+      montar();
+      await screen.findByText('Sala Toscana');
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('el buscador filtra por nombre', async () => {
+      const user = userEvent.setup();
+      montar();
+      await screen.findByText('Sala Toscana');
+
+      await user.type(screen.getByRole('searchbox', { name: 'Buscar productos' }), 'comedor');
+
+      await waitFor(() => {
+        expect(screen.queryByText('Sala Toscana')).not.toBeInTheDocument();
+      });
+      expect(screen.getByText('Comedor Roble')).toBeInTheDocument();
+    });
   });
 
-  it('omits the city segment when the company has none', async () => {
-    getMyCompany.mockResolvedValue({ id: 'c1', name: 'Empresa B', city: null });
-    renderPage();
+  describe('enlace profundo desde la búsqueda global', () => {
+    it('`?abrir=` abre la ficha de ESE producto', async () => {
+      parametros = new URLSearchParams('abrir=p2');
+      montar();
 
-    await waitFor(() =>
-      expect(screen.getByText('Productos activos de Empresa B')).toBeInTheDocument(),
-    );
+      const dialogo = await screen.findByRole('dialog');
+      expect(dialogo).toHaveTextContent('Editar producto');
+      expect(await screen.findByDisplayValue('Comedor Roble')).toBeInTheDocument();
+    });
+
+    it('un id que no existe no abre nada ni rompe la pantalla', async () => {
+      // Un producto borrado deja enlaces vivos por ahí. Abrir un modal vacío
+      // sería peor que no abrir nada.
+      parametros = new URLSearchParams('abrir=inexistente');
+      montar();
+
+      expect(await screen.findByText('Sala Toscana')).toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 });

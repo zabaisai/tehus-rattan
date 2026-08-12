@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSearchParams } from "next/navigation";
 import {
   Plus,
   Search,
@@ -35,13 +36,16 @@ const currencyFormatter = new Intl.NumberFormat("es-CO", {
   maximumFractionDigits: 0,
 });
 
-export default function ProductsPage() {
+function ProductsPageContent() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const parametros = useSearchParams();
+  const idPorUrl = parametros.get("abrir");
+  const [urlAplicada, setUrlAplicada] = useState<string | null>(null);
 
   const { data: products, isLoading } = useQuery({
     queryKey: ["products", category],
@@ -57,6 +61,25 @@ export default function ProductsPage() {
   const catalogSubtitle = company
     ? `Productos activos de ${company.name}${company.city ? ` · ${company.city}` : ""}`
     : "Productos activos del catálogo";
+
+  // Enlace profundo desde la busqueda global: `?abrir=<id>` abre la ficha de
+  // ese producto. Solo abre si el id existe de verdad: un producto borrado
+  // deja enlaces vivos por ahi, y un modal vacio seria peor que no abrir nada.
+  //
+  // Se ajusta en el RENDER y no en un efecto. Un efecto que llama a `setState`
+  // provoca un segundo render en cascada -y el modal aparecería un fotograma
+  // tarde-; este es el patron que React documenta para reaccionar a un cambio
+  // de entrada. `urlAplicada` hace que ocurra una sola vez, de modo que cerrar
+  // el modal no lo reabra mientras el parametro siga en la URL.
+  const productoPorUrl =
+    idPorUrl && products
+      ? (products.find((p) => p.id === idPorUrl) ?? null)
+      : null;
+  if (productoPorUrl && urlAplicada !== idPorUrl) {
+    setUrlAplicada(idPorUrl);
+    setEditingProduct(productoPorUrl);
+    setModalOpen(true);
+  }
 
   const filtered = useMemo(() => {
     if (!products) return [];
@@ -285,5 +308,21 @@ export default function ProductsPage() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * `useSearchParams` obliga a un limite de Suspense para que la pagina pueda
+ * prerenderizarse. Mismo patron que cotizaciones y conversaciones.
+ */
+export default function ProductsPage() {
+  return (
+    <Suspense
+      fallback={
+        <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>
+      }
+    >
+      <ProductsPageContent />
+    </Suspense>
   );
 }
