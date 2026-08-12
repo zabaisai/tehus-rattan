@@ -74,7 +74,9 @@ export class SearchService {
     // En paralelo: son consultas independientes y encadenarlas solo suma
     // latencia a una interfaz que responde mientras se teclea.
     const grupos = await Promise.all(
-      tipos.map((tipo) => this.buscarTipo(tipo, companyId, q, limite, opciones.incluirPapelera)),
+      tipos.map((tipo) =>
+        this.buscarTipo(tipo, companyId, q, limite, opciones.incluirPapelera),
+      ),
     );
 
     return {
@@ -119,7 +121,13 @@ export class SearchService {
         ...(incluirPapelera ? {} : { archivedAt: null }),
         OR: [{ name: like(q) }, { phone: like(q) }, { email: like(q) }],
       },
-      select: { id: true, name: true, phone: true, email: true, archivedAt: true },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        email: true,
+        archivedAt: true,
+      },
       orderBy: { updatedAt: 'desc' },
       take: limite,
     });
@@ -241,7 +249,8 @@ export class SearchService {
         tipo: 'productos' as const,
         id: p.id,
         titulo: p.name,
-        subtitulo: [p.sku ?? p.code, p.category].filter(Boolean).join(' · ') || null,
+        subtitulo:
+          [p.sku ?? p.code, p.category].filter(Boolean).join(' · ') || null,
         insignia: null,
         contactoId: null,
       })),

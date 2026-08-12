@@ -25,17 +25,29 @@ describe('SearchService — aislamiento multiempresa (e2e, base real)', () => {
     await prisma.$connect();
     service = new SearchService(prisma);
 
-    const a = await prisma.company.create({ data: { name: 'E2E Search Co A' } });
-    const b = await prisma.company.create({ data: { name: 'E2E Search Co B' } });
+    const a = await prisma.company.create({
+      data: { name: 'E2E Search Co A' },
+    });
+    const b = await prisma.company.create({
+      data: { name: 'E2E Search Co B' },
+    });
     empresaA = a.id;
     empresaB = b.id;
 
     const [ca, cb] = await Promise.all([
       prisma.contact.create({
-        data: { companyId: empresaA, phone: '+19990000001', name: `${TERMINO} Contacto` },
+        data: {
+          companyId: empresaA,
+          phone: '+19990000001',
+          name: `${TERMINO} Contacto`,
+        },
       }),
       prisma.contact.create({
-        data: { companyId: empresaB, phone: '+19990000002', name: `${TERMINO} Contacto` },
+        data: {
+          companyId: empresaB,
+          phone: '+19990000002',
+          name: `${TERMINO} Contacto`,
+        },
       }),
     ]);
     contactoA = ca.id;
@@ -87,14 +99,18 @@ describe('SearchService — aislamiento multiempresa (e2e, base real)', () => {
   });
 
   it('una empresa sin coincidencias devuelve cero grupos, no los de otra', async () => {
-    const vacia = await prisma.company.create({ data: { name: 'E2E Search Co Vacia' } });
+    const vacia = await prisma.company.create({
+      data: { name: 'E2E Search Co Vacia' },
+    });
     try {
       const r = await service.buscar(vacia.id, { q: TERMINO });
 
       expect(r.total).toBe(0);
       expect(r.grupos).toEqual([]);
     } finally {
-      await prisma.company.delete({ where: { id: vacia.id } }).catch(() => undefined);
+      await prisma.company
+        .delete({ where: { id: vacia.id } })
+        .catch(() => undefined);
     }
   });
 
@@ -125,7 +141,9 @@ describe('SearchService — aislamiento multiempresa (e2e, base real)', () => {
         archivado: true,
       });
     } finally {
-      await prisma.contact.delete({ where: { id: archivado.id } }).catch(() => undefined);
+      await prisma.contact
+        .delete({ where: { id: archivado.id } })
+        .catch(() => undefined);
     }
   });
 });

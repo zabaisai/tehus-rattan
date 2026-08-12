@@ -57,7 +57,7 @@ export class SearchQueryDto {
     return lista.map((v) => String(v).trim()).filter(Boolean);
   })
   @IsArray()
-  @IsIn(TIPOS_BUSCABLES as unknown as string[], { each: true })
+  @IsIn(TIPOS_BUSCABLES, { each: true })
   tipos?: TipoBuscable[];
 
   /** Incluye contactos archivados (la papelera). Por defecto NO. */

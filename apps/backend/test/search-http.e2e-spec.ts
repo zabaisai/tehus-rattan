@@ -9,7 +9,10 @@ import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { SearchController } from '../src/modules/search/search.controller';
 import { SearchService } from '../src/modules/search/search.service';
-import { buildFakeSessionPrisma, encodeSid } from './helpers/fake-session-prisma';
+import {
+  buildFakeSessionPrisma,
+  encodeSid,
+} from './helpers/fake-session-prisma';
 
 const TEST_JWT_SECRET = 'e2e-test-only-secret-do-not-use-in-prod';
 
@@ -58,7 +61,11 @@ describe('GET /api/search (e2e)', () => {
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }),
+      new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: true,
+      }),
     );
     await app.init();
     jwt = new JwtService({ secret: TEST_JWT_SECRET });
@@ -70,7 +77,11 @@ describe('GET /api/search (e2e)', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    searchServiceMock.buscar.mockResolvedValue({ consulta: 'x', total: 0, grupos: [] });
+    searchServiceMock.buscar.mockResolvedValue({
+      consulta: 'x',
+      total: 0,
+      grupos: [],
+    });
   });
 
   describe('quién puede buscar', () => {

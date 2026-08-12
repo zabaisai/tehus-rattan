@@ -31,7 +31,13 @@ describe('SearchService', () => {
       // ha traído: basta un `return` mal puesto para que salgan.
       await service.buscar('empresa-1', { q: 'laura' });
 
-      for (const tabla of ['contact', 'conversation', 'lead', 'product', 'quote'] as const) {
+      for (const tabla of [
+        'contact',
+        'conversation',
+        'lead',
+        'product',
+        'quote',
+      ] as const) {
         expect(prisma[tabla].findMany).toHaveBeenCalledWith(
           expect.objectContaining({
             where: expect.objectContaining({ companyId: 'empresa-1' }),
@@ -77,10 +83,20 @@ describe('SearchService', () => {
 
     it('marca el resultado archivado para que la interfaz lo distinga', async () => {
       prisma.contact.findMany.mockResolvedValue([
-        { id: 'c1', name: 'Laura', phone: '+57300', email: null, archivedAt: new Date() },
+        {
+          id: 'c1',
+          name: 'Laura',
+          phone: '+57300',
+          email: null,
+          archivedAt: new Date(),
+        },
       ]);
 
-      const r = await service.buscar('e1', { q: 'laura', incluirPapelera: true, tipos: ['contactos'] });
+      const r = await service.buscar('e1', {
+        q: 'laura',
+        incluirPapelera: true,
+        tipos: ['contactos'],
+      });
 
       expect(r.grupos[0].resultados[0]).toMatchObject({
         archivado: true,
@@ -119,7 +135,11 @@ describe('SearchService', () => {
     });
 
     it('respeta el límite pedido', async () => {
-      await service.buscar('e1', { q: 'laura', tipos: ['contactos'], limite: 12 });
+      await service.buscar('e1', {
+        q: 'laura',
+        tipos: ['contactos'],
+        limite: 12,
+      });
 
       expect(prisma.contact.findMany).toHaveBeenCalledWith(
         expect.objectContaining({ take: 12 }),
@@ -141,7 +161,13 @@ describe('SearchService', () => {
 
     it('un contacto sin nombre se muestra por su teléfono, no vacío', async () => {
       prisma.contact.findMany.mockResolvedValue([
-        { id: 'c1', name: null, phone: '+573001112233', email: null, archivedAt: null },
+        {
+          id: 'c1',
+          name: null,
+          phone: '+573001112233',
+          email: null,
+          archivedAt: null,
+        },
       ]);
 
       const r = await service.buscar('e1', { q: '300', tipos: ['contactos'] });
@@ -160,12 +186,19 @@ describe('SearchService', () => {
         },
       ]);
 
-      const r = await service.buscar('e1', { q: 'sala', tipos: ['oportunidades'] });
+      const r = await service.buscar('e1', {
+        q: 'sala',
+        tipos: ['oportunidades'],
+      });
       const resultado = r.grupos[0].resultados[0];
 
       expect(resultado).not.toHaveProperty('enlace');
       expect(resultado).not.toHaveProperty('url');
-      expect(resultado).toMatchObject({ tipo: 'oportunidades', id: 'l1', contactoId: 'c1' });
+      expect(resultado).toMatchObject({
+        tipo: 'oportunidades',
+        id: 'l1',
+        contactoId: 'c1',
+      });
     });
 
     it('la búsqueda no distingue mayúsculas', async () => {
@@ -179,7 +212,10 @@ describe('SearchService', () => {
     });
 
     it('recorta espacios de la consulta', async () => {
-      const r = await service.buscar('e1', { q: '  laura  ', tipos: ['contactos'] });
+      const r = await service.buscar('e1', {
+        q: '  laura  ',
+        tipos: ['contactos'],
+      });
 
       expect(r.consulta).toBe('laura');
       const [args] = prisma.contact.findMany.mock.calls[0];
