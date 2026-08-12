@@ -8,8 +8,9 @@
 
 - Fecha: 12 de agosto de 2026 · America/Bogota
 - Rama: `feature/takto-brand-ui-integration`
-- HEAD local: `3da29143e0ef8b798282f9d19bb0e0cab475139a` (al empezar la fase 0)
-- HEAD remoto: idéntico, 0/0
+- HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
+- HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
+- Commits del incremento: `d3b7fee` (fase 0) · `add1717` + `7220bbf` (backend) · `a98229d` (frontend)
 - `main`: `b19217c2e4da69b251285774c1f6585cc29fb765`
 - CI del SHA: ✅ Backend `success` · Frontend `success`
 - Staging: no tocado
@@ -45,7 +46,7 @@
 |---|---|---|---|
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | 12 primitivas en `components/ui/`; faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar, swatches, tooltip | — |
-| 2. Shell, búsqueda y notificaciones | **EN_CURSO** | Incremento activo 2.1 | — |
+| 2. Shell, búsqueda y notificaciones | **EN_CURSO** | Incremento **2.1 HECHO**; falta 2.2 (crear rápido, recientes) y el inicio del mockup 01 | — |
 | 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen; **fusión FALTANTE** | — |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
@@ -78,7 +79,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 | WhatsApp multi-número | **PARCIAL** | 12 endpoints en `whatsapp-integration`; 1 integración por empresa en el esquema. Multi-número del mockup 13 por verificar |
 | Empresa / equipo / datos | **PARCIAL** | `settings/company`, `settings/data`, `compliance` (12 endpoints). **Equipo e invitaciones sin UI de empresa**: `admin/invitation-codes` solo existe en el panel de plataforma |
 | Acceso / onboarding | **PARCIAL** | Login, recuperación, restablecimiento y onboarding de 8 pasos. `sessions` existe en backend; **sin UI de dispositivos** |
-| Búsqueda / notificaciones | **PARCIAL** | Notificaciones completas (6 endpoints + centro + campana). **Búsqueda global: FALTANTE** — no hay endpoint ni UI; solo filtros `search`/`q` por módulo |
+| Búsqueda / notificaciones | **PARCIAL** | Notificaciones completas. **Búsqueda global: HECHA** (`GET /search` + paleta Ctrl+K, incremento 2.1). Falta el panel «Crear rápidamente» y «Recientes» del mockup 16 |
 
 ### Mapa de entidades y enlaces existentes
 
@@ -134,26 +135,71 @@ resuelve consultando lo existente.
 
 ---
 
-## Incremento activo
+## Incremento cerrado: 2.1 — Búsqueda global tenant-wide
 
-- **ID:** `2.1 — Búsqueda global tenant-wide`
-- **Fase:** 2 · **Mockup:** `16-busqueda-y-crear.png`
-- **Por qué este:** es el hueco **FALTANTE** más claro y autocontenido, y es vertical de verdad (contrato, backend, UI, permisos, aislamiento, pruebas y QA). No requiere migraciones ni cambia comportamiento existente.
-- **Objetivo observable:** desde cualquier pantalla, abrir la paleta con `Ctrl/⌘+K`, escribir, ver resultados agrupados por tipo y abrir el objeto exacto con teclado o ratón.
+**Estado: HECHO.** Mockup 16. Sin migraciones.
 
-**Alcance de este incremento**
+### Qué se entregó
 
-- Backend: `GET /search` acotado por `companyId` sobre contactos, conversaciones, oportunidades, productos y cotizaciones.
-- Frontend: paleta de comandos en el shell, pestañas por tipo, navegación con teclado, enlaces profundos y estados de carga/vacío/error.
-- Filtro «incluir papelera» para contactos archivados.
-- Pruebas: unitarias de servicio, e2e de aislamiento multiempresa y de rol, y pruebas de componente.
-- QA desktop en 1920/1440/1280/1024.
+| Capa | Archivos |
+|---|---|
+| Contrato | `apps/backend/src/modules/search/dto/search-query.dto.ts` |
+| Backend | `search.service.ts`, `search.controller.ts`, `search.module.ts`, registro en `app.module.ts` |
+| Frontend | `apps/frontend/src/lib/busqueda.ts`, `components/busqueda/PaletaDeBusqueda.tsx`, disparador en `layout/Header.tsx` |
+| Enlace profundo nuevo | `?abrir=` en `app/dashboard/products/page.tsx` |
 
-**Fuera de alcance, a propósito (queda como incremento 2.2)**
+### Flujo observable
 
-- Panel «Crear rápidamente» del mockup.
-- Lista de «Recientes».
-- Lenguaje natural («crear tarea para Laura mañana a las 9:00»).
+Desde cualquier pantalla: `Ctrl/⌘+K` (o el botón «Buscar…») abre la paleta →
+se escribe → resultados agrupados por tipo → `↑↓` navega, `Enter` abre el
+objeto exacto, `Esc` cierra. Filtros por tipo y «Incluir papelera».
+
+### Cómo se cumple cada punto del §9
+
+| # | Criterio | Evidencia |
+|---|---|---|
+| 1 | Flujo observable completo | QA desktop: escribir → 14 resultados reales → `Enter` → `/dashboard/pipeline?perfil=…` |
+| 2 | Datos reales y relaciones | Consulta las 5 entidades vivas; los resultados traen `contactoId` |
+| 3 | Tenant, permisos, auditoría | `companyId` en el `where` de las 5 consultas; e2e con dos empresas de texto idéntico; SUPER_ADMIN sin empresa → 403; `companyId` por query → 400. **Sin auditoría a propósito**: leer no se audita en este repositorio, y registrar cada tecleo crearía un historial de lo que la gente busca |
+| 4 | Estados alternos | Mínimo de caracteres, cargando, vacío (con atajo a la papelera), error con `role="alert"` |
+| 5 | Pruebas y CI | 14 unitarias + 17 e2e backend; 22 frontend. CI: ver abajo |
+| 6 | Cuatro anchos desktop | 1920/1440/1280/1024, sin desbordes |
+| 7 | No degrada ni deja datos | Suite completa verde; no se creó dato QA nuevo |
+| 8 | Documentado con límites | Esta sección |
+| 9 | Reanudable | «Próximo comando seguro» |
+| 10 | No depende de staging | QA local en 3010/3011 |
+
+### Decisiones técnicas
+
+- **La API no devuelve URLs.** Devuelve `tipo` e `id`; la ruta la arma el
+  frontend. Si las construyera el backend, mover una pantalla obligaría a
+  desplegar la API para arreglar un enlace.
+- **Las conversaciones se encuentran por su contacto, no por el texto de los
+  mensajes.** Recorrer el histórico completo es caro y expondría en una lista
+  lo que alguien escribió en un chat.
+- **Mínimo dos caracteres y cinco resultados por tipo.** Es una paleta, no un
+  listado.
+- **Sin `@Roles`.** Los cinco listados que consulta ya son legibles por
+  cualquier usuario de la empresa; restringir aquí escondería resultados
+  visibles entrando a la pantalla y sugeriría una protección inexistente.
+
+### Limitaciones honestas
+
+- **No busca dentro de los mensajes** (ver arriba). Si se pide, es un
+  incremento propio con su decisión de privacidad.
+- **`contains` sin índice de texto completo.** Correcto y suficiente para el
+  volumen actual; con catálogos grandes habrá que medir y quizá pasar a
+  búsqueda de texto completo de PostgreSQL.
+- **Los contactos abren su perfil sobre el embudo** (`/dashboard/pipeline?perfil=`)
+  porque no existe una ruta `/dashboard/contacts/[id]`. Es el destino real hoy.
+- **Panel «Crear rápidamente» y «Recientes» del mockup 16: fuera de alcance**,
+  declarado desde el inicio. Van en el incremento 2.2.
+
+### Próximo incremento propuesto: `2.2 — Crear rápidamente y recientes`
+
+Completa el mockup 16: panel de creación rápida (contacto, oportunidad, tarea,
+cotización, producto, bot) y lista de recientes. Reutiliza los modales que ya
+existen; no necesita endpoints nuevos salvo, quizá, uno de «recientes».
 
 ---
 
@@ -181,6 +227,13 @@ resuelve consultando lo existente.
 | 2026-08-12 | Fase 0 | `vitest run` (frontend) | 490/490 en el SHA base |
 | 2026-08-12 | Fase 0 | `npx jest` (backend) | **2105/2105 en 127 suites** |
 | 2026-08-12 | Fase 0 | CI remoto sobre `3da2914` | Backend y Frontend `success` |
+| 2026-08-12 | 2.1 | `npx jest src/modules/search` | **14/14** |
+| 2026-08-12 | 2.1 | `npx jest --config test/jest-e2e.json search-` | **17/17** (4 contra Postgres real) |
+| 2026-08-12 | 2.1 | `vitest run` (frontend completo) | **512/512** en 64 archivos (+22) |
+| 2026-08-12 | 2.1 | `tsc --noEmit` backend y frontend | sin errores |
+| 2026-08-12 | 2.1 | `eslint` backend y frontend | 0 errores (1 warning previo) |
+| 2026-08-12 | 2.1 | `next build` | compila |
+| 2026-08-12 | 2.1 | QA desktop 1920/1440/1280/1024 | **sin hallazgos**; 14 resultados reales por ancho |
 
 ---
 
@@ -188,7 +241,7 @@ resuelve consultando lo existente.
 
 | Pantalla | 1920 | 1440 | 1280 | 1024 | Teclado | Consola | Estado |
 |---|---:|---:|---:|---:|---:|---:|---|
-| Búsqueda global |  |  |  |  |  |  | EN_CURSO |
+| Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Inicio |  |  |  |  |  |  | PENDIENTE |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
@@ -203,14 +256,34 @@ resuelve consultando lo existente.
 | Empresa/Datos/Equipo |  |  |  |  |  |  | PENDIENTE |
 
 > Nota: la QA anterior de esta rama se hizo en 1440/1280/1024/768/390. El plan
-> desktop pide **1920** y retira 768/390, así que 1920 hay que rehacerlo.
+> desktop pide **1920** y retira 768/390, así que las pantallas ya migradas
+> siguen sin verificarse a 1920. La búsqueda global sí se probó en los cuatro.
+
+**Cómo se ejecutó la QA sin romper la vista previa del usuario.** Había una
+vista previa en `:3000`/`:3001` que el usuario está revisando y que no debía
+detenerse. El servidor standalone lee de `.next`, y recompilar lo habría roto,
+así que se copió a `%TEMP%	akto-preview-standalone` y se reinició desde ahí:
+queda independiente del directorio de build. La QA usó `:3010`/`:3011`, con
+`CSRF_ALLOWED_ORIGINS=http://localhost:3010` en el proceso de QA —variable de
+entorno, no cambio de configuración—. Hosts contactados durante la QA:
+`localhost:3010` y `localhost:3011`, ninguno más.
 
 ---
 
 ## Deuda y limitaciones conocidas
 
-Ver «Baseline de pruebas y deuda». Las deudas históricas se verificaron contra el
-código de este SHA antes de anotarse.
+Ver «Baseline de pruebas y deuda» y las limitaciones del incremento 2.1.
+
+Añadido en este incremento:
+
+- La búsqueda usa `contains` sin índice de texto completo. Correcto para el
+  volumen actual; con catálogos grandes habrá que medirlo.
+- Los contactos abren su perfil sobre el embudo porque no existe
+  `/dashboard/contacts/[id]`. Cuando exista, cambia una línea en
+  `rutaDelResultado`.
+- La búsqueda **no** se audita, a propósito: leer no se audita en este
+  repositorio y registrar cada tecleo crearía un historial de lo que la gente
+  busca.
 
 ---
 
@@ -221,5 +294,6 @@ código de este SHA antes de anotarse.
 git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
-# Continuar el incremento 2.1 (búsqueda global) desde la sección «Incremento activo».
+# El incremento 2.1 esta CERRADO. El siguiente es 2.2 (crear rapido y recientes),
+# descrito al final de la seccion «Incremento cerrado: 2.1».
 ```
