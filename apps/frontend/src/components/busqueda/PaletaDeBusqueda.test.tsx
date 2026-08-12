@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PaletaDeBusqueda } from './PaletaDeBusqueda';
+import { useAuthStore } from '@/store/auth.store';
+import { olvidarRecientes } from '@/lib/creacion-rapida';
 import { rutaDelResultado, resultadosEnOrden } from '@/lib/busqueda';
 import type { RespuestaDeBusqueda } from '@/lib/busqueda';
 
@@ -62,7 +64,10 @@ const RESPUESTA: RespuestaDeBusqueda = {
   ],
 };
 
+const SESION = { id: 'u1', companyId: 'e1', role: 'ADMIN', name: 'Ana', email: 'a@b.c' };
+
 function montar(onCerrar = vi.fn()) {
+  useAuthStore.setState({ user: SESION as never });
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
@@ -75,6 +80,7 @@ function montar(onCerrar = vi.fn()) {
 describe('PaletaDeBusqueda', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    olvidarRecientes();
     buscarMock.mockResolvedValue(RESPUESTA);
   });
 
@@ -184,6 +190,25 @@ describe('PaletaDeBusqueda', () => {
       await waitFor(() => {
         expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
       });
+    });
+
+    it('tras pulsar un filtro con el raton, el teclado SIGUE gobernando', async () => {
+      // Defecto que encontro la QA del 2.1: el foco se quedaba en el chip, y a
+      // partir de ahi las flechas no movian nada y Enter reactivaba el chip.
+      // Con solo teclado o solo raton funcionaba; el camino mixto no.
+      const user = userEvent.setup();
+      montar();
+
+      await user.type(screen.getByRole('combobox'), 'laura');
+      await screen.findAllByRole('option');
+
+      await user.click(screen.getByRole('button', { name: 'Contactos' }));
+      expect(document.activeElement).toBe(screen.getByRole('combobox'));
+
+      await user.keyboard('{ArrowDown}');
+      await user.keyboard('{Enter}');
+
+      expect(push).toHaveBeenCalledWith('/dashboard/pipeline?perfil=c2');
     });
 
     it('cierra con Escape', async () => {

@@ -9,6 +9,7 @@ import { logout } from '@/lib/auth';
 import { broadcastAuthEvent } from '@/lib/auth-events';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { PaletaDeBusqueda } from '@/components/busqueda/PaletaDeBusqueda';
+import { olvidarRecientes } from '@/lib/creacion-rapida';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -45,6 +46,10 @@ export function Header({ onMenuClick }: HeaderProps) {
       // ignored — see comment above
     }
     clearSession();
+    // Los recientes viven en memoria del modulo, no en el estado de React, asi
+    // que no se van solos: hay que vaciarlos o la siguiente sesion en esta
+    // pestaña veria lo que abrio la anterior.
+    olvidarRecientes();
     // Drop all cached queries (notifications, etc.) so nothing leaks into the
     // next session in this tab.
     queryClient.clear();

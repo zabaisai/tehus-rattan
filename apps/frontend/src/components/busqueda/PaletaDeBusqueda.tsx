@@ -24,6 +24,9 @@ import {
 } from '@/lib/busqueda';
 import { mensajeDeError } from '@/components/ui/ListState';
 import { useDialogoModal } from '@/components/ui/useDialogoModal';
+import { useAuthStore } from '@/store/auth.store';
+import { registrarReciente } from '@/lib/creacion-rapida';
+import { CreacionRapida } from './CreacionRapida';
 
 const ICONO: Record<TipoBuscable, typeof User> = {
   contactos: User,
@@ -40,6 +43,7 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
   const campoRef = useRef<HTMLInputElement>(null);
+  const user = useAuthStore((s) => s.user);
   const [texto, setTexto] = useState('');
   const [consulta, setConsulta] = useState('');
   const [tipo, setTipo] = useState<TipoBuscable | 'todo'>('todo');
@@ -94,8 +98,21 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
   }
 
   function abrir(r: ResultadoDeBusqueda) {
+    registrarReciente(r, { companyId: user?.companyId, userId: user?.id });
     router.push(rutaDelResultado(r));
     onCerrar();
+  }
+
+  /**
+   * Devuelve el foco al campo.
+   *
+   * EXISTE POR UN DEFECTO QUE ENCONTRO LA QA. Al pulsar un filtro con el
+   * raton, el foco se quedaba en el chip: a partir de ahi las flechas no
+   * movian la seleccion y Enter volvia a activar el chip en vez de abrir el
+   * resultado. Con solo teclado o solo raton funcionaba; el camino mixto no.
+   */
+  function devolverFoco() {
+    campoRef.current?.focus();
   }
 
   function alPulsar(e: React.KeyboardEvent) {
@@ -119,14 +136,19 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[10vh]">
+      {/* El teclado se escucha en el PANEL, no solo en el campo: si dependiera
+          del campo, pulsar un filtro con el raton dejaria el foco en el chip y
+          las flechas y Enter dejarian de gobernar la lista. */}
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label="Buscar en la empresa"
         tabIndex={-1}
-        className="flex max-h-[75vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface-default shadow-lg outline-none"
+        onKeyDown={alPulsar}
+        className="flex max-h-[75vh] w-full max-w-3xl overflow-hidden rounded-lg bg-surface-default shadow-lg outline-none"
       >
+        <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-2 border-b border-line-default px-4">
           <Search size={17} aria-hidden="true" className="shrink-0 text-content-secondary" />
           <input
@@ -134,7 +156,7 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
             type="text"
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={alPulsar}
+
             placeholder="Buscar contactos, conversaciones, oportunidades, productos o cotizaciones"
             aria-label="Buscar en la empresa"
             // `combobox` + `listbox`: sin esto el lector de pantalla anuncia un
@@ -152,17 +174,24 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
         </div>
 
         <div className="flex flex-wrap items-center gap-1 border-b border-line-default px-3 py-2">
-          <Filtro activo={tipo === 'todo'} onClick={() => setTipo('todo')}>
+          <Filtro
+            activo={tipo === 'todo'}
+            onClick={() => { setTipo('todo'); devolverFoco(); }}
+          >
             Todo
           </Filtro>
           {TIPOS_BUSCABLES.map((t) => (
-            <Filtro key={t} activo={tipo === t} onClick={() => setTipo(t)}>
+            <Filtro
+              key={t}
+              activo={tipo === t}
+              onClick={() => { setTipo(t); devolverFoco(); }}
+            >
               {ETIQUETA_DE_TIPO[t]}
             </Filtro>
           ))}
           <button
             type="button"
-            onClick={() => setIncluirPapelera((v) => !v)}
+            onClick={() => { setIncluirPapelera((v) => !v); devolverFoco(); }}
             aria-pressed={incluirPapelera}
             className={`ml-auto flex items-center gap-1.5 rounded-md px-2 py-1 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-line-focus ${
               incluirPapelera
@@ -196,7 +225,7 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
               {!incluirPapelera && (
                 <button
                   type="button"
-                  onClick={() => setIncluirPapelera(true)}
+                  onClick={() => { setIncluirPapelera(true); devolverFoco(); }}
                   className="mt-2 rounded text-sm text-content-link underline outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
                 >
                   Buscar también en la papelera
@@ -266,12 +295,15 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
 
         {/* Las teclas se enuncian: una paleta que solo se deja usar por quien
             ya sabe los atajos no sirve de nada. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line-default px-4 py-2 text-[11px] text-content-secondary">
-          <span>↑↓ Navegar</span>
-          <span>Enter Abrir</span>
-          <span>Esc Cerrar</span>
-          <span className="ml-auto">Solo tu empresa y tus permisos</span>
+          <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-t border-line-default px-4 py-2 text-[11px] text-content-secondary">
+            <span>↑↓ Navegar</span>
+            <span>Enter Abrir</span>
+            <span>Esc Cerrar</span>
+            <span className="ml-auto">Solo tu empresa y tus permisos</span>
+          </div>
         </div>
+
+        <CreacionRapida onCerrar={onCerrar} />
       </div>
     </div>
   );
