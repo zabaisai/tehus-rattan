@@ -37,6 +37,7 @@ import { LeadsModule } from './modules/leads/leads.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { NotesModule } from './modules/notes/notes.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { SearchModule } from './modules/search/search.module';
 import { ProductsModule } from './modules/products/products.module';
 import { PlatformModule } from './modules/platform/platform.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
@@ -86,6 +87,7 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     TasksModule,
     NotesModule,
     AnalyticsModule,
+    SearchModule,
     ProductsModule,
     PlatformModule,
     OnboardingModule,
