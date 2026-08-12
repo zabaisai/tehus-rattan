@@ -46,7 +46,7 @@
 |---|---|---|---|
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | 12 primitivas en `components/ui/`; faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar, swatches, tooltip | — |
-| 2. Shell, búsqueda y notificaciones | **EN_CURSO** | Incremento **2.1 HECHO**; falta 2.2 (crear rápido, recientes) y el inicio del mockup 01 | — |
+| 2. Shell, búsqueda y notificaciones | **EN_CURSO** | **2.1 y 2.2 HECHOS** (mockup 16 completo). Falta el inicio del mockup 01 | — |
 | 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen; **fusión FALTANTE** | — |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
@@ -79,7 +79,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 | WhatsApp multi-número | **PARCIAL** | 12 endpoints en `whatsapp-integration`; 1 integración por empresa en el esquema. Multi-número del mockup 13 por verificar |
 | Empresa / equipo / datos | **PARCIAL** | `settings/company`, `settings/data`, `compliance` (12 endpoints). **Equipo e invitaciones sin UI de empresa**: `admin/invitation-codes` solo existe en el panel de plataforma |
 | Acceso / onboarding | **PARCIAL** | Login, recuperación, restablecimiento y onboarding de 8 pasos. `sessions` existe en backend; **sin UI de dispositivos** |
-| Búsqueda / notificaciones | **PARCIAL** | Notificaciones completas. **Búsqueda global: HECHA** (`GET /search` + paleta Ctrl+K, incremento 2.1). Falta el panel «Crear rápidamente» y «Recientes» del mockup 16 |
+| Búsqueda / notificaciones | **HECHO** (mockup 16) | Notificaciones completas. Búsqueda global + paleta Ctrl+K + creación rápida + recientes (incrementos 2.1 y 2.2) |
 
 ### Mapa de entidades y enlaces existentes
 
@@ -203,6 +203,95 @@ existen; no necesita endpoints nuevos salvo, quizá, uno de «recientes».
 
 ---
 
+## Incremento cerrado: 2.2 — Creación rápida y recientes
+
+**Estado: HECHO.** Mockup 16 queda completo. Sin migraciones, sin endpoints nuevos.
+
+### Qué se entregó
+
+| Capa | Archivos |
+|---|---|
+| Contrato/permisos | `apps/frontend/src/lib/creacion-rapida.ts` |
+| UI | `components/busqueda/CreacionRapida.tsx`; paleta a dos columnas en `PaletaDeBusqueda.tsx` |
+| Sesión | `olvidarRecientes()` al cerrar sesión, en `layout/Header.tsx` |
+
+### Reutilización, que era el requisito
+
+**No se escribió ni un formulario nuevo.** El panel abre `ContactModal`,
+`LeadFormModal`, `TaskModal` y `ProductModal` tal cual. Duplicarlos habría
+dejado dos sitios donde arreglar cada validación.
+
+### Permisos, espejados del backend
+
+| Acción | Roles | Endpoint |
+|---|---|---|
+| Contacto, oportunidad, tarea | cualquiera de la empresa | `POST /contacts`, `/leads`, `/tasks` |
+| **Producto** | `ADMIN`, `SUPER_ADMIN` | `POST /products` |
+| **Bot** | `ADMIN`, `MANAGER`, `SUPER_ADMIN` | `POST /flowbots` |
+
+La protección real vive en los guardas del servidor. Filtrar aquí evita ofrecer
+un botón que devolvería 403: enseñar una acción prohibida y fallar al pulsarla
+es peor que no enseñarla, porque el usuario cree que le falta algo suyo.
+
+### Dos acciones navegan en vez de abrir formulario
+
+Una cotización pertenece **siempre** a una oportunidad
+(`POST /quotes/from-lead/:leadId`), así que sin elegirla antes no hay nada que
+crear: lleva al embudo. Un bot se edita en su pantalla. Ambas lo avisan debajo
+del botón, y hay una prueba que exige que ese aviso exista.
+
+### Recientes: en memoria, no en disco
+
+El nombre de un contacto es un dato personal. Este producto guarda el token
+**solo en memoria** justamente para no dejar rastro en disco; escribir ahí una
+lista de clientes contradiría esa decisión. Además, un navegador compartido
+filtraría entre usuarios —y entre empresas— lo que cada uno estuvo mirando.
+
+La lista está atada a `empresa+usuario`: si cambia la sesión se descarta entera,
+y al cerrar sesión se vacía.
+
+**Limitación, verificada en el navegador:** se pierde al recargar la página.
+Medido explícitamente — sin recargar la lista funciona y respeta el orden; tras
+`F5` queda vacía. Persistirla exige decidir antes dónde y con qué retención;
+queda como decisión de producto pendiente.
+
+### Defecto de 2.1 corregido aquí
+
+El manejador de teclas colgaba del campo, así que pulsar un chip de filtro con
+el ratón dejaba el foco en el chip y a partir de ahí las flechas no movían la
+selección y Enter reactivaba el chip. Ahora las teclas se escuchan en el panel
+y elegir un filtro devuelve el foco al campo. Hay una prueba que fija el camino
+mixto que fallaba.
+
+### QA desktop — 1920 / 1440 / 1280 / 1024
+
+| Comprobación | Resultado |
+|---|---|
+| 6 acciones visibles para ADMIN | ✅ en los 4 anchos |
+| Abre el modal reutilizado de contactos (3 campos) | ✅ |
+| Foco dentro del modal, fondo bloqueado | ✅ |
+| Escape cierra el modal y **deja la paleta abierta** | ✅ |
+| Recientes tras abrir un resultado | ✅ con su tipo |
+| Desbordes, botones sin nombre, colores genéricos | ✅ ninguno |
+| Hosts contactados | ✅ solo `localhost:3001` y `:3010` |
+
+### Limitaciones honestas
+
+- **Recientes se pierden al recargar** (ver arriba).
+- El panel se **oculta por debajo de `lg`**: este trabajo es desktop primero y
+  el plan pide no improvisar móvil.
+- «Nueva cotización» y «Nuevo bot» navegan; no crean desde la paleta.
+- A 1440 px y menos, los chips de filtro ocupan dos líneas. Cabe y no desborda,
+  pero es el punto más apretado de la paleta.
+
+### Próximo incremento propuesto: `2.3 — Inicio accionable (mockup 01)`
+
+Cierra la fase 2: actividad reciente, métricas que lleven a su listado y
+próximos pasos. `analytics` ya expone seis endpoints reales, así que es
+sobre todo UI y enlaces profundos.
+
+---
+
 ## Decisiones adoptadas durante la implementación
 
 | Fecha | Decisión | Motivo | Consecuencia |
@@ -234,6 +323,11 @@ existen; no necesita endpoints nuevos salvo, quizá, uno de «recientes».
 | 2026-08-12 | 2.1 | `eslint` backend y frontend | 0 errores (1 warning previo) |
 | 2026-08-12 | 2.1 | `next build` | compila |
 | 2026-08-12 | 2.1 | QA desktop 1920/1440/1280/1024 | **sin hallazgos**; 14 resultados reales por ancho |
+| 2026-08-12 | 2.2 | `vitest run` (frontend completo) | **539/539** en 66 archivos (+27) |
+| 2026-08-12 | 2.2 | `tsc --noEmit` + `eslint` | sin errores (1 warning previo) |
+| 2026-08-12 | 2.2 | `next build` | compila |
+| 2026-08-12 | 2.2 | QA desktop 1920/1440/1280/1024 | **sin hallazgos** |
+| 2026-08-12 | 2.2 | Recientes con y sin recarga | funciona sin recargar; vacío tras `F5` (limitación documentada) |
 
 ---
 
@@ -242,6 +336,7 @@ existen; no necesita endpoints nuevos salvo, quizá, uno de «recientes».
 | Pantalla | 1920 | 1440 | 1280 | 1024 | Teclado | Consola | Estado |
 |---|---:|---:|---:|---:|---:|---:|---|
 | Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
+| Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Inicio |  |  |  |  |  |  | PENDIENTE |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
@@ -284,6 +379,9 @@ Añadido en este incremento:
 - La búsqueda **no** se audita, a propósito: leer no se audita en este
   repositorio y registrar cada tecleo crearía un historial de lo que la gente
   busca.
+- Los **recientes se pierden al recargar**: viven en memoria para no escribir
+  nombres de clientes en el disco. Persistirlos es una decisión de producto.
+- El panel de creación rápida **no se muestra por debajo de `lg`**.
 
 ---
 
@@ -294,6 +392,7 @@ Añadido en este incremento:
 git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
-# El incremento 2.1 esta CERRADO. El siguiente es 2.2 (crear rapido y recientes),
-# descrito al final de la seccion «Incremento cerrado: 2.1».
+# Los incrementos 2.1 y 2.2 estan CERRADOS: el mockup 16 queda completo.
+# El siguiente es 2.3 (inicio accionable, mockup 01), descrito al final de la
+# seccion «Incremento cerrado: 2.2».
 ```
