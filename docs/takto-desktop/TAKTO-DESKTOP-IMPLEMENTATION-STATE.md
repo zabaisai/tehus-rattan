@@ -10,7 +10,9 @@
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
-- Commits del incremento: `d3b7fee` (fase 0) · `add1717` + `7220bbf` (backend) · `a98229d` (frontend)
+- HEAD al cerrar el incremento 2.3: `716e885232a14fd80c73ba914ff9628dabb63b9f`
+- Commits de 2.1: `d3b7fee` (fase 0) · `add1717` + `7220bbf` (backend) · `a98229d` (frontend)
+- Commits de 2.3: `66a3c49` (fundamentos + pantalla) · `716e885` (conversaciones sin responder + retícula)
 - `main`: `b19217c2e4da69b251285774c1f6585cc29fb765`
 - CI del SHA: ✅ Backend `success` · Frontend `success`
 - Staging: no tocado
@@ -45,8 +47,8 @@
 | Fase | Estado | Evidencia | Bloqueador |
 |---|---|---|---|
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
-| 1. Fundamentos visuales | **PARCIAL** | 12 primitivas en `components/ui/`; faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar, swatches, tooltip | — |
-| 2. Shell, búsqueda y notificaciones | **EN_CURSO** | **2.1 y 2.2 HECHOS** (mockup 16 completo). Falta el inicio del mockup 01 | — |
+| 1. Fundamentos visuales | **PARCIAL** | 24 primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card y panel con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
+| 2. Shell, búsqueda y notificaciones | **HECHO** | **2.1, 2.2 y 2.3 cerrados**: mockups 16 y 01 | — |
 | 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen; **fusión FALTANTE** | — |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
@@ -292,6 +294,146 @@ sobre todo UI y enlaces profundos.
 
 ---
 
+## Incremento cerrado: 2.3 — Inicio accionable (mockup 01)
+
+**Commits:** `66a3c49` (fundamentos visuales + pantalla) · `716e885`
+(conversaciones sin responder + retícula del mockup)
+
+### Fundamentos de fase 1 que entraron aquí, y por qué solo esos
+
+El objetivo pedía completar «los fundamentos visuales de la fase 1 que la
+pantalla realmente necesita», sin cerrar la fase con componentes sin
+consumidor. Entraron cuatro, cada uno con su consumidor dentro del Inicio:
+
+| Primitiva | Consumidor real | Por qué existe |
+|---|---|---|
+| `ui/Skeleton` | `MetricCard`, `Panel` | El esqueleto va `aria-hidden`; lo que anuncia la carga es `aria-busy` en la región |
+| `ui/ForbiddenState` | Métricas y dos paneles | Un 403 no invita a reintentar: no lleva botón ni `role=alert` |
+| `ui/Avatar` | Rendimiento y conversaciones | Iniciales y color derivado del nombre. **Nunca una fotografía** (§3.1 del master) |
+| `ui/MetricCard` | Las cuatro métricas | `href` obligatorio: una cifra que no lleva a su listado solo informa |
+| `ui/Panel` | Los cinco bloques | Cabecera + cuatro ramas de estado en un sitio, no cinco copias |
+
+**No entraron** tabla, drawer, tabs, tooltip ni swatches: el Inicio no los usa
+y construirlos aquí sería exactamente lo que el objetivo prohíbe.
+
+**`MetricCard` no tiene variante «con tendencia».** El mockup dibuja una curva
+y un «+14 % vs. ayer», pero `analytics` no expone series temporales. Pintar una
+tendencia inventada es peor que no pintarla, porque la gente decide mirando esa
+flecha. Por lo mismo falta el panel «Tendencia de ventas» del mockup.
+
+### Qué muestra el Inicio, y de dónde sale cada dato
+
+| Bloque | Contrato | Rol | Enlace profundo |
+|---|---|---|---|
+| Oportunidades abiertas | `analytics/leads-by-stage` (suma) | ADMIN/SUPER_ADMIN | `/dashboard/pipeline` |
+| Valor abierto · Conversión | `analytics/overview` | ADMIN/SUPER_ADMIN | `/dashboard/pipeline` |
+| Tareas vencidas | `analytics/overdue-tasks-count` | ADMIN/SUPER_ADMIN | `/dashboard/tasks` |
+| Embudo comercial | `analytics/leads-by-stage` | ADMIN/SUPER_ADMIN | `/dashboard/pipeline?etapa=<id>` |
+| Conversaciones que requieren respuesta | `conversations/inbox?unread=true&limit=5` | cualquiera | `/dashboard/conversations?c=<id>` |
+| Agenda de hoy | `tasks` (pendientes, por vencimiento) | cualquiera | `/dashboard/tasks` |
+| Rendimiento por asesor | `analytics/agent-performance` | ADMIN/SUPER_ADMIN | — |
+| Actividad reciente | `notifications?limit=6` | cualquiera | el `actionUrl` que ya trae cada aviso |
+
+**Ningún contrato nuevo.** La actividad reciente se apoya en notificaciones
+porque ya están acotadas por empresa y ya llevan enlace profundo; construir un
+feed aparte habría duplicado eso. Las conversaciones sin responder son la
+bandeja de siempre con `unread`, que el backend deriva comparando la marca de
+lectura **de quien mira** con los mensajes entrantes: la lista dice lo mismo en
+el Inicio que en Conversaciones.
+
+### Permisos: no se pide lo que se sabe que va a dar 403
+
+`analytics` es ADMIN/SUPER_ADMIN entero. Para los demás roles las cuatro
+consultas van con `enabled:false`: pedirlas para recibir un 403 llena la
+consola de errores y hace parpadear la pantalla antes de enseñar el estado
+correcto. Verificado en el navegador con un usuario AGENT real: **cero**
+peticiones a `/analytics/`, cero respuestas `>=400`, cero `role=alert`.
+
+En `Panel`, `sinPermiso` se evalúa **antes** que `error` a propósito: un 403
+llega como error de red y tratarlo como avería invita a reintentar algo que
+nunca va a funcionar.
+
+### Consolidación
+
+`timeAgo` vivía dentro de `ConversationList`. Salió a `lib/tiempo` junto con
+`antiguedadEnPalabras`, que es lo que oye un lector de pantalla. Dos copias de
+una regla de redondeo son dos sitios donde el mismo hilo puede decir «59m» en
+una pantalla y «1h» en la otra. Se borró `components/dashboard/StatCard.tsx`,
+que `MetricCard` sustituye.
+
+### Evidencia de pruebas
+
+```
+apps/frontend: 580 pruebas en 68 archivos · verde
+  page.test.tsx        20  (identidad, métricas, permisos, agenda,
+                            conversaciones sin responder, estados)
+  MetricCard.test.tsx  17  (MetricCard, Avatar, ForbiddenState, Panel)
+  tiempo.test.ts        6
+typecheck  limpio
+lint       0 errores · 1 aviso preexistente (EstadoTransporte.test.tsx)
+build      OK
+```
+
+Secuencia ejecutada en el orden del CI y **después del último archivo tocado**,
+según la lección de `49f2141`.
+
+### QA desktop (navegador real, `:3010` contra el backend local)
+
+| Comprobación | 1920 | 1440 | 1280 | 1024 |
+|---|---|---|---|---|
+| Sin desborde horizontal | ✅ | ✅ | ✅ | ✅ |
+| Cuatro métricas, todas enlazando | ✅ | ✅ | ✅ | ✅ |
+| Ninguna cifra cortada | ✅ | ✅ | ✅ | ✅ |
+| Sin colores genéricos de Tailwind | ✅ | ✅ | ✅ | ✅ |
+| Sin controles sin nombre accesible | ✅ | ✅ | ✅ | ✅ |
+
+Además, a 1440:
+
+| Comprobación | Resultado |
+|---|---|
+| Cinco regiones con nombre en el árbol de accesibilidad | ✅ Embudo · Conversaciones · Agenda · Rendimiento · Actividad |
+| Tabulación con anillo de foco visible en todo el recorrido | ✅ |
+| Enter sobre «Tareas vencidas» navega a `/dashboard/tasks` | ✅ |
+| `prefers-reduced-motion: reduce` → 0 animaciones y 0 transiciones | ✅ |
+| Cargando: `aria-busy=true`, esqueletos `aria-hidden`, sin cifras falsas | ✅ |
+| Vacío: mensaje que orienta, no bloque en blanco | ✅ |
+| Error (500 forzado en red): `role=alert`, `aria-busy` limpio | ✅ |
+| Sin permiso (AGENT real): `ForbiddenState`, sin `role=alert` | ✅ |
+| Hosts contactados | ✅ solo `localhost:3001` y `:3010` |
+
+**El error tarda ~7 s en aparecer.** No es un fallo de la pantalla: react-query
+reintenta tres veces con retroceso antes de dar la consulta por fallida, y
+mientras tanto la región sigue anunciando «ocupado», que es lo correcto. Se
+anota porque una QA con menos espera lo lee como «el estado de error no
+funciona».
+
+### Diferencias deliberadas con el mockup 01
+
+| Mockup | Implementación | Motivo |
+|---|---|---|
+| Curvas de tendencia y «+14 % vs. ayer» | No están | La API no expone series temporales |
+| Panel «Tendencia de ventas» | No está | Ídem |
+| Fotografías de personas | Iniciales | §3.1 del master lo prohíbe |
+| Cifras en sans | Cifras en `font-mono` | `DESIGN-SYSTEM.md` §tipografía: cifras y montos en IBM Plex Mono |
+| Botón «Responder» por conversación | Toda la fila es el enlace | Responder ocurre dentro del hilo; un botón que solo navega promete más de lo que hace |
+
+### Limitaciones honestas
+
+- El Inicio de un AGENT enseña tres paneles útiles y dos avisos de «sin
+  permiso». Es correcto, pero deja la fila de abajo medio vacía para ese rol.
+- «Agenda de hoy» enlaza a `/dashboard/tasks` sin abrir la tarea concreta: no
+  existe todavía un parámetro de apertura por id en esa pantalla.
+- «Rendimiento por asesor» no tiene acción de cabecera porque no hay pantalla
+  de informes a la que llevar.
+
+### Próximo incremento propuesto: `3.x — Fusión de contactos duplicados`
+
+Es el único FALTANTE puro del semáforo (fase 3) y es vertical de verdad:
+tiene backend, contrato, permisos y una pantalla del mockup. Alternativa si se
+prefiere seguir por fase: el pipeline **vertical** del mockup 04.
+
+---
+
 ## Decisiones adoptadas durante la implementación
 
 | Fecha | Decisión | Motivo | Consecuencia |
@@ -419,7 +561,7 @@ ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
-# Los incrementos 2.1 y 2.2 estan CERRADOS: el mockup 16 queda completo.
-# El siguiente es 2.3 (inicio accionable, mockup 01), descrito al final de la
-# seccion «Incremento cerrado: 2.2».
+# Los incrementos 2.1, 2.2 y 2.3 estan CERRADOS: la fase 2 queda completa.
+# El siguiente incremento propuesto esta al final de la seccion
+# «Incremento cerrado: 2.3».
 ```
