@@ -14,10 +14,16 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
 }));
 
-const createContact = vi.fn(async () => ({ id: 'c9' }));
+// Tipado explicito del payload: con `unknown[]` + `as []` TypeScript deduce
+// una tupla de longitud cero y `mock.calls[0][0]` deja de existir. El `tsc`
+// del CI lo ve aunque las pruebas pasen.
+type PayloadContacto = { phone: string; name?: string; email?: string };
+const createContact = vi.fn<(payload: PayloadContacto) => Promise<{ id: string }>>(
+  async () => ({ id: 'c9' }),
+);
 vi.mock('@/lib/contacts', async () => {
   const real = await vi.importActual<typeof import('@/lib/contacts')>('@/lib/contacts');
-  return { ...real, createContact: (...a: unknown[]) => createContact(...(a as [])) };
+  return { ...real, createContact: (p: PayloadContacto) => createContact(p) };
 });
 
 vi.mock('@/lib/pipeline', async () => {
