@@ -18,13 +18,14 @@ import {
   getOverdueTasksCount,
 } from '@/lib/analytics';
 import { getMyCompany } from '@/lib/companies';
+import { getInbox } from '@/lib/conversations';
 import { getTasks } from '@/lib/tasks';
 import { getNotifications } from '@/lib/notifications';
+import { antiguedadEnPalabras, timeAgo } from '@/lib/tiempo';
 import { Avatar } from '@/components/ui/Avatar';
 import { ForbiddenState } from '@/components/ui/ForbiddenState';
 import { MetricCard } from '@/components/ui/MetricCard';
 import { Panel, esSinPermiso } from '@/components/ui/Panel';
-import { Skeleton } from '@/components/ui/Skeleton';
 
 const dinero = new Intl.NumberFormat('es-CO', {
   style: 'currency',
@@ -98,6 +99,15 @@ export default function DashboardHomePage() {
     queryFn: () => getNotifications({ limit: 6 }),
   });
 
+  // «Requieren respuesta» = sin leer por QUIEN MIRA. Es la bandeja de siempre
+  // con `unread`, no un contrato nuevo: el backend ya deriva los no leídos
+  // comparando la marca de lectura de este usuario con los mensajes entrantes,
+  // así que la lista dice lo mismo aquí que en Conversaciones.
+  const pendientes = useQuery({
+    queryKey: ['inbox', 'inicio-sin-responder'],
+    queryFn: () => getInbox({ unread: true, limit: 5 }),
+  });
+
   const abiertas = porEtapa.data?.reduce((s, e) => s + e.count, 0) ?? 0;
   const valorEtapaMaximo = Math.max(
     1,
@@ -142,6 +152,9 @@ export default function DashboardHomePage() {
 
       {/* Métricas. Cada una enlaza a donde se actúa sobre ella. */}
       {puedeVerMetricas ? (
+        // Cuatro en fila solo a partir de 1280: a 1024 la tarjeta se queda en
+        // ~115 px de texto y «$ 27,6 M» sale cortado, que en una métrica es
+        // peor que no enseñarla.
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
             etiqueta="Oportunidades abiertas"
@@ -189,7 +202,7 @@ export default function DashboardHomePage() {
         />
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-12">
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
         {/* Embudo comercial */}
         <Panel
           titulo="Embudo comercial"
@@ -200,7 +213,7 @@ export default function DashboardHomePage() {
           error={esSinPermiso(porEtapa.error) ? undefined : porEtapa.error}
           vacio={(porEtapa.data?.length ?? 0) === 0}
           mensajeVacio="Todavía no hay oportunidades en el embudo."
-          className="xl:col-span-5"
+          className="lg:col-span-6 xl:col-span-4"
         >
           <ul className="space-y-2.5">
             {porEtapa.data?.map((etapa) => (
@@ -236,6 +249,66 @@ export default function DashboardHomePage() {
           </ul>
         </Panel>
 
+        {/* Conversaciones que requieren respuesta. Es lo único del Inicio que
+            un asesor atiende AHORA, así que va en la columna ancha y por
+            delante de la agenda. Cualquier rol lo ve: la bandeja es del
+            equipo. */}
+        <Panel
+          titulo="Conversaciones que requieren respuesta"
+          accion={{ href: '/dashboard/conversations', etiqueta: 'Ver todas' }}
+          cargando={pendientes.isLoading}
+          error={pendientes.error}
+          vacio={(pendientes.data?.items.length ?? 0) === 0}
+          mensajeVacio="Todo respondido. No hay mensajes sin leer."
+          className="lg:col-span-6 xl:col-span-4"
+        >
+          <ul className="space-y-1">
+            {pendientes.data?.items.map((c) => {
+              const ultimo = c.messages?.[0];
+              return (
+                <li key={c.id}>
+                  <Link
+                    href={`/dashboard/conversations?c=${encodeURIComponent(c.id)}`}
+                    // El nombre accesible dice quién, cuánto lleva esperando y
+                    // cuántos mensajes hay: las tres cosas que se leen de un
+                    // vistazo y que en la tarjeta van repartidas en tres sitios.
+                    aria-label={`${c.contact.name}, ${c.unreadCount} sin leer, ${antiguedadEnPalabras(c.lastMessageAt)}. Abrir la conversación`}
+                    className="flex items-start gap-2.5 rounded-md px-2 py-2 outline-none transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
+                  >
+                    <Avatar nombre={c.contact.name} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-content-primary">
+                        {c.contact.name}
+                      </span>
+                      <span className="block truncate text-xs text-content-secondary">
+                        {/* `body` es nulo en los mensajes que solo llevan
+                            adjunto: ahí se dice qué llegó, no un hueco. */}
+                        {ultimo?.body?.trim() ||
+                          (ultimo ? 'Adjunto sin texto.' : 'Sin mensajes todavía.')}
+                      </span>
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="flex shrink-0 flex-col items-end gap-1"
+                    >
+                      <span className="font-mono text-[11px] tabular-nums text-content-secondary">
+                        {timeAgo(c.lastMessageAt)}
+                      </span>
+                      {c.unreadCount > 0 && (
+                        // La insignia lleva el número dentro: sin color no se
+                        // pierde nada, que es la regla para lo que informa.
+                        <span className="rounded-full bg-status-warning-surface px-1.5 py-px font-mono text-[11px] tabular-nums font-semibold text-status-warning-strong">
+                          {c.unreadCount}
+                        </span>
+                      )}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+
         {/* Agenda de hoy — visible para cualquier rol */}
         <Panel
           titulo="Agenda de hoy"
@@ -244,7 +317,7 @@ export default function DashboardHomePage() {
           error={tareas.error}
           vacio={proximas.length === 0}
           mensajeVacio="No tienes tareas pendientes."
-          className="xl:col-span-4"
+          className="lg:col-span-6 xl:col-span-4"
         >
           <ul className="space-y-1">
             {proximas.map((t) => (
@@ -272,39 +345,6 @@ export default function DashboardHomePage() {
           </ul>
         </Panel>
 
-        {/* Actividad reciente — se apoya en notificaciones, que ya traen
-            `actionUrl`. Construir un feed nuevo habría duplicado un contrato
-            que existe, está acotado por empresa y ya lleva enlaces profundos. */}
-        <Panel
-          titulo="Actividad reciente"
-          accion={{ href: '/dashboard/notifications', etiqueta: 'Ver toda' }}
-          cargando={actividad.isLoading}
-          error={actividad.error}
-          vacio={(actividad.data?.items.length ?? 0) === 0}
-          mensajeVacio="Sin actividad todavía."
-          className="xl:col-span-3"
-        >
-          <ul className="space-y-1">
-            {actividad.data?.items.map((n) => (
-              <li key={n.id}>
-                <Link
-                  href={n.actionUrl ?? '/dashboard/notifications'}
-                  className="block rounded-md px-2 py-2 outline-none transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
-                >
-                  <span className="block truncate text-sm text-content-primary">
-                    {n.title}
-                  </span>
-                  {n.bodyPreview && (
-                    <span className="block truncate text-xs text-content-secondary">
-                      {n.bodyPreview}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-
         {/* Rendimiento por asesor */}
         <Panel
           titulo="Rendimiento por asesor"
@@ -314,7 +354,7 @@ export default function DashboardHomePage() {
           error={esSinPermiso(asesores.error) ? undefined : asesores.error}
           vacio={(asesores.data?.length ?? 0) === 0}
           mensajeVacio="Todavía no hay actividad de asesores."
-          className="xl:col-span-12"
+          className="lg:col-span-6 xl:col-span-8"
         >
           <ul className="divide-y divide-line-default">
             {asesores.data?.map((a) => (
@@ -340,10 +380,40 @@ export default function DashboardHomePage() {
             ))}
           </ul>
         </Panel>
-      </div>
 
-      {/* Reserva el alto del pie para que el scroll no salte al cargar. */}
-      {tareas.isLoading && <Skeleton className="mt-4 h-1 w-full opacity-0" />}
+        {/* Actividad reciente — se apoya en notificaciones, que ya traen
+            `actionUrl`. Construir un feed nuevo habría duplicado un contrato
+            que existe, está acotado por empresa y ya lleva enlaces profundos. */}
+        <Panel
+          titulo="Actividad reciente"
+          accion={{ href: '/dashboard/notifications', etiqueta: 'Ver toda' }}
+          cargando={actividad.isLoading}
+          error={actividad.error}
+          vacio={(actividad.data?.items.length ?? 0) === 0}
+          mensajeVacio="Sin actividad todavía."
+          className="lg:col-span-6 xl:col-span-4"
+        >
+          <ul className="space-y-1">
+            {actividad.data?.items.map((n) => (
+              <li key={n.id}>
+                <Link
+                  href={n.actionUrl ?? '/dashboard/notifications'}
+                  className="block rounded-md px-2 py-2 outline-none transition-colors hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
+                >
+                  <span className="block truncate text-sm text-content-primary">
+                    {n.title}
+                  </span>
+                  {n.bodyPreview && (
+                    <span className="block truncate text-xs text-content-secondary">
+                      {n.bodyPreview}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      </div>
     </div>
   );
 }

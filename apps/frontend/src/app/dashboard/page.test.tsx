@@ -12,6 +12,7 @@ const getAgentPerformance = vi.fn();
 const getOverdueTasksCount = vi.fn();
 const getTasks = vi.fn();
 const getNotifications = vi.fn();
+const getInbox = vi.fn();
 
 vi.mock('@/lib/analytics', () => ({
   getOverview: () => getOverview(),
@@ -24,6 +25,9 @@ vi.mock('@/lib/analytics', () => ({
 vi.mock('@/lib/companies', () => ({ getMyCompany: () => getMyCompany() }));
 vi.mock('@/lib/tasks', () => ({ getTasks: () => getTasks() }));
 vi.mock('@/lib/notifications', () => ({ getNotifications: () => getNotifications() }));
+vi.mock('@/lib/conversations', () => ({
+  getInbox: (f: unknown) => getInbox(f),
+}));
 
 function sesion(role: Role, companyId: string | null = 'c1') {
   useAuthStore.setState({
@@ -73,6 +77,34 @@ beforeEach(() => {
       contactId: null, assignedTo: null, lead: null, contact: null, agent: null,
     },
   ]);
+  getInbox.mockResolvedValue({
+    items: [
+      {
+        id: 'cv1',
+        status: 'OPEN',
+        stage: null,
+        isPaused: false,
+        channel: 'WHATSAPP',
+        lastMessageAt: new Date(Date.now() - 25 * 60_000).toISOString(),
+        updatedAt: '2026-08-12T10:00:00.000Z',
+        contact: { id: 'c9', name: 'Laura Martínez' },
+        agent: null,
+        unreadCount: 3,
+        lastReadAt: null,
+        messages: [
+          {
+            id: 'm1',
+            body: '¿Tienen disponibilidad para entrega?',
+            type: 'text',
+            direction: 'INBOUND',
+            status: 'DELIVERED',
+            createdAt: '2026-08-12T10:00:00.000Z',
+          },
+        ],
+      },
+    ],
+    hasMore: false,
+  });
   getNotifications.mockResolvedValue({
     items: [
       {
@@ -196,6 +228,86 @@ describe('Inicio — agenda y actividad', () => {
 
     const etapa = await screen.findByRole('link', { name: /Nuevo/ });
     expect(etapa).toHaveAttribute('href', '/dashboard/pipeline?etapa=s1');
+  });
+});
+
+describe('Inicio — conversaciones que requieren respuesta', () => {
+  it('pide la bandeja de siempre filtrada por no leídas, no un contrato nuevo', async () => {
+    sesion('ADMIN');
+    renderPage();
+
+    await waitFor(() => expect(getInbox).toHaveBeenCalled());
+    expect(getInbox).toHaveBeenCalledWith({ unread: true, limit: 5 });
+  });
+
+  it('cada conversación abre su hilo por enlace profundo', async () => {
+    sesion('ADMIN');
+    renderPage();
+
+    const enlace = await screen.findByRole('link', { name: /Laura Martínez, 3 sin leer/ });
+    expect(enlace).toHaveAttribute('href', '/dashboard/conversations?c=cv1');
+  });
+
+  it('el nombre accesible dice cuántos faltan y cuánto llevan esperando', async () => {
+    sesion('ADMIN');
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', {
+        name: 'Laura Martínez, 3 sin leer, hace 25 minutos. Abrir la conversación',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('un AGENT también lo ve: la bandeja es del equipo, no de los administradores', async () => {
+    sesion('AGENT');
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: /Laura Martínez, 3 sin leer/ }),
+    ).toBeInTheDocument();
+    expect(getInbox).toHaveBeenCalled();
+  });
+
+  it('un mensaje sin texto dice qué llegó, no deja el renglón vacío', async () => {
+    sesion('ADMIN');
+    getInbox.mockResolvedValue({
+      items: [
+        {
+          id: 'cv2',
+          status: 'OPEN',
+          stage: null,
+          isPaused: false,
+          channel: 'WHATSAPP',
+          lastMessageAt: new Date().toISOString(),
+          updatedAt: '2026-08-12T10:00:00.000Z',
+          contact: { id: 'c8', name: 'Carlos Mejía' },
+          agent: null,
+          unreadCount: 1,
+          lastReadAt: null,
+          messages: [
+            {
+              id: 'm9', body: null, type: 'image', direction: 'INBOUND',
+              status: 'DELIVERED', createdAt: '2026-08-12T10:00:00.000Z',
+            },
+          ],
+        },
+      ],
+      hasMore: false,
+    });
+    renderPage();
+
+    expect(await screen.findByText('Adjunto sin texto.')).toBeInTheDocument();
+  });
+
+  it('sin pendientes lo dice, en vez de dejar el bloque en blanco', async () => {
+    sesion('ADMIN');
+    getInbox.mockResolvedValue({ items: [], hasMore: false });
+    renderPage();
+
+    expect(
+      await screen.findByText('Todo respondido. No hay mensajes sin leer.'),
+    ).toBeInTheDocument();
   });
 });
 
