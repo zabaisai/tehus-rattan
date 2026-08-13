@@ -43,18 +43,44 @@ function DashboardShell({ children }: { children: React.ReactNode }) {
 
   if (isPlatformSuperAdmin && !isOnPlatformRoute) {
     return (
-      <div className="flex h-screen items-center justify-center bg-neutral-50">
+      <div className="flex h-dvh items-center justify-center bg-neutral-50">
         <p className="text-sm text-neutral-500">Redirigiendo...</p>
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-neutral-50">
+    // `h-dvh` y no `h-screen`: `100vh` es la altura del viewport LARGO, la que
+    // habría si las barras dinámicas del navegador estuvieran retraídas. En
+    // escritorio ambas miden lo mismo —medido: 695,2 px las dos—, así que este
+    // cambio no mueve nada hoy; existe para que el shell no se pase de alto
+    // justamente donde `100vh` miente, que es el navegador con barra dinámica.
+    <div className="flex h-dvh overflow-hidden bg-neutral-50">
       <Sidebar mobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <Header onMenuClick={() => setMobileNavOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
+        {/* `relative` NO es decoración: es lo que impide una SEGUNDA barra de
+            desplazamiento en el documento.
+
+            Un `overflow` distinto de `visible` solo recorta a un descendiente
+            absoluto si el elemento que recorta es además su BLOQUE CONTENEDOR.
+            Con `main` en `position: static` no lo era, así que cualquier
+            descendiente `position: absolute` resolvía contra el bloque
+            contenedor inicial —el viewport—, se quedaba fuera del recorte y su
+            posición estática, que cae dentro del contenido ya desplazado,
+            pasaba a contar como desbordamiento DEL DOCUMENTO.
+
+            Lo disparaba algo tan inocente como `sr-only`, que es
+            `position: absolute`: el `<caption>` de la tabla equivalente de
+            «Tendencia de ventas» quedaba a 1083 px y estiraba el documento a
+            1083 frente a los 695 del viewport. Resultado medido en 1536 px:
+            dos barras verticales y 388 px de blanco por debajo del shell.
+
+            Arreglar solo aquel `<caption>` habría tapado el síntoma y dejado
+            la trampa puesta para el siguiente `sr-only`, `absolute` o tooltip
+            que entre en cualquier pantalla. Con `relative`, el recorte lo hace
+            el mismo elemento que ya es la única zona desplazable. */}
+        <main className="relative flex-1 overflow-y-auto p-4 sm:p-6">{children}</main>
       </div>
     </div>
   );

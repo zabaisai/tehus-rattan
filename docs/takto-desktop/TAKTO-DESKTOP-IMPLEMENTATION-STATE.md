@@ -14,6 +14,8 @@
 - Commits de 2.3 (primer intento, **rechazado visualmente**): `66a3c49` · `716e885`
 - SHA que cerró documentalmente aquel intento: `99968cdc057c5de38555d4c48463ff0f660da573`
 - Commits de 2.3 (segundo intento): `f9e6992` (contratos) · `e506330` (shell + pantalla)
+  · `84772f7` (tres recortes) · corrección del doble desplazamiento (SHA se anota
+  tras publicar, según la lección de más abajo)
 - `main`: `b19217c2e4da69b251285774c1f6585cc29fb765`
 - Staging: no tocado
 - Producción: fuera de alcance
@@ -311,6 +313,55 @@ siguiente conserva el registro del primer intento, que sigue siendo cierto en
 lo que afirma.
 
 **Commits de la reentrega:** `f9e6992` (contratos) · `e506330` (shell + pantalla)
+· `84772f7` (tres recortes) · corrección del doble desplazamiento
+
+### Segunda ronda de revisión humana: dos barras de desplazamiento
+
+**Hallazgo reproducible.** En `/dashboard` aparecían dos barras verticales —una
+del contenido y otra del documento— y al bajar del todo quedaba un blanco enorme
+por debajo del shell. Capturado en pantalla física de 1920 px con el navegador
+al 100 %, que en este equipo son **1536 px CSS** (Windows al 125 %).
+
+**Causa exacta, medida y no deducida.** Un `overflow` distinto de `visible` solo
+recorta a un descendiente absoluto si además es su **bloque contenedor**. `main`
+era `position: static`, así que no lo era: cualquier descendiente
+`position: absolute` resolvía contra el bloque contenedor inicial —el viewport—,
+quedaba fuera del recorte de `main`, y su posición estática, que cae dentro del
+contenido ya desplazado, pasaba a contar como desbordamiento **del documento**.
+
+Lo disparaba `sr-only`, que es `position: absolute`: el `<caption>` de la tabla
+equivalente en texto de «Tendencia de ventas» —la que existe para el lector de
+pantalla— se quedaba a 1083 px y estiraba el documento a 1083 frente a los 695
+del viewport. **El elemento que rompía la pantalla es el que la hace accesible**,
+y por eso no se veía leyendo el código.
+
+Hay un segundo `<caption class="sr-only">` en «Rendimiento por asesor». Hoy no
+se monta porque en la vista previa ninguna oportunidad tiene responsable y el
+panel enseña su estado honesto; en cuanto haya uno asignado habría escapado
+también. El arreglo cubre los dos y los que vengan.
+
+**Qué NO se hizo.** No se puso `overflow: hidden` en `html` ni en `body`: eso
+habría escondido el síntoma dejando la trampa puesta. Tampoco se arregló solo
+aquel `<caption>`, por lo mismo.
+
+**Corrección.** `main` pasa a `relative`, con lo que el recorte lo hace el mismo
+elemento que ya era la única zona desplazable. El shell pasa de `h-screen` a
+`h-dvh`: en escritorio miden lo mismo —695,2 px las dos, medido— así que hoy no
+mueve nada; existe para el navegador con barra dinámica, donde `100vh` es la
+altura del viewport largo y deja el shell más alto que la pantalla.
+
+**Efecto secundario que se corrige solo.** El bloqueo de fondo de los diálogos
+hace `body { overflow: hidden }`. Con la barra del documento presente, abrir la
+paleta o cualquier modal la retiraba y el ancho útil saltaba de 1521 a 1536 px:
+cabecera y contenido se movían 15 px en cada apertura y cada cierre. Sin barra
+de documento no hay nada que retirar, y el salto medido es **0**.
+
+**Lo que este arreglo NO toca, y conviene que la revisión sepa.** El fondo nunca
+estuvo bloqueado de verdad: `body { overflow: hidden }` frenaba la barra del
+documento, no la de `main`, así que con un diálogo abierto el contenido de
+detrás siempre se ha podido desplazar. Sigue igual —no es una regresión de este
+cambio, y arreglarlo toca `useDialogoModal`, que usan todas las pantallas—. Se
+anota como deuda, no se corrige aquí.
 
 ### Qué rechazó la revisión, y cómo se resolvió
 
@@ -370,8 +421,14 @@ según la lección de `49f2141`.
 
 ### Limitaciones honestas
 
-- **La QA de anchos cubre 1440/1280/1024 y 1536; falta 1920.** Ver «QA visual
-  desktop» para la razón, que es del equipo y no del código.
+- **La QA de anchos cubre los cuatro del plan: 1920, 1440, 1280 y 1024**, más
+  1536, que es el ancho real de la captura de la revisión en este equipo. 1920
+  px CSS se mide por CDP con `deviceScaleFactor: 1`; ver «QA visual desktop».
+- **El fondo de los diálogos no está bloqueado de verdad.** `useDialogoModal`
+  hace `body { overflow: hidden }`, que nunca frenó la zona desplazable real
+  —`main`—, solo la barra del documento. Es anterior a este trabajo y sigue
+  igual; arreglarlo toca un hook que usan todas las pantallas y merece su
+  propio incremento.
 - **Un dato de la vista previa cambió durante la sesión y no fue por este
   trabajo.** `PREVIEW_BRANDING_Comedor para restaurante`
   (`cmsoy6eos001kv2fs2smcoia2`) pasó de `OPEN` a `WON` el 13 de agosto a las
@@ -569,6 +626,11 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 | 2026-08-12 | 2.2 | Recientes con y sin recarga | funciona sin recargar; vacío tras `F5` (limitación documentada) |
 | 2026-08-12 | 2.2 | CI sobre `821da8d` | ❌ **Frontend falló** en «Typecheck (incluye tests)» |
 | 2026-08-12 | 2.2 | CI sobre `199bcac` | ver «Cierre del incremento» |
+| 2026-08-13 | 2.3 | CI sobre `25cf639` | Backend y Frontend `success` |
+| 2026-08-13 | 2.3 (doble scroll) | `vitest run` (frontend completo) | **623/623** en 69 archivos (+4, +1 archivo) |
+| 2026-08-13 | 2.3 (doble scroll) | `npm run typecheck` + `npm run lint` + `npm run build` | sin errores (1 warning previo) |
+| 2026-08-13 | 2.3 (doble scroll) | backend `tsc --noEmit` + `npx jest` | **2137/2137** en 129 suites, sin cambios |
+| 2026-08-13 | 2.3 (doble scroll) | Mediciones DOM 1920/1536/1440/1280/1024 | una sola zona desplazable en los cinco |
 
 ---
 
@@ -578,7 +640,7 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 |---|---:|---:|---:|---:|---:|---:|---|
 | Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
-| Inicio (reentrega 2.3) | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ | **PARCIAL** (falta 1920) |
+| Inicio (reentrega 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **QA COMPLETA** · 2.3 sigue en revisión humana |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
@@ -609,23 +671,54 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 > | Regiones con nombre (7) | ✅ | ✅ | ✅ | ✅ |
 > | `role=alert` / `aria-busy` colgados | ✅ | ✅ | ✅ | ✅ |
 >
-> \* 1536 px es el ancho **más amplio alcanzable en este equipo**, y es lo que
-> sustituye a 1920. La pantalla es de 1920 px físicos con escalado de Windows
-> al 125 %, así que el viewport CSS máximo es 1536 y Chrome rechaza agrandar la
-> ventana más allá de la pantalla («Bounds must be at least 50 % within visible
-> screen space»). Para exercitar 1920 px CSS hay que bajar el escalado del
-> sistema al 100 %, que es un cambio del equipo y no de este trabajo.
+> \* 1536 px es el ancho **más amplio alcanzable redimensionando la ventana en
+> este equipo**. La pantalla es de 1920 px físicos con escalado de Windows al
+> 125 %, así que el viewport CSS máximo de una ventana normal es 1536.
 >
-> El contenido va en un contenedor `max-w-[1600px]` y el punto de ruptura más
-> alto del diseño es `xl` (1280 px), así que entre 1536 y 1920 solo cambiaría
-> el margen exterior — pero eso es un razonamiento, no una medición, y por eso
-> la fila queda en PARCIAL y no en HECHO.
+> **1920 px CSS ya está medido, y sin tocar el escalado del equipo.** Lo que
+> faltaba no era la pantalla sino el método: se levanta Chrome con
+> `--force-device-scale-factor=1` y se fija el viewport exacto por CDP con
+> `Emulation.setDeviceMetricsOverride`, que es lo que usa el panel de
+> dispositivos de DevTools. No instala nada —Node 24 ya trae `WebSocket`— y da
+> los cinco anchos con las mismas cifras que el navegador real allí donde ambos
+> llegan: a 1536 los dos dan cabecera de 1296 px, una sola zona desplazable y
+> documento sin desbordar. El arnés vive fuera del repositorio, en el
+> directorio temporal de la sesión; no es código de producto.
 >
 > **El barrido encontró tres recortes reales** (`84772f7`), todos invisibles
 > leyendo el código: la cifra de la métrica a 1280, el titular del panel de
 > conversaciones a 1280 y el saludo del hero a 1024. El ancho más apretado
 > resultó ser **1280**, no 1024, porque es donde `xl` mete las cuatro tarjetas
 > en una fila.
+
+> **Doble barra de desplazamiento: antes y después.** Viewport de 1000 px de
+> alto en los cinco anchos. «Barra doc.» es `innerWidth − clientWidth`, es
+> decir, los píxeles que se comía la segunda barra.
+>
+> | Ancho CSS | Exceso vertical del documento | Barra doc. | Zonas desplazables | Absolutos fugados de `main` |
+> |---|---|---|---|---|
+> | 1920 | 67 → **0** | 15 → **0** | 2 → **1** | `caption.sr-only` → **ninguno** |
+> | 1536 | 85 → **0** | 15 → **0** | 2 → **1** | `caption.sr-only` → **ninguno** |
+> | 1440 | 85 → **0** | 15 → **0** | 2 → **1** | `caption.sr-only` → **ninguno** |
+> | 1280 | 85 → **0** | 15 → **0** | 2 → **1** | `caption.sr-only` → **ninguno** |
+> | 1024 | 532 → **0** | 15 → **0** | 2 → **1** | `caption.sr-only` → **ninguno** |
+>
+> En los cinco: desbordamiento horizontal **0** antes y después, y el contenido
+> del Inicio se recorre hasta el final dentro de la única zona que queda. El
+> exceso crece a 1024 porque la retícula se apila y la tabla equivalente baja.
+> En el navegador real a 1536 —con barras clásicas y ventana maximizada— el
+> mismo defecto medía **388 px** de exceso con el viewport a 695 px de alto.
+>
+> **Apertura y cierre de la paleta y de los modales, a 1536:** ancho útil,
+> cabecera y contenido quedan en 1536/1296/1296 px con la paleta abierta,
+> cerrada y antes de abrirla; salto medido **0 px** en las tres medidas, y la
+> posición de desplazamiento de `main` se conserva. Antes, abrir la paleta
+> movía cabecera y contenido de 1281 a 1296 px.
+>
+> **Ninguna otra pantalla cambia.** Comprobadas a 1536 px con el mismo arnés:
+> pipeline, conversaciones, tareas, contactos, productos, cotizaciones, bots y
+> empresa. Cero desbordamiento vertical y horizontal del documento y cero
+> absolutos fugados en todas.
 
 **Cómo se ejecutó la QA sin romper la vista previa del usuario.** Había una
 vista previa en `:3000`/`:3001` que el usuario está revisando y que no debía

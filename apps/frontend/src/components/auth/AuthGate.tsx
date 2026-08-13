@@ -30,7 +30,10 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   if (status !== 'authenticated') {
     return (
-      <div className="flex h-screen items-center justify-center bg-neutral-50">
+      // `h-dvh` para que el cargador ocupe exactamente lo mismo que el shell
+      // que va a sustituirlo: con `100vh` el paso de «Cargando…» al dashboard
+      // cambiaba de alto en los navegadores con barra dinámica.
+      <div className="flex h-dvh items-center justify-center bg-neutral-50">
         <p className="text-sm text-neutral-500">Cargando...</p>
       </div>
     );
