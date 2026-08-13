@@ -14,8 +14,11 @@
 - Commits de 2.3 (primer intento, **rechazado visualmente**): `66a3c49` · `716e885`
 - SHA que cerró documentalmente aquel intento: `99968cdc057c5de38555d4c48463ff0f660da573`
 - Commits de 2.3 (segundo intento): `f9e6992` (contratos) · `e506330` (shell + pantalla)
-  · `84772f7` (tres recortes) · `f133e69` (doble desplazamiento) · empaquetado de
-  la retícula (SHA se anota tras publicar, según la lección de más abajo)
+  · `84772f7` (tres recortes) · `f133e69` (doble desplazamiento) · `1d16fae`
+  (empaquetado de la retícula)
+- **SHA de implementación de 2.3 aprobado por revisión humana: `1d16fae460f04fcaa4b87befcc1bee7f9cb2ba15`**
+- **CI de ese SHA: verde — run [`31746787438`](https://github.com/zabaisai/tehus-rattan/actions/runs/31746787438)**
+- Aprobación humana: **13 de agosto de 2026**
 - `main`: `b19217c2e4da69b251285774c1f6585cc29fb765`
 - Staging: no tocado
 - Producción: fuera de alcance
@@ -58,7 +61,7 @@
 |---|---|---|---|
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
-| 2. Shell, búsqueda y notificaciones | **EN REVISIÓN HUMANA** | 2.1 y 2.2 aprobados (mockup 16). **2.3 reabierto y reentregado**, pendiente de revisión visual | Revisión humana |
+| 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
 | 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen; **fusión FALTANTE** | — |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
@@ -79,7 +82,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 | Capacidad | Estado | Evidencia/ruta |
 |---|---|---|
 | Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); 12 primitivas en `components/ui/`. Faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar de iniciales, swatches, tooltip |
-| Dashboard | **PARCIAL** | `app/dashboard/page.tsx` + `analytics` (6 endpoints reales: `overview`, `leads-by-stage`, `agent-performance`, `tasks-overdue`, `conversations-pending`, `lost-reasons`). Sin actividad reciente ni próximos pasos del mockup 01 |
+| Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
 | Contactos / papelera / fusión | **PARCIAL** | 11 endpoints: `GET /contacts`, `papelera/listado`, `:id/restore`, `:id/impacto`, `:id/perfil`, `:id/definitivo`. **Fusión: FALTANTE** (sin endpoint ni UI) |
 | Conversaciones / perfil lateral | **HECHO** (funcional) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
 | Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
@@ -304,17 +307,45 @@ sobre todo UI y enlaces profundos.
 
 ---
 
-## Incremento 2.3 — Inicio accionable (mockup 01) · **EN REVISIÓN HUMANA**
+## Incremento cerrado: 2.3 — Inicio accionable (mockup 01)
 
-**Estado: NO cerrado.** El primer intento (`66a3c49` + `716e885`, cerrado
-documentalmente en `99968cd`) pasó pruebas y CI pero **la revisión humana lo
-rechazó visualmente**. Esta sección documenta la reentrega; la sección
-siguiente conserva el registro del primer intento, que sigue siendo cierto en
-lo que afirma.
+**Estado: HECHO / APROBADO.** Aprobado por revisión humana el **13 de agosto de
+2026**. El primer intento (`66a3c49` + `716e885`, cerrado documentalmente en
+`99968cd`) pasó pruebas y CI pero **la revisión humana lo rechazó
+visualmente**; esta sección documenta la reentrega, que sí quedó aprobada. La
+sección siguiente conserva el registro de aquel primer intento, que sigue
+siendo cierto en lo que afirma.
 
 **Commits de la reentrega:** `f9e6992` (contratos) · `e506330` (shell + pantalla)
-· `84772f7` (tres recortes) · `f133e69` (doble desplazamiento) · empaquetado de la
-retícula
+· `84772f7` (tres recortes) · `f133e69` (doble desplazamiento) · `1d16fae`
+(empaquetado de la retícula)
+
+### Aprobación humana — 13 de agosto de 2026
+
+| Dato | Valor |
+|---|---|
+| SHA de implementación aprobado | **`1d16fae460f04fcaa4b87befcc1bee7f9cb2ba15`** |
+| CI de ese SHA | **verde**, run [`31746787438`](https://github.com/zabaisai/tehus-rattan/actions/runs/31746787438) — Frontend y Backend `success`, incluidos «Typecheck (incluye tests)» y E2E |
+| Rama | `feature/takto-brand-ui-integration`, árbol limpio y sincronizado |
+| Veredicto | «Se ve bien, me gusta y todo está correcto» |
+
+**Criterios comprobados en la revisión:**
+
+| # | Criterio | Resultado |
+|---|---|---|
+| 1 | Revisión visual del Inicio contra el mockup 01 | ✅ aprobado |
+| 2 | Todas las acciones y enlaces profundos visibles, probados uno a uno | ✅ funcionan |
+| 3 | Una sola barra de desplazamiento vertical | ✅ |
+| 4 | Paleta de búsqueda sin saltos de posición al abrir y cerrar | ✅ |
+| 5 | Retícula sin huecos excesivos | ✅ |
+| 6 | 2.1 y 2.2 siguen aprobados y sin regresión | ✅ |
+| 7 | Ningún dato modificado durante la revisión | ✅ |
+
+Con esto la **fase 2 queda HECHA**: mockups 16 (2.1 y 2.2) y 01 (2.3).
+
+> El SHA de **este cierre documental** no se anota aquí a propósito: se lee del
+> historial de la rama. Anotarlo antes de publicar es justo el error que
+> corrigió la nota de «Última actualización».
 
 ### Segunda ronda de revisión humana: dos barras de desplazamiento
 
@@ -625,10 +656,9 @@ funciona».
 
 ### Siguiente paso
 
-**Revisión humana de la reentrega de 2.3.** No se propone incremento nuevo
-hasta que haya veredicto: el propuesto antes (`3.x — Fusión de contactos
-duplicados`, mockup 22, único FALTANTE puro del semáforo) sigue sobre la mesa,
-pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
+Ya resuelto: la reentrega de 2.3 **fue aprobada el 13 de agosto de 2026** sobre
+`1d16fae`. Ver «Aprobación humana» en la sección del incremento y «Próximo
+incremento seguro» al final del documento.
 
 ---
 
@@ -680,6 +710,8 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 | 2026-08-13 | 2.3 (retícula) | `typecheck` + `lint` + `build` | sin errores (1 warning previo) |
 | 2026-08-13 | 2.3 (retícula) | Huecos 1920/1536/1440/1280/1024 | 273 → 16 px; 535 → 67 px a 1024 |
 | 2026-08-13 | 2.3 (retícula) | Estados: escaso, carga y seis paneles en error | sin huecos, solapes ni desbordes |
+| 2026-08-13 | 2.3 | CI sobre `1d16fae` | **run `31746787438`** — Backend y Frontend `success` |
+| 2026-08-13 | 2.3 | **Revisión humana sobre `1d16fae`** | **APROBADO** — ver «Aprobación humana» |
 
 ---
 
@@ -689,7 +721,7 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 |---|---:|---:|---:|---:|---:|---:|---|
 | Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
-| Inicio (reentrega 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **QA COMPLETA** · 2.3 sigue en revisión humana |
+| Inicio (mockup 01, incremento 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 13-ago-2026 |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
@@ -860,6 +892,24 @@ ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 
 ---
 
+## Próximo incremento seguro: `3.x — Fusión de contactos duplicados`
+
+**Registrado, no iniciado.** Mockup 22. Es el **único FALTANTE puro** del
+semáforo —no existe ni endpoint ni UI— y el resto de la fase 3 (listado,
+papelera, restauración y perfil) ya está.
+
+Antes de escribir una línea hay que resolver el gap que ya figura en «Gaps que
+requieren decisión de producto»: **qué campo gana ante conflicto y si el
+contacto absorbido queda como alias o desaparece**. El §4.1 del master exige
+además vista previa, elección del valor por campo, traslado transaccional de
+las relaciones, alias/redirección y auditoría, y prohíbe borrar conversaciones
+para «limpiar» un contacto.
+
+Su diseño y su implementación **no se redactan aquí**: se abren cuando se
+arranque el incremento, con su propio preflight §2.
+
+---
+
 ## Próximo comando seguro
 
 ```bash
@@ -867,11 +917,13 @@ ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
-# 2.1 y 2.2 estan aprobados. 2.3 esta REENTREGADO y EN REVISION HUMANA:
-# no abrir 3.x hasta que haya veredicto.
+# 2.1, 2.2 y 2.3 estan APROBADOS: la fase 2 esta HECHA.
+# 2.3 aprobado el 13-ago-2026 sobre 1d16fae (CI run 31746787438).
+# Siguiente incremento registrado y NO iniciado: 3.x - Fusion de contactos
+# duplicados (mockup 22). Requiere primero la decision de producto sobre
+# conflictos de campo y alias del contacto absorbido.
 #
 # Vista previa local (worker apagado, transporte falso, sin efectos externos):
 #   cd apps/backend  && node dist/src/main        # :3001, con las variables
 #   cd apps/frontend && npx next start -p 3000    # :3000
-# Falta cerrar la QA de 1920/1440/1280/1024: ver la nota de «QA visual desktop».
 ```
