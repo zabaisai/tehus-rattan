@@ -6,17 +6,25 @@
 
 ## Última actualización
 
-- Fecha: 12 de agosto de 2026 · America/Bogota
+- Fecha: 13 de agosto de 2026 · America/Bogota
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
-- HEAD al cerrar el incremento 2.3: `716e885232a14fd80c73ba914ff9628dabb63b9f`
 - Commits de 2.1: `d3b7fee` (fase 0) · `add1717` + `7220bbf` (backend) · `a98229d` (frontend)
-- Commits de 2.3: `66a3c49` (fundamentos + pantalla) · `716e885` (conversaciones sin responder + retícula)
+- Commits de 2.3 (primer intento, **rechazado visualmente**): `66a3c49` · `716e885`
+- SHA que cerró documentalmente aquel intento: `99968cdc057c5de38555d4c48463ff0f660da573`
+- Commits de 2.3 (segundo intento): `f9e6992` (contratos) · `e506330` (shell + pantalla)
 - `main`: `b19217c2e4da69b251285774c1f6585cc29fb765`
-- CI del SHA: ✅ Backend `success` · Frontend `success`
 - Staging: no tocado
 - Producción: fuera de alcance
+
+> **Corrección de una discrepancia del propio documento.** La versión anterior
+> declaraba «HEAD al cerrar el incremento 2.3: `716e885`», que es el último
+> commit de *código*, no el HEAD: el cierre documental fue `99968cd`, un commit
+> posterior que este archivo no registraba. En consecuencia, su línea «CI del
+> SHA: ✅» se refería a `716e885` y no al HEAD real. Se verificó aparte que
+> `99968cd` también estaba en verde (Backend y Frontend `success`). A partir de
+> ahora el SHA de cierre se anota **después** de publicar, no antes.
 
 ### Preflight §2 ejecutado
 
@@ -47,8 +55,8 @@
 | Fase | Estado | Evidencia | Bloqueador |
 |---|---|---|---|
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
-| 1. Fundamentos visuales | **PARCIAL** | 24 primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card y panel con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
-| 2. Shell, búsqueda y notificaciones | **HECHO** | **2.1, 2.2 y 2.3 cerrados**: mockups 16 y 01 | — |
+| 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
+| 2. Shell, búsqueda y notificaciones | **EN REVISIÓN HUMANA** | 2.1 y 2.2 aprobados (mockup 16). **2.3 reabierto y reentregado**, pendiente de revisión visual | Revisión humana |
 | 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen; **fusión FALTANTE** | — |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
@@ -294,7 +302,85 @@ sobre todo UI y enlaces profundos.
 
 ---
 
-## Incremento cerrado: 2.3 — Inicio accionable (mockup 01)
+## Incremento 2.3 — Inicio accionable (mockup 01) · **EN REVISIÓN HUMANA**
+
+**Estado: NO cerrado.** El primer intento (`66a3c49` + `716e885`, cerrado
+documentalmente en `99968cd`) pasó pruebas y CI pero **la revisión humana lo
+rechazó visualmente**. Esta sección documenta la reentrega; la sección
+siguiente conserva el registro del primer intento, que sigue siendo cierto en
+lo que afirma.
+
+**Commits de la reentrega:** `f9e6992` (contratos) · `e506330` (shell + pantalla)
+
+### Qué rechazó la revisión, y cómo se resolvió
+
+| # | Hallazgo | Resolución |
+|---|---|---|
+| 1 | Shell blanco, sin logo TAKTO, navegación navy, selector de empresa ni acción global Crear | Barra navy con `TaktoLogo` en negativo, bloque propio de empresa, activo con barra naranja y `aria-current`; «Crear» en la cabecera abre la paleta que ya contiene «Crear rápidamente» |
+| 2 | Hero sin la composición aprobada; CTA de cotización no era una acción de creación | Degradado navy del mockup, saludo por primer nombre, CTA que reutiliza la definición de `creacion-rapida` (al embudo, con su aviso) |
+| 3 | Métricas planas | Curva y comparación reales desde `sales-trend`; nota honesta en las dos que no tienen serie |
+| 4 | Faltaba «Tendencia de ventas» | Panel nuevo con dos series reales + tabla equivalente en texto |
+| 5 | Embudo sin jerarquía | Orden, nombre, conteo, valor, barra y total; sin códigos técnicos; sin filtrar etapas reales |
+| 6 | Conversaciones sin prioridad, tiempos ni estados legibles | Orden por espera, insignia de tiempo, estado traducido, canal y acción «Responder» |
+| 7 | Agenda sin densidad, prioridad ni enlaces profundos | Prioridad real, hora, vencida marcada y `?abrir=<id>` (añadido a Tareas) |
+| 8 | Rendimiento sin jerarquía y con todo a cero | Tabla comparativa; con todo sin asignar, estado honesto y enlace para asignar |
+| 9 | Actividad reciente vacía | Diagnóstico: se leía `notifications` (bandeja personal) y la empresa tenía 0; ahora lee la auditoría por `analytics/activity` |
+| 10 | Alturas rígidas y huecos | `items-start`; los paneles de administración no se montan para otros roles |
+| 11 | Falta movimiento útil | Tokens `--duration-rapida/media/lenta` (140/180/220 ms), apagados por `prefers-reduced-motion` |
+| 12 | No romper 2.1 y 2.2 | Ctrl/⌘+K, filtros, teclado, creación rápida, Escape por capas y recientes en memoria: sin cambios y con sus pruebas en verde |
+
+### Contratos
+
+| Contrato | Estado |
+|---|---|
+| `analytics/overview`, `leads-by-stage`, `agent-performance`, `tasks-overdue` | **reutilizados**, sin cambios |
+| `conversations/inbox?unread=true`, `tasks` | **reutilizados**, sin cambios |
+| `analytics/sales-trend` | **nuevo** — serie diaria + ventana previa |
+| `analytics/activity` | **nuevo** — auditoría de la empresa, sin campos sensibles |
+| `notifications` | ya no alimenta el panel de actividad; sigue intacto para la campana y su pantalla |
+
+Sin migraciones. Ambos endpoints van dentro del controlador de `analytics`, que
+ya exige `AuthGuard('jwt') + BusinessTenantGuard + RolesGuard` y
+`@Roles('ADMIN','SUPER_ADMIN')`.
+
+### Evidencia de pruebas
+
+```
+apps/backend   2137 pruebas en 129 suites · verde   (+16 unitarias de analytics)
+               6 e2e contra PostgreSQL real (analytics-inicio)
+apps/frontend  619 pruebas en 68 archivos · verde   (+39)
+typecheck      limpio en los dos
+lint           0 errores · 1 aviso preexistente (EstadoTransporte.test.tsx)
+build          OK en los dos
+```
+
+Secuencia ejecutada en el orden del CI y **después del último archivo tocado**,
+según la lección de `49f2141`.
+
+### Diferencias deliberadas con el mockup 01
+
+| Mockup | Implementación | Motivo |
+|---|---|---|
+| «Proyectado» en la tendencia | Solo series reales: abiertas y ganadas | Proyectar exige un pronóstico ponderado que el producto no calcula |
+| «+14 % vs. ayer» en las cuatro métricas | Comparación solo donde hay serie; nota en las otras dos | Conversión es un acumulado y «tareas vencidas» es una foto del presente |
+| Fotografías de personas | Iniciales | §3.1 del master lo prohíbe |
+| Casilla para completar tareas en la agenda | No está | Completar es una escritura; este incremento es visual |
+| Selector de empresa desplegable | Bloque que abre la configuración, solo para quien administra | Un usuario pertenece a una sola empresa: no hay entre qué elegir |
+| Botón «Ver reporte completo» en rendimiento | No está | No existe pantalla de informes a la que llevar |
+
+### Limitaciones honestas
+
+- **La QA de anchos quedó incompleta a 1920 px.** Ver «QA visual desktop».
+- Con los datos de la vista previa, la curva de tendencia es un pico en un solo
+  día: las cinco oportunidades se crearon la misma tarde. Es el dato real.
+- «Rendimiento por asesor» enseña el estado de «sin asignar» porque en la vista
+  previa ninguna oportunidad tiene responsable. No se sembró ninguno.
+- La actividad reciente no lleva enlace por fila: la auditoría no devuelve
+  `entityId` a propósito, así que no hay a dónde llevar.
+
+---
+
+## Registro del primer intento de 2.3 (rechazado visualmente)
 
 **Commits:** `66a3c49` (fundamentos visuales + pantalla) · `716e885`
 (conversaciones sin responder + retícula del mockup)
@@ -426,11 +512,12 @@ funciona».
 - «Rendimiento por asesor» no tiene acción de cabecera porque no hay pantalla
   de informes a la que llevar.
 
-### Próximo incremento propuesto: `3.x — Fusión de contactos duplicados`
+### Siguiente paso
 
-Es el único FALTANTE puro del semáforo (fase 3) y es vertical de verdad:
-tiene backend, contrato, permisos y una pantalla del mockup. Alternativa si se
-prefiere seguir por fase: el pipeline **vertical** del mockup 04.
+**Revisión humana de la reentrega de 2.3.** No se propone incremento nuevo
+hasta que haya veredicto: el propuesto antes (`3.x — Fusión de contactos
+duplicados`, mockup 22, único FALTANTE puro del semáforo) sigue sobre la mesa,
+pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 
 ---
 
@@ -481,7 +568,7 @@ prefiere seguir por fase: el pipeline **vertical** del mockup 04.
 |---|---:|---:|---:|---:|---:|---:|---|
 | Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
-| Inicio |  |  |  |  |  |  | PENDIENTE |
+| Inicio (reentrega 2.3) | ⚠️ | — | — | — | ✅ | ✅ | **PARCIAL** |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
@@ -497,6 +584,31 @@ prefiere seguir por fase: el pipeline **vertical** del mockup 04.
 > Nota: la QA anterior de esta rama se hizo en 1440/1280/1024/768/390. El plan
 > desktop pide **1920** y retira 768/390, así que las pantallas ya migradas
 > siguen sin verificarse a 1920. La búsqueda global sí se probó en los cuatro.
+
+> **La QA de anchos del Inicio quedó incompleta, y conviene decir por qué.**
+> El equipo tiene una pantalla de 1920 px físicos con escalado de Windows al
+> 125 %, así que el navegador reporta un viewport CSS de **1536 px** y Chrome
+> rechaza agrandar la ventana más allá de la pantalla («Bounds must be at least
+> 50% within visible screen space»). Con la ventana maximizada, redimensionarla
+> tampoco surte efecto: `innerWidth` se queda en 1536 pase lo que pase. Se
+> verificó a **1536 px CSS** —el ancho real más amplio disponible— con este
+> resultado, medido en el navegador y no deducido del código:
+>
+> | Comprobación a 1536 px | Resultado |
+> |---|---|
+> | Desborde horizontal del documento | ✅ ninguno |
+> | Cifras o métricas cortadas | ✅ ninguna (obligó a bajar la cifra de 28 a 24 px) |
+> | Controles sin nombre accesible | ✅ ninguno |
+> | Clases de color genéricas en el DOM | ✅ ninguna |
+> | Regiones con nombre en el árbol de accesibilidad | ✅ 7 |
+> | `role=alert` o `aria-busy` colgados tras cargar | ✅ ninguno |
+>
+> **1440, 1280 y 1024 siguen sin verificar en navegador real.** El contenido va
+> en un contenedor `max-w-[1600px]` y el punto de ruptura más alto del diseño es
+> `xl` (1280 px), así que a 1920 solo cambiaría el margen exterior; pero eso es
+> un razonamiento, no una medición, y no sustituye a la QA. Para completarla
+> hace falta que la ventana de Chrome **no esté maximizada** (o bajar el
+> escalado del sistema al 100 %), y entonces el barrido se hace en minutos.
 
 **Cómo se ejecutó la QA sin romper la vista previa del usuario.** Había una
 vista previa en `:3000`/`:3001` que el usuario está revisando y que no debía
@@ -561,7 +673,11 @@ ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
-# Los incrementos 2.1, 2.2 y 2.3 estan CERRADOS: la fase 2 queda completa.
-# El siguiente incremento propuesto esta al final de la seccion
-# «Incremento cerrado: 2.3».
+# 2.1 y 2.2 estan aprobados. 2.3 esta REENTREGADO y EN REVISION HUMANA:
+# no abrir 3.x hasta que haya veredicto.
+#
+# Vista previa local (worker apagado, transporte falso, sin efectos externos):
+#   cd apps/backend  && node dist/src/main        # :3001, con las variables
+#   cd apps/frontend && npx next start -p 3000    # :3000
+# Falta cerrar la QA de 1920/1440/1280/1024: ver la nota de «QA visual desktop».
 ```
