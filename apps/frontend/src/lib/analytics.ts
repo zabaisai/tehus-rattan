@@ -1,5 +1,12 @@
 import api from './axios';
-import { AnalyticsOverview, LeadsByStage, AgentPerformance, LostReason } from '@/types';
+import {
+  ActividadReciente,
+  AgentPerformance,
+  AnalyticsOverview,
+  LeadsByStage,
+  LostReason,
+  SalesTrend,
+} from '@/types';
 
 export async function getOverview(): Promise<AnalyticsOverview> {
   const { data } = await api.get<AnalyticsOverview>('/analytics/overview');
@@ -29,4 +36,21 @@ export async function getOverdueTasksCount(): Promise<number> {
 export async function getPendingConversationsCount(): Promise<number> {
   const { data } = await api.get<{ count: number }>('/analytics/conversations-pending');
   return data.count;
+}
+
+/** Serie diaria: alimenta la tendencia y las comparaciones de las métricas. */
+export async function getSalesTrend(days = 30): Promise<SalesTrend> {
+  const { data } = await api.get<SalesTrend>('/analytics/sales-trend', {
+    params: { days },
+  });
+  return data;
+}
+
+export async function getRecentActivity(
+  limit = 8,
+): Promise<ActividadReciente[]> {
+  const { data } = await api.get<ActividadReciente[]>('/analytics/activity', {
+    params: { limit },
+  });
+  return data;
 }

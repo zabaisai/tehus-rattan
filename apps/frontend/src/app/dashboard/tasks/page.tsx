@@ -1,33 +1,27 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { Suspense, useState, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Check, Trash2, Pencil, CheckSquare } from 'lucide-react';
 import { getTasks, createTask, updateTask, completeTask, deleteTask } from '@/lib/tasks';
+import {
+  CLASES_PRIORIDAD,
+  ETIQUETA_ESTADO_TAREA,
+  ETIQUETA_PRIORIDAD,
+} from '@/lib/tareas';
 import { Task } from '@/types';
 import { TaskModal, TaskFormData } from '@/components/tasks/TaskModal';
 import { ListState } from '@/components/ui/ListState';
 import { SugerenciasDeTarea } from '@/components/tasks/SugerenciasDeTarea';
 import { intervaloDeRefresco, useRealtime } from '@/lib/use-realtime';
 
-const priorityColors: Record<string, string> = {
-  LOW: 'bg-neutral-100 text-neutral-600',
-  MEDIUM: 'bg-status-info-surface text-status-info',
-  HIGH: 'bg-status-warning-surface text-status-warning-strong',
-  URGENT: 'bg-status-error-surface text-status-error',
-};
-
-const priorityLabels: Record<string, string> = {
-  LOW: 'Baja',
-  MEDIUM: 'Media',
-  HIGH: 'Alta',
-  URGENT: 'Urgente',
-};
-
-const statusLabels: Record<string, string> = {
-  PENDING: 'Pendiente',
-  IN_PROGRESS: 'En progreso',
-};
+// Las tablas de prioridad y estado viven en `lib/tareas`: la agenda del Inicio
+// enseña lo mismo, y dos copias son dos sitios donde la misma tarea puede
+// salir como «Alta» en una pantalla y «HIGH» en la otra.
+const priorityColors = CLASES_PRIORIDAD;
+const priorityLabels = ETIQUETA_PRIORIDAD;
+const statusLabels = ETIQUETA_ESTADO_TAREA;
 
 function formatDueDate(value: string | null) {
   if (!value) return null;
@@ -163,7 +157,7 @@ function TaskGroup({
   );
 }
 
-export default function TasksPage() {
+function TasksPageContent() {
   const queryClient = useQueryClient();
   // Una tarea asignada por otro asesor aparece sola.
   const { enVivo } = useRealtime();
@@ -175,6 +169,25 @@ export default function TasksPage() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+
+  // Enlace profundo desde la agenda del Inicio: `?abrir=<id>` abre esa tarea.
+  // Mismo patrón que Productos, incluida la razón: se ajusta en el RENDER y no
+  // en un efecto —un efecto que llama a `setState` provoca un segundo render
+  // en cascada y el diálogo aparecería un fotograma tarde—, y `urlAplicada`
+  // hace que ocurra una sola vez, de modo que cerrarlo no lo reabra mientras
+  // el parámetro siga en la URL.
+  //
+  // Solo abre si el id existe de verdad: una tarea completada o borrada deja
+  // enlaces vivos por ahí, y un diálogo vacío es peor que no abrir nada.
+  const parametros = useSearchParams();
+  const idPorUrl = parametros.get('abrir');
+  const [urlAplicada, setUrlAplicada] = useState<string | null>(null);
+  const tareaPorUrl =
+    idPorUrl && tasks ? (tasks.find((t) => t.id === idPorUrl) ?? null) : null;
+  if (tareaPorUrl && urlAplicada !== idPorUrl) {
+    setUrlAplicada(idPorUrl);
+    setEditingTask(tareaPorUrl);
+  }
 
   const groups = useMemo(() => groupTasks(tasks ?? []), [tasks]);
 
@@ -260,5 +273,21 @@ export default function TasksPage() {
         <TaskModal task={editingTask} onClose={() => setEditingTask(null)} onSubmit={handleUpdate} />
       )}
     </div>
+  );
+}
+
+/**
+ * `useSearchParams` obliga a un límite de Suspense para que la página pueda
+ * prerenderizarse. Mismo patrón que Productos, cotizaciones y conversaciones.
+ */
+export default function TasksPage() {
+  return (
+    <Suspense
+      fallback={
+        <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>
+      }
+    >
+      <TasksPageContent />
+    </Suspense>
   );
 }

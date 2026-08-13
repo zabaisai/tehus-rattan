@@ -164,6 +164,15 @@
 
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-entrance: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Duraciones de la banda 140–220 ms que fija el plan maestro (§3.2).
+     Existen como tokens para que nadie vuelva a escribir `duration-[170ms]` a
+     ojo: tres valores con nombre cubren hover, entrada y paneles, y cualquier
+     valor fuera de la banda se nota al revisarlo. Todas se apagan solas con
+     `prefers-reduced-motion` por la regla del final de este archivo. */
+  --duration-rapida: 140ms;
+  --duration-media: 180ms;
+  --duration-lenta: 220ms;
 }
 
 :root {

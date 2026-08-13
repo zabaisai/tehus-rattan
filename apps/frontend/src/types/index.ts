@@ -237,6 +237,45 @@ export interface LostReason {
   count: number;
 }
 
+/** Un día de la serie. El dinero ya viene sumado en Decimal por el servidor. */
+export interface PuntoTendencia {
+  date: string;
+  openedCount: number;
+  openedValue: number;
+  wonCount: number;
+  wonValue: number;
+}
+
+export interface TotalesTendencia {
+  openedCount: number;
+  openedValue: number;
+  wonCount: number;
+  wonValue: number;
+}
+
+export interface SalesTrend {
+  days: number;
+  from: string;
+  to: string;
+  points: PuntoTendencia[];
+  totals: TotalesTendencia;
+  /** La ventana anterior del MISMO tamaño, para comparar sin inventar nada. */
+  previous: TotalesTendencia;
+  /**
+   * Ganadas sin historial de etapa: no se pueden fechar, así que no están en
+   * `points`. Se enseña como nota, no se reparte entre los días.
+   */
+  wonWithoutDate: number;
+}
+
+export interface ActividadReciente {
+  id: string;
+  action: string;
+  entityType: string;
+  createdAt: string;
+  actorName: string | null;
+}
+
 export interface Product {
   id: string;
   code: string | null;

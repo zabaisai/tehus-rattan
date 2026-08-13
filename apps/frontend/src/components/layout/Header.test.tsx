@@ -64,3 +64,31 @@ describe('Header', () => {
     expect(useAuthStore.getState().user).toBeNull();
   });
 });
+
+describe('Header — acción global «Crear»', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'u1', name: 'Ana', email: 'a@co.test', role: 'ADMIN', companyId: 'c1' } as never,
+    });
+  });
+
+  it('existe y abre la MISMA paleta que Ctrl+K, no un menú aparte', async () => {
+    // El panel «Crear rápidamente» del mockup 16 ya vive dentro de la paleta,
+    // con sus seis acciones y sus permisos espejados del backend. Un menú
+    // propio aquí sería una segunda lista que mantener.
+    renderHeader({ onMenuClick: vi.fn() });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Crear' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('dialog')).toBeInTheDocument(),
+    );
+  });
+
+  it('el disparador de búsqueda sigue existiendo junto al de crear', () => {
+    renderHeader({ onMenuClick: vi.fn() });
+
+    expect(screen.getByRole('button', { name: /Buscar/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Crear' })).toBeInTheDocument();
+  });
+});

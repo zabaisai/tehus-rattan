@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
+  ChevronRight,
   LayoutDashboard,
   Users,
   KanbanSquare,
@@ -27,6 +28,8 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { useDialogoModal } from '@/components/ui/useDialogoModal';
+import { iniciales } from '@/components/ui/Avatar';
+import { TaktoLogo } from '@/components/ui/TaktoLogo';
 import { getMyCompany, resolveCompanyAssetUrl } from '@/lib/companies';
 import { NOMBRE_PULSO } from '@/lib/producto';
 
@@ -133,16 +136,82 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
       ];
 
   const logoUrl = company?.logoUrl ? resolveCompanyAssetUrl(company.logoUrl) : null;
-  // Dentro del espacio de trabajo manda la identidad de LA EMPRESA: es su
-  // casa. TAKTO solo aparece como respaldo mientras carga o si no hay
-  // nombre; mezclar ambas marcas en la misma barra es justo lo que el manual
-  // prohibe.
   const brandName = company?.name || 'TAKTO';
-  const activeColor = company?.primaryColor || undefined;
+
+  /**
+   * LAS DOS MARCAS, SEPARADAS EN VEZ DE MEZCLADAS.
+   *
+   * El manual prohibe mezclar la identidad de TAKTO con la de la empresa
+   * cliente, y antes eso se resolvia enseñando SOLO a la empresa: la barra no
+   * decia de que producto era. El mockup 01 lo resuelve mejor y es lo que se
+   * implementa aqui: TAKTO arriba, como marca del producto en su propia
+   * franja, y la empresa justo debajo en su propio bloque. Nunca comparten
+   * linea, nunca comparten fondo, y el color propio de la empresa no se
+   * derrama sobre la navegacion.
+   *
+   * Por eso el color primario de la empresa YA NO pinta el elemento activo del
+   * menu: el elemento activo pertenece al producto, no al inquilino. La
+   * identidad de la empresa vive en su bloque, en sus documentos y en sus
+   * pantallas.
+   */
+  const bloqueDeEmpresa = (compacto = false) => {
+    const contenido = (
+      <>
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={logoUrl}
+            alt=""
+            className="h-7 w-7 shrink-0 rounded-md bg-white object-contain p-0.5"
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10 text-[11px] font-semibold text-white"
+          >
+            {iniciales(brandName)}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-white">
+          {brandName}
+        </span>
+        {canManageCompany && (
+          <ChevronRight
+            size={15}
+            aria-hidden="true"
+            className="shrink-0 text-white/50 transition-transform duration-rapida ease-standard group-hover:translate-x-0.5"
+          />
+        )}
+      </>
+    );
+
+    // El chevron solo aparece si de verdad lleva a algun sitio. Un desplegable
+    // dibujado que no despliega nada es peor que no dibujarlo: un usuario
+    // pertenece a UNA empresa, asi que aqui no hay nada entre lo que elegir.
+    // Para quien administra, el bloque abre la configuracion de su empresa.
+    return canManageCompany ? (
+      <Link
+        href="/dashboard/settings/company"
+        className={`group flex items-center gap-2.5 rounded-lg bg-white/5 outline-none transition-colors duration-rapida ease-standard hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-brand-secondary ${
+          compacto ? 'px-2.5 py-2' : 'px-3 py-2.5'
+        }`}
+      >
+        {contenido}
+      </Link>
+    ) : (
+      <div
+        className={`flex items-center gap-2.5 rounded-lg bg-white/5 ${
+          compacto ? 'px-2.5 py-2' : 'px-3 py-2.5'
+        }`}
+      >
+        {contenido}
+      </div>
+    );
+  };
 
   function renderNav(onNavigate?: () => void) {
     return (
-      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 pb-4">
         {navItems.map((item) => {
           const isActive =
             item.href === '/dashboard'
@@ -155,19 +224,17 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               key={item.href}
               href={item.href}
               onClick={onNavigate}
-              style={isActive && activeColor ? { backgroundColor: activeColor } : undefined}
-              // El acento naranja marca DONDE ESTAS: una barra a la
-              // izquierda del elemento activo. Va como borde y no como fondo
-              // porque el naranja de marca a pantalla completa compite con el
-              // contenido, y porque asi convive con el color propio de cada
-              // empresa sin taparlo.
-              className={`flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
+              aria-current={isActive ? 'page' : undefined}
+              // El acento naranja marca DONDE ESTAS: una barra a la izquierda
+              // del elemento activo. Va como borde y no como fondo porque el
+              // naranja a pantalla completa compite con el contenido.
+              className={`flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors duration-rapida ease-standard sm:py-2 ${
                 isActive
-                  ? `border-brand-secondary text-white ${activeColor ? '' : 'bg-brand-primary'}`
-                  : 'border-transparent text-neutral-600 hover:bg-neutral-100'
+                  ? 'border-brand-secondary bg-white/10 font-medium text-white'
+                  : 'border-transparent text-neutral-300 hover:bg-white/5 hover:text-white'
               }`}
             >
-              <Icon size={16} strokeWidth={2} />
+              <Icon size={16} strokeWidth={2} className="shrink-0" />
               {item.label}
             </Link>
           );
@@ -180,18 +247,20 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             </div>
             {platformNavItems.map((item) => {
               const Icon = item.icon;
+              const isActive = pathname.startsWith(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
-                  className={`flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-sm transition-colors sm:py-2 ${
-                    pathname.startsWith(item.href)
-                      ? 'bg-brand-primary text-white'
-                      : 'text-neutral-600 hover:bg-neutral-100'
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`flex items-center gap-2.5 rounded-md border-l-2 px-2.5 py-2.5 text-sm transition-colors duration-rapida ease-standard sm:py-2 ${
+                    isActive
+                      ? 'border-brand-secondary bg-white/10 font-medium text-white'
+                      : 'border-transparent text-neutral-300 hover:bg-white/5 hover:text-white'
                   }`}
                 >
-                  <Icon size={16} strokeWidth={2} />
+                  <Icon size={16} strokeWidth={2} className="shrink-0" />
                   {item.label}
                 </Link>
               );
@@ -202,26 +271,25 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
     );
   }
 
-  const brandHeader = (
-    <div className="flex shrink-0 items-center gap-2.5 border-b border-neutral-200 px-5 py-4">
-      {logoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={logoUrl} alt={brandName} className="h-8 w-8 shrink-0 rounded object-contain" />
-      ) : null}
-      <div className="min-w-0">
-        <h1 className="truncate text-sm font-semibold tracking-tight text-neutral-900">
-          {brandName}
-        </h1>
-        <p className="text-xs text-neutral-500">CRM</p>
-      </div>
-    </div>
-  );
-
   return (
     <>
       {/* Desktop: fixed sidebar, always visible from the lg breakpoint up. */}
-      <aside className="hidden h-full w-60 shrink-0 flex-col border-r border-neutral-200 bg-white lg:flex">
-        {brandHeader}
+      <aside className="hidden h-full w-60 shrink-0 flex-col bg-surface-inverse lg:flex">
+        <div className="flex shrink-0 items-center px-5 py-4">
+          {/* TAKTO en negativo: TAK blanco, TO naranja. Es la regla del manual
+              para fondo oscuro, y la geometria aprobada vive en el propio
+              componente, no redibujada aqui. */}
+          <Link
+            href="/dashboard"
+            aria-label="TAKTO — ir al inicio"
+            className="rounded outline-none focus-visible:ring-2 focus-visible:ring-brand-secondary"
+          >
+            <TaktoLogo variant="lockup" tone="negative" height={26} />
+          </Link>
+        </div>
+        {!isPlatformSuperAdmin && (
+          <div className="shrink-0 px-3 pb-3">{bloqueDeEmpresa()}</div>
+        )}
         {renderNav()}
       </aside>
 
@@ -255,27 +323,24 @@ export function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
                 'aria-label': 'Navegación principal',
               }
             : { inert: true })}
-          className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 max-w-[85vw] flex-col bg-white shadow-xl transition-transform duration-200 ease-out ${
+          className={`fixed inset-y-0 left-0 z-50 flex h-full w-72 max-w-[85vw] flex-col bg-surface-inverse shadow-xl transition-transform duration-lenta ease-standard ${
             mobileOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="flex shrink-0 items-center justify-between border-b border-neutral-200 px-4 py-3">
-            <div className="flex min-w-0 items-center gap-2.5">
-              {logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={logoUrl} alt={brandName} className="h-7 w-7 shrink-0 rounded object-contain" />
-              ) : null}
-              <span className="truncate text-sm font-semibold text-neutral-900">{brandName}</span>
-            </div>
+          <div className="flex shrink-0 items-center justify-between px-4 py-3">
+            <TaktoLogo variant="lockup" tone="negative" height={24} />
             <button
               type="button"
               onClick={onMobileClose}
               aria-label="Cerrar menú"
-              className="rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100"
+              className="rounded-md p-1.5 text-white/70 transition-colors duration-rapida ease-standard hover:bg-white/10 hover:text-white"
             >
               <X size={18} />
             </button>
           </div>
+          {!isPlatformSuperAdmin && (
+            <div className="shrink-0 px-3 pb-3">{bloqueDeEmpresa(true)}</div>
+          )}
           {renderNav(onMobileClose)}
         </div>
       </div>

@@ -144,3 +144,59 @@ describe('Sidebar', () => {
     expect(screen.getAllByRole('link', { name: /Eliminaciones/i }).length).toBeGreaterThan(0);
   });
 });
+
+describe('Sidebar — identidad del producto y de la empresa', () => {
+  beforeEach(() => {
+    currentPathname = '/dashboard';
+    useAuthStore.setState({
+      user: { id: 'u1', name: 'Ana', email: 'a@co.test', role: 'ADMIN', companyId: 'c1' } as never,
+    });
+  });
+
+  it('lleva el logotipo TAKTO y enlaza al inicio', () => {
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    const marca = screen.getAllByRole('link', { name: 'TAKTO — ir al inicio' })[0];
+    expect(marca).toHaveAttribute('href', '/dashboard');
+  });
+
+  it('la empresa va en SU PROPIO bloque, nunca en la misma línea que TAKTO', async () => {
+    // El manual prohíbe mezclar las dos marcas. Separarlas en dos franjas es
+    // lo que permite enseñar ambas sin incumplirlo.
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    const empresa = await screen.findAllByRole('link', { name: /Tehus Rattan/ });
+    expect(empresa[0]).toHaveAttribute('href', '/dashboard/settings/company');
+    expect(empresa[0].textContent).not.toContain('TAKTO');
+  });
+
+  it('para quien NO administra, el bloque de empresa no finge ser un selector', async () => {
+    // Un usuario pertenece a UNA empresa: un desplegable que no despliega
+    // nada es peor que no dibujarlo.
+    useAuthStore.setState({
+      user: { id: 'u2', name: 'Luis', email: 'l@co.test', role: 'AGENT', companyId: 'c1' } as never,
+    });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(await screen.findAllByText('Tehus Rattan')).not.toHaveLength(0);
+    expect(
+      screen.queryByRole('link', { name: /Tehus Rattan/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('el elemento activo se anuncia como página actual', () => {
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    const inicio = screen.getAllByRole('link', { name: 'Inicio' })[0];
+    expect(inicio).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('el color de la empresa ya NO pinta la navegación del producto', () => {
+    // El elemento activo pertenece al producto; la identidad de la empresa
+    // vive en su bloque, en sus documentos y en sus pantallas.
+    const { container } = renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    const conEstiloDeFondo = container.querySelectorAll('[style*="background-color"]');
+    expect(conEstiloDeFondo).toHaveLength(0);
+  });
+});

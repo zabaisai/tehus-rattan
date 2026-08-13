@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { LogOut, Menu, Search } from 'lucide-react';
+import { LogOut, Menu, Plus, Search } from 'lucide-react';
 import { useAuthStore } from '@/store/auth.store';
 import { logout } from '@/lib/auth';
 import { broadcastAuthEvent } from '@/lib/auth-events';
+import { Avatar } from '@/components/ui/Avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
 import { PaletaDeBusqueda } from '@/components/busqueda/PaletaDeBusqueda';
 import { olvidarRecientes } from '@/lib/creacion-rapida';
@@ -84,12 +85,41 @@ export function Header({ onMenuClick }: HeaderProps) {
       </button>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* ACCIÓN GLOBAL «CREAR». Abre la MISMA paleta que Ctrl/⌘+K, que es
+            donde ya vive el panel «Crear rápidamente» del mockup 16 con sus
+            seis acciones y sus permisos espejados del backend. Un menú propio
+            aquí habría sido una segunda lista de acciones que mantener —y el
+            primer sitio donde olvidar que «Nuevo producto» es solo para
+            administradores. */}
+        <button
+          type="button"
+          onClick={() => setPaletaAbierta(true)}
+          // El nombre accesible va en `aria-label` y el rótulo visible va
+          // `aria-hidden`: por debajo de `sm` el texto se oculta con CSS, y un
+          // `sr-only` de repuesto habría hecho que el lector de pantalla oyera
+          // «Crear Crear» en los anchos donde ambos existen.
+          aria-label="Crear"
+          className="inline-flex items-center gap-1.5 rounded-md bg-brand-secondary px-3 py-1.5 text-sm font-semibold text-brand-primary outline-none transition-colors duration-rapida ease-standard hover:bg-secondary-600 focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1"
+        >
+          <Plus size={16} aria-hidden="true" />
+          <span aria-hidden="true" className="hidden sm:inline">
+            Crear
+          </span>
+        </button>
+
         <NotificationBell />
-        <span className="hidden text-sm text-neutral-700 sm:inline">{user?.name ?? '...'}</span>
+
+        <span className="hidden items-center gap-2 sm:flex">
+          <Avatar nombre={user?.name} size="sm" />
+          <span className="max-w-[9rem] truncate text-sm text-content-primary">
+            {user?.name ?? '…'}
+          </span>
+        </span>
+
         <button
           onClick={handleLogout}
           aria-label="Cerrar sesión"
-          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-content-secondary transition-colors duration-rapida ease-standard hover:bg-neutral-100 hover:text-content-primary"
         >
           <LogOut size={15} />
           <span className="hidden sm:inline">Salir</span>

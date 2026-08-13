@@ -162,3 +162,132 @@ describe('Panel', () => {
     expect(esSinPermiso(undefined)).toBe(false);
   });
 });
+
+describe('MetricCard — tendencia, que nunca se inventa', () => {
+  it('NO dibuja curva con menos de dos puntos', () => {
+    // Una recta sobre un solo día sugiere una estabilidad que nadie ha medido.
+    const { container } = render(
+      <MetricCard
+        etiqueta="Abiertas"
+        valor={3}
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir"
+        serie={[5]}
+      />,
+    );
+    expect(container.querySelector('svg path')).toBeNull();
+  });
+
+  it('dibuja la curva cuando la serie existe de verdad', () => {
+    const { container } = render(
+      <MetricCard
+        etiqueta="Abiertas"
+        valor={3}
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir"
+        serie={[1, 4, 2, 7]}
+      />,
+    );
+    expect(container.querySelectorAll('svg path').length).toBeGreaterThan(0);
+  });
+
+  it('una serie plana no rompe el dibujo (sin división por cero)', () => {
+    const { container } = render(
+      <MetricCard
+        etiqueta="Abiertas"
+        valor={0}
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir"
+        serie={[0, 0, 0]}
+      />,
+    );
+    const d = container.querySelector('svg path')?.getAttribute('d') ?? '';
+    expect(d).not.toContain('NaN');
+  });
+
+  it('la comparación entra en el nombre accesible, no solo en la flecha', () => {
+    render(
+      <MetricCard
+        etiqueta="Abiertas"
+        valor={7}
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir el embudo"
+        comparacion={{ texto: '+3', contra: 'vs. 30 días previos', direccion: 'sube' }}
+      />,
+    );
+    expect(
+      screen.getByRole('link', {
+        name: 'Abiertas: 7. +3 vs. 30 días previos. Abrir el embudo',
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it('subir no siempre es bueno: el color sale de la métrica, no del signo', () => {
+    const { container } = render(
+      <MetricCard
+        etiqueta="Tareas vencidas"
+        valor={9}
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir"
+        comparacion={{
+          texto: '+4',
+          contra: 'vs. ayer',
+          direccion: 'sube',
+          subirEsBueno: false,
+        }}
+      />,
+    );
+    expect(container.innerHTML).toContain('text-status-error');
+    expect(container.innerHTML).not.toContain('text-status-success-strong');
+  });
+
+  it('sin cambio, el color se queda neutro', () => {
+    const { container } = render(
+      <MetricCard
+        etiqueta="Abiertas"
+        valor={7}
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir"
+        comparacion={{ texto: '0', contra: 'vs. ayer', direccion: 'igual' }}
+      />,
+    );
+    expect(container.innerHTML).not.toContain('text-status-success-strong');
+    expect(container.innerHTML).not.toContain('text-status-error');
+  });
+
+  it('la nota explica una métrica sin curva, en vez de dejar el hueco', () => {
+    render(
+      <MetricCard
+        etiqueta="Conversión"
+        valor="18,4 %"
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir"
+        nota="acumulado histórico"
+      />,
+    );
+    expect(screen.getByText('acumulado histórico')).toBeInTheDocument();
+  });
+
+  it('mientras carga no enseña ni cifra ni curva', () => {
+    const { container } = render(
+      <MetricCard
+        etiqueta="Abiertas"
+        valor={7}
+        icono={Target}
+        href="/x"
+        hrefLabel="Abrir"
+        cargando
+        serie={[1, 2, 3]}
+      />,
+    );
+    expect(screen.queryByText('7')).not.toBeInTheDocument();
+    expect(container.querySelector('svg path')).toBeNull();
+  });
+});
