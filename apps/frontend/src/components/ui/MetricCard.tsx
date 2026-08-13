@@ -129,7 +129,11 @@ export function MetricCard({
             aria-hidden="true"
             className={`mt-1 shrink-0 ${tono === 'atencion' ? 'text-status-warning-strong' : 'text-primary-400'}`}
           >
-            <Sparkline puntos={serie} ancho={56} alto={24} />
+            {/* 44 px y no 56: el ancho más apretado NO es 1024 sino **1280**,
+                donde `xl` pone las cuatro tarjetas en fila y cada una se queda
+                con ~82 px para la cifra. Medido en el navegador: «$ 20 M»
+                pedía 86 px y salía cortado por cuatro. */}
+            <Sparkline puntos={serie} ancho={44} alto={22} />
           </span>
         )}
       </div>

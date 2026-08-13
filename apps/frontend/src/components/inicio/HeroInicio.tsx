@@ -84,16 +84,20 @@ export function HeroInicio({
         </svg>
       </span>
 
-      <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+      {/* El saludo y las acciones comparten fila desde `xl`, no desde `lg`. A
+          1024 px caben pero el titular se recortaba —«Buenas tardes,
+          Administrador» no entraba junto a los dos botones— y un saludo
+          cortado por la mitad es lo primero que se ve de la pantalla. */}
+      <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <h2
             id="inicio-saludo"
-            className="truncate text-2xl font-semibold tracking-tight text-white sm:text-[28px]"
+            className="text-2xl font-semibold leading-tight tracking-tight text-white sm:text-[28px]"
           >
             {saludo(hora)}
             {nombre ? `, ${nombre}` : ''}
           </h2>
-          <p className="mt-1 truncate text-sm text-white/70">
+          <p className="mt-1 text-sm text-white/70">
             {nombreEmpresa
               ? `Tu operación comercial de hoy · ${nombreEmpresa}`
               : 'Tu operación comercial de hoy'}

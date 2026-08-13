@@ -52,7 +52,12 @@ export function Panel({
       <div className="flex shrink-0 items-center justify-between gap-3 border-b border-line-default px-4 py-3">
         <h3
           id={`panel-${titulo.replace(/\s+/g, '-').toLowerCase()}`}
-          className="truncate text-sm font-semibold text-content-primary"
+          // Envuelve en vez de truncarse. A 1280 px el panel se queda en un
+          // tercio del ancho y «Conversaciones que requieren respuesta» pedía
+          // 254 px en 213: se leía «…que requieren re». Un titular cortado es
+          // peor que un titular de dos líneas, y con `items-start` en la
+          // retícula la altura extra no arrastra a los paneles vecinos.
+          className="min-w-0 text-sm font-semibold leading-snug text-content-primary"
         >
           {titulo}
         </h3>
