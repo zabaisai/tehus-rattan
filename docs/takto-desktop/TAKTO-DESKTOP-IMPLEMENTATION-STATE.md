@@ -14,8 +14,8 @@
 - Commits de 2.3 (primer intento, **rechazado visualmente**): `66a3c49` · `716e885`
 - SHA que cerró documentalmente aquel intento: `99968cdc057c5de38555d4c48463ff0f660da573`
 - Commits de 2.3 (segundo intento): `f9e6992` (contratos) · `e506330` (shell + pantalla)
-  · `84772f7` (tres recortes) · corrección del doble desplazamiento (SHA se anota
-  tras publicar, según la lección de más abajo)
+  · `84772f7` (tres recortes) · `f133e69` (doble desplazamiento) · empaquetado de
+  la retícula (SHA se anota tras publicar, según la lección de más abajo)
 - `main`: `b19217c2e4da69b251285774c1f6585cc29fb765`
 - Staging: no tocado
 - Producción: fuera de alcance
@@ -313,7 +313,8 @@ siguiente conserva el registro del primer intento, que sigue siendo cierto en
 lo que afirma.
 
 **Commits de la reentrega:** `f9e6992` (contratos) · `e506330` (shell + pantalla)
-· `84772f7` (tres recortes) · corrección del doble desplazamiento
+· `84772f7` (tres recortes) · `f133e69` (doble desplazamiento) · empaquetado de la
+retícula
 
 ### Segunda ronda de revisión humana: dos barras de desplazamiento
 
@@ -362,6 +363,49 @@ documento, no la de `main`, así que con un diálogo abierto el contenido de
 detrás siempre se ha podido desplazar. Sigue igual —no es una regresión de este
 cambio, y arreglarlo toca `useDialogoModal`, que usan todas las pantallas—. Se
 anota como deuda, no se corrige aquí.
+
+### Tercera ronda de revisión humana: huecos de la retícula
+
+Aprobado el doble desplazamiento y probadas todas las acciones y enlaces
+profundos del Inicio, quedaba un defecto visual: **«Embudo comercial» es más
+alto que «Conversaciones» y «Agenda», y como los tres compartían fila, la
+segunda fila esperaba al Embudo y dejaba una franja de fondo vacío bajo los
+paneles cortos.**
+
+**Causa exacta.** En una retícula la fila entera mide lo que su elemento más
+alto. `items-start` ya impedía que los paneles se estirasen —eso se arregló en
+la reentrega— pero no impide que la fila siguiente espere. Medido a 1536 px:
+Embudo 422 px, Conversaciones 165 y Agenda 246; la segunda fila arrancaba a
+438 px del techo de la primera, así que quedaban **273 px** de fondo bajo
+Conversaciones y **192 px** bajo Agenda.
+
+A 1024 era peor por otro motivo: «Tendencia de ventas» ocupaba `col-span-12`,
+así que no cabía junto a la Agenda y dejaba **media fila entera vacía**. Hueco
+medido: **535 px**.
+
+Segundo defecto en el mismo sitio: la fila de abajo iba **5/4/3** contra el
+**4/4/4** de la de arriba, de modo que ningún panel inferior quedaba alineado
+con el superior. Medido a 1536: Embudo empezaba en x=264 y Tendencia también,
+pero Conversaciones en 680 contra Rendimiento en 784, y Agenda en 1097 contra
+Actividad en 1201.
+
+**Corrección.** Cada pareja se agrupa en su **columna**, para que Tendencia
+suba pegada al Embudo, Rendimiento a Conversaciones y Actividad a la Agenda.
+Eso pide dos disposiciones —seis elementos sueltos por debajo de `xl`, tres
+columnas a partir de `xl`— y **`display: contents`** las da con un solo DOM:
+por debajo de `xl` el envoltorio no genera caja y sus paneles participan en la
+retícula como si no existiera; a partir de `xl` se convierte en columna
+flexible. Ni componentes duplicados, ni dos dashboards, ni alturas fijas. Las
+tres columnas pasan a `col-span-4`, así que ahora sí se alinean.
+
+**Qué se descartó.** `grid-template-rows: masonry` no está disponible de forma
+estable. Las columnas CSS (`columns-*`) empaquetan igual de bien pero reparten
+los paneles por equilibrado de altura, y entonces la pareja de cada columna
+deja de ser la del mockup, que es justo lo que pedía la revisión.
+
+**La primera columna es entera de administración**, así que para el resto de
+roles no se monta ni el envoltorio: reservar un tercio de pantalla a nada sería
+cambiar un hueco por otro.
 
 ### Qué rechazó la revisión, y cómo se resolvió
 
@@ -631,6 +675,11 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 | 2026-08-13 | 2.3 (doble scroll) | `npm run typecheck` + `npm run lint` + `npm run build` | sin errores (1 warning previo) |
 | 2026-08-13 | 2.3 (doble scroll) | backend `tsc --noEmit` + `npx jest` | **2137/2137** en 129 suites, sin cambios |
 | 2026-08-13 | 2.3 (doble scroll) | Mediciones DOM 1920/1536/1440/1280/1024 | una sola zona desplazable en los cinco |
+| 2026-08-13 | 2.3 (doble scroll) | CI sobre `f133e69` | Backend y Frontend `success` |
+| 2026-08-13 | 2.3 (retícula) | `vitest run` (frontend completo) | **627/627** en 69 archivos (+4) |
+| 2026-08-13 | 2.3 (retícula) | `typecheck` + `lint` + `build` | sin errores (1 warning previo) |
+| 2026-08-13 | 2.3 (retícula) | Huecos 1920/1536/1440/1280/1024 | 273 → 16 px; 535 → 67 px a 1024 |
+| 2026-08-13 | 2.3 (retícula) | Estados: escaso, carga y seis paneles en error | sin huecos, solapes ni desbordes |
 
 ---
 
@@ -719,6 +768,41 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 > pipeline, conversaciones, tareas, contactos, productos, cotizaciones, bots y
 > empresa. Cero desbordamiento vertical y horizontal del documento y cero
 > absolutos fugados en todas.
+
+> **Huecos de la retícula: antes y después.** «Hueco» es la distancia del fondo
+> de un panel al techo del panel más cercano que quede por debajo y solape
+> horizontalmente con él, aunque no compartan borde izquierdo. El separador
+> legítimo de la retícula es 16 px; todo lo que exceda es fondo vacío.
+>
+> | Ancho CSS | Hueco máximo | Dónde estaba | Alto del contenido |
+> |---|---|---|---|
+> | 1920 | 273 → **16** | bajo Conversaciones | 1118 → 1118 |
+> | 1536 | 273 → **16** | bajo Conversaciones (y 192 bajo Agenda) | 1136 → 1136 |
+> | 1440 | 273 → **16** | ídem | 1136 → 1136 |
+> | 1280 | 254 → **16** | ídem | 1136 → 1136 |
+> | 1024 | 535 → **67** | media fila vacía junto a la Agenda | 1892 → **1472** |
+>
+> De 1280 en adelante no queda ningún hueco por encima del separador. A 1024 el
+> resto son **51, 49 y 46 px** de diferencia natural entre los dos paneles que
+> comparten fila en una disposición de dos columnas: con tres columnas a ese
+> ancho cada una se quedaría en 234 px y no cabrían ni la tabla de rendimiento
+> ni las filas del embudo. Además el contenido se acorta 420 px, que es
+> desplazamiento que el usuario ya no hace.
+>
+> En los cinco anchos, antes y después: **cero solapamientos**, **cero
+> desbordamiento horizontal**, y sigue habiendo **una sola zona desplazable**
+> (`main`).
+>
+> **Estados comprobados.** Contenido escaso, que es el de la vista previa: una
+> conversación, tres tareas, cuatro registros de actividad y «Rendimiento por
+> asesor» ya en su estado honesto de «sin responsable». Carga con esqueletos, y
+> los **seis paneles en error a la vez** (bloqueando `analytics`,
+> `conversations/inbox` y `tasks` en la red): los seis quedan a 146 px a 1536 y
+> a 166 px a 1024, con separación de 16 px, sin solapes ni desbordes. El caso
+> «sin permiso» se fija en las pruebas, no en el navegador: para un rol sin
+> métricas el Inicio ni siquiera consulta `analytics`, así que lo que hay que
+> garantizar es estructural —que no se reserve la columna vacía— y eso es
+> exactamente lo que comprueba la prueba nueva.
 
 **Cómo se ejecutó la QA sin romper la vista previa del usuario.** Había una
 vista previa en `:3000`/`:3001` que el usuario está revisando y que no debía

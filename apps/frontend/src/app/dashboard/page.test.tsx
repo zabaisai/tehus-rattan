@@ -652,6 +652,85 @@ describe('Inicio — estados de carga y error', () => {
   });
 });
 
+// jsdom no calcula maquetación, así que aquí se fija la ESTRUCTURA que produce
+// el empaquetado por columnas —qué panel va con cuál y en qué orden—, no los
+// píxeles. El hueco medido va en la QA de navegador.
+describe('Inicio — la retícula empaqueta por columnas, no por filas', () => {
+  function columnas(container: HTMLElement) {
+    return [...container.querySelectorAll('.contents')] as HTMLElement[];
+  }
+  function titulosDe(col: HTMLElement) {
+    return [...col.querySelectorAll('section[aria-labelledby^="panel-"] h3')].map(
+      (h) => h.textContent,
+    );
+  }
+
+  it('empareja cada panel de abajo con el de arriba de su columna', async () => {
+    sesion('ADMIN');
+    const { container } = renderPage();
+    await screen.findByRole('region', { name: 'Embudo comercial' });
+
+    const cols = columnas(container);
+    expect(cols).toHaveLength(3);
+    // Es la pareja del mockup 01: lo de abajo cuelga de lo de arriba.
+    expect(titulosDe(cols[0])).toEqual(['Embudo comercial', 'Tendencia de ventas']);
+    expect(titulosDe(cols[1])).toEqual([
+      'Conversaciones que requieren respuesta',
+      'Rendimiento por asesor',
+    ]);
+    expect(titulosDe(cols[2])).toEqual(['Agenda de hoy', 'Actividad reciente']);
+  });
+
+  it('cada columna se apila sola: sin alturas fijas y sin estirar los paneles', async () => {
+    sesion('ADMIN');
+    const { container } = renderPage();
+    await screen.findByRole('region', { name: 'Embudo comercial' });
+
+    for (const col of columnas(container)) {
+      // `contents` por debajo de xl y columna flexible a partir de xl. Si
+      // alguien mete aquí un alto fijo, el empaquetado deja de depender del
+      // contenido y vuelve el hueco.
+      expect(col.className).toContain('contents');
+      expect(col.className).toContain('xl:flex-col');
+      expect(col.className).not.toMatch(/\bh-\d|\bh-\[|min-h-\[/);
+    }
+    // La retícula sigue sin estirar sus elementos al más alto.
+    const rejilla = container.querySelector('.lg\\:grid-cols-12');
+    expect(rejilla?.className).toContain('items-start');
+  });
+
+  it('el orden del DOM —y por tanto el del teclado— recorre cada columna entera', async () => {
+    sesion('ADMIN');
+    const { container } = renderPage();
+    await screen.findByRole('region', { name: 'Embudo comercial' });
+
+    const orden = [...container.querySelectorAll('section[aria-labelledby^="panel-"] h3')].map(
+      (h) => h.textContent,
+    );
+    expect(orden).toEqual([
+      'Embudo comercial',
+      'Tendencia de ventas',
+      'Conversaciones que requieren respuesta',
+      'Rendimiento por asesor',
+      'Agenda de hoy',
+      'Actividad reciente',
+    ]);
+  });
+
+  it('sin permiso de métricas no reserva la columna que se quedaría vacía', async () => {
+    sesion('AGENT');
+    const { container } = renderPage();
+    await screen.findByRole('region', { name: 'Agenda de hoy' });
+
+    // La primera columna es entera de administración: no debe montarse un
+    // envoltorio que ocuparía un tercio de la pantalla sin nada dentro.
+    const cols = columnas(container);
+    expect(cols).toHaveLength(2);
+    expect(titulosDe(cols[0])).toEqual(['Conversaciones que requieren respuesta']);
+    expect(titulosDe(cols[1])).toEqual(['Agenda de hoy']);
+  });
+});
+
 /** Una conversación de bandeja con la espera que se quiera, en minutos. */
 function base(id: string, nombre: string, minutos: number) {
   return {

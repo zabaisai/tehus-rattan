@@ -232,108 +232,139 @@ export default function DashboardHomePage() {
         />
       )}
 
-      {/* `items-start` y no la altura igualada por defecto: con paneles de
-          contenido muy distinto, estirar todos al más alto es lo que dejaba
-          medio panel en blanco. Cada bloque ocupa lo que necesita. */}
+      {/* COLUMNAS QUE SE EMPAQUETAN SOLAS, NO FILAS QUE SE ESPERAN.
+          En una retícula, la fila entera mide lo que el elemento más alto: el
+          Embudo (422 px) obligaba a Conversaciones (165) y Agenda (246) a
+          dejar 273 y 192 px de fondo vacío debajo antes de que empezara la
+          segunda fila. `items-start` ya impedía que los paneles se estiraran,
+          pero no que la fila siguiente esperara.
+
+          La solución es agrupar cada pareja en su COLUMNA, para que Tendencia
+          suba pegada al Embudo, Rendimiento a Conversaciones y Actividad a la
+          Agenda, cada una a la altura que le toque. Eso pide dos disposiciones
+          distintas —seis elementos sueltos por debajo de `xl`, tres columnas a
+          partir de `xl`— y `display: contents` las da con UN SOLO DOM: por
+          debajo de `xl` el envoltorio no genera caja y sus paneles participan
+          en la retícula como si no existiera; a partir de `xl` se convierte en
+          columna flexible. Ni componentes duplicados, ni dos dashboards, ni
+          alturas fijas: el alto lo sigue poniendo el contenido real.
+
+          No se usa `grid-template-rows: masonry` porque no está disponible de
+          forma estable, ni columnas CSS (`columns-*`) porque reparten los
+          paneles por equilibrado de altura y la pareja de cada columna dejaría
+          de ser la del mockup.
+
+          Las tres columnas pasan a medir lo mismo (`col-span-4`). Antes la
+          segunda fila iba 5/4/3 contra el 4/4/4 de la primera, así que ningún
+          panel de abajo quedaba alineado con el de arriba. */}
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-12">
         {/* Los cuatro paneles de administración NO se montan para el resto de
             roles. Antes salían como cuatro cajas de «sin permiso» seguidas, y
             el Inicio de un asesor era medio aviso legal: el mensaje de arriba
             ya dice una vez lo que falta y a quién pedírselo. `sinPermiso`
-            sigue dentro por si el servidor y el rol de la sesión discrepan. */}
+            sigue dentro por si el servidor y el rol de la sesión discrepan.
+
+            La primera columna es entera de administración: si no se puede ver,
+            no se monta el envoltorio tampoco, para no dejar un tercio de
+            pantalla reservado a nada. */}
         {puedeVerMetricas && (
-          <Panel
-            titulo="Embudo comercial"
-            accion={{ href: '/dashboard/pipeline', etiqueta: 'Ver embudo' }}
-            cargando={porEtapa.isLoading}
-            sinPermiso={esSinPermiso(porEtapa.error)}
-            detalleSinPermiso="Solo un administrador ve el resumen por etapa."
-            error={esSinPermiso(porEtapa.error) ? undefined : porEtapa.error}
-            vacio={(porEtapa.data?.length ?? 0) === 0}
-            mensajeVacio="Todavía no hay etapas en el embudo."
-            className="lg:col-span-6 xl:col-span-4"
-          >
-            {porEtapa.data && (
-              <EmbudoComercial etapas={porEtapa.data} formatoDinero={dineroCorto} />
-            )}
-          </Panel>
+          <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-4">
+            <Panel
+              titulo="Embudo comercial"
+              accion={{ href: '/dashboard/pipeline', etiqueta: 'Ver embudo' }}
+              cargando={porEtapa.isLoading}
+              sinPermiso={esSinPermiso(porEtapa.error)}
+              detalleSinPermiso="Solo un administrador ve el resumen por etapa."
+              error={esSinPermiso(porEtapa.error) ? undefined : porEtapa.error}
+              vacio={(porEtapa.data?.length ?? 0) === 0}
+              mensajeVacio="Todavía no hay etapas en el embudo."
+              className="lg:col-span-6"
+            >
+              {porEtapa.data && (
+                <EmbudoComercial etapas={porEtapa.data} formatoDinero={dineroCorto} />
+              )}
+            </Panel>
+
+            <Panel
+              titulo="Tendencia de ventas"
+              cargando={tendencia.isLoading}
+              sinPermiso={esSinPermiso(tendencia.error)}
+              detalleSinPermiso="Solo un administrador ve la tendencia comercial."
+              error={esSinPermiso(tendencia.error) ? undefined : tendencia.error}
+              className="lg:col-span-6"
+            >
+              {tendencia.data && (
+                <TendenciaDeVentas datos={tendencia.data} formatoDinero={dineroCorto} />
+              )}
+            </Panel>
+          </div>
         )}
 
-        {/* Es lo único del Inicio que un asesor atiende AHORA, así que va por
-            delante de la agenda. Cualquier rol lo ve: la bandeja es del equipo. */}
-        <Panel
-          titulo="Conversaciones que requieren respuesta"
-          accion={{ href: '/dashboard/conversations', etiqueta: 'Ver todas' }}
-          cargando={pendientes.isLoading}
-          error={pendientes.error}
-          vacio={(pendientes.data?.items.length ?? 0) === 0}
-          mensajeVacio="Todo respondido. No hay mensajes sin leer."
-          className="lg:col-span-6 xl:col-span-4"
-        >
-          {pendientes.data && (
-            <ConversacionesPendientes conversaciones={pendientes.data.items} />
+        <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-4">
+          {/* Es lo único del Inicio que un asesor atiende AHORA, así que va por
+              delante de la agenda. Cualquier rol lo ve: la bandeja es del
+              equipo. */}
+          <Panel
+            titulo="Conversaciones que requieren respuesta"
+            accion={{ href: '/dashboard/conversations', etiqueta: 'Ver todas' }}
+            cargando={pendientes.isLoading}
+            error={pendientes.error}
+            vacio={(pendientes.data?.items.length ?? 0) === 0}
+            mensajeVacio="Todo respondido. No hay mensajes sin leer."
+            className="lg:col-span-6"
+          >
+            {pendientes.data && (
+              <ConversacionesPendientes conversaciones={pendientes.data.items} />
+            )}
+          </Panel>
+
+          {puedeVerMetricas && (
+            <Panel
+              titulo="Rendimiento por asesor"
+              cargando={asesores.isLoading}
+              sinPermiso={esSinPermiso(asesores.error)}
+              detalleSinPermiso="Solo un administrador ve el rendimiento del equipo."
+              error={esSinPermiso(asesores.error) ? undefined : asesores.error}
+              vacio={(asesores.data?.length ?? 0) === 0}
+              mensajeVacio="Todavía no hay personas activas en la empresa."
+              className="lg:col-span-6"
+            >
+              {asesores.data && (
+                <RendimientoPorAsesor asesores={asesores.data} formatoDinero={dineroCorto} />
+              )}
+            </Panel>
           )}
-        </Panel>
+        </div>
 
-        <Panel
-          titulo="Agenda de hoy"
-          accion={{ href: '/dashboard/tasks', etiqueta: 'Ver todas' }}
-          cargando={tareas.isLoading}
-          error={tareas.error}
-          vacio={proximas.length === 0}
-          mensajeVacio="No tienes tareas pendientes."
-          className="lg:col-span-6 xl:col-span-4"
-        >
-          <AgendaDeHoy tareas={proximas} />
-        </Panel>
-
-        {puedeVerMetricas && (
+        <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-4">
           <Panel
-            titulo="Tendencia de ventas"
-            cargando={tendencia.isLoading}
-            sinPermiso={esSinPermiso(tendencia.error)}
-            detalleSinPermiso="Solo un administrador ve la tendencia comercial."
-            error={esSinPermiso(tendencia.error) ? undefined : tendencia.error}
-            className="lg:col-span-12 xl:col-span-5"
+            titulo="Agenda de hoy"
+            accion={{ href: '/dashboard/tasks', etiqueta: 'Ver todas' }}
+            cargando={tareas.isLoading}
+            error={tareas.error}
+            vacio={proximas.length === 0}
+            mensajeVacio="No tienes tareas pendientes."
+            className="lg:col-span-6"
           >
-            {tendencia.data && (
-              <TendenciaDeVentas datos={tendencia.data} formatoDinero={dineroCorto} />
-            )}
+            <AgendaDeHoy tareas={proximas} />
           </Panel>
-        )}
 
-        {puedeVerMetricas && (
-          <Panel
-            titulo="Rendimiento por asesor"
-            cargando={asesores.isLoading}
-            sinPermiso={esSinPermiso(asesores.error)}
-            detalleSinPermiso="Solo un administrador ve el rendimiento del equipo."
-            error={esSinPermiso(asesores.error) ? undefined : asesores.error}
-            vacio={(asesores.data?.length ?? 0) === 0}
-            mensajeVacio="Todavía no hay personas activas en la empresa."
-            className="lg:col-span-6 xl:col-span-4"
-          >
-            {asesores.data && (
-              <RendimientoPorAsesor asesores={asesores.data} formatoDinero={dineroCorto} />
-            )}
-          </Panel>
-        )}
-
-        {puedeVerMetricas && (
-          <Panel
-            titulo="Actividad reciente"
-            accion={{ href: '/dashboard/notifications', etiqueta: 'Ver avisos' }}
-            cargando={actividad.isLoading}
-            sinPermiso={esSinPermiso(actividad.error)}
-            detalleSinPermiso="Solo un administrador ve la actividad de la empresa."
-            error={esSinPermiso(actividad.error) ? undefined : actividad.error}
-            vacio={(actividad.data?.length ?? 0) === 0}
-            mensajeVacio="Sin actividad registrada todavía."
-            className="lg:col-span-6 xl:col-span-3"
-          >
-            {actividad.data && <ActividadReciente filas={actividad.data} />}
-          </Panel>
-        )}
+          {puedeVerMetricas && (
+            <Panel
+              titulo="Actividad reciente"
+              accion={{ href: '/dashboard/notifications', etiqueta: 'Ver avisos' }}
+              cargando={actividad.isLoading}
+              sinPermiso={esSinPermiso(actividad.error)}
+              detalleSinPermiso="Solo un administrador ve la actividad de la empresa."
+              error={esSinPermiso(actividad.error) ? undefined : actividad.error}
+              vacio={(actividad.data?.length ?? 0) === 0}
+              mensajeVacio="Sin actividad registrada todavía."
+              className="lg:col-span-6"
+            >
+              {actividad.data && <ActividadReciente filas={actividad.data} />}
+            </Panel>
+          )}
+        </div>
       </div>
     </div>
   );
