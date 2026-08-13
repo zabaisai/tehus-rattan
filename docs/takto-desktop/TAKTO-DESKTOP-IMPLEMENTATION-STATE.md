@@ -62,7 +62,7 @@
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
-| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados: backend HECHO y verificado (3.x); interfaz NO entregada** | Interfaz de 3.x |
+| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados (3.x): entregada de extremo a extremo, EN REVISIÓN HUMANA** | Revisión humana de 3.x |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
@@ -83,7 +83,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 |---|---|---|
 | Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); 12 primitivas en `components/ui/`. Faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar de iniciales, swatches, tooltip |
 | Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
-| Contactos / papelera / fusión | **PARCIAL** | 11 endpoints previos más 7 de fusión (`:id/duplicados`, `:id/canonico`, `fusion/comparar`, `fusion/descartar`, `fusion/ejecutar`, `fusion/:id/deshacer`, `fusion/:id/estado`). **Fusión: backend HECHO, interfaz FALTANTE** |
+| Contactos / papelera / fusión | **PARCIAL** | 11 endpoints previos más 7 de fusión (`:id/duplicados`, `:id/canonico`, `fusion/comparar`, `fusion/descartar`, `fusion/ejecutar`, `fusion/:id/deshacer`, `fusion/:id/estado`) y el flujo del mockup 22 en `components/contacts/FusionDeDuplicados.tsx`. **Fusión: entregada, en revisión humana** |
 | Conversaciones / perfil lateral | **HECHO** (funcional) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
 | Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
 | Tareas y sugerencias | **PARCIAL** | 9 endpoints con `:id/aprobar` y `:id/rechazar`; `SugerenciasDeTarea` en frontend. Falta la vista del mockup 07 con pendientes/completadas/sugeridas separadas |
@@ -662,16 +662,12 @@ incremento seguro» al final del documento.
 
 ---
 
-## Incremento 3.x — Fusión segura de contactos duplicados (mockup 22)
+## Incremento 3.x — Fusión segura de contactos duplicados (mockup 22) · **EN REVISIÓN HUMANA**
 
-**Estado: EN CURSO. Backend entregado y verificado; INTERFAZ NO ENTREGADA.**
+**Estado: entregado de extremo a extremo. Pendiente de revisión visual.**
 
-No se marca `EN REVISIÓN HUMANA` a propósito: no hay nada visual que revisar
-todavía, y el §9 del master es explícito en que un endpoint sin consumidor no
-es una capacidad entregada. Marcarlo como listo para revisión sería exactamente
-el error que costó dos rondas en 2.3.
-
-**Commit de esta entrega:** `1582848` (esquema, contrato y backend).
+**Commits:** `1582848` (esquema, contrato y backend) · `b05b319` (interfaz)
+· `7e6383f` (pruebas de frontend) · el de este cierre documental.
 
 ### Preflight §2
 
@@ -738,20 +734,114 @@ Siete, todos bajo `/contacts` y con rutas de dos segmentos para no chocar con
 - Unitarias de permisos y de auditoría sin PII.
 - Backend completo: **2149/2149 en 131 suites**; typecheck y lint limpios.
 
-### Lo que NO se entregó, y por qué
+### Interfaz (mockup 22)
 
-- **La interfaz del mockup 22 no está hecha.** Ni el drawer de tres pasos, ni
-  su integración en Contactos y el perfil, ni la resolución de enlaces
-  antiguos, ni las pruebas de frontend.
-- **No se creó ningún dato `QA_MERGE_`.** Se dejó para cuando exista la
-  pantalla que hay que revisar con ellos; sembrarlos ahora solo dejaría datos
-  sueltos en la vista previa sin nada donde mirarlos.
-- **No se hizo QA de navegador.** Depende de lo anterior.
+| Capa | Archivo |
+|---|---|
+| Consumidor tipado | `apps/frontend/src/lib/fusion.ts` |
+| Flujo completo | `apps/frontend/src/components/contacts/FusionDeDuplicados.tsx` |
+| Integración | `apps/frontend/src/app/dashboard/contacts/page.tsx` |
 
-El motivo es de alcance, no técnico: el backend, su migración y sus garantías
-—transacción, concurrencia, reversión, aislamiento— consumieron la sesión
-entera. Se prefirió cerrar esa mitad demostrada y publicada antes que dejar dos
-mitades a medio probar.
+Cuatro pasos: elegir con quién —candidatos con nivel y razón, selección manual
+cuando no hay ninguno, «No son duplicados»—, comparar con posibilidad de
+invertir el principal, resolver campo por campo y confirmar. Modal encima de
+Contactos; ni se rediseña la pantalla ni se duplica el perfil.
+
+**Decisiones de la interfaz:**
+
+- **La cuenta atrás sale de `deshacerHasta`, la marca del servidor.** Restar
+  diez minutos desde el navegador enseñaría tiempo restante después de que la
+  ventana hubiera vencido. Una marca ilegible se trata como vencida.
+- **La selección vive en la URL** (`?fusionar=` y `?con=`): una recarga a mitad
+  de la comparación vuelve a la misma pareja.
+- **Un enlace a un contacto absorbido se reescribe por el canónico** contra
+  `/:id/canonico`, con `replace` para no dejar la ruta muerta en el historial.
+  La condición `canonicoId !== id` corta el bucle.
+- **Invertir el principal descarta las decisiones ya tomadas**: se tomaron
+  respecto al principal y arrastrarlas sería aplicar algo que nadie eligió.
+- **El alias y la redirección se enseñan como garantías, no como
+  interruptores.** El backend no ofrece apagarlos. Solo «conservar identidades
+  alternativas» es una casilla, porque `conservarAlternativas` sí existe.
+- **No se enseñan consentimientos** ni se promete restaurar desde Auditoría.
+
+### Pruebas de frontend
+
+**667 en 71 archivos** (+40). 36 nuevas: cuenta atrás del servidor, traducción
+de 409, roles, flujo de cuatro pasos, cambio de principal, decisiones campo por
+campo, identidades alternativas, etiquetas, campos personalizados, «no son
+duplicados», confirmación explícita, éxito y URL canónica, deshacer disponible,
+vencido y bloqueado, foco, Escape y aviso antes de perder elecciones. En la
+pantalla: acción visible para ADMIN y no para AGENT, enlace absorbido
+reescrito, y un id no absorbido que **no** provoca redirección.
+
+Escribirlas encontró dos defectos de producto, corregidos: un mensaje de
+reversión bloqueada que se enseñaba dos veces y una etiqueta de campo que el
+lector de pantalla leía tres veces.
+
+### QA de navegador
+
+Contra el build de producción, con el arnés CDP y `deviceScaleFactor: 1`.
+
+| Ancho | Desborde horizontal | Del diálogo | Zonas de desplazamiento | Consola |
+|---|---|---|---|---|
+| 1920 | 0 | 0 | 0 | sin errores ni avisos |
+| 1440 | 0 | 0 | 0 | sin errores ni avisos |
+| 1280 | 0 | 0 | 0 | sin errores ni avisos |
+| 1024 | 0 | 0 | 0 | sin errores ni avisos |
+
+Medido en los cuatro pasos del flujo, no solo al abrir. **El documento nunca
+desplaza**: `html` no aparece como zona en ninguna medición.
+
+**Zoom 200 %** (viewport de 960 y 640 px, que es 1920 y 1280 al doble):
+desborde horizontal 0, y tres zonas de desplazamiento **independientes y
+correctas** —el menú lateral, el contenido de la página y el cuerpo del
+diálogo—. No son dos barras compitiendo por lo mismo: el documento sigue sin
+desplazarse y la acción principal queda visible en el pie fijo del diálogo.
+
+**La QA no fusionó nada**: recorre los cuatro pasos y cancela.
+
+### Datos QA para la revisión
+
+Creados **solo** en la empresa de la vista previa
+(`cmsoy6e7l0008v2fsvfa1xiur`), con prefijo `QA_MERGE_` y datos íntegramente
+ficticios: teléfonos de rango de pruebas y correos en `example.invalid`, que la
+RFC 2606 reserva para que nunca resuelvan. Sin integración de WhatsApp, sin
+envíos, sin bots.
+
+| Objeto | Id |
+|---|---|
+| Contacto principal (activo) | `cmss4x9a50003v2v0ndielk7d` |
+| Contacto duplicado (archivado) | `cmss4x9af0005v2v0y1jb80ik` |
+| Definición de campo personalizado | `cmss4x99v0001v2v0xe608z6k` |
+| Valor del principal | `cmss4x9am0007v2v0wlsv9hpg` |
+| Valor del duplicado | `cmss4x9au0009v2v0omcdqsh1` |
+| Conversación | `cmss4x9az000bv2v06kp0yizx` |
+| Mensajes | `cmss4x9b7000dv2v0fglfvmi4`, `cmss4x9bg000fv2v0ymtt32z4`, `cmss4x9bl000hv2v0m23wnsc1` |
+| Oportunidad | `cmss4x9br000jv2v0amjs3oww` |
+| Tarea | `cmss4x9c1000lv2v0ko0bk7sk` |
+| Cotización (la relación documental real) | `cmss4x9c9000nv2v0gmecmyyp` |
+| Nota | `cmss4x9ci000pv2v0g3t0q1tn` |
+| Auditoría del archivado | `cmss4x9cq000rv2v07yb0e8lf` |
+
+Diferencias controladas: el duplicado lleva **el mismo número escrito de otra
+forma** (`300 111 0101` frente a `+573001110101`), lo que da coincidencia
+fuerte y una fila «Coincide · Mismo número en formato E.164»; correo distinto,
+una etiqueta compartida y otra propia, y un campo personalizado con valor
+distinto que obliga a decidir.
+
+**No hay modelo `Document` en el repositorio**: el documento real del producto
+es el PDF de una cotización, así que la relación documental que se sembró es la
+cotización.
+
+**La pareja NO está fusionada**: `contact_merges` = 0,
+`contact_merge_dismissals` = 0 y ningún contacto con `mergedIntoId`. Queda
+lista para recorrerla.
+
+**Ruta para empezar la revisión:**
+`http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d`
+
+Los cinco contactos `PREVIEW_BRANDING_` y los objetos `sd`, `sfg`, `daa` y
+Fernanda quedaron intactos.
 
 ### Limitaciones honestas de lo entregado
 
@@ -833,6 +923,10 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-13 | 3.x | `npx jest --config test/jest-e2e.json contact-fusion` | **24/24 contra PostgreSQL real** |
 | 2026-08-13 | 3.x | `tsc --noEmit` + `eslint` backend | sin errores |
 | 2026-08-13 | 3.x | Migración en base limpia y en copia representativa | sin pérdida; conteos idénticos |
+| 2026-08-13 | 3.x | CI sobre `6a1be9e` | Backend y Frontend `success` (run 31750534144) |
+| 2026-08-13 | 3.x | `vitest run` (frontend completo) | **667/667** en 71 archivos (+40) |
+| 2026-08-13 | 3.x | `typecheck` + `lint` + `build` frontend | sin errores (1 warning previo) |
+| 2026-08-13 | 3.x | QA de navegador 1920/1440/1280/1024 y zoom 200 % | sin desbordes ni errores de consola |
 
 ---
 
@@ -843,6 +937,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Inicio (mockup 01, incremento 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 13-ago-2026 |
+| Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **EN REVISIÓN HUMANA** |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
@@ -1039,15 +1134,14 @@ git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
 # 2.1, 2.2 y 2.3 estan APROBADOS: la fase 2 esta HECHA.
-# 3.x - Fusion de contactos duplicados: BACKEND ENTREGADO Y VERIFICADO.
-# LA INTERFAZ NO ESTA HECHA: no abrir revision visual todavia.
+# 3.x - Fusion de contactos duplicados: ENTREGADO, EN REVISION HUMANA.
+# No abrir el incremento siguiente hasta que haya veredicto.
 #
-# Para continuar 3.x, por este orden:
-#   1. lib/fusion.ts en el frontend sobre los 7 endpoints ya publicados
-#   2. drawer de 3 pasos del mockup 22, montado en Contactos y en el perfil
-#   3. resolucion de enlace antiguo -> URL canonica del principal
-#   4. datos QA_MERGE_ en la empresa preview (NO tocar PREVIEW_BRANDING_)
-#   5. QA de navegador 1920/1536/1440/1280/1024 y zoom 200 %
+# Ruta para revisar el flujo con los datos QA_MERGE_:
+#   http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d
+#
+# La pareja QA_MERGE_ NO esta fusionada. Tras la aprobacion se limpia SOLO por
+# id (ver la seccion de datos QA), conservando las auditorias.
 #
 # Vista previa local (worker apagado, transporte falso, sin efectos externos):
 #   cd apps/backend  && node dist/src/main        # :3001, con las variables
