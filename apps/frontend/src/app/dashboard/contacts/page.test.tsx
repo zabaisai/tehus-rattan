@@ -23,6 +23,23 @@ vi.mock("@/lib/contacts", async () => {
   };
 });
 
+// La pantalla guarda la pareja a fusionar en la URL (`?fusionar=` / `?con=`),
+// así que ahora usa el router. Se controla desde aquí para poder afirmar sobre
+// la ruta a la que se navega.
+const replace = vi.fn();
+const push = vi.fn();
+let parametrosDeUrl = new URLSearchParams();
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace, push, prefetch: vi.fn() }),
+  useSearchParams: () => parametrosDeUrl,
+}));
+
+const getCanonico = vi.fn();
+vi.mock("@/lib/fusion", async () => {
+  const real = await vi.importActual<typeof import("@/lib/fusion")>("@/lib/fusion");
+  return { ...real, getCanonico: (id: string) => getCanonico(id) };
+});
+
 let rol = "ADMIN";
 vi.mock("@/store/auth.store", () => ({
   useAuthStore: (selector: (s: unknown) => unknown) =>
@@ -56,6 +73,15 @@ function renderPage() {
 
 describe("Pantalla de contactos", () => {
   beforeEach(() => {
+  replace.mockClear();
+  push.mockClear();
+  parametrosDeUrl = new URLSearchParams();
+  getCanonico.mockResolvedValue({
+    solicitado: "c1",
+    canonicoId: "c1",
+    fueFusionado: false,
+    fusionadoEn: null,
+  });
     rol = "ADMIN";
     getContacts.mockResolvedValue([contacto()]);
     getPapelera.mockResolvedValue({ items: [], total: 0 });
@@ -167,5 +193,74 @@ describe("Pantalla de contactos", () => {
     expect(
       screen.queryByRole("button", { name: /eliminar definitivamente/i }),
     ).toBeNull();
+  });
+
+  describe("fusión de duplicados", () => {
+    it("un ADMIN ve la acción de fusionar y la abre en la URL, no en estado suelto", async () => {
+      rol = "ADMIN";
+      getContacts.mockResolvedValue([contacto()]);
+      renderPage();
+
+      const botones = await screen.findAllByRole("button", {
+        name: /Fusionar duplicado de Ana Restrepo/,
+      });
+      await userEvent.click(botones[0]);
+
+      // La pareja vive en la ruta: recargar vuelve a la misma comparación.
+      expect(replace).toHaveBeenCalledWith(
+        "/dashboard/contacts?fusionar=c1",
+      );
+    });
+
+    it("un AGENT no ve la acción de fusionar", async () => {
+      rol = "AGENT";
+      getContacts.mockResolvedValue([contacto()]);
+      renderPage();
+
+      await screen.findAllByText("Ana Restrepo");
+      expect(
+        screen.queryAllByRole("button", { name: /Fusionar duplicado/ }),
+      ).toHaveLength(0);
+    });
+
+    it("un enlace a un contacto ABSORBIDO se reescribe por el canónico", async () => {
+      rol = "ADMIN";
+      getContacts.mockResolvedValue([contacto()]);
+      parametrosDeUrl = new URLSearchParams("fusionar=viejo&con=otro");
+      getCanonico.mockResolvedValue({
+        solicitado: "viejo",
+        canonicoId: "c1",
+        fueFusionado: true,
+        fusionadoEn: new Date().toISOString(),
+      });
+
+      renderPage();
+
+      await waitFor(() =>
+        expect(replace).toHaveBeenCalledWith("/dashboard/contacts?fusionar=c1"),
+      );
+      // El `con` se descarta: pertenecía a la pareja anterior.
+      expect(replace).not.toHaveBeenCalledWith(
+        expect.stringContaining("con=otro"),
+      );
+    });
+
+    it("un id que NO fue absorbido no provoca ninguna redirección: sin bucles", async () => {
+      rol = "ADMIN";
+      getContacts.mockResolvedValue([contacto()]);
+      parametrosDeUrl = new URLSearchParams("fusionar=c1");
+      getCanonico.mockResolvedValue({
+        solicitado: "c1",
+        canonicoId: "c1",
+        fueFusionado: false,
+        fusionadoEn: null,
+      });
+
+      renderPage();
+
+      await screen.findAllByText("Ana Restrepo");
+      await waitFor(() => expect(getCanonico).toHaveBeenCalledWith("c1"));
+      expect(replace).not.toHaveBeenCalled();
+    });
   });
 });

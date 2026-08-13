@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { Suspense, useEffect, useState, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Plus,
@@ -10,6 +11,7 @@ import {
   Trash2,
   Pencil,
   Users,
+  Merge,
 } from "lucide-react";
 import {
   getContacts,
@@ -22,12 +24,14 @@ import {
 import { Contact } from "@/types";
 import { ContactModal } from "@/components/contacts/ContactModal";
 import { EliminarContactoDialog } from "@/components/contacts/EliminarContactoDialog";
+import { FusionDeDuplicados } from "@/components/contacts/FusionDeDuplicados";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { getCanonico, puedeFusionar } from "@/lib/fusion";
 import { useAuthStore } from "@/store/auth.store";
 
 type Vista = "activos" | "papelera";
 
-export default function ContactsPage() {
+function ContactsPageContent() {
   const queryClient = useQueryClient();
   const rol = useAuthStore((s) => s.user?.role);
   const [vista, setVista] = useState<Vista>("activos");
@@ -51,6 +55,58 @@ export default function ContactsPage() {
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [aEliminar, setAEliminar] = useState<Contact | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+
+  // LA SELECCIÓN VIVE EN LA URL, no en el estado de React: `?fusionar=<id>` y
+  // `?con=<id>`. Así una recarga a mitad de la comparación devuelve a la misma
+  // pareja en vez de al listado, y el enlace se puede pegar en un mensaje.
+  const router = useRouter();
+  const parametros = useSearchParams();
+  const fusionarId = parametros.get("fusionar");
+  const duplicadoId = parametros.get("con");
+  const puedeUnirDuplicados = puedeFusionar(rol);
+
+  function abrirFusion(id: string, con?: string | null) {
+    const q = new URLSearchParams(parametros.toString());
+    q.set("fusionar", id);
+    if (con) q.set("con", con);
+    else q.delete("con");
+    router.replace(`/dashboard/contacts?${q.toString()}`);
+  }
+
+  function cerrarFusion() {
+    const q = new URLSearchParams(parametros.toString());
+    q.delete("fusionar");
+    q.delete("con");
+    const cadena = q.toString();
+    router.replace(`/dashboard/contacts${cadena ? `?${cadena}` : ""}`);
+  }
+
+  // UN ENLACE ANTIGUO A UN CONTACTO ABSORBIDO SE REESCRIBE POR EL CANÓNICO.
+  //
+  // Se resuelve contra el servidor, que es quien sabe si ese id sigue siendo
+  // un contacto o ya es un alias, y se usa `replace` para no dejar la URL
+  // muerta en el historial —volver atrás la reabriría—. La condición
+  // `canonicoId !== fusionarId` evita el bucle: una vez reescrita, la
+  // resolución siguiente devuelve el mismo id y no vuelve a navegar.
+  useEffect(() => {
+    if (!fusionarId) return;
+    let vigente = true;
+    getCanonico(fusionarId)
+      .then((r) => {
+        if (!vigente || !r.fueFusionado || r.canonicoId === fusionarId) return;
+        const q = new URLSearchParams(parametros.toString());
+        q.set("fusionar", r.canonicoId);
+        q.delete("con");
+        router.replace(`/dashboard/contacts?${q.toString()}`);
+        setAviso(
+          "Ese contacto se había fusionado: te llevamos a la ficha que lo absorbió.",
+        );
+      })
+      .catch(() => undefined);
+    return () => {
+      vigente = false;
+    };
+  }, [fusionarId, parametros, router]);
 
   // La eliminación definitiva no es una limpieza de escritorio. El servidor
   // la restringe igualmente; esconder el botón solo evita ofrecer algo que
@@ -171,6 +227,16 @@ export default function ContactsPage() {
           >
             <Pencil size={tamaño} />
           </button>
+          {puedeUnirDuplicados && (
+            <button
+              onClick={() => abrirFusion(contact.id)}
+              aria-label={`Fusionar duplicado de ${contact.name || contact.phone}`}
+              title="Fusionar duplicado"
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            >
+              <Merge size={tamaño} />
+            </button>
+          )}
           <button
             onClick={() => handleArchive(contact)}
             aria-label={`Archivar a ${contact.name || contact.phone}`}
@@ -368,6 +434,23 @@ export default function ContactsPage() {
         />
       )}
 
+      {fusionarId && (
+        <FusionDeDuplicados
+          key={`${fusionarId}:${duplicadoId ?? ""}`}
+          contactoId={fusionarId}
+          duplicadoInicialId={duplicadoId}
+          puedeEjecutar={puedeUnirDuplicados}
+          onCerrar={cerrarFusion}
+          onCambioDeDuplicado={(id) => abrirFusion(fusionarId, id)}
+          onFusionado={async (canonicoId) => {
+            cerrarFusion();
+            await refrescar();
+            setAviso("Fusión completada. Este es el contacto principal.");
+            router.push(`/dashboard/pipeline?perfil=${canonicoId}`);
+          }}
+        />
+      )}
+
       {aEliminar && (
         <EliminarContactoDialog
           contact={aEliminar}
@@ -384,5 +467,21 @@ export default function ContactsPage() {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * `useSearchParams` obliga a un límite de Suspense para que la página pueda
+ * prerenderizarse. Mismo patrón que Tareas, Productos y cotizaciones.
+ */
+export default function ContactsPage() {
+  return (
+    <Suspense
+      fallback={
+        <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>
+      }
+    >
+      <ContactsPageContent />
+    </Suspense>
   );
 }
