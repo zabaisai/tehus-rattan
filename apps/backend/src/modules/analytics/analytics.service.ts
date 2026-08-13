@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { suma, aNumeroParaMostrar } from '../../common/dinero/dinero';
 
@@ -152,4 +153,218 @@ export class AnalyticsService {
       where: { companyId, status: { in: ['OPEN', 'PENDING'] } },
     });
   }
+
+  /**
+   * Serie diaria de oportunidades abiertas y ganadas.
+   *
+   * POR QUÉ EXISTE. El resto de `analytics` devuelve fotos fijas: cuántas hay
+   * ahora, cuánto suman ahora. Ninguna dice si la semana va mejor o peor que
+   * la anterior, que es justo lo que pide una pantalla de inicio. Sin esto,
+   * cualquier flecha de tendencia de la interfaz sería inventada.
+   *
+   * DE DÓNDE SALE CADA FECHA, Y POR QUÉ NO DE `updatedAt`:
+   *
+   *   · **Abierta** usa `lead.createdAt`. Es exacto: la oportunidad nació ese
+   *     día y ese campo no vuelve a moverse.
+   *   · **Ganada** usa el ÚLTIMO cambio de etapa registrado en
+   *     `LeadStageHistory`. Es la única marca de tiempo del modelo que
+   *     corresponde a un hecho comercial. `updatedAt` habría sido más cómodo y
+   *     habría estado mal: cambia al corregir un teléfono, así que una venta
+   *     de marzo se dibujaría en la columna de hoy.
+   *   · Una oportunidad ganada **sin** historial de etapa no se coloca en
+   *     ningún día: se cuenta aparte en `wonWithoutDate`. Repartirla o
+   *     empujarla al último día sería fabricar un dato.
+   *
+   * La ventana previa del mismo tamaño se devuelve entera para que la
+   * comparación se calcule con los mismos criterios, y no con dos consultas
+   * que podrían divergir.
+   */
+  async getSalesTrend(companyId: string, days?: number) {
+    const dias = Math.min(90, Math.max(7, Math.trunc(Number(days)) || 30));
+
+    const finExclusivo = comienzoDelDia(new Date());
+    finExclusivo.setDate(finExclusivo.getDate() + 1);
+    const inicio = new Date(finExclusivo);
+    inicio.setDate(inicio.getDate() - dias);
+    const inicioPrevio = new Date(inicio);
+    inicioPrevio.setDate(inicioPrevio.getDate() - dias);
+
+    const [creadas, ganadas] = await Promise.all([
+      // `companyId` va DENTRO de la consulta, nunca filtrado después en
+      // memoria: es la regla de aislamiento de todo el repositorio.
+      this.prisma.lead.findMany({
+        where: {
+          companyId,
+          createdAt: { gte: inicioPrevio, lt: finExclusivo },
+        },
+        select: { createdAt: true, value: true },
+      }),
+      this.prisma.lead.findMany({
+        where: { companyId, status: 'WON' },
+        select: {
+          value: true,
+          stageHistory: {
+            orderBy: { changedAt: 'desc' },
+            take: 1,
+            select: { changedAt: true },
+          },
+        },
+      }),
+    ]);
+
+    const puntos = new Map<string, PuntoTendencia>();
+    for (let i = 0; i < dias; i++) {
+      const dia = new Date(inicio);
+      dia.setDate(dia.getDate() + i);
+      puntos.set(claveDeDia(dia), {
+        date: claveDeDia(dia),
+        openedCount: 0,
+        openedValue: 0,
+        wonCount: 0,
+        wonValue: 0,
+      });
+    }
+
+    const acumuladoActual = nuevoAcumulado();
+    const acumuladoPrevio = nuevoAcumulado();
+    let wonWithoutDate = 0;
+
+    for (const lead of creadas) {
+      const enVentanaActual = lead.createdAt >= inicio;
+      const destino = enVentanaActual ? acumuladoActual : acumuladoPrevio;
+      destino.openedCount += 1;
+      destino.openedValue.push(lead.value);
+      if (enVentanaActual) {
+        const punto = puntos.get(claveDeDia(lead.createdAt));
+        if (punto) {
+          punto.openedCount += 1;
+          punto.openedValue = aNumeroParaMostrar(
+            suma(punto.openedValue, lead.value ?? 0),
+          );
+        }
+      }
+    }
+
+    for (const lead of ganadas) {
+      const cerrada = lead.stageHistory[0]?.changedAt;
+      if (!cerrada) {
+        wonWithoutDate += 1;
+        continue;
+      }
+      if (cerrada >= finExclusivo || cerrada < inicioPrevio) continue;
+      const enVentanaActual = cerrada >= inicio;
+      const destino = enVentanaActual ? acumuladoActual : acumuladoPrevio;
+      destino.wonCount += 1;
+      destino.wonValue.push(lead.value);
+      if (enVentanaActual) {
+        const punto = puntos.get(claveDeDia(cerrada));
+        if (punto) {
+          punto.wonCount += 1;
+          punto.wonValue = aNumeroParaMostrar(
+            suma(punto.wonValue, lead.value ?? 0),
+          );
+        }
+      }
+    }
+
+    return {
+      days: dias,
+      from: claveDeDia(inicio),
+      to: claveDeDia(new Date(finExclusivo.getTime() - 1)),
+      points: Array.from(puntos.values()),
+      totals: cerrarAcumulado(acumuladoActual),
+      previous: cerrarAcumulado(acumuladoPrevio),
+      wonWithoutDate,
+    };
+  }
+
+  /**
+   * Actividad reciente de LA EMPRESA, leída de la auditoría.
+   *
+   * POR QUÉ NO SE REUSAN LAS NOTIFICACIONES. El inicio enseñaba aquí
+   * `notifications`, que es la bandeja PERSONAL de cada usuario: una empresa
+   * puede llevar semanas trabajando y tener el panel vacío porque nadie ha
+   * generado un aviso dirigido a quien mira. La auditoría sí registra lo que
+   * pasó en la empresa, y es lo que el mockup pide en ese hueco.
+   *
+   * QUÉ NO SALE DE AQUÍ, Y ES DELIBERADO: `metadata` (lleva valores antiguos y
+   * nuevos de lo que se cambió), `reason` (texto libre escrito por una
+   * persona), `entityId`, `ipAddress` y `userAgent`. Un panel de inicio
+   * necesita saber QUÉ ocurrió y QUIÉN lo hizo; el detalle vive en la pantalla
+   * de auditoría, que tiene sus propios permisos.
+   */
+  async getRecentActivity(companyId: string, limit?: number) {
+    const limite = Math.min(20, Math.max(1, Math.trunc(Number(limit)) || 8));
+
+    const filas = await this.prisma.auditLog.findMany({
+      where: { affectedCompanyId: companyId },
+      orderBy: { createdAt: 'desc' },
+      take: limite,
+      select: {
+        id: true,
+        action: true,
+        entityType: true,
+        createdAt: true,
+        actor: { select: { name: true } },
+      },
+    });
+
+    return filas.map((f) => ({
+      id: f.id,
+      action: f.action,
+      entityType: f.entityType,
+      createdAt: f.createdAt,
+      // El actor puede haber sido dado de baja: la clave foránea es `SetNull`
+      // y la auditoría sobrevive a propósito. `null` se traduce en pantalla.
+      actorName: f.actor?.name ?? null,
+    }));
+  }
+}
+
+export interface PuntoTendencia {
+  date: string;
+  openedCount: number;
+  openedValue: number;
+  wonCount: number;
+  wonValue: number;
+}
+
+interface Acumulado {
+  openedCount: number;
+  openedValue: (Prisma.Decimal | null)[];
+  wonCount: number;
+  wonValue: (Prisma.Decimal | null)[];
+}
+
+function nuevoAcumulado(): Acumulado {
+  return { openedCount: 0, openedValue: [], wonCount: 0, wonValue: [] };
+}
+
+function cerrarAcumulado(a: Acumulado) {
+  return {
+    openedCount: a.openedCount,
+    openedValue: aNumeroParaMostrar(suma(...a.openedValue.map((v) => v ?? 0))),
+    wonCount: a.wonCount,
+    wonValue: aNumeroParaMostrar(suma(...a.wonValue.map((v) => v ?? 0))),
+  };
+}
+
+function comienzoDelDia(fecha: Date): Date {
+  const d = new Date(fecha);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/**
+ * `YYYY-MM-DD` en la hora LOCAL del servidor, no en UTC.
+ *
+ * `toISOString()` habría sido más corto y habría movido de día todo lo
+ * ocurrido después de las 19:00 en Bogotá: una venta del lunes por la noche
+ * aparecería el martes.
+ */
+function claveDeDia(fecha: Date): string {
+  const d = comienzoDelDia(fecha);
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
 }

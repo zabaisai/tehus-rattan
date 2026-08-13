@@ -52,4 +52,27 @@ export class AnalyticsController {
     );
     return { count };
   }
+
+  /**
+   * Serie diaria para la tendencia y para las comparaciones de las métricas.
+   *
+   * `days` se recorta en el servicio a 7–90: un cliente no puede pedir dos
+   * años de serie y convertir una pantalla de inicio en un barrido de tabla.
+   */
+  @Get('sales-trend')
+  getSalesTrend(@Request() req: any, @Query('days') days?: string) {
+    return this.analyticsService.getSalesTrend(
+      req.user.companyId,
+      days === undefined ? undefined : Number(days),
+    );
+  }
+
+  /** Actividad reciente de la empresa. Sin metadatos ni texto libre. */
+  @Get('activity')
+  getRecentActivity(@Request() req: any, @Query('limit') limit?: string) {
+    return this.analyticsService.getRecentActivity(
+      req.user.companyId,
+      limit === undefined ? undefined : Number(limit),
+    );
+  }
 }
