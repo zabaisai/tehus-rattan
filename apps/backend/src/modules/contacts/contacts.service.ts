@@ -27,6 +27,12 @@ export class ContactsService {
     return this.prisma.contact.findMany({
       where: {
         companyId,
+        // Un contacto ABSORBIDO por una fusion no es un contacto: es un alias
+        // que solo existe para que sus enlaces antiguos sigan resolviendo. No
+        // sale en activos y tampoco en papelera, porque no esta archivado sino
+        // fusionado, y ofrecerlo para acciones nuevas seria volver a partir en
+        // dos a la persona que se acaba de unificar.
+        mergedIntoId: null,
         // Los archivados NO salen salvo que se pidan. Verlos mezclados con los
         // activos hace dudar de cuales siguen vivos, que es justo lo que
         // archivar pretende resolver.

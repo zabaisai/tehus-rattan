@@ -205,10 +205,28 @@ describe('SearchService', () => {
       await service.buscar('e1', { q: 'LAURA', tipos: ['contactos'] });
 
       const [args] = prisma.contact.findMany.mock.calls[0];
-      for (const clausula of args.where.OR) {
+
+      // Las cláusulas de TEXTO se comparan sin distinguir mayúsculas.
+      //
+      // Las de IDENTIDAD ALTERNATIVA (`altPhones` / `altEmails`) no llevan
+      // `mode`: son arrays y se comparan con `has`, que es exacto. No es una
+      // excepción a la regla sino la misma regla aplicada antes: esos valores
+      // se guardan ya normalizados —E.164 y minúsculas— y la consulta se
+      // normaliza igual, así que «LAURA@X.COM» y «laura@x.com» acaban siendo
+      // la misma cadena antes de llegar a la base.
+      const deTexto = args.where.OR.filter(
+        (c: any) => !('altPhones' in c) && !('altEmails' in c),
+      );
+      expect(deTexto.length).toBeGreaterThan(0);
+      for (const clausula of deTexto) {
         const campo = Object.values(clausula)[0] as { mode?: string };
         expect(campo.mode).toBe('insensitive');
       }
+
+      const porCorreoAlternativo = args.where.OR.find(
+        (c: any) => 'altEmails' in c,
+      );
+      expect(porCorreoAlternativo.altEmails.has).toBe('laura');
     });
 
     it('recorta espacios de la consulta', async () => {

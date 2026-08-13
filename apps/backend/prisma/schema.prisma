@@ -130,6 +130,9 @@ model Company {
 
   handoffs ConversationHandoff[]
 
+  contactMerges           ContactMerge[]
+  contactMergeDismissals  ContactMergeDismissal[]
+
   flowBotCredentials FlowBotCredential[]
   flowBotSettings    FlowBotSettings?
   flowBotAiUsage     FlowBotAiUsage[]
@@ -248,6 +251,33 @@ model Contact {
   /// porque no hay nada que preservar.
   anonymizedAt DateTime?
 
+  /// IDENTIDADES ALTERNATIVAS, conservadas al fusionar duplicados.
+  ///
+  /// Una persona con dos fichas suele tener dos números o dos correos reales.
+  /// Al fusionar solo uno puede ser el principal —`phone` es único por empresa
+  /// y es el que resuelve la entrada de WhatsApp—, pero tirar el otro haría
+  /// que quien lo busque no encuentre nada. Aquí se guardan ya normalizados:
+  /// los teléfonos en E.164 y los correos en minúsculas, para que la búsqueda
+  /// compare formas canónicas y no texto tal cual se escribió.
+  altPhones String[]
+  altEmails String[]
+
+  /// ALIAS: este contacto fue absorbido por otro al fusionar duplicados.
+  ///
+  /// La fila NO se borra. Sigue existiendo para que ningún identificador ya
+  /// repartido —un enlace, una auditoría, un informe— apunte a la nada, y
+  /// para poder deshacer la fusión. Lo que cambia es que deja de ser un
+  /// contacto operable: no sale en activos ni en papelera, no se puede
+  /// restaurar como si estuviera archivado y cualquier resolución por id o
+  /// por teléfono salta a `mergedInto`.
+  ///
+  /// `Restrict` y no `Cascade`: borrar el principal no puede llevarse por
+  /// delante al alias, que es justo la fila que conserva la trazabilidad.
+  mergedIntoId String?
+  mergedInto   Contact?  @relation("ContactoFusionado", fields: [mergedIntoId], references: [id], onDelete: Restrict)
+  aliases      Contact[] @relation("ContactoFusionado")
+  mergedAt     DateTime?
+
   companyId     String
   company       Company        @relation(fields: [companyId], references: [id])
   conversations Conversation[]
@@ -258,8 +288,82 @@ model Contact {
 
   customFieldValues CustomFieldValue[]
 
+  fusionesComoPrincipal ContactMerge[]          @relation("FusionPrincipal")
+  fusionComoAbsorbido   ContactMerge?           @relation("FusionAbsorbido")
+  descartesComoA        ContactMergeDismissal[] @relation("DescarteA")
+  descartesComoB        ContactMergeDismissal[] @relation("DescarteB")
+
   @@unique([phone, companyId])
+  /// Listar activos y papelera excluye alias: el índice lo hace barato.
+  @@index([companyId, mergedIntoId])
   @@map("contacts")
+}
+
+/// Una fusión de contactos duplicados, con lo justo para poder deshacerla.
+///
+/// POR QUÉ EXISTE UNA TABLA Y NO SOLO UNA AUDITORÍA. La auditoría responde
+/// «quién y cuándo»; deshacer necesita además «qué fila estaba dónde». Son dos
+/// necesidades distintas y mezclarlas obligaría a meter en la auditoría datos
+/// operativos que allí no pintan nada.
+///
+/// `snapshot` guarda el estado previo de los campos escalares que la fusión
+/// pisó y los ids de las filas trasladadas, agrupados por relación. No guarda
+/// mensajes, ni documentos, ni tokens: solo identificadores y los valores de
+/// los campos que hay que devolver a su sitio.
+model ContactMerge {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  primaryContactId String
+  primaryContact   Contact @relation("FusionPrincipal", fields: [primaryContactId], references: [id], onDelete: Cascade)
+
+  /// Único: un contacto se absorbe una sola vez. Es la barrera de base de
+  /// datos contra dos fusiones concurrentes sobre el mismo duplicado.
+  mergedContactId String  @unique
+  mergedContact   Contact @relation("FusionAbsorbido", fields: [mergedContactId], references: [id], onDelete: Cascade)
+
+  /// Id del usuario que ejecutó. Sin clave foránea a propósito: el registro
+  /// con valor probatorio es el `AuditLog`, que sí la tiene. Aquí solo hace
+  /// falta saber a quién mostrar en la cinta de «deshacer».
+  performedById String?
+  performedAt   DateTime  @default(now())
+  undoneById    String?
+  undoneAt      DateTime?
+
+  /// Hasta cuándo se puede deshacer. Se calcula al fusionar y no se recalcula:
+  /// una ventana que se mueve sola no es una ventana.
+  undoableUntil DateTime
+
+  snapshot Json
+
+  @@index([companyId, performedAt])
+  @@map("contact_merges")
+}
+
+/// «No son duplicados»: la pareja deja de sugerirse, sin tocar los contactos.
+///
+/// Se guarda ordenada (`contactAId` < `contactBId`) para que la pareja (X, Y)
+/// y la (Y, X) sean la misma fila y el índice único haga el trabajo.
+model ContactMergeDismissal {
+  id String @id @default(cuid())
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  contactAId String
+  contactA   Contact @relation("DescarteA", fields: [contactAId], references: [id], onDelete: Cascade)
+  contactBId String
+  contactB   Contact @relation("DescarteB", fields: [contactBId], references: [id], onDelete: Cascade)
+
+  dismissedById String?
+  dismissedAt   DateTime @default(now())
+
+  @@unique([companyId, contactAId, contactBId])
+  @@index([companyId, contactAId])
+  @@index([companyId, contactBId])
+  @@map("contact_merge_dismissals")
 }
 
 model Conversation {

@@ -35,6 +35,21 @@ export class CrmAdapter implements PuertoCrm {
     private readonly executionId: string | null = null,
   ) {}
 
+  /**
+   * Sigue el alias de una fusion y devuelve el contacto que hay que tocar.
+   *
+   * Un salto basta: al fusionar, los alias del absorbido se reapuntan al
+   * principal, asi que no hay cadenas. Si algun dia las hubiera, escribir sobre
+   * el primer salto sigue siendo mejor que escribir sobre un alias muerto.
+   */
+  private async resolverAlias(contactId: string): Promise<string> {
+    const fila = await this.prisma.contact.findFirst({
+      where: { id: contactId, companyId: this.companyId },
+      select: { mergedIntoId: true },
+    });
+    return fila?.mergedIntoId ?? contactId;
+  }
+
   async guardarContacto(input: {
     contactId: string | null;
     nombre?: string;
@@ -51,17 +66,20 @@ export class CrmAdapter implements PuertoCrm {
       : null;
 
     if (input.contactId) {
+      // Un id absorbido por una fusion apunta al principal: escribir sobre el
+      // alias dejaria el dato en una ficha que ya nadie mira.
+      const destino = await this.resolverAlias(input.contactId);
       // Solo se escribe lo que llega. Un nodo que actualiza el correo no debe
       // borrar el nombre que ya había por no haberlo enviado.
       await this.prisma.contact.updateMany({
-        where: { id: input.contactId, companyId: this.companyId },
+        where: { id: destino, companyId: this.companyId },
         data: {
           ...(input.nombre ? { name: input.nombre } : {}),
           ...(input.email ? { email: input.email } : {}),
           ...(telefono ? { phone: telefono } : {}),
         },
       });
-      return { contactId: input.contactId };
+      return { contactId: destino };
     }
 
     // Sin id, se busca por teléfono antes de crear: dos contactos con el mismo
@@ -72,14 +90,16 @@ export class CrmAdapter implements PuertoCrm {
         select: { id: true },
       });
       if (existente) {
+        // Mismo motivo: el numero puede ser el del contacto absorbido.
+        const destino = await this.resolverAlias(existente.id);
         await this.prisma.contact.updateMany({
-          where: { id: existente.id, companyId: this.companyId },
+          where: { id: destino, companyId: this.companyId },
           data: {
             ...(input.nombre ? { name: input.nombre } : {}),
             ...(input.email ? { email: input.email } : {}),
           },
         });
-        return { contactId: existente.id };
+        return { contactId: destino };
       }
     }
 

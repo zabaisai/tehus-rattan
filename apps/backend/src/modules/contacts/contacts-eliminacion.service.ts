@@ -306,13 +306,16 @@ export class ContactsEliminacionService {
 
     const [items, total] = await Promise.all([
       this.prisma.contact.findMany({
-        where: { companyId, archivedAt: { not: null } },
+        // `mergedIntoId: null`: un alias de fusion no esta en la papelera. No
+        // se archivo, se absorbio, y restaurarlo desde aqui devolveria a la
+        // vida un duplicado que alguien acaba de resolver.
+        where: { companyId, archivedAt: { not: null }, mergedIntoId: null },
         orderBy: { archivedAt: 'desc' },
         take,
         skip,
       }),
       this.prisma.contact.count({
-        where: { companyId, archivedAt: { not: null } },
+        where: { companyId, archivedAt: { not: null }, mergedIntoId: null },
       }),
     ]);
 

@@ -1,10 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { normalizePhone } from '../../common/phone/e164.util';
 import {
   LIMITE_POR_TIPO_POR_DEFECTO,
   TIPOS_BUSCABLES,
   TipoBuscable,
 } from './dto/search-query.dto';
+
+/**
+ * Formas canónicas con las que buscar en `altPhones`.
+ *
+ * Las alternativas se guardan YA normalizadas a E.164, así que aquí basta con
+ * normalizar lo que se teclea. Se reutiliza `normalizePhone`, que es la única
+ * fuente de verdad del producto para decidir cuándo dos números son el mismo:
+ * una segunda regla aquí acabaría discrepando de la de la fusión.
+ */
+function variantesDeIdentidad(q: string): string[] {
+  const e164 = normalizePhone(q).e164;
+  return e164 ? [e164] : [];
+}
 
 /**
  * Un resultado, ya normalizado para pintarlo sin conocer la entidad.
@@ -116,10 +130,26 @@ export class SearchService {
     const filas = await this.prisma.contact.findMany({
       where: {
         companyId,
+        // Un contacto absorbido por una fusión no es un resultado: abrirlo
+        // llevaría a un perfil que ya no se opera. Su identidad sigue siendo
+        // encontrable, pero a través del principal, que la conserva en
+        // `altPhones` y `altEmails`.
+        mergedIntoId: null,
         // Los archivados quedan fuera salvo que se pidan: mezclarlos hace
         // dudar de cuáles siguen vivos, que es lo que archivar resuelve.
         ...(incluirPapelera ? {} : { archivedAt: null }),
-        OR: [{ name: like(q) }, { phone: like(q) }, { email: like(q) }],
+        OR: [
+          { name: like(q) },
+          { phone: like(q) },
+          { email: like(q) },
+          // IDENTIDADES ALTERNATIVAS. Tras fusionar, el número o el correo que
+          // no ganó sigue siendo de la misma persona: quien lo teclee tiene
+          // que llegar al contacto principal y no a un resultado vacío.
+          ...variantesDeIdentidad(q).map((v) => ({
+            altPhones: { has: v },
+          })),
+          { altEmails: { has: q.trim().toLowerCase() } },
+        ],
       },
       select: {
         id: true,

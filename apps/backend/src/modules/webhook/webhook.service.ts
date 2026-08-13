@@ -238,6 +238,17 @@ export class WebhookService {
       where: { phone: message.from, companyId },
     });
 
+    // Si ese número pertenece a un contacto ABSORBIDO por una fusión, la
+    // conversación tiene que colgar del principal. Sin este salto, el primer
+    // mensaje que llegara después de fusionar volvería a partir en dos a la
+    // misma persona, y la fusión duraría lo que tarde en escribir.
+    if (contactRecord?.mergedIntoId) {
+      const principal = await this.prisma.contact.findFirst({
+        where: { id: contactRecord.mergedIntoId, companyId },
+      });
+      if (principal) contactRecord = principal;
+    }
+
     if (!contactRecord) {
       contactRecord = await this.contactsService.create(companyId, {
         phone: message.from,
