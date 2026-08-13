@@ -370,7 +370,17 @@ según la lección de `49f2141`.
 
 ### Limitaciones honestas
 
-- **La QA de anchos quedó incompleta a 1920 px.** Ver «QA visual desktop».
+- **La QA de anchos cubre 1440/1280/1024 y 1536; falta 1920.** Ver «QA visual
+  desktop» para la razón, que es del equipo y no del código.
+- **Un dato de la vista previa cambió durante la sesión y no fue por este
+  trabajo.** `PREVIEW_BRANDING_Comedor para restaurante`
+  (`cmsoy6eos001kv2fs2smcoia2`) pasó de `OPEN` a `WON` el 13 de agosto a las
+  19:21 UTC. Las cinco oportunidades siguen existiendo con sus IDs; solo cambió
+  el estado de una. Este incremento únicamente lee, y no hay registro de quién
+  lo hizo porque **el cambio de estado de una oportunidad no se audita** en
+  este repositorio: solo quedó el `updatedAt`. Se anota aquí para que nadie
+  interprete después que el Inicio movió datos, y como argumento para auditar
+  ese cambio en su momento.
 - Con los datos de la vista previa, la curva de tendencia es un pico en un solo
   día: las cinco oportunidades se crearon la misma tarde. Es el dato real.
 - «Rendimiento por asesor» enseña el estado de «sin asignar» porque en la vista
@@ -568,7 +578,7 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 |---|---:|---:|---:|---:|---:|---:|---|
 | Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
-| Inicio (reentrega 2.3) | ⚠️ | — | — | — | ✅ | ✅ | **PARCIAL** |
+| Inicio (reentrega 2.3) | ⚠️ | ✅ | ✅ | ✅ | ✅ | ✅ | **PARCIAL** (falta 1920) |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
@@ -585,30 +595,37 @@ pero abrirlo con 2.3 sin aprobar repetiría el error que trajo hasta aquí.
 > desktop pide **1920** y retira 768/390, así que las pantallas ya migradas
 > siguen sin verificarse a 1920. La búsqueda global sí se probó en los cuatro.
 
-> **La QA de anchos del Inicio quedó incompleta, y conviene decir por qué.**
-> El equipo tiene una pantalla de 1920 px físicos con escalado de Windows al
-> 125 %, así que el navegador reporta un viewport CSS de **1536 px** y Chrome
-> rechaza agrandar la ventana más allá de la pantalla («Bounds must be at least
-> 50% within visible screen space»). Con la ventana maximizada, redimensionarla
-> tampoco surte efecto: `innerWidth` se queda en 1536 pase lo que pase. Se
-> verificó a **1536 px CSS** —el ancho real más amplio disponible— con este
-> resultado, medido en el navegador y no deducido del código:
+> **QA de anchos del Inicio: tres de cuatro, y conviene decir por qué falta uno.**
+> Medido en navegador real contra el build de producción, no deducido del
+> código:
 >
-> | Comprobación a 1536 px | Resultado |
-> |---|---|
-> | Desborde horizontal del documento | ✅ ninguno |
-> | Cifras o métricas cortadas | ✅ ninguna (obligó a bajar la cifra de 28 a 24 px) |
-> | Controles sin nombre accesible | ✅ ninguno |
-> | Clases de color genéricas en el DOM | ✅ ninguna |
-> | Regiones con nombre en el árbol de accesibilidad | ✅ 7 |
-> | `role=alert` o `aria-busy` colgados tras cargar | ✅ ninguno |
+> | Comprobación | 1440 | 1280 | 1024 | 1536* |
+> |---|---|---|---|---|
+> | Desborde horizontal del documento | ✅ | ✅ | ✅ | ✅ |
+> | Cifras cortadas | ✅ | ✅ | ✅ | ✅ |
+> | Titulares o celdas cortadas | ✅ | ✅ | ✅ | ✅ |
+> | Controles sin nombre accesible | ✅ | ✅ | ✅ | ✅ |
+> | Clases de color genéricas en el DOM | ✅ | ✅ | ✅ | ✅ |
+> | Regiones con nombre (7) | ✅ | ✅ | ✅ | ✅ |
+> | `role=alert` / `aria-busy` colgados | ✅ | ✅ | ✅ | ✅ |
 >
-> **1440, 1280 y 1024 siguen sin verificar en navegador real.** El contenido va
-> en un contenedor `max-w-[1600px]` y el punto de ruptura más alto del diseño es
-> `xl` (1280 px), así que a 1920 solo cambiaría el margen exterior; pero eso es
-> un razonamiento, no una medición, y no sustituye a la QA. Para completarla
-> hace falta que la ventana de Chrome **no esté maximizada** (o bajar el
-> escalado del sistema al 100 %), y entonces el barrido se hace en minutos.
+> \* 1536 px es el ancho **más amplio alcanzable en este equipo**, y es lo que
+> sustituye a 1920. La pantalla es de 1920 px físicos con escalado de Windows
+> al 125 %, así que el viewport CSS máximo es 1536 y Chrome rechaza agrandar la
+> ventana más allá de la pantalla («Bounds must be at least 50 % within visible
+> screen space»). Para exercitar 1920 px CSS hay que bajar el escalado del
+> sistema al 100 %, que es un cambio del equipo y no de este trabajo.
+>
+> El contenido va en un contenedor `max-w-[1600px]` y el punto de ruptura más
+> alto del diseño es `xl` (1280 px), así que entre 1536 y 1920 solo cambiaría
+> el margen exterior — pero eso es un razonamiento, no una medición, y por eso
+> la fila queda en PARCIAL y no en HECHO.
+>
+> **El barrido encontró tres recortes reales** (`84772f7`), todos invisibles
+> leyendo el código: la cifra de la métrica a 1280, el titular del panel de
+> conversaciones a 1280 y el saludo del hero a 1024. El ancho más apretado
+> resultó ser **1280**, no 1024, porque es donde `xl` mete las cuatro tarjetas
+> en una fila.
 
 **Cómo se ejecutó la QA sin romper la vista previa del usuario.** Había una
 vista previa en `:3000`/`:3001` que el usuario está revisando y que no debía
