@@ -62,7 +62,7 @@
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
-| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen; **fusión FALTANTE** | — |
+| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados: backend HECHO y verificado (3.x); interfaz NO entregada** | Interfaz de 3.x |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
@@ -83,7 +83,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 |---|---|---|
 | Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); 12 primitivas en `components/ui/`. Faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar de iniciales, swatches, tooltip |
 | Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
-| Contactos / papelera / fusión | **PARCIAL** | 11 endpoints: `GET /contacts`, `papelera/listado`, `:id/restore`, `:id/impacto`, `:id/perfil`, `:id/definitivo`. **Fusión: FALTANTE** (sin endpoint ni UI) |
+| Contactos / papelera / fusión | **PARCIAL** | 11 endpoints previos más 7 de fusión (`:id/duplicados`, `:id/canonico`, `fusion/comparar`, `fusion/descartar`, `fusion/ejecutar`, `fusion/:id/deshacer`, `fusion/:id/estado`). **Fusión: backend HECHO, interfaz FALTANTE** |
 | Conversaciones / perfil lateral | **HECHO** (funcional) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
 | Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
 | Tareas y sugerencias | **PARCIAL** | 9 endpoints con `:id/aprobar` y `:id/rechazar`; `SugerenciasDeTarea` en frontend. Falta la vista del mockup 07 con pendientes/completadas/sugeridas separadas |
@@ -143,7 +143,7 @@ resuelve consultando lo existente.
 
 | Gap | Por qué necesita decisión |
 |---|---|
-| Fusión de contactos | Qué campo gana ante conflicto, y si el absorbido queda como alias o desaparece |
+| ~~Fusión de contactos~~ | **RESUELTO** el 13-ago-2026: gana el campo que elija la persona, uno a uno, con el valor del principal preseleccionado; el absorbido queda como alias interno. Implementado en 3.x |
 | Pipeline vertical | Cambia la interacción de arrastre ya probada; conviene confirmar antes de reescribir |
 | WhatsApp multi-número | El esquema hoy asume una integración por empresa; ampliarlo es cambio de modelo |
 | Eliminación definitiva | Ya existe `:id/definitivo` con frase de confirmación; falta política de retención visible |
@@ -662,6 +662,115 @@ incremento seguro» al final del documento.
 
 ---
 
+## Incremento 3.x — Fusión segura de contactos duplicados (mockup 22)
+
+**Estado: EN CURSO. Backend entregado y verificado; INTERFAZ NO ENTREGADA.**
+
+No se marca `EN REVISIÓN HUMANA` a propósito: no hay nada visual que revisar
+todavía, y el §9 del master es explícito en que un endpoint sin consumidor no
+es una capacidad entregada. Marcarlo como listo para revisión sería exactamente
+el error que costó dos rondas en 2.3.
+
+**Commit de esta entrega:** `1582848` (esquema, contrato y backend).
+
+### Preflight §2
+
+Ejecutado y en verde antes de escribir nada: HEAD local = remoto =
+`c5ee5e13e2a9fbd74b6d3c17dfc6d0995c5ca316`, árbol limpio, sin `index.lock`,
+`brand/` sin rastrear, 26/26 mockups coincidiendo con el índice y CI de ese SHA
+verde (run `31747629546`). Línea base de pruebas de las áreas afectadas antes de
+tocar comportamiento: 127/127.
+
+### Caracterización dirigida
+
+Lo que se encontró, contra el esquema y el código, no contra informes:
+
+| Área | Hallazgo |
+|---|---|
+| Relaciones con `contactId` | **Siete**, todas con `companyId`: `Conversation`, `Lead`, `Task`, `TaskSuggestion`, `Quote`, `FlowBotExecution`, `CustomFieldValue` |
+| Mensajes y notas | **No cuelgan del contacto**: `Message` cuelga de la conversación y `Note` de la oportunidad o la conversación. Viajan solos y no hay que moverlos |
+| Restricción crítica | `contacts.@@unique([phone, companyId])` y `custom_field_values.@@unique([definitionId, contactId])`. Las dos condicionan el diseño entero |
+| Normalización | Existe `common/phone/e164.util` (`normalizePhone`, `isSamePhone`, `phoneLookupVariants`). **Se reutiliza**; no se escribió otra. De correo no había ninguna: se añadió recorte + minúsculas |
+| Archivo/papelera | `archivedAt`; borrado definitivo separado con anonimización. El alias es un tercer estado distinto de ambos |
+| Permisos | Controlador con `AuthGuard('jwt') + BusinessTenantGuard + RolesGuard`. `BusinessTenantGuard` ya corta al SUPER_ADMIN sin empresa |
+| Auditoría | `PlatformAuditLogService.record(writer, …)`, aceptando el cliente de transacción |
+| Resolución por identidad | **Tres** sitios: entrada de WhatsApp, adaptador de CRM de Pulso y búsqueda global. Los tres tuvieron que aprender a seguir el alias |
+
+### Política aprobada, y cómo quedó implementada
+
+| # | Política | Implementación |
+|---|---|---|
+| 1 | El usuario elige el principal | `principalId` es entrada del contrato; la vista previa se puede pedir en cualquier orden |
+| 2 | Campo por campo, sin sobrescribir en silencio | `elecciones.campos`; por defecto gana el principal y la vista previa marca `requiereDecision` |
+| 3 | Teléfonos y correos alternativos | `altPhones` / `altEmails` normalizados; la búsqueda global los consulta |
+| 4 | Etiquetas y fuentes sin duplicados | `unirSinDuplicados` sobre `tags` |
+| 5 | Campos personalizados campo por campo | `elecciones.camposPersonalizados` por `definitionId` |
+| 6 | Todo en una transacción | `$transaction`; rollback probado con un fallo real inyectado en la base |
+| 7 | Conversaciones intactas | Solo cambia `contactId`; ids, canal y mensajes no se tocan. Probado |
+| 8 | Alias interno | `mergedIntoId`; fuera de activos, papelera y búsqueda; sin cadenas; no restaurable |
+| 9 | Detección | Teléfono/correo normalizados = **alta**; nombre = **sugerida**. Nunca automática |
+| 10 | «No son duplicados» | `contact_merge_dismissals`, pareja ordenada, idempotente |
+| 11 | Deshacer 10 min y solo si es seguro | Ventana fija + comprobación de que nada cambió después; si no, 409 explicando |
+| 12 | Permisos | ADMIN y MANAGER sí; AGENT no; SUPER_ADMIN sin empresa ni entra |
+| 13 | Auditoría sin PII | `contact.merge`, `contact.merge.dismiss`, `contact.merge.undo` con ids, claves y recuentos |
+| 14 | Sin efectos | No mueve etapas, no envía nada, no dispara automatizaciones |
+
+### Mapa de relaciones trasladadas
+
+`Conversation`, `Lead`, `Task`, `TaskSuggestion`, `Quote`, `FlowBotExecution` se
+mueven por `contactId`. `CustomFieldValue` **no se mueve a ciegas**: se resuelve
+por definición y el valor perdedor se guarda entero en el snapshot antes de
+borrarse, porque el índice único no admite dos valores del mismo campo.
+`Message` y `Note` viajan solas. Los alias que apuntaban al absorbido se
+reapuntan al principal para que nunca haya cadenas.
+
+### Contratos
+
+Siete, todos bajo `/contacts` y con rutas de dos segmentos para no chocar con
+`GET /contacts/:id`: `:id/duplicados`, `:id/canonico`, `fusion/comparar`,
+`fusion/descartar`, `fusion/ejecutar`, `fusion/:mergeId/deshacer` y
+`fusion/:mergeId/estado`.
+
+### Pruebas
+
+- **24 e2e contra PostgreSQL real** (`test/contact-fusion.e2e-spec.ts`).
+- Caracterización previa de los tres puntos de resolución por identidad.
+- Unitarias de permisos y de auditoría sin PII.
+- Backend completo: **2149/2149 en 131 suites**; typecheck y lint limpios.
+
+### Lo que NO se entregó, y por qué
+
+- **La interfaz del mockup 22 no está hecha.** Ni el drawer de tres pasos, ni
+  su integración en Contactos y el perfil, ni la resolución de enlaces
+  antiguos, ni las pruebas de frontend.
+- **No se creó ningún dato `QA_MERGE_`.** Se dejó para cuando exista la
+  pantalla que hay que revisar con ellos; sembrarlos ahora solo dejaría datos
+  sueltos en la vista previa sin nada donde mirarlos.
+- **No se hizo QA de navegador.** Depende de lo anterior.
+
+El motivo es de alcance, no técnico: el backend, su migración y sus garantías
+—transacción, concurrencia, reversión, aislamiento— consumieron la sesión
+entera. Se prefirió cerrar esa mitad demostrada y publicada antes que dejar dos
+mitades a medio probar.
+
+### Limitaciones honestas de lo entregado
+
+- **El teléfono principal se puede intercambiar, y eso mueve el número del
+  duplicado.** Es correcto —ambas fichas son la misma persona y ningún número
+  se pierde—, pero conviene saberlo: tras elegir el teléfono del duplicado, el
+  alias se queda con el del principal.
+- **La ventana de deshacer no se puede ampliar.** El mockup promete además que
+  «después, un administrador podrá restaurarla desde Auditoría»: eso **no
+  existe** y la interfaz no debe prometerlo.
+- **`snapshot` conserva los valores escalares previos** mientras viva la fila
+  de `contact_merges`. Es lo que hace posible deshacer; no se purga al vencer
+  la ventana, y eso es una decisión de retención que conviene revisar.
+- **Los candidatos se calculan sobre 500 contactos como mucho**, comparando en
+  memoria por forma canónica. Suficiente para el volumen actual; con carteras
+  grandes habrá que medirlo.
+
+---
+
 ## Decisiones adoptadas durante la implementación
 
 | Fecha | Decisión | Motivo | Consecuencia |
@@ -676,6 +785,14 @@ incremento seguro» al final del documento.
 | Migración | Aditiva | Local | Staging | Backfill | Rollback |
 |---|---:|---:|---:|---|---|
 | Ninguna en el incremento 2.1 | — | — | ❌ | — | — |
+| `20260813221223_fusion_contactos_duplicados` | ✅ | ✅ | ❌ | no hace falta | forward-only; revertir exigiría una migración nueva |
+
+La de 3.x se probó en base **limpia** (57 migraciones desde cero) y sobre una
+**copia representativa** restaurada de un respaldo `pg_dump` tomado antes de
+aplicarla: 19 contactos, 11 conversaciones, 26 mensajes, 18 oportunidades, 14
+tareas, 12 cotizaciones y 349 auditorías idénticos antes y después, 0 arrays en
+NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
+`db push`, sin seed.
 
 ---
 
@@ -712,6 +829,10 @@ incremento seguro» al final del documento.
 | 2026-08-13 | 2.3 (retícula) | Estados: escaso, carga y seis paneles en error | sin huecos, solapes ni desbordes |
 | 2026-08-13 | 2.3 | CI sobre `1d16fae` | **run `31746787438`** — Backend y Frontend `success` |
 | 2026-08-13 | 2.3 | **Revisión humana sobre `1d16fae`** | **APROBADO** — ver «Aprobación humana» |
+| 2026-08-13 | 3.x | `npx jest` (backend completo) | **2149/2149 en 131 suites** (+12, +2 suites) |
+| 2026-08-13 | 3.x | `npx jest --config test/jest-e2e.json contact-fusion` | **24/24 contra PostgreSQL real** |
+| 2026-08-13 | 3.x | `tsc --noEmit` + `eslint` backend | sin errores |
+| 2026-08-13 | 3.x | Migración en base limpia y en copia representativa | sin pérdida; conteos idénticos |
 
 ---
 
@@ -918,10 +1039,15 @@ git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
 # 2.1, 2.2 y 2.3 estan APROBADOS: la fase 2 esta HECHA.
-# 2.3 aprobado el 13-ago-2026 sobre 1d16fae (CI run 31746787438).
-# Siguiente incremento registrado y NO iniciado: 3.x - Fusion de contactos
-# duplicados (mockup 22). Requiere primero la decision de producto sobre
-# conflictos de campo y alias del contacto absorbido.
+# 3.x - Fusion de contactos duplicados: BACKEND ENTREGADO Y VERIFICADO.
+# LA INTERFAZ NO ESTA HECHA: no abrir revision visual todavia.
+#
+# Para continuar 3.x, por este orden:
+#   1. lib/fusion.ts en el frontend sobre los 7 endpoints ya publicados
+#   2. drawer de 3 pasos del mockup 22, montado en Contactos y en el perfil
+#   3. resolucion de enlace antiguo -> URL canonica del principal
+#   4. datos QA_MERGE_ en la empresa preview (NO tocar PREVIEW_BRANDING_)
+#   5. QA de navegador 1920/1536/1440/1280/1024 y zoom 200 %
 #
 # Vista previa local (worker apagado, transporte falso, sin efectos externos):
 #   cd apps/backend  && node dist/src/main        # :3001, con las variables
