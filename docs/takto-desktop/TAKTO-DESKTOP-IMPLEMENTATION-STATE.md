@@ -7,7 +7,7 @@
 ## Última actualización
 
 - Fecha: 14 de agosto de 2026 · America/Bogota
-- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` (**EN REVISIÓN HUMANA**)
+- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` · `c9c4bc5` (navegación) (**EN REVISIÓN HUMANA**)
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
@@ -1049,6 +1049,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-14 | 3.y (2ª ronda) | `vitest run` (frontend completo) | **794/794** en 77 archivos |
 | 2026-08-14 | 3.y (2ª ronda) | `typecheck` + `lint` + `build` en ambos | sin errores (1 warning previo) |
 | 2026-08-14 | 3.y (2ª ronda) | QA de navegador 1920/1440/1280/1024 | 4 pestañas en 1 fila, ficha abierta por defecto en ≥1280, 0 desborde, consola limpia |
+| 2026-08-14 | 3.y (2ª ronda) | Interacción real en navegador (clic, pestañas, Atrás/Adelante, Escape) | defecto de navegación encontrado y corregido; todo verde tras el arreglo |
 
 ---
 
@@ -1358,6 +1359,32 @@ cuanto alguien tuviera once. `valorAbierto` suma solo las oportunidades
 **abiertas**. Y los **documentos** del producto son los PDF de cotizaciones
 emitidas —no hay modelo `Document` en el repositorio y un borrador todavía no es
 un documento—, cosa que la pestaña dice en una línea en vez de dejarlo implícito.
+
+### Un defecto que solo aparece en el navegador
+
+Midiendo la corrección apareció algo peor que lo que se venía a arreglar:
+**pulsar una conversación, una pestaña o el icono de la ficha no cambiaba
+nada.** La barra de direcciones se quedaba igual.
+
+No lo veían las pruebas porque doblan `next/navigation`, y la QA anterior
+navegaba **escribiendo la URL**, no pulsando. Se aisló midiendo en la vista
+previa: React estaba hidratado —las pestañas del perfil, que son estado local,
+sí respondían—, un `<Link>` navegaba bien, y espiando `history.pushState` y
+`replaceState` se vio que la llamada del router no llegaba a aplicarse.
+
+En esta pantalla la ruta **nunca** cambia: solo cambian los parámetros. Ahora
+esos cambios usan la History API del navegador, que es lo que Next 15+ observa y
+con lo que `useSearchParams` se actualiza, y que además es lo correcto para el
+caso: cambiar parámetros sin volver a pedir la ruta al servidor.
+
+Comprobado en navegador real: a 1024 y 1440 la ficha va cerrada → abierta →
+cerrada escribiendo `perfil=1` y `perfil=0`; pulsar una fila abre el hilo;
+«Mías» filtra de 7 filas a 1 conservando el hilo abierto; Atrás y Adelante
+restauran; Escape cierra el cajón sin cerrar la conversación.
+
+**Deuda anotada:** el embudo (`/dashboard/pipeline`) usa el mismo patrón de
+`router.replace` para cambios de solo query. No se tocó en este incremento, pero
+conviene revisarlo con la misma medición.
 
 ### Verificación por ancho, después de la corrección
 
