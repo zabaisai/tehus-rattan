@@ -97,7 +97,23 @@ export interface ResultadoFusion {
   mergeId: string;
   principalId: string;
   duplicadoId: string;
+  /**
+   * Lo que se MOVIO desde el duplicado. Es el historial que cambio de dueño.
+   *
+   * NO es lo que el contacto resultante tiene: lo que ya era del principal
+   * sigue ahi y no se movio a ninguna parte. Llamar «conservados» a esta
+   * cifra fue lo que hizo que la confirmacion dijera 10 y el exito 9.
+   */
   trasladadas: RecuentoRelaciones;
+  /**
+   * Lo que el contacto resultante TIENE, contado despues de mover.
+   *
+   * Es la misma pregunta que responde `relaciones` en la vista previa, para
+   * que el «se conservaran» de antes y el «se conservaron» de despues hablen
+   * de lo mismo. Se mide, no se deduce sumando: dos valores del mismo campo
+   * personalizado no sobreviven los dos.
+   */
+  totalConservado: RecuentoRelaciones;
   realizadaEn: string;
   /** Hasta cuándo se puede deshacer. */
   deshacerHasta: string;

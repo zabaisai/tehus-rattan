@@ -928,6 +928,77 @@ describe('Fusión de contactos duplicados (e2e, base real)', () => {
       expect(ab.relaciones.mensajes).toBe(2);
     });
 
+    it('lo TRASLADADO y lo CONSERVADO son dos cifras distintas, y la vista previa proyecta la segunda', async () => {
+      // LA CONTRADICCION QUE ENCONTRO LA REVISION. La confirmacion decia «se
+      // conservaran 10 registros» y el exito «se conservaron 9». Ni siquiera
+      // eran la misma pregunta: 10 salia de sumar los dos contactos y 9 de
+      // contar solo lo que se movio del duplicado.
+      //
+      // Y el 10 tampoco era correcto: cuando los dos tienen valor del MISMO
+      // campo personalizado, el indice unico impide que sobrevivan los dos, y
+      // sumar contaba uno de mas.
+      const definicion = await prisma.customFieldDefinition.create({
+        data: {
+          companyId: empresaA,
+          entity: 'CONTACT',
+          key: 'e2e_fus_simetria',
+          label: 'Presupuesto',
+          type: 'TEXT',
+        },
+      });
+
+      // El principal tiene HISTORIAL PROPIO: una conversacion con su mensaje,
+      // ademas del campo personalizado que chocara con el del duplicado.
+      const P = await conHistorial(empresaA, { name: `${PREFIJO} Total A` });
+      const D = await conHistorial(empresaA, { name: `${PREFIJO} Total B` });
+      for (const [contactId, valor] of [
+        [P.c.id, '15-20 millones'],
+        [D.c.id, '10-15 millones'],
+      ] as const)
+        await prisma.customFieldValue.create({
+          data: {
+            companyId: empresaA,
+            definitionId: definicion.id,
+            contactId,
+            valueText: valor,
+          },
+        });
+
+      const vista = await fusion.comparar(P.c.id, D.c.id, empresaA);
+      const r = await fusion.fusionar({
+        companyId: empresaA,
+        usuarioId: usuario,
+        principalId: P.c.id,
+        duplicadoId: D.c.id,
+        elecciones: {},
+        versiones: vista.versiones,
+      });
+
+      const suma = (x: object) =>
+        Object.values(x).reduce((a: number, b) => a + Number(b), 0);
+
+      // 1. El resultado informa las DOS cifras, no una sola.
+      expect(r.totalConservado).toBeDefined();
+      expect(suma(r.totalConservado)).toBeGreaterThan(suma(r.trasladadas));
+
+      // 2. Lo trasladado sigue siendo el historial del duplicado.
+      expect(r.trasladadas.conversaciones).toBe(1);
+
+      // 3. Lo conservado es lo que tiene el contacto resultante, medido de
+      //    verdad despues de mover.
+      expect(r.totalConservado.conversaciones).toBe(2);
+      expect(r.totalConservado.mensajes).toBe(2);
+
+      // 4. Y la vista previa PROYECTA exactamente eso: la confirmacion y el
+      //    resultado hablan de lo mismo.
+      expect(vista.relaciones).toEqual(r.totalConservado);
+
+      // 5. El campo personalizado no se cuenta dos veces: solo sobrevive uno
+      //    por definicion.
+      expect(vista.relaciones.camposPersonalizados).toBe(1);
+      expect(r.totalConservado.camposPersonalizados).toBe(1);
+    });
+
     it('un teléfono igual en otro formato no cuenta como diferencia', async () => {
       const P = await contacto(empresaA, {
         name: `${PREFIJO} Victor`,

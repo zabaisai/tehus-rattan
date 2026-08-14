@@ -120,11 +120,38 @@ const VISTA = {
   decisionesPendientes: 3,
 };
 
+/** Lo que se movió del duplicado: suma 9. */
+const TRASLADADAS = {
+  conversaciones: 1,
+  mensajes: 3,
+  oportunidades: 1,
+  tareas: 1,
+  sugerenciasDeTarea: 0,
+  cotizaciones: 1,
+  camposPersonalizados: 1,
+  ejecucionesDeBot: 0,
+  notas: 1,
+};
+
+/** Lo que queda en el contacto resultante: suma 11. Distinto a propósito. */
+const CONSERVADO = {
+  conversaciones: 2,
+  mensajes: 4,
+  oportunidades: 1,
+  tareas: 1,
+  sugerenciasDeTarea: 0,
+  cotizaciones: 1,
+  camposPersonalizados: 1,
+  ejecucionesDeBot: 0,
+  notas: 1,
+};
+
 const RESULTADO = {
   mergeId: 'm1',
   principalId: 'p1',
   duplicadoId: 'd1',
-  trasladadas: VISTA.relaciones,
+  trasladadas: TRASLADADAS,
+  totalConservado: CONSERVADO,
   realizadaEn: '2026-08-13T12:00:00.000Z',
   deshacerHasta: '',
   segundosRestantes: 540,
@@ -541,7 +568,7 @@ describe('FusionDeDuplicados — flujo del mockup 22', () => {
       await screen.findByText(/será el contacto principal/);
       await user.click(screen.getByRole('checkbox', { name: /misma persona/ }));
       await user.click(screen.getByRole('button', { name: 'Sí, fusionar contactos' }));
-      await screen.findByText(/Se conservaron \d+ registros/);
+      await screen.findByText(/se conservaron \d+ registros/i);
     }
 
     it('enseña el éxito con el recuento real y lleva al contacto canónico', async () => {
@@ -549,9 +576,29 @@ describe('FusionDeDuplicados — flujo del mockup 22', () => {
       const { onFusionado } = montar();
       await fusionar(user);
 
-      expect(screen.getByText(/Se conservaron 19 registros/)).toBeInTheDocument();
+      expect(screen.getByText(/se conservaron 11 registros/i)).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Ver el contacto' }));
       expect(onFusionado).toHaveBeenCalledWith('p1');
+    });
+
+    /**
+     * LA CONTRADICCION QUE ENCONTRO LA REVISION. La confirmacion prometia «se
+     * conservaran 10» y el exito decia «se conservaron 9», porque la pantalla
+     * llamaba «conservados» al contador de lo TRASLADADO. Son dos preguntas
+     * distintas: lo que cambio de dueño y lo que el contacto resultante
+     * tiene. Aqui los dos recuentos son distintos a proposito —9 y 11— para
+     * que confundirlos no pueda pasar inadvertido.
+     */
+    it('no llama «conservados» a lo trasladado: enseña las dos cifras', async () => {
+      const user = userEvent.setup();
+      montar();
+      await fusionar(user);
+
+      const aviso = screen.getByText(/se conservaron \d+ registros/i);
+      expect(aviso).toHaveTextContent(/se trasladaron 9 registros/i);
+      expect(aviso).toHaveTextContent(/se conservaron 11 registros/i);
+      // Y NUNCA la cifra de trasladados presentada como conservados.
+      expect(aviso).not.toHaveTextContent(/conservaron 9/i);
     });
 
     it('la cuenta atrás sale de `deshacerHasta` del servidor', async () => {

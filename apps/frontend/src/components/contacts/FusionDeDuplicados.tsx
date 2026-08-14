@@ -993,17 +993,21 @@ export function FusionDeDuplicados({
 
   function pasoResultado() {
     if (!resultado) return null;
-    const total = RELACIONES_VISIBLES.reduce(
-      (s, x) => s + (resultado.trasladadas[x.clave] ?? 0),
-      0,
-    );
+    // DOS CIFRAS, DOS PREGUNTAS. `trasladadas` es lo que cambió de dueño;
+    // `totalConservado` es lo que el contacto resultante tiene. Las dos las
+    // mide el servidor: recalcular la segunda aquí desde la vista previa
+    // volvería a permitir que la confirmación y el resultado no coincidan.
+    const sumar = (r: RecuentoRelaciones) =>
+      RELACIONES_VISIBLES.reduce((s, x) => s + (r[x.clave] ?? 0), 0);
+    const trasladados = sumar(resultado.trasladadas);
+    const conservados = sumar(resultado.totalConservado);
     return (
       <div className="space-y-4">
         <p className="flex items-start gap-2 rounded-md border border-status-success-surface bg-status-success-surface p-3 text-sm text-status-success-strong">
           <CheckCircle2 size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
           {estadoDeshacer === 'hecho'
             ? 'La fusión se deshizo: los dos contactos vuelven a estar separados.'
-            : `Fusión completada. Se conservaron ${total} registros relacionados.`}
+            : `Fusión completada. Se trasladaron ${trasladados} registros al contacto principal; en total se conservaron ${conservados} registros relacionados.`}
         </p>
 
         {estadoDeshacer === 'disponible' && (

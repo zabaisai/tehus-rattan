@@ -74,7 +74,21 @@ interface SnapshotFusion {
    * después, cuando ya cuelgan del principal y no se distinguen de los suyos.
    */
   recuento: RecuentoRelaciones;
+  /** Lo que quedo en el principal al terminar. Medido, no deducido. */
+  conservado?: RecuentoRelaciones;
 }
+
+const RECUENTO_VACIO: RecuentoRelaciones = {
+  conversaciones: 0,
+  mensajes: 0,
+  oportunidades: 0,
+  tareas: 0,
+  sugerenciasDeTarea: 0,
+  cotizaciones: 0,
+  camposPersonalizados: 0,
+  ejecucionesDeBot: 0,
+  notas: 0,
+};
 
 /** Suma dos recuentos clave a clave. */
 function sumarRecuentos(
@@ -323,18 +337,26 @@ export class FusionContactosService {
         companyId,
       );
 
-    // LO QUE SE CONSERVARA ES LA SUMA DE LOS DOS, no el historial de uno.
+    // LO QUE TENDRA EL CONTACTO RESULTANTE, proyectado.
     //
-    // Contar solo el del duplicado hacia que el resumen cambiara al invertir
-    // el principal —de siete filas a una, en la pareja de QA—, cuando lo que
-    // la etiqueta promete es lo que tendra el contacto resultante. Ese total
-    // es el mismo mirado desde cualquiera de los dos lados, que es justo la
-    // propiedad que una persona espera de un resumen antes de decidir.
+    // No es el historial del duplicado —contarlo asi hacia que el resumen
+    // cambiara al invertir el principal— ni tampoco la suma cruda de los dos:
+    // los campos personalizados NO se suman, porque el indice
+    // `@@unique([definitionId, contactId])` impide que sobrevivan dos valores
+    // de la misma definicion. Sumarlos hacia prometer un registro que la
+    // fusion iba a borrar, y es exactamente la diferencia entre el «10» de la
+    // confirmacion y lo que quedaba despues.
+    //
+    // `camposPersonalizados` sale del numero de DEFINICIONES con valor en
+    // alguno de los dos, que es cuantas filas quedaran.
     const [delPrincipal, delDuplicado] = await Promise.all([
       this.contarRelaciones(this.prisma, principal.id, companyId),
       this.contarRelaciones(this.prisma, duplicado.id, companyId),
     ]);
-    const relaciones = sumarRecuentos(delPrincipal, delDuplicado);
+    const relaciones: RecuentoRelaciones = {
+      ...sumarRecuentos(delPrincipal, delDuplicado),
+      camposPersonalizados: camposPersonalizados.length,
+    };
 
     const razones: string[] = [];
     let nivel: NivelDeCoincidencia = 'sugerida';
@@ -805,6 +827,10 @@ export class FusionContactosService {
       }),
     ]);
 
+    // Se cuenta DESPUES de mover y de resolver los campos personalizados: es
+    // lo que el contacto resultante tiene de verdad, no una suma optimista.
+    const conservado = await this.contarRelaciones(tx, principal.id, companyId);
+
     const snapshot: SnapshotFusion = {
       principalAntes: {
         name: principal.name,
@@ -824,6 +850,7 @@ export class FusionContactosService {
       camposPersonalizadosPisados,
       aliasReapuntados: aliasPrevios.map((x) => x.id),
       recuento,
+      conservado,
     };
 
     const ahora = new Date();
@@ -1206,17 +1233,10 @@ export class FusionContactosService {
       mergeId: merge.id,
       principalId: merge.primaryContactId,
       duplicadoId: merge.mergedContactId,
-      trasladadas: snapshot.recuento ?? {
-        conversaciones: 0,
-        mensajes: 0,
-        oportunidades: 0,
-        tareas: 0,
-        sugerenciasDeTarea: 0,
-        cotizaciones: 0,
-        camposPersonalizados: 0,
-        ejecucionesDeBot: 0,
-        notas: 0,
-      },
+      trasladadas: snapshot.recuento ?? RECUENTO_VACIO,
+      // Las fusiones anteriores a este contrato no lo guardaron: se informa
+      // vacio en vez de inventar un total que nadie midio.
+      totalConservado: snapshot.conservado ?? RECUENTO_VACIO,
       realizadaEn: merge.performedAt.toISOString(),
       deshacerHasta: merge.undoableUntil.toISOString(),
       segundosRestantes: merge.undoneAt ? 0 : restante,

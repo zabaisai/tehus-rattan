@@ -77,7 +77,20 @@ export interface ResultadoFusion {
   mergeId: string;
   principalId: string;
   duplicadoId: string;
+  /**
+   * Lo que se MOVIÓ desde el duplicado: el historial que cambió de dueño.
+   * No es lo que el contacto resultante tiene —lo que ya era del principal
+   * sigue ahí y no se movió—, y confundirlas fue lo que hizo que la
+   * confirmación dijera 10 y el éxito 9.
+   */
   trasladadas: RecuentoRelaciones;
+  /**
+   * Lo que el contacto resultante TIENE, medido por el servidor después de
+   * mover. Es la misma pregunta que responde `relaciones` en la vista previa.
+   * No se recalcula en la pantalla: hacerlo desde una vista previa que puede
+   * estar obsoleta es volver a tener dos verdades.
+   */
+  totalConservado: RecuentoRelaciones;
   realizadaEn: string;
   /** Marca del SERVIDOR. La cuenta atrás se calcula contra esto. */
   deshacerHasta: string;
