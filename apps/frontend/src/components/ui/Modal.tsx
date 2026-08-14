@@ -10,6 +10,11 @@ const MAX_WIDTH_CLASSES = {
   lg: 'sm:max-w-lg',
   xl: 'sm:max-w-xl',
   '2xl': 'sm:max-w-2xl',
+  // Para diálogos que comparan DOS registros lado a lado. Un formulario cabe
+  // en 672 px; una tabla de «este valor o este otro, y el resultado» no, y
+  // apretarla es lo que obliga a leerla desplazándola de lado.
+  '3xl': 'sm:max-w-3xl',
+  '4xl': 'sm:max-w-4xl',
 } as const;
 
 export type ModalMaxWidth = keyof typeof MAX_WIDTH_CLASSES;

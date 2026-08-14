@@ -205,10 +205,20 @@ function FilaDeCampo({
   return (
     <fieldset className="border-t border-line-default py-2.5">
       <legend className="sr-only">{campo.etiqueta}</legend>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[9rem_1fr_1fr_1fr] sm:items-center">
+      {/* `min-w-0` EN LA RETICULA Y EN CADA CELDA.
+          Un elemento de retícula tiene `min-width: auto`, así que una cadena
+          sin puntos de corte —un correo, un identificador— empuja su columna
+          hasta su ancho intrínseco y arrastra la tabla entera fuera del
+          diálogo. Medido antes de arreglarlo: 195 px de exceso y la columna
+          del resultado recortada. `min-w-0` es lo que permite encoger; el
+          corte de palabra, más abajo, es lo que evita que haga falta.
+
+          La columna de la etiqueta es `minmax`, no fija: cuando el espacio
+          aprieta cede primero ella, que es la que menos información lleva. */}
+      <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(6rem,9rem)_1fr_1fr_1fr] sm:items-start">
         <span
           aria-hidden="true"
-          className="text-xs font-medium text-content-secondary"
+          className="min-w-0 break-words text-xs font-medium text-content-secondary sm:pt-0.5"
         >
           {campo.etiqueta}
           {campo.requiereDecision && (
@@ -227,10 +237,14 @@ function FilaDeCampo({
           const valor =
             cual === 'principal' ? campo.valorPrincipal : campo.valorDuplicado;
           return (
-            <label key={cual} className="flex items-center gap-2 text-sm">
+            <label
+              key={cual}
+              className="flex min-w-0 items-start gap-2 text-sm"
+            >
               <input
                 type="radio"
                 name={nombreGrupo}
+                className="mt-1 shrink-0"
                 checked={lado === cual}
                 disabled={campo.iguales || valor == null}
                 onChange={() => onElegir(cual)}
@@ -238,16 +252,18 @@ function FilaDeCampo({
                   cual === 'principal' ? 'contacto principal' : 'posible duplicado'
                 }`}
               />
-              <span className="truncate text-content-primary">
+              {/* Se PARTE, no se recorta: recortar aquí escondería justo el
+                  final del correo, que suele ser lo que distingue a los dos. */}
+              <span className="min-w-0 break-words text-content-primary">
                 {valor ?? <span className="text-content-secondary">—</span>}
               </span>
             </label>
           );
         })}
 
-        <span className="text-sm">
+        <span className="min-w-0 text-sm">
           <span className="sr-only">Resultado final: </span>
-          <span className="font-medium text-content-primary">
+          <span className="break-words font-medium text-content-primary">
             {valorFinal ?? '—'}
           </span>
           {campo.iguales && (
@@ -558,7 +574,7 @@ export function FusionDeDuplicados({
     <Modal
       title={TITULOS[paso]}
       onClose={intentarCerrar}
-      maxWidth="2xl"
+      maxWidth="4xl"
       footer={pieDeModal()}
     >
       {paso !== 'elegir' && paso !== 'resultado' && <Pasos actual={paso} />}

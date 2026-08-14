@@ -391,6 +391,46 @@ describe('FusionDeDuplicados — flujo del mockup 22', () => {
       expect(within(resumen).queryByText(/consentimiento/i)).not.toBeInTheDocument();
     });
 
+    /**
+     * SIN DESBORDAMIENTO HORIZONTAL.
+     *
+     * jsdom no calcula maquetación, así que aquí no se mide el desborde: se
+     * fijan las condiciones que lo hacen imposible. Un elemento de retícula o
+     * de flex tiene `min-width: auto`, así que una cadena sin puntos de corte
+     * —un correo como `valentina.ocampo@example.invalid`— empuja su columna
+     * hasta su ancho intrínseco y arrastra la tabla entera. Medido en
+     * navegador antes de arreglarlo: 195 px de exceso en 1280, 1366, 1440 y
+     * 1920, con la columna del valor final recortada.
+     *
+     * Hacen falta las dos cosas: `min-w-0` para que la columna PUEDA
+     * encogerse, y una clase de corte para que el texto largo se reparta en
+     * varias líneas en vez de exigir una sola. Con una sola de las dos el
+     * desborde vuelve.
+     */
+    it('las celdas pueden encogerse y los valores largos parten: sin desborde horizontal', async () => {
+      const user = userEvent.setup();
+      const { container } = montar();
+      await irAResolver(user);
+
+      const filas = container.querySelectorAll('fieldset');
+      expect(filas.length).toBeGreaterThan(0);
+
+      for (const fila of filas) {
+        const rejilla = fila.querySelector('div');
+        expect(rejilla?.className).toContain('min-w-0');
+
+        // Cada celda de la fila tiene que poder encogerse.
+        for (const celda of rejilla!.children)
+          expect(celda.className).toContain('min-w-0');
+      }
+
+      // El valor final se parte en vez de exigir una línea entera, y no se
+      // recorta: el contenido completo sigue siendo legible.
+      const correo = screen.getAllByText('laura@example.invalid')[0];
+      expect(correo.className).toMatch(/break-words|break-all/);
+      expect(correo.className).not.toContain('truncate');
+    });
+
     it('dice cuántas diferencias faltan por decidir', async () => {
       const user = userEvent.setup();
       montar();
