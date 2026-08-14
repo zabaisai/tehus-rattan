@@ -7,7 +7,10 @@
 ## Última actualización
 
 - Fecha: 14 de agosto de 2026 · America/Bogota
-- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` · `c9c4bc5` (navegación) · **3ª ronda:** `7c7b857` · `3bd4585` · `e44ef82` (**EN REVISIÓN HUMANA**)
+- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` · `c9c4bc5` (navegación) · **3ª ronda:** `7c7b857` · `3bd4585` · `e44ef82` · `d36c5b4`
+- **SHA de 3.y aprobado por revisión humana: `7a1e0a16a340efd17393fc0869496ac8550dc015`**
+- **CI de ese SHA: verde — run [`31844338412`](https://github.com/zabaisai/tehus-rattan/actions/runs/31844338412)**
+- Aprobación humana de 3.y: **14 de agosto de 2026**. Con ella, la **fase 3 queda HECHA**
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
@@ -70,7 +73,7 @@
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
-| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados (3.x, mockup 22): HECHO y aprobado el 14-ago-2026 sobre `397dab9`** | Inbox de tres paneles y perfil 360 (3.y, mockups 03 y 18): **entregado, EN REVISIÓN HUMANA** |
+| 3. Contactos, conversaciones y perfil 360 | **HECHO** | Listado, papelera y restauración; **fusión de duplicados (3.x, mockup 22) aprobada sobre `397dab9`**; **inbox de tres paneles y perfil 360 (3.y, mockups 03 y 18) aprobados el 14-ago-2026 sobre `7a1e0a1`** | — |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
@@ -92,7 +95,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 | Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); 12 primitivas en `components/ui/`. Faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar de iniciales, swatches, tooltip |
 | Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
 | Contactos / papelera / fusión | **PARCIAL** | 11 endpoints previos más 7 de fusión (`:id/duplicados`, `:id/canonico`, `fusion/comparar`, `fusion/descartar`, `fusion/ejecutar`, `fusion/:id/deshacer`, `fusion/:id/estado`) y el flujo del mockup 22 en `components/contacts/FusionDeDuplicados.tsx`. **Fusión: HECHO** (mockup 22 completado, aprobado el 14-ago-2026 sobre `397dab9`) |
-| Conversaciones / perfil lateral | **HECHO** (funcional) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
+| Conversaciones / perfil lateral | **HECHO** (mockups 03 y 18) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
 | Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
 | Tareas y sugerencias | **PARCIAL** | 9 endpoints con `:id/aprobar` y `:id/rechazar`; `SugerenciasDeTarea` en frontend. Falta la vista del mockup 07 con pendientes/completadas/sugeridas separadas |
 | Productos / imágenes / importación | **PARCIAL** | 14 endpoints con wizard completo (`import`, `mapping`, `preview`, `start`, `cancel`, `report`, `limits`). Catálogo sin imágenes; falta UI del wizard (mockup 09) |
@@ -1054,6 +1057,8 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-14 | 3.y (3ª ronda) | `typecheck` + `lint` + `build` | sin errores (1 warning previo) |
 | 2026-08-14 | 3.y (3ª ronda) | Medición de recortes y líneas visuales 1024–1920 | 0 pestañas recortadas, 0 cortes a mitad de palabra, 0 desbordamiento |
 | 2026-08-14 | 3.y (3ª ronda) | Scroll horizontal de la ficha lateral 1024–1920 | **0** en los cuatro |
+| 2026-08-14 | 3.y | CI sobre `7a1e0a1` | **run `31844338412`** — Backend y Frontend `success` |
+| 2026-08-14 | 3.y | **Revisión humana en escritorio sobre `7a1e0a1`** | **APROBADO** — ver «Aprobación humana — 14 de agosto de 2026» |
 
 ---
 
@@ -1066,7 +1071,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Inicio (mockup 01, incremento 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 13-ago-2026 |
 | Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
-| Inbox de tres paneles (mockups 03 y 18, 3.y) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **EN REVISIÓN HUMANA** |
+| Inbox de tres paneles (mockups 03 y 18, 3.y) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
 | TAKTO Pulso |  |  |  |  |  |  | PENDIENTE |
 | Tareas |  |  |  |  |  |  | PENDIENTE |
@@ -1235,7 +1240,56 @@ ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 
 ---
 
-## Incremento 3.y — Inbox de tres paneles con perfil colapsable y URL profunda · **EN REVISIÓN HUMANA**
+## Incremento cerrado: 3.y — Inbox de tres paneles con perfil colapsable y URL profunda
+
+**Estado: HECHO · APROBADO EN REVISIÓN HUMANA. Mockups 03 y 18 cubiertos.**
+
+**SHA aprobado: `7a1e0a16a340efd17393fc0869496ac8550dc015`.**
+**CI de ese SHA: verde — run
+[`31844338412`](https://github.com/zabaisai/tehus-rattan/actions/runs/31844338412)**
+(Backend: typecheck, lint, unitarias, build, migraciones en base aislada y e2e;
+Frontend: pruebas, typecheck, lint y build).
+
+### Aprobación humana — 14 de agosto de 2026
+
+Lo que la persona revisó **en su escritorio**, con sus manos y su pantalla:
+
+| Qué se probó | Veredicto |
+|---|---|
+| Inbox: las cuatro pestañas completas y legibles | Aprobado |
+| Vista seleccionada: tres paneles, perfil abierto y conversación en solo lectura | Aprobado |
+| Perfil 360: estructura visual, seis pestañas funcionales y legibles, sin desbordamiento horizontal | Aprobado |
+| Recorrido de las seis pestañas —Conversaciones, Oportunidades, Tareas, Cotizaciones, Documentos y Actividad— | Todas funcionan |
+
+> **Qué revisó una persona y qué midió una máquina.** Conviene no mezclarlo. La
+> **revisión humana** se hizo en escritorio, sobre la vista previa local, y es
+> la que aprueba: mira si se entiende, si se lee y si sirve. Las **mediciones
+> automatizadas** —1024, 1280, 1440 y 1920 px con `deviceScaleFactor: 1` por
+> CDP— no aprueban nada: solo comprueban lo que un ojo no puede afirmar con
+> certeza (píxeles de desbordamiento, líneas visuales, zonas de desplazamiento,
+> consola). Las dos cosas hicieron falta: la máquina encontró el compositor sin
+> integración y los cortes a mitad de palabra; la persona encontró que la ficha
+> empezaba cerrada y que «Sin asignar» se leía «Sin as…», que ninguna medición
+> habría marcado como error.
+
+### Datos QA — **conservar**
+
+Los registros `QA_INBOX_` **no se limpian**: son los que hacen revisable esta
+pantalla (una conversación con oportunidad y responsable, otra archivada, una
+tarea pendiente). Sus ids están en «Datos QA creados», más abajo, con el orden
+exacto de borrado para cuando se decida retirarlos. `PREVIEW_BRANDING_` y
+`QA_MERGE_` siguen intactos.
+
+### Rutas de QA aprobadas
+
+- Bandeja sin selección: `http://localhost:3000/dashboard/conversations`
+- Conversación con los tres paneles: `http://localhost:3000/dashboard/conversations?c=cmstafxf00005v2y8wubfxh06`
+- Con la ficha cerrada a mano: añadir `&perfil=0`
+- Perfil 360: `http://localhost:3000/dashboard/contacts/cmstafxee0001v2y8ydl7ehv3`
+
+---
+
+### Registro de la entrega
 
 Mockups **03** y **18**. **Entregado de extremo a extremo. Pendiente de
 revisión visual. No cerrar.**
@@ -1498,6 +1552,19 @@ impresión.
 
 ---
 
+## Próximo incremento seguro: `4.1 — Pipeline vertical (mockup 04)`
+
+**Registrado, no iniciado.** Con 3.y aprobado, la **fase 3 queda cerrada** y el
+master pasa a la **fase 4 — pipeline vertical, tareas y acciones desde chat**
+(mockups 04, 07, 19, 20, 21). Su primer punto es el pipeline vertical, que el
+inventario ya señala como el hueco: el kanban existe pero es **horizontal**, y
+el mockup 04 lo pide vertical.
+
+Su diseño y su implementación **no se redactan aquí**: se abren cuando se
+arranque el incremento, con su propio preflight §2.
+
+---
+
 ## Próximo comando seguro
 
 ```bash
@@ -1510,10 +1577,15 @@ git rev-parse origin/feature/takto-brand-ui-integration
 # sobre 397dab9, CI verde (run 31822358130). Mockup 22 completado.
 #
 # 3.y - Inbox de tres paneles con perfil colapsable y URL profunda
-# (mockups 03 y 18): ENTREGADO, EN REVISION HUMANA. No cerrarlo hasta que haya
-# veredicto, y no abrir el incremento siguiente.
+# (mockups 03 y 18): APROBADO el 14-ago-2026 sobre 7a1e0a1, CI verde
+# (run 31844338412). Con el, la FASE 3 queda HECHA.
 #
-# Rutas para revisar 3.y, con los datos QA_INBOX_:
+# Proximo incremento registrado y NO iniciado:
+#   4.1 - Pipeline vertical (mockup 04). Abrirlo exige su propio preflight §2.
+#
+# Los datos QA_INBOX_ se CONSERVAN: son los que hacen revisable el inbox.
+#
+# Rutas de QA de 3.y, con los datos QA_INBOX_:
 #   http://localhost:3000/dashboard/conversations
 #   http://localhost:3000/dashboard/conversations?c=cmstafxf00005v2y8wubfxh06
 #   http://localhost:3000/dashboard/conversations?c=cmstafxf00005v2y8wubfxh06&perfil=1
