@@ -522,6 +522,18 @@ describe("Inbox — el compositor no promete lo que no puede", () => {
     expect(screen.queryByText(/modo solo lectura/i)).toBeNull();
   });
 
+  it("si no se puede saber el estado, NO se bloquea el hilo", async () => {
+    // Un fallo al preguntar no es una desconexión. Bloquear ahí seria contar
+    // una averia como una decision de configuracion.
+    getEstadoDeWhatsApp.mockRejectedValue(new Error("sin red"));
+    montar("/dashboard/conversations?c=conv-1");
+
+    expect(
+      await screen.findByPlaceholderText(/escribe un mensaje/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/modo solo lectura/i)).toBeNull();
+  });
+
   it("una integración que exige reconexión tampoco deja escribir", async () => {
     getEstadoDeWhatsApp.mockResolvedValue({ status: "REAUTH_REQUIRED" });
     montar("/dashboard/conversations?c=conv-1");

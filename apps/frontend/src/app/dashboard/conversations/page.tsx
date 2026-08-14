@@ -185,7 +185,16 @@ function InboxContenido() {
     staleTime: 5 * 60_000,
     retry: false,
   });
-  const puedeEnviar = conexion.data?.status === "CONNECTED";
+  /**
+   * Si NO se sabe, no se bloquea.
+   *
+   * Un fallo al preguntar por el estado no es una desconexión: dejar el hilo en
+   * solo lectura porque la consulta se cayó sería contar una avería como una
+   * decisión de configuración. Cuando el estado se desconoce, el compositor
+   * sigue ahí y el camino de envío ya dice la verdad si el mensaje no sale.
+   */
+  const estadoConexion = conexion.data?.status ?? null;
+  const puedeEnviar = estadoConexion === null || estadoConexion === "CONNECTED";
 
   const { data: asesores } = useQuery({
     queryKey: ["users"],
