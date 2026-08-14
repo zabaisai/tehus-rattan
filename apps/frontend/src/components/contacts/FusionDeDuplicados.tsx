@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
@@ -363,6 +363,24 @@ export function FusionDeDuplicados({
   const [conservarAlternativas, setConservarAlternativas] = useState(true);
   const [confirmado, setConfirmado] = useState(false);
   const [enviando, setEnviando] = useState(false);
+
+  /**
+   * CANDADO SINCRONO. `setEnviando(true)` no bloquea nada: dos eventos en el
+   * mismo fotograma leen el mismo `enviando` antes de que React vuelva a
+   * renderizar, y salen dos peticiones de un solo gesto. Una `ref` cambia en
+   * el acto.
+   */
+  const enviandoRef = useRef(false);
+
+  /**
+   * NUMERO DE OPERACION, para descartar respuestas que llegan tarde.
+   *
+   * Si alguien abandona la operacion —«volver a comparar», cambiar de paso—
+   * mientras la peticion sigue en vuelo, su respuesta ya no describe lo que
+   * hay en pantalla. Pintarla fue lo que hizo aparecer un «fusion completada»
+   * despues de un conflicto, sin que nadie volviera a pulsar el boton.
+   */
+  const operacionRef = useRef(0);
   const [error, setError] = useState<string | null>(null);
   const [conflicto, setConflicto] = useState(false);
   const [resultado, setResultado] = useState<ResultadoFusion | null>(null);
@@ -508,8 +526,22 @@ export function FusionDeDuplicados({
     }
   }
 
+  /** Descarta lo que este en vuelo: su respuesta ya no se pintara. */
+  function abandonarOperacion() {
+    operacionRef.current += 1;
+    enviandoRef.current = false;
+    setEnviando(false);
+  }
+
   async function fusionar() {
     if (!vista || !duplicadoId) return;
+    // El candado va ANTES de cualquier `await` y de cualquier `setState`.
+    if (enviandoRef.current) return;
+    enviandoRef.current = true;
+
+    const operacion = ++operacionRef.current;
+    const vigente = () => operacion === operacionRef.current;
+
     setEnviando(true);
     setError(null);
     setConflicto(false);
@@ -520,17 +552,22 @@ export function FusionDeDuplicados({
         versiones: vista.versiones,
         elecciones: { ...elecciones, conservarAlternativas },
       });
+      // La cache se invalida siempre: la fusion ocurrio de verdad aunque quien
+      // la pidio ya no este mirando esta pantalla.
+      invalidarTrasFusion(queryClient);
+      if (!vigente()) return;
       setResultado(r);
       setDesenlaceDeshacer(null);
       setAhora(Date.now());
       setPaso('resultado');
-      invalidarTrasFusion(queryClient);
     } catch (e) {
+      if (!vigente()) return;
       const err = leerErrorDeFusion(e);
       setError(err.mensaje);
       setConflicto(err.tipo === 'conflicto');
     } finally {
-      setEnviando(false);
+      enviandoRef.current = false;
+      if (vigente()) setEnviando(false);
     }
   }
 
@@ -620,9 +657,16 @@ export function FusionDeDuplicados({
               <button
                 type="button"
                 onClick={() => {
+                  // Se ABANDONA lo que este en vuelo antes de nada: si la
+                  // peticion anterior responde despues, su resultado ya no
+                  // pertenece a esta pantalla.
+                  abandonarOperacion();
                   setConflicto(false);
                   setError(null);
+                  setConfirmado(false);
                   irAPaso('comparar');
+                  // Versiones nuevas: seguir con las de antes es volver a
+                  // decidir sobre datos que ya se sabe que cambiaron.
                   comparacion.refetch();
                 }}
                 className="ml-2 underline"
@@ -1109,7 +1153,10 @@ export function FusionDeDuplicados({
             onClick={
               paso === 'comparar'
                 ? intentarCerrar
-                : () => irAPaso(paso === 'resolver' ? 'comparar' : 'resolver')
+                : () => {
+                    abandonarOperacion();
+                    irAPaso(paso === 'resolver' ? 'comparar' : 'resolver');
+                  }
             }
             className="rounded-md border border-line-default px-3 py-2 text-sm"
           >

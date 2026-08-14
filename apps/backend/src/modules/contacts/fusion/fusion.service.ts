@@ -623,14 +623,30 @@ export class FusionContactosService {
         this.ejecutarFusion(tx, entrada),
       );
     } catch (e: any) {
-      // Dos fusiones a la vez sobre el mismo duplicado: la única que llega
-      // segunda choca con el índice único de `contact_merges`.
-      if (e?.code === 'P2002')
+      // Choque con el índice único de `contact_merges`. Hay DOS situaciones
+      // detrás y no se pueden contar igual:
+      //
+      //  · la misma operación que llega dos veces —un reintento del cliente,
+      //    dos eventos en el mismo fotograma—. No hay ninguna otra persona:
+      //    la fusión que se pedía ya está hecha, con el mismo principal y el
+      //    mismo duplicado, así que se devuelve. Acusar aquí a «otra persona»
+      //    era falso y ademas dejaba a quien lo veía sin saber si su fusión
+      //    se había aplicado o no.
+      //  · una fusión REALMENTE distinta sobre el mismo duplicado, con otro
+      //    principal. Eso sí es un conflicto y se mantiene como tal.
+      if (e?.code === 'P2002') {
+        const ya = await this.prisma.contactMerge.findFirst({
+          where: { companyId, mergedContactId: duplicadoId },
+        });
+        if (ya && ya.primaryContactId === principalId && !ya.undoneAt)
+          return this.aResultado(ya);
+
         throw new ConflictException({
           codigo: 'FUSION_CONCURRENTE',
           mensaje:
             'Otra fusión sobre este contacto se completó primero. Vuelve a revisar.',
         });
+      }
       throw e;
     }
   }
@@ -716,12 +732,32 @@ export class FusionContactosService {
         ...(intercambiaTelefono ? { phone: tokenTemporal } : {}),
       },
     });
-    if (reclamado.count !== 1)
+    if (reclamado.count !== 1) {
+      // EL CANDADO SALTO. Antes de dar la operacion por obsoleta hay que
+      // distinguir dos cosas que se veian iguales:
+      //
+      //  · alguien EDITO el duplicado entre la vista previa y el boton. Es un
+      //    conflicto de verdad y hay que revisar otra vez.
+      //  · esta MISMA operacion ya se aplico —un reintento, dos eventos en el
+      //    mismo fotograma, una respuesta que se perdio—. Aqui no hay nada que
+      //    revisar: la fusion que se pedia esta hecha, con el mismo principal
+      //    y el mismo duplicado, y lo correcto es devolverla.
+      //
+      // Sin esta distincion, una persona que pulso una sola vez veia «otra
+      // persona completo una fusion primero» sin que hubiera ninguna otra
+      // persona, y sin saber si su fusion se habia aplicado.
+      const ya = await tx.contactMerge.findFirst({
+        where: { companyId, mergedContactId: duplicado.id },
+      });
+      if (ya && ya.primaryContactId === principal.id && !ya.undoneAt)
+        return this.aResultado(ya);
+
       throw new ConflictException({
         codigo: 'VISTA_PREVIA_OBSOLETA',
         mensaje:
           'El posible duplicado cambió mientras se preparaba la fusión. Revísala otra vez.',
       });
+    }
 
     // ── 2. Campos elegidos sobre el principal, también con bloqueo optimista.
     const alternativas = this.calcularAlternativas(

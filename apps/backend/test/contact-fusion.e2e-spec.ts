@@ -558,6 +558,42 @@ describe('Fusión de contactos duplicados (e2e, base real)', () => {
       ).toBe(1);
     });
 
+    it('un reintento IDENTICO despues de confirmar devuelve la misma fusion, no acusa a nadie', async () => {
+      // EL CASO QUE PRODUJO EL FALSO «otra persona completo una fusion».
+      //
+      // Si dos peticiones IGUALES llegan a la vez —un reintento del cliente,
+      // dos eventos en el mismo fotograma—, la segunda choca con el indice
+      // unico de `contact_merges` y hasta ahora eso se traducia en un 409
+      // «FUSION_CONCURRENTE». Pero no hay ninguna otra persona: es la misma
+      // operacion, con el mismo principal y el mismo duplicado. La respuesta
+      // correcta es devolver la fusion que ya se hizo.
+      const P = await contacto(empresaA, { name: `${PREFIJO} Reintento` });
+      const D = await contacto(empresaA, { name: `${PREFIJO} Reintento D` });
+      const v = versiones(P, D);
+
+      const peticion = () =>
+        fusion.fusionar({
+          companyId: empresaA,
+          usuarioId: usuario,
+          principalId: P.id,
+          duplicadoId: D.id,
+          elecciones: {},
+          versiones: v,
+        });
+
+      const [a, b] = await Promise.allSettled([peticion(), peticion()]);
+
+      expect(a.status).toBe('fulfilled');
+      expect(b.status).toBe('fulfilled');
+      expect((a as PromiseFulfilledResult<any>).value.mergeId).toBe(
+        (b as PromiseFulfilledResult<any>).value.mergeId,
+      );
+      // Y una sola fila: no se fusiono dos veces.
+      expect(
+        await prisma.contactMerge.count({ where: { mergedContactId: D.id } }),
+      ).toBe(1);
+    });
+
     it('dos fusiones concurrentes sobre el mismo duplicado: solo una gana', async () => {
       const P1 = await contacto(empresaA, { name: `${PREFIJO} Lima A` });
       const P2 = await contacto(empresaA, { name: `${PREFIJO} Lima B` });
