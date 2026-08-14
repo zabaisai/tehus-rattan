@@ -6,7 +6,7 @@
 
 ## Última actualización
 
-- Fecha: 13 de agosto de 2026 · America/Bogota
+- Fecha: 14 de agosto de 2026 · America/Bogota
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
@@ -19,6 +19,13 @@
 - **SHA de implementación de 2.3 aprobado por revisión humana: `1d16fae460f04fcaa4b87befcc1bee7f9cb2ba15`**
 - **CI de ese SHA: verde — run [`31746787438`](https://github.com/zabaisai/tehus-rattan/actions/runs/31746787438)**
 - Aprobación humana: **13 de agosto de 2026**
+- Commits de 3.x: `1582848` (esquema, contrato y backend) · `b05b319` (interfaz)
+  · `7e6383f` (pruebas de frontend) · `c4b6d59` (intercambio de principal)
+  · `f2622fc` (desborde del paso 2) · `1c6b3e6` (conteos trasladado/conservado)
+  · `397dab9` (reentrada y respuestas obsoletas)
+- **SHA funcional de 3.x aprobado por revisión humana: `397dab90878a524627b74385b2edc1d19464aece`**
+- **CI de ese SHA: verde — run [`31822358130`](https://github.com/zabaisai/tehus-rattan/actions/runs/31822358130)**
+- Aprobación humana de 3.x: **14 de agosto de 2026**
 - `main`: `b19217c2e4da69b251285774c1f6585cc29fb765`
 - Staging: no tocado
 - Producción: fuera de alcance
@@ -62,7 +69,7 @@
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
-| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados (3.x): entregada de extremo a extremo, EN REVISIÓN HUMANA** | Revisión humana de 3.x |
+| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados (3.x, mockup 22): HECHO y aprobado el 14-ago-2026 sobre `397dab9`** | Falta el inbox de tres paneles (mockups 03 y 18) |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
@@ -83,7 +90,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 |---|---|---|
 | Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); 12 primitivas en `components/ui/`. Faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar de iniciales, swatches, tooltip |
 | Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
-| Contactos / papelera / fusión | **PARCIAL** | 11 endpoints previos más 7 de fusión (`:id/duplicados`, `:id/canonico`, `fusion/comparar`, `fusion/descartar`, `fusion/ejecutar`, `fusion/:id/deshacer`, `fusion/:id/estado`) y el flujo del mockup 22 en `components/contacts/FusionDeDuplicados.tsx`. **Fusión: entregada, en revisión humana** |
+| Contactos / papelera / fusión | **PARCIAL** | 11 endpoints previos más 7 de fusión (`:id/duplicados`, `:id/canonico`, `fusion/comparar`, `fusion/descartar`, `fusion/ejecutar`, `fusion/:id/deshacer`, `fusion/:id/estado`) y el flujo del mockup 22 en `components/contacts/FusionDeDuplicados.tsx`. **Fusión: HECHO** (mockup 22 completado, aprobado el 14-ago-2026 sobre `397dab9`) |
 | Conversaciones / perfil lateral | **HECHO** (funcional) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
 | Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
 | Tareas y sugerencias | **PARCIAL** | 9 endpoints con `:id/aprobar` y `:id/rechazar`; `SugerenciasDeTarea` en frontend. Falta la vista del mockup 07 con pendientes/completadas/sugeridas separadas |
@@ -662,12 +669,79 @@ incremento seguro» al final del documento.
 
 ---
 
-## Incremento 3.x — Fusión segura de contactos duplicados (mockup 22) · **EN REVISIÓN HUMANA**
+## Incremento cerrado: 3.x — Fusión segura de contactos duplicados (mockup 22)
 
-**Estado: entregado de extremo a extremo. Pendiente de revisión visual.**
+**Estado: HECHO · APROBADO EN REVISIÓN HUMANA. Mockup 22 completado.**
 
-**Commits:** `1582848` (esquema, contrato y backend) · `b05b319` (interfaz)
-· `7e6383f` (pruebas de frontend) · el de este cierre documental.
+**Commits de implementación:** `1582848` (esquema, contrato y backend) ·
+`b05b319` (interfaz) · `7e6383f` (pruebas de frontend) · `c4b6d59`, `f2622fc`,
+`1c6b3e6` y `397dab9` (las cuatro rondas de corrección). El de este cierre es
+documental y no cambia comportamiento.
+
+### Aprobación humana — 14 de agosto de 2026
+
+La persona responsable recorrió el flujo y declaró: **«Está bueno»** y **«ya
+está listo»**. Criterios que dio por cumplidos:
+
+| Criterio declarado | Estado |
+|---|---|
+| La última fusión controlada funcionó correctamente | Aprobado |
+| No apareció el falso conflicto | Aprobado |
+| Principal y duplicado conservaron la orientación mostrada | Aprobado |
+| Confirmación y resultado usaron los conteos corregidos | Aprobado |
+| Deshacer se ejecutó dentro de la ventana de 10 minutos | Aprobado |
+
+**SHA aprobado: `397dab90878a524627b74385b2edc1d19464aece`.**
+**CI de ese SHA: verde — run
+[`31822358130`](https://github.com/zabaisai/tehus-rattan/actions/runs/31822358130)**
+(backend: typecheck, lint, unitarias, build, migraciones en base aislada y e2e;
+frontend: pruebas, typecheck, lint y build).
+
+**Recorrido de la QA humana:** selección del duplicado, comparación,
+intercambio del contacto principal, resolución campo por campo, confirmación,
+ejecución y Deshacer. Los siete pasos del flujo, no solo la apertura.
+
+> **Precisión sobre la evidencia local, para que nadie la busque después y no
+> la encuentre.** En la base local quedan **dos** fusiones, ambas deshechas
+> dentro de la ventana, a las 11:12 y a las 11:45 del 14-ago; las dos son
+> **anteriores** al arreglo de reentrada (`397dab9`, 12:05). Sobre el binario ya
+> corregido el log registra la pasada de revisión de las 12:11–12:16 —cinco
+> comparaciones y dos resoluciones de canónico, que es la firma del intercambio
+> de principal— **sin `POST fusion/ejecutar`**. Es decir: la aprobación es real
+> y la pareja quedó intacta, pero **la última fusión ejecutada de extremo a
+> extremo en esta base es la de las 11:45**, no una posterior al arreglo. Se
+> anota tal cual en vez de dar por registrado algo que la base no muestra.
+
+### Cuatro rondas de corrección durante la revisión
+
+| SHA | Defecto reproducible | Corrección |
+|---|---|---|
+| `c4b6d59` | «Cambiar contacto principal» dejaba las dos tarjetas mostrando el mismo contacto y el resumen de relaciones colapsaba a un campo | Se comparaba un contacto consigo mismo; el servidor ahora rechaza esa comparación con 400 y la pantalla intercambia los dos identificadores, no uno |
+| `f2622fc` | Barra horizontal dentro del modal a ~1920 × 875 | `min-width: auto` de la retícula; `min-w-0` + partido de palabras y diálogo a `4xl` |
+| `1c6b3e6` | La confirmación prometía 10 registros y el resultado informaba 9 | No eran la misma pregunta: se separó en contrato lo **trasladado** desde el duplicado y el **total conservado** por el contacto resultante, medido por el servidor |
+| `397dab9` | Un clic producía un falso 409 y «Volver a comparar» acababa en pantalla de éxito | Candado síncrono contra reentrada, número de operación que descarta respuestas obsoletas, «Volver a comparar» que abandona lo que esté en vuelo, y reconciliación del reintento idéntico en el servidor |
+
+### Garantías entregadas
+
+| Garantía | Dónde vive |
+|---|---|
+| El principal lo elige una persona, nunca el sistema | `principalId` es entrada del contrato; la vista previa se pide en cualquier orden |
+| Resolución campo por campo, sin sobrescribir en silencio | `elecciones.campos`; `requiereDecision` en la vista previa |
+| Identidades alternativas conservadas y buscables | `altPhones` / `altEmails` normalizados; los consulta la búsqueda global |
+| Unión de etiquetas sin duplicados | `unirSinDuplicados` sobre `tags` |
+| Traslado de relaciones en una sola transacción | `$transaction`; rollback probado con un fallo real en la base |
+| Conversaciones y mensajes intactos | Solo cambia `contactId`; ids, canal y mensajes no se tocan |
+| Alias interno y redirección de enlaces antiguos | `mergedIntoId` + `/:id/canonico`; sin cadenas, no restaurable |
+| Exclusión «no son duplicados» | `contact_merge_dismissals`, pareja ordenada, idempotente |
+| Permisos | ADMIN y MANAGER sí; AGENT no; SUPER_ADMIN sin empresa ni entra |
+| Auditoría sin PII | Ids, claves y recuentos; ningún nombre, teléfono ni correo |
+| Deshacer durante 10 minutos, y solo si es seguro | Ventana del servidor + comprobación de que nada cambió después |
+| Bloqueo optimista | `updateMany` condicional sobre `updatedAt` de ambos contactos |
+| Reintento idéntico idempotente | Si la fusión repetida coincide en principal y duplicado, se devuelve la existente en vez de un conflicto falso |
+| Un gesto produce una sola fusión | Candado síncrono (`useRef`) antes de cualquier `await` o `setState` |
+| Una respuesta tardía no pisa el estado vigente | Número de operación; la respuesta de una operación abandonada se descarta |
+| Conteos distintos para trasladado y total conservado | `trasladadas` y `totalConservado` en el contrato, ambos medidos por el servidor |
+| Layout desktop sin desbordamiento horizontal | 1280 / 1366 / 1440 / 1920 medidos en navegador real |
 
 ### Preflight §2
 
@@ -729,7 +803,8 @@ Siete, todos bajo `/contacts` y con rutas de dos segmentos para no chocar con
 
 ### Pruebas
 
-- **24 e2e contra PostgreSQL real** (`test/contact-fusion.e2e-spec.ts`).
+- **28 e2e contra PostgreSQL real** (`test/contact-fusion.e2e-spec.ts`): 24 en
+  la entrega inicial y 4 añadidas por las rondas de corrección.
 - Caracterización previa de los tres puntos de resolución por identidad.
 - Unitarias de permisos y de auditoría sin PII.
 - Backend completo: **2149/2149 en 131 suites**; typecheck y lint limpios.
@@ -766,7 +841,8 @@ Contactos; ni se rediseña la pantalla ni se duplica el perfil.
 
 ### Pruebas de frontend
 
-**667 en 71 archivos** (+40). 36 nuevas: cuenta atrás del servidor, traducción
+**667 en 71 archivos** al entregar; **686 en 73** al cerrar, con las pruebas de
+las cuatro rondas de corrección. 36 nuevas: cuenta atrás del servidor, traducción
 de 409, roles, flujo de cuatro pasos, cambio de principal, decisiones campo por
 campo, identidades alternativas, etiquetas, campos personalizados, «no son
 duplicados», confirmación explícita, éxito y URL canónica, deshacer disponible,
@@ -833,12 +909,29 @@ distinto que obliga a decidir.
 es el PDF de una cotización, así que la relación documental que se sembró es la
 cotización.
 
-**La pareja NO está fusionada**: `contact_merges` = 0,
-`contact_merge_dismissals` = 0 y ningún contacto con `mergedIntoId`. Queda
-lista para recorrerla.
+**Estado de la pareja al cerrar el incremento**, verificado en una transacción
+`READ ONLY` el 14-ago-2026: las dos fusiones de la revisión están **deshechas**
+y todo volvió a su sitio.
 
-**Ruta para empezar la revisión:**
-`http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d`
+| Comprobación | Resultado |
+|---|---|
+| Los dos contactos existen y están separados | ✅ `mergedIntoId` nulo en ambos |
+| Estados originales | ✅ el duplicado sigue archivado desde el 2-ago, como se sembró |
+| Alias activos hacia la pareja | ✅ **0** |
+| Relaciones en su dueño original | ✅ 1 conversación, 3 mensajes, 1 oportunidad, 1 tarea, 1 cotización y 1 nota en Valentina O. |
+| Presupuestos | ✅ «15-20 millones» en Valentina Ocampo · «10-15 millones» en Valentina O. |
+| Historial de fusiones | ✅ 2 filas conservadas, ambas con `undoneAt` |
+| Auditorías | ✅ 4 (`contact.merge` ×2, `contact.merge.undo` ×2), sin PII |
+| Outbox pendiente | ✅ **0** eventos, de cualquier estado |
+| Efectos externos | ✅ ninguno |
+| Descartes «no son duplicados» | 0 |
+
+Los identificadores de las dos fusiones —`cmst5b3ak0001v2mo00tg6q4q` y
+`cmst6i4zo0003v2ps9f6aa4a1`— y sus auditorías **se conservan a propósito**: son
+el rastro de la revisión. No se limpian.
+
+**Ruta para volver a recorrer el flujo con esta pareja:**
+`http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d&con=cmss4x9af0005v2v0y1jb80ik`
 
 Los cinco contactos `PREVIEW_BRANDING_` y los objetos `sd`, `sfg`, `daa` y
 Fernanda quedaron intactos.
@@ -858,6 +951,14 @@ Fernanda quedaron intactos.
 - **Los candidatos se calculan sobre 500 contactos como mucho**, comparando en
   memoria por forma canónica. Suficiente para el volumen actual; con carteras
   grandes habrá que medirlo.
+- **Deuda observacional, no bloqueante: los logs HTTP no registran las
+  respuestas 4xx.** El interceptor solo escribe los éxitos (`error: () =>
+  undefined`) y el filtro global de excepciones solo registra a partir de 500,
+  así que un 409 no deja rastro en ninguna parte. Diagnosticando el falso
+  conflicto de `397dab9` eso impidió demostrar desde los logs cuántas
+  peticiones salieron por gesto; se corrigieron los dos mecanismos posibles en
+  vez de aislar uno. Registrar los 4xx —sin cuerpos ni cabeceras— es un cambio
+  pequeño y transversal que merece su propio incremento.
 
 ---
 
@@ -927,6 +1028,16 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-13 | 3.x | `vitest run` (frontend completo) | **667/667** en 71 archivos (+40) |
 | 2026-08-13 | 3.x | `typecheck` + `lint` + `build` frontend | sin errores (1 warning previo) |
 | 2026-08-13 | 3.x | QA de navegador 1920/1440/1280/1024 y zoom 200 % | sin desbordes ni errores de consola |
+| 2026-08-14 | 3.x (intercambio de principal) | 11 pruebas rojas primero, luego verdes | `FusionIntercambioPrincipal.test.tsx`; CI sobre `c4b6d59` verde |
+| 2026-08-14 | 3.x (desborde del paso 2) | Medición en navegador a 1280/1366/1440/1920 | desborde horizontal del diálogo **0** en los cuatro; CI sobre `f2622fc` verde |
+| 2026-08-14 | 3.x (conteos) | E2E en base aislada: trasladado ≠ total conservado | ninguna cifra fijada en código; CI sobre `1c6b3e6` verde |
+| 2026-08-14 | 3.x (reentrada) | 9 pruebas rojas primero (`FusionReentrada.test.tsx` + E2E de reintento idéntico) | verdes tras el arreglo |
+| 2026-08-14 | 3.x | `npx jest` backend + `contact-fusion` e2e | **2149** unitarias y **28/28** e2e contra PostgreSQL real |
+| 2026-08-14 | 3.x | `vitest run` (frontend completo) | **686** en 73 archivos |
+| 2026-08-14 | 3.x | `typecheck` + `lint` + `build` en backend y frontend | sin errores |
+| 2026-08-14 | 3.x | CI sobre `397dab9` | **run `31822358130`** — Backend y Frontend `success` |
+| 2026-08-14 | 3.x | **Revisión humana sobre `397dab9`** | **APROBADO** — ver «Aprobación humana — 14 de agosto de 2026» |
+| 2026-08-14 | 3.x | Estado de la pareja QA tras el segundo Deshacer (`READ ONLY`) | todo restaurado; 0 alias, 0 outbox, auditorías conservadas |
 
 ---
 
@@ -937,7 +1048,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Búsqueda global (paleta) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Inicio (mockup 01, incremento 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 13-ago-2026 |
-| Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **EN REVISIÓN HUMANA** |
+| Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
 | Conversaciones |  |  |  |  |  |  | PENDIENTE |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
@@ -1108,18 +1219,12 @@ ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 
 ---
 
-## Próximo incremento seguro: `3.x — Fusión de contactos duplicados`
+## Próximo incremento seguro: `3.y — Inbox de tres paneles con perfil colapsable y URL profunda`
 
-**Registrado, no iniciado.** Mockup 22. Es el **único FALTANTE puro** del
-semáforo —no existe ni endpoint ni UI— y el resto de la fase 3 (listado,
-papelera, restauración y perfil) ya está.
-
-Antes de escribir una línea hay que resolver el gap que ya figura en «Gaps que
-requieren decisión de producto»: **qué campo gana ante conflicto y si el
-contacto absorbido queda como alias o desaparece**. El §4.1 del master exige
-además vista previa, elección del valor por campo, traslado transaccional de
-las relaciones, alias/redirección y auditoría, y prohíbe borrar conversaciones
-para «limpiar» un contacto.
+**Registrado, no iniciado.** Mockups **03** y **18**. Es el tercero de los
+cuatro incrementos que el master sugiere para la fase 3 (§«Fase 3»); los otros
+tres —listado/papelera/restauración, perfil 360 y fusión de duplicados— ya
+están.
 
 Su diseño y su implementación **no se redactan aquí**: se abren cuando se
 arranque el incremento, con su propio preflight §2.
@@ -1134,14 +1239,18 @@ git status --short --branch
 git rev-parse HEAD
 git rev-parse origin/feature/takto-brand-ui-integration
 # 2.1, 2.2 y 2.3 estan APROBADOS: la fase 2 esta HECHA.
-# 3.x - Fusion de contactos duplicados: ENTREGADO, EN REVISION HUMANA.
-# No abrir el incremento siguiente hasta que haya veredicto.
+# 3.x - Fusion de contactos duplicados (mockup 22): APROBADO el 14-ago-2026
+# sobre 397dab9, CI verde (run 31822358130). Mockup 22 completado.
 #
-# Ruta para revisar el flujo con los datos QA_MERGE_:
-#   http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d
+# Proximo incremento registrado y NO iniciado:
+#   3.y - Inbox de tres paneles con perfil colapsable y URL profunda
+#   (mockups 03 y 18). Abrirlo exige su propio preflight §2.
 #
-# La pareja QA_MERGE_ NO esta fusionada. Tras la aprobacion se limpia SOLO por
-# id (ver la seccion de datos QA), conservando las auditorias.
+# Ruta para volver a recorrer el flujo con los datos QA_MERGE_:
+#   http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d&con=cmss4x9af0005v2v0y1jb80ik
+#
+# La pareja QA_MERGE_ quedo SEPARADA: las dos fusiones de la revision estan
+# deshechas. Sus registros y auditorias se conservan a proposito; no se borran.
 #
 # Vista previa local (worker apagado, transporte falso, sin efectos externos):
 #   cd apps/backend  && node dist/src/main        # :3001, con las variables
