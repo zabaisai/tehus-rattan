@@ -1053,6 +1053,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-14 | 3.y (3ª ronda) | `vitest run` (frontend completo) | **812/812** en 78 archivos |
 | 2026-08-14 | 3.y (3ª ronda) | `typecheck` + `lint` + `build` | sin errores (1 warning previo) |
 | 2026-08-14 | 3.y (3ª ronda) | Medición de recortes y líneas visuales 1024–1920 | 0 pestañas recortadas, 0 cortes a mitad de palabra, 0 desbordamiento |
+| 2026-08-14 | 3.y (3ª ronda) | Scroll horizontal de la ficha lateral 1024–1920 | **0** en los cuatro |
 
 ---
 
@@ -1432,6 +1433,13 @@ su causa:
 | «Documentos 0» caía a una segunda fila | La barra envolvía | No envuelve nunca; se desplazaría dentro de sí misma si no cupiera, y la activa se trae a la vista |
 | «Mueb / les», «A / dministrador», una «d» sola | `break-words` corta donde le toca | Componente `TextoLargo`: el salto solo se permite tras `_`, `.`, `@`, `-`, `/`; los trozos de una letra se funden; el valor íntegro va en `title` |
 | Columnas que rompían palabras | 3/6/3 sobre doce desde 1280 dejaba el centro en 550 px | 2/6/2 sobre diez desde **1440** —corte propio, porque Tailwind salta de 1280 a 1536— y a 1280 la columna derecha baja a lo ancho |
+
+**El mismo corte estaba en la ficha lateral**, que es donde más se ve: en
+288 px, «Asesor PREVIEW_BRANDING_Administrador» enfrentado a su etiqueta
+empujaba el panel y le salía una barra horizontal propia. Cero desbordamiento
+de página no significa cero desbordamiento. Misma solución y mismo componente;
+el cuerpo del panel deja además de poder desplazarse en horizontal, para que un
+valor futuro no vuelva a empujarlo sin que nadie lo note.
 
 **Una hora perdida que conviene no repetir.** Los dos rangos se escribieron
 primero solapados (`xl:` y `ancho:`). Sus `@media` acaban en *chunks* de CSS
