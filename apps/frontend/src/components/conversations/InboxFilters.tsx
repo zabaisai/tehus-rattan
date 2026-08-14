@@ -52,14 +52,13 @@ export function InboxFilters({
 
   return (
     <div className="border-b border-neutral-200 bg-white">
-      {/* LAS CUATRO PESTAÑAS, EN UNA FILA.
-          Antes se envolvían y «Sin leer» caía a una segunda línea, que no es lo
-          que enseña el mockup 03. Caben las cuatro repartiéndose el ancho a
-          partes iguales (`flex-1` con `min-w-0`) y recortando el relleno, no el
-          tamaño de letra: encoger el texto para que quepa es pagar la fila con
-          legibilidad. Nada se desplaza en horizontal, así que no hay filtro
-          escondido detrás de un scroll invisible. */}
-      <div className="flex items-stretch gap-0.5 px-1.5 pt-2">
+      {/* LAS CUATRO PESTAÑAS, ENTERAS Y EN UNA FILA.
+          Repartirse el ancho a partes iguales parecía justo y era el defecto:
+          «Todas» sobraba sitio y «Sin asignar» quedaba en «Sin as…». Ahora cada
+          una ocupa LO SUYO —`w-fit`, sin `flex-1`— y el hueco sobrante se
+          reparte entre ellas. La letra no se toca: lo que se recorta es el
+          relleno lateral, que es espacio, no información. */}
+      <div className="flex items-stretch justify-between gap-0.5 px-1 pt-2">
         {pestanas.map((p) => (
           <button
             key={p.clave}
@@ -67,16 +66,16 @@ export function InboxFilters({
             onClick={() => onChange({ pestana: p.clave })}
             aria-current={activa === p.clave ? 'true' : undefined}
             title={p.etiqueta}
-            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md px-1 py-1.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-line-focus ${
+            className={`flex w-fit shrink-0 items-center gap-1 rounded-md px-1 py-1.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-line-focus ${
               activa === p.clave
                 ? 'bg-neutral-100 text-neutral-900'
                 : 'text-neutral-500 hover:bg-neutral-50'
             }`}
           >
-            <span className="truncate">{p.etiqueta}</span>
+            <span className="whitespace-nowrap">{p.etiqueta}</span>
             {p.total !== undefined && p.total > 0 && (
               <span
-                className={`shrink-0 rounded-full px-1 text-[10px] leading-4 ${
+                className={`shrink-0 rounded-full px-1 text-[10px] leading-4 tabular-nums ${
                   p.clave === 'sinleer'
                     ? 'bg-secondary-500 text-brand-primary'
                     : 'bg-neutral-200 text-neutral-600'

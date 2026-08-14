@@ -348,7 +348,7 @@ function InboxContenido() {
       {/* ── Panel izquierdo: la bandeja ─────────────────────────── */}
       <section
         aria-label="Conversaciones"
-        className={`flex min-h-0 w-full shrink-0 flex-col border-neutral-200 md:flex md:w-[17rem] md:border-r 2xl:w-[19rem] ${
+        className={`flex min-h-0 w-full shrink-0 flex-col border-neutral-200 md:flex md:w-[18rem] md:border-r 2xl:w-[19rem] ${
           conversacionId ? "hidden md:flex" : "flex"
         }`}
       >

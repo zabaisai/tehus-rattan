@@ -54,6 +54,52 @@ describe('InboxFilters', () => {
     });
   });
 
+  describe('las cuatro caben enteras', () => {
+    it('ninguna etiqueta se trunca: son los cuatro filtros principales', () => {
+      // Con `flex-1` las cuatro se repartian el ancho a partes iguales y
+      // «Sin asignar» quedaba en «Sin as…». Una pestaña principal no puede
+      // depender de un tooltip para saber que dice.
+      render(
+        <InboxFilters filtros={{}} contadores={contadores} onChange={vi.fn()} />,
+      );
+
+      for (const etiqueta of ['Todas', 'Mías', 'Sin asignar', 'Sin leer']) {
+        const boton = screen.getByRole('button', { name: new RegExp('^' + etiqueta) });
+        const texto = boton.querySelector('span');
+        expect(texto?.className).not.toContain('truncate');
+        expect(texto?.textContent).toBe(etiqueta);
+      }
+    });
+
+    it('no se reparten el ancho a partes iguales: cada una ocupa lo suyo', () => {
+      render(
+        <InboxFilters filtros={{}} contadores={contadores} onChange={vi.fn()} />,
+      );
+
+      const boton = screen.getByRole('button', { name: /^Sin asignar/ });
+      expect(boton.className).not.toContain('flex-1');
+    });
+
+    it('la etiqueta no se parte en dos lineas', () => {
+      render(
+        <InboxFilters filtros={{}} contadores={contadores} onChange={vi.fn()} />,
+      );
+      const texto = screen
+        .getByRole('button', { name: /^Sin asignar/ })
+        .querySelector('span');
+      expect(texto?.className).toContain('whitespace-nowrap');
+    });
+
+    it('los contadores siguen visibles junto a su pestaña', () => {
+      render(
+        <InboxFilters filtros={{}} contadores={contadores} onChange={vi.fn()} />,
+      );
+      expect(
+        screen.getByRole('button', { name: /^Sin leer/ }),
+      ).toHaveTextContent('5');
+    });
+  });
+
   describe('cada pestaña reemplaza el filtro anterior', () => {
     it('«Mías» filtra por asignación y APAGA sin leer', async () => {
       // Dejar restos de la pestaña anterior produce combinaciones que el
