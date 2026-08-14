@@ -7,7 +7,7 @@
 ## Última actualización
 
 - Fecha: 14 de agosto de 2026 · America/Bogota
-- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` · `c9c4bc5` (navegación) (**EN REVISIÓN HUMANA**)
+- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` · `c9c4bc5` (navegación) · **3ª ronda:** `7c7b857` · `3bd4585` · `e44ef82` (**EN REVISIÓN HUMANA**)
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
@@ -1050,6 +1050,9 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-14 | 3.y (2ª ronda) | `typecheck` + `lint` + `build` en ambos | sin errores (1 warning previo) |
 | 2026-08-14 | 3.y (2ª ronda) | QA de navegador 1920/1440/1280/1024 | 4 pestañas en 1 fila, ficha abierta por defecto en ≥1280, 0 desborde, consola limpia |
 | 2026-08-14 | 3.y (2ª ronda) | Interacción real en navegador (clic, pestañas, Atrás/Adelante, Escape) | defecto de navegación encontrado y corregido; todo verde tras el arreglo |
+| 2026-08-14 | 3.y (3ª ronda) | `vitest run` (frontend completo) | **812/812** en 78 archivos |
+| 2026-08-14 | 3.y (3ª ronda) | `typecheck` + `lint` + `build` | sin errores (1 warning previo) |
+| 2026-08-14 | 3.y (3ª ronda) | Medición de recortes y líneas visuales 1024–1920 | 0 pestañas recortadas, 0 cortes a mitad de palabra, 0 desbordamiento |
 
 ---
 
@@ -1417,6 +1420,40 @@ Contacto `QA_INBOX_ Marcela Tobón`, todo del contrato, nada inventado:
 
 Los ceros se enseñan como ceros, con su estado vacío. No hay «calidad de datos
 96 %», «relación activa 82 %» ni «última compra»: esas cifras no existen.
+
+### Tercera ronda: legibilidad responsive
+
+La estructura ya estaba; lo que bloqueaba eran los cortes. Cuatro defectos con
+su causa:
+
+| Defecto | Causa raíz | Corrección |
+|---|---|---|
+| «Sin asignar» se veía «Sin as…» | No faltaba sitio: se repartía a partes iguales. Con `flex-1` las cuatro medían lo mismo, a «Todas» le sobraba y a «Sin asignar» le faltaba | Cada pestaña ocupa lo suyo; la lista sube de 17 a 18 rem por debajo de 2xl. Las cuatro suman **263 px** |
+| «Documentos 0» caía a una segunda fila | La barra envolvía | No envuelve nunca; se desplazaría dentro de sí misma si no cupiera, y la activa se trae a la vista |
+| «Mueb / les», «A / dministrador», una «d» sola | `break-words` corta donde le toca | Componente `TextoLargo`: el salto solo se permite tras `_`, `.`, `@`, `-`, `/`; los trozos de una letra se funden; el valor íntegro va en `title` |
+| Columnas que rompían palabras | 3/6/3 sobre doce desde 1280 dejaba el centro en 550 px | 2/6/2 sobre diez desde **1440** —corte propio, porque Tailwind salta de 1280 a 1536— y a 1280 la columna derecha baja a lo ancho |
+
+**Una hora perdida que conviene no repetir.** Los dos rangos se escribieron
+primero solapados (`xl:` y `ancho:`). Sus `@media` acaban en *chunks* de CSS
+distintos, así que quién ganaba dependía del orden de carga y el cambio parecía
+no aplicarse. Ahora son disjuntos: `max-ancho:xl:` para 1280–1439 y `ancho:`
+desde 1440.
+
+**Medición final, en navegador real:**
+
+| Ancho | Pestañas del inbox | Barra del 360 | Cortes a mitad de palabra | `scrollWidth − clientWidth` |
+|---|---|---|---|---|
+| 1920 | 4 en 1 fila, ninguna recortada | 6 en 1 fila (933 px para 923) | 0 | 0 |
+| 1536 | — | 6 en 1 fila (703 para 693) | 0 | 0 |
+| 1440 | 4 en 1 fila | 6 en 1 fila (655 para 645) | 0 | 0 |
+| 1280 | 4 en 1 fila | 6 en 1 fila (623 para 613) | 0 | 0 |
+| 1024 | 4 en 1 fila | 6 en 1 fila (687 para 677) | 0 | 0 |
+
+Los valores que sí ocupan dos líneas cortan donde deben: `marcela.tobon@example.`
+/ `invalid`, `PREVIEW_BRANDING_` / `Muebles del Valle`, `PREVIEW_BRANDING_` /
+`Administrador`. El veredicto se calcula fuera de la página, sobre las líneas
+visuales extraídas con `Range`, para que la evidencia sea auditable y no una
+impresión.
 
 ### Diferencias deliberadas con los mockups 03 y 18
 
