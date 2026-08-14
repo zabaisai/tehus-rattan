@@ -82,7 +82,19 @@ function perfil(overrides: Partial<Contrato> = {}): Contrato {
       { key: "ciudad", label: "Ciudad", valor: "Medellín" },
     ],
     pulso: null,
-    actividad: [
+    resumen: {
+    valorAbierto: 0,
+    conversaciones: 1,
+    oportunidades: 1,
+    tareasPendientes: 1,
+    cotizaciones: 1,
+    documentos: 0,
+  },
+  conversaciones: [],
+  oportunidades: [],
+  documentos: [],
+  ultimaInteraccionEn: null,
+  actividad: [
       {
         tipo: "etapa",
         descripcion: "Pasó a «Cotizando»",
@@ -157,6 +169,36 @@ describe("Perfil comercial", () => {
       "aria-selected",
       "true",
     );
+  });
+
+  it("el pie queda FUERA del cuerpo desplazable, no encima del contenido", async () => {
+    // El pie es fijo. Si viviera dentro de la zona con scroll, taparia la
+    // ultima fila justo cuando se llega al final, que es cuando se lee.
+    pintar();
+    const enlace = await screen.findByRole("link", {
+      name: /ver perfil completo/i,
+    });
+    const panel = screen.getByRole("complementary", {
+      name: /perfil del contacto/i,
+    });
+    const cuerpo = panel.querySelector(".overflow-y-auto") as HTMLElement;
+
+    expect(cuerpo).toBeTruthy();
+    expect(cuerpo.contains(enlace)).toBe(false);
+    expect(panel.contains(enlace)).toBe(true);
+  });
+
+  it("el cuerpo puede encogerse: sin min-h-0 el pie se sale del panel", async () => {
+    pintar();
+    await screen.findByText("Ana Restrepo");
+    const panel = screen.getByRole("complementary", {
+      name: /perfil del contacto/i,
+    });
+    const cuerpo = panel.querySelector(".overflow-y-auto") as HTMLElement;
+
+    expect(panel.className).toContain("flex-col");
+    expect(cuerpo.className).toContain("min-h-0");
+    expect(cuerpo.className).toContain("flex-1");
   });
 
   it("ofrece el perfil completo del contacto", async () => {

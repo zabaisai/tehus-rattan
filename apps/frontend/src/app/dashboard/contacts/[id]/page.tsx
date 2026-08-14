@@ -1,36 +1,47 @@
 "use client";
 
-import { Suspense, use, useMemo } from "react";
+import { Suspense, use, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
+  Activity,
   ArrowLeft,
+  Banknote,
+  CheckSquare,
   FileText,
+  ListChecks,
   MessageSquare,
+  Paperclip,
   Target,
-  UserRound,
 } from "lucide-react";
-import { getPerfilComercial, clavePerfil } from "@/lib/perfil";
+import { getPerfilComercial, clavePerfil, type PerfilComercial } from "@/lib/perfil";
 import { getCanonico, clavesDeFusion } from "@/lib/fusion";
+import { canalLegible } from "@/lib/conversations";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
-import { Panel } from "@/components/ui/Panel";
 import { ForbiddenState } from "@/components/ui/ForbiddenState";
 
 /**
  * Perfil 360 de un contacto (mockup 18).
  *
- * Existe para que «Ver perfil completo» del inbox lleve a algún sitio: antes no
- * había ruta de contacto y el enlace no se podía ofrecer. NO duplica consultas
- * ni contratos: pide el MISMO `/contacts/:id/perfil` que la ficha lateral y
- * comparte con ella la entrada de caché, así que las dos pantallas no pueden
- * discrepar sobre la misma persona.
+ * Estructura del mockup, datos del contrato. Las cifras que el mockup enseña y
+ * el producto no tiene —«calidad del dato 96 %», «relación activa 82 %»,
+ * «última compra»— no se dibujan: inventarlas sería peor que no ponerlas. Todo
+ * lo demás sí está, con conteos reales de `resumen` y estados vacíos honestos
+ * cuando la relación no existe.
  *
- * Lo que enseña es lo que el contrato trae. No hay «calidad del dato», ni
- * «última compra», ni «relación activa 82 %» del mockup: esas cifras no existen
- * en el producto y ponerlas obligaría a inventarlas.
+ * No duplica consultas: pide el MISMO `/contacts/:id/perfil` que la ficha
+ * lateral y comparte con ella la entrada de caché.
  */
+
+type Pestana =
+  | "actividad"
+  | "conversaciones"
+  | "oportunidades"
+  | "tareas"
+  | "cotizaciones"
+  | "documentos";
 
 function moneda(v: number): string {
   return new Intl.NumberFormat("es-CO", {
@@ -44,6 +55,15 @@ function fechaLarga(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CO", {
     day: "2-digit",
     month: "long",
+    year: "numeric",
+  });
+}
+
+function fechaCorta(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("es-CO", {
+    day: "2-digit",
+    month: "short",
     year: "numeric",
   });
 }
@@ -63,10 +83,25 @@ const PRIORIDAD: Record<string, string> = {
   URGENT: "Urgente",
 };
 
+const ESTADO_OPORTUNIDAD: Record<string, string> = {
+  OPEN: "Abierta",
+  WON: "Ganada",
+  LOST: "Perdida",
+};
+
+const ESTADO_CONVERSACION: Record<string, string> = {
+  OPEN: "Abierta",
+  PENDING: "Pendiente",
+  RESOLVED: "Resuelta",
+  CLOSED: "Cerrada",
+  ARCHIVED: "Archivada",
+};
+
 function Perfil360({ contactId }: { contactId: string }) {
   const router = useRouter();
   const params = useSearchParams();
   const volverA = params.get("volverA");
+  const [pestana, setPestana] = useState<Pestana>("actividad");
 
   /**
    * Un enlace viejo puede apuntar a un contacto ABSORBIDO por una fusión. En
@@ -105,6 +140,9 @@ function Perfil360({ contactId }: { contactId: string }) {
     return `/dashboard/conversations?${q.toString()}`;
   };
 
+  const enlaceAlEmbudo = (pipelineId: string, leadId: string) =>
+    `/dashboard/pipeline?embudo=${pipelineId}&lead=${leadId}`;
+
   if (estado === 403) {
     return (
       <div className="mx-auto max-w-3xl p-6">
@@ -137,20 +175,31 @@ function Perfil360({ contactId }: { contactId: string }) {
   }
 
   if (perfil.isLoading || canonico.isLoading) {
-    return (
-      <p className="p-6 text-sm text-neutral-500">Cargando el perfil…</p>
-    );
+    return <p className="p-6 text-sm text-neutral-500">Cargando el perfil…</p>;
   }
 
   const p = perfil.data;
   if (!p) return null;
 
   const nombre = p.contacto.nombre || p.contacto.telefono;
+  const responsable =
+    p.oportunidad?.asesor?.nombre ?? p.conversacion?.asesor?.nombre ?? null;
+
+  const PESTANAS: ReadonlyArray<{
+    clave: Pestana;
+    etiqueta: string;
+    total?: number;
+  }> = [
+    { clave: "actividad", etiqueta: "Actividad" },
+    { clave: "conversaciones", etiqueta: "Conversaciones", total: p.resumen.conversaciones },
+    { clave: "oportunidades", etiqueta: "Oportunidades", total: p.resumen.oportunidades },
+    { clave: "tareas", etiqueta: "Tareas", total: p.resumen.tareasPendientes },
+    { clave: "cotizaciones", etiqueta: "Cotizaciones", total: p.resumen.cotizaciones },
+    { clave: "documentos", etiqueta: "Documentos", total: p.resumen.documentos },
+  ];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4 p-4 xl:p-6">
-      {/* Volver: la ruta viene de quien nos mandó, así que regresar cae en el
-          MISMO hilo con sus filtros, no en la bandeja de cero. */}
+    <div className="flex w-full flex-col gap-4 p-4 2xl:p-6">
       <div className="flex items-center gap-2 text-sm">
         <Link
           href={rutaDeRegreso}
@@ -173,7 +222,7 @@ function Perfil360({ contactId }: { contactId: string }) {
         </p>
       )}
 
-      {/* Encabezado */}
+      {/* ── Encabezado ───────────────────────────────────────────── */}
       <header className="flex flex-wrap items-start justify-between gap-4 rounded-lg border border-neutral-200 bg-white p-4">
         <div className="flex min-w-0 items-start gap-3">
           <Avatar nombre={nombre} size="lg" />
@@ -198,15 +247,32 @@ function Perfil360({ contactId }: { contactId: string }) {
               {p.contacto.etiquetas.map((t) => (
                 <span
                   key={t}
-                  className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700"
+                  className="max-w-[12rem] truncate rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700"
                 >
                   {t}
                 </span>
               ))}
             </div>
+            <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-neutral-500">
+              <span>
+                Responsable:{" "}
+                <span className="text-neutral-800">
+                  {responsable ?? "Sin asignar"}
+                </span>
+              </span>
+              <span>
+                Última interacción:{" "}
+                <span className="text-neutral-800">
+                  {p.ultimaInteraccionEn
+                    ? fechaCorta(p.ultimaInteraccionEn)
+                    : "Todavía ninguna"}
+                </span>
+              </span>
+            </p>
           </div>
         </div>
 
+        {/* Solo acciones con un flujo real detrás. */}
         <div className="flex flex-wrap gap-2">
           {p.conversacion ? (
             <Link
@@ -224,7 +290,7 @@ function Perfil360({ contactId }: { contactId: string }) {
 
           {p.oportunidad ? (
             <Link
-              href={`/dashboard/pipeline?embudo=${p.oportunidad.pipeline.id}&lead=${p.oportunidad.id}`}
+              href={enlaceAlEmbudo(p.oportunidad.pipeline.id, p.oportunidad.id)}
               className="flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 outline-none transition-colors duration-150 hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
             >
               <Target size={14} aria-hidden="true" />
@@ -238,10 +304,51 @@ function Perfil360({ contactId }: { contactId: string }) {
         </div>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        {/* Columna de datos */}
-        <div className="flex flex-col gap-4">
-          <Panel titulo="Información del contacto">
+      {/* ── Métricas accionables ─────────────────────────────────── */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Metrica
+          icono={Banknote}
+          titulo="Valor abierto"
+          valor={moneda(p.resumen.valorAbierto)}
+          detalle={`${p.resumen.oportunidades} oportunidad${p.resumen.oportunidades === 1 ? "" : "es"}`}
+          onIr={() => setPestana("oportunidades")}
+          etiquetaIr="Ver oportunidades"
+        />
+        <Metrica
+          icono={FileText}
+          titulo="Cotizaciones"
+          valor={String(p.resumen.cotizaciones)}
+          detalle={`${p.resumen.documentos} con documento emitido`}
+          onIr={() => setPestana("cotizaciones")}
+          etiquetaIr="Ver cotizaciones"
+        />
+        <Metrica
+          icono={CheckSquare}
+          titulo="Tareas pendientes"
+          valor={String(p.resumen.tareasPendientes)}
+          detalle={p.resumen.tareasPendientes ? "Por hacer" : "Nada pendiente"}
+          onIr={() => setPestana("tareas")}
+          etiquetaIr="Ver tareas"
+        />
+        <Metrica
+          icono={MessageSquare}
+          titulo="Conversaciones"
+          valor={String(p.resumen.conversaciones)}
+          detalle={
+            p.ultimaInteraccionEn
+              ? `Última: ${fechaCorta(p.ultimaInteraccionEn)}`
+              : "Sin mensajes"
+          }
+          onIr={() => setPestana("conversaciones")}
+          etiquetaIr="Ver conversaciones"
+        />
+      </div>
+
+      {/* ── Cuerpo: tres columnas ────────────────────────────────── */}
+      <div className="grid gap-4 xl:grid-cols-12">
+        {/* Izquierda: quién es */}
+        <div className="flex flex-col gap-4 xl:col-span-3">
+          <Tarjeta titulo="Información del contacto">
             <dl className="space-y-1.5 text-sm">
               <Dato etiqueta="Teléfono" valor={p.contacto.telefono} mono />
               <Dato etiqueta="Correo" valor={p.contacto.email ?? "—"} />
@@ -250,104 +357,435 @@ function Perfil360({ contactId }: { contactId: string }) {
                 etiqueta="Creado el"
                 valor={fechaLarga(p.contacto.creadoEn)}
               />
+              {p.contacto.archivadoEn && (
+                <Dato
+                  etiqueta="Archivado el"
+                  valor={fechaLarga(p.contacto.archivadoEn)}
+                />
+              )}
             </dl>
-          </Panel>
+          </Tarjeta>
 
-          {p.camposPersonalizados.length > 0 && (
-            <Panel titulo="Campos personalizados">
+          <Tarjeta titulo="Campos personalizados">
+            {p.camposPersonalizados.length > 0 ? (
               <dl className="space-y-1.5 text-sm">
                 {p.camposPersonalizados.map((c) => (
-                  <Dato
-                    key={c.key}
-                    etiqueta={c.label}
-                    valor={c.valor ?? "—"}
-                  />
+                  <Dato key={c.key} etiqueta={c.label} valor={c.valor ?? "—"} />
                 ))}
               </dl>
-            </Panel>
-          )}
+            ) : (
+              <Vacio>Sin campos personalizados.</Vacio>
+            )}
+          </Tarjeta>
+
+          <Tarjeta titulo="Etiquetas">
+            {p.contacto.etiquetas.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {p.contacto.etiquetas.map((t) => (
+                  <span
+                    key={t}
+                    className="max-w-full truncate rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <Vacio>Sin etiquetas.</Vacio>
+            )}
+          </Tarjeta>
         </div>
 
-        {/* Columna central: lo relacionado */}
-        <div className="flex flex-col gap-4 lg:col-span-2">
-          <Panel titulo={`Cotizaciones (${p.cotizaciones.length})`}>
-            {p.cotizaciones.length > 0 ? (
-              <ul className="divide-y divide-neutral-100 text-sm">
-                {p.cotizaciones.map((c) => (
-                  <li
-                    key={c.id}
-                    className="flex items-center justify-between gap-2 py-1.5"
-                  >
-                    <span className="flex min-w-0 items-center gap-1.5 text-neutral-800">
-                      <FileText
-                        size={13}
-                        aria-hidden="true"
-                        className="shrink-0 text-neutral-400"
-                      />
-                      <span className="truncate">{c.numero}</span>
+        {/* Centro: lo relacionado, en pestañas con conteos reales */}
+        <div className="min-w-0 xl:col-span-6">
+          <div className="rounded-lg border border-neutral-200 bg-white">
+            <div
+              role="tablist"
+              aria-label="Objetos relacionados"
+              className="flex flex-wrap gap-1 border-b border-neutral-200 px-2 pt-2"
+            >
+              {PESTANAS.map((t) => (
+                <button
+                  key={t.clave}
+                  type="button"
+                  role="tab"
+                  aria-selected={pestana === t.clave}
+                  onClick={() => setPestana(t.clave)}
+                  className={`-mb-px flex items-center gap-1.5 border-b-2 px-2.5 py-1.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-line-focus ${
+                    pestana === t.clave
+                      ? "border-brand-secondary text-neutral-900"
+                      : "border-transparent text-neutral-500 hover:text-neutral-800"
+                  }`}
+                >
+                  {t.etiqueta}
+                  {t.total !== undefined && (
+                    <span className="rounded-full bg-neutral-100 px-1.5 text-[10px] text-neutral-600">
+                      {t.total}
                     </span>
-                    <span className="flex shrink-0 items-center gap-2">
-                      <span className="font-mono text-xs text-neutral-700">
-                        {moneda(c.total)}
-                      </span>
-                      <Badge tone="neutral">
-                        {ESTADO_COTIZACION[c.estado] ?? c.estado}
-                      </Badge>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Vacio>Todavía no se ha cotizado nada para esta persona.</Vacio>
-            )}
-          </Panel>
+                  )}
+                </button>
+              ))}
+            </div>
 
-          <Panel titulo={`Tareas pendientes (${p.tareasPendientes.length})`}>
+            <div className="p-4">
+              {pestana === "actividad" && (
+                <LineaDeTiempo actividad={p.actividad} />
+              )}
+
+              {pestana === "conversaciones" &&
+                (p.conversaciones.length > 0 ? (
+                  <ul className="divide-y divide-neutral-100 text-sm">
+                    {p.conversaciones.map((c) => (
+                      <li
+                        key={c.id}
+                        className="flex items-center justify-between gap-3 py-2"
+                      >
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate text-neutral-800">
+                            {canalLegible(c.canal)}
+                            {c.asesor ? ` · ${c.asesor.nombre}` : " · Sin asignar"}
+                          </span>
+                          <span className="text-xs text-neutral-400">
+                            {fechaCorta(c.ultimoMensajeEn)}
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <Badge tone="neutral">
+                            {ESTADO_CONVERSACION[c.estado] ?? c.estado}
+                          </Badge>
+                          <Link
+                            href={enlaceAlChat(c.id)}
+                            className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-700 outline-none hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
+                          >
+                            Abrir
+                          </Link>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Vacio>Todavía no hay conversaciones con esta persona.</Vacio>
+                ))}
+
+              {pestana === "oportunidades" &&
+                (p.oportunidades.length > 0 ? (
+                  <ul className="divide-y divide-neutral-100 text-sm">
+                    {p.oportunidades.map((o) => (
+                      <li
+                        key={o.id}
+                        className="flex items-center justify-between gap-3 py-2"
+                      >
+                        <span className="flex min-w-0 flex-col">
+                          <span className="truncate text-neutral-800">
+                            {o.titulo}
+                          </span>
+                          <span className="text-xs text-neutral-500">
+                            {o.pipeline.nombre} · {o.etapa.nombre} ·{" "}
+                            <span className="font-mono">{moneda(o.valor)}</span>
+                          </span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <Badge tone="neutral">
+                            {ESTADO_OPORTUNIDAD[o.estado] ?? o.estado}
+                          </Badge>
+                          <Link
+                            href={enlaceAlEmbudo(o.pipeline.id, o.id)}
+                            className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-700 outline-none hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
+                          >
+                            Ver
+                          </Link>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Vacio>Sin oportunidades registradas.</Vacio>
+                ))}
+
+              {pestana === "tareas" &&
+                (p.tareasPendientes.length > 0 ? (
+                  <ul className="divide-y divide-neutral-100 text-sm">
+                    {p.tareasPendientes.map((t) => (
+                      <li
+                        key={t.id}
+                        className="flex items-start justify-between gap-3 py-2"
+                      >
+                        <span className="flex min-w-0 flex-col">
+                          <span className="break-words text-neutral-800">
+                            {t.titulo}
+                          </span>
+                          <span className="text-xs text-neutral-400">
+                            Vence: {fechaCorta(t.vence)}
+                          </span>
+                        </span>
+                        <Badge tone="neutral">
+                          {PRIORIDAD[t.prioridad] ?? t.prioridad}
+                        </Badge>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Vacio>Nada pendiente.</Vacio>
+                ))}
+
+              {pestana === "cotizaciones" &&
+                (p.cotizaciones.length > 0 ? (
+                  <ul className="divide-y divide-neutral-100 text-sm">
+                    {p.cotizaciones.map((c) => (
+                      <li
+                        key={c.id}
+                        className="flex items-center justify-between gap-3 py-2"
+                      >
+                        <span className="flex min-w-0 items-center gap-1.5 text-neutral-800">
+                          <FileText
+                            size={13}
+                            aria-hidden="true"
+                            className="shrink-0 text-neutral-400"
+                          />
+                          <span className="truncate">{c.numero}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span className="font-mono text-xs text-neutral-700">
+                            {moneda(c.total)}
+                          </span>
+                          <Badge tone="neutral">
+                            {ESTADO_COTIZACION[c.estado] ?? c.estado}
+                          </Badge>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Vacio>Todavía no se ha cotizado nada para esta persona.</Vacio>
+                ))}
+
+              {pestana === "documentos" && (
+                <>
+                  <p className="mb-2 text-xs text-neutral-500">
+                    En este producto el documento de un contacto es el PDF de una
+                    cotización emitida. Un borrador todavía no lo es.
+                  </p>
+                  {p.documentos.length > 0 ? (
+                    <ul className="divide-y divide-neutral-100 text-sm">
+                      {p.documentos.map((d) => (
+                        <li
+                          key={d.id}
+                          className="flex items-center justify-between gap-3 py-2"
+                        >
+                          <span className="flex min-w-0 items-center gap-1.5 text-neutral-800">
+                            <Paperclip
+                              size={13}
+                              aria-hidden="true"
+                              className="shrink-0 text-neutral-400"
+                            />
+                            <span className="truncate">{d.numero}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span className="text-xs text-neutral-400">
+                              {fechaCorta(d.creadaEn)}
+                            </span>
+                            <Badge tone="neutral">
+                              {ESTADO_COTIZACION[d.estado] ?? d.estado}
+                            </Badge>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <Vacio>Todavía no se ha emitido ningún documento.</Vacio>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Derecha: qué hacer ahora */}
+        <div className="flex flex-col gap-4 xl:col-span-3">
+          <Tarjeta titulo="Oportunidad activa">
+            {p.oportunidad ? (
+              <div className="space-y-2 text-sm">
+                <p className="break-words font-medium text-neutral-900">
+                  {p.oportunidad.titulo}
+                </p>
+                <dl className="space-y-1.5">
+                  <Dato etiqueta="Embudo" valor={p.oportunidad.pipeline.nombre} />
+                  <Dato etiqueta="Etapa" valor={p.oportunidad.etapa.nombre} />
+                  <Dato
+                    etiqueta="Valor"
+                    valor={moneda(p.oportunidad.valor)}
+                    mono
+                  />
+                  <Dato
+                    etiqueta="Responsable"
+                    valor={p.oportunidad.asesor?.nombre ?? "Sin asignar"}
+                  />
+                </dl>
+                <Link
+                  href={enlaceAlEmbudo(
+                    p.oportunidad.pipeline.id,
+                    p.oportunidad.id,
+                  )}
+                  className="mt-1 flex items-center justify-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 outline-none hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
+                >
+                  <Target size={14} aria-hidden="true" />
+                  Abrir en pipeline
+                </Link>
+              </div>
+            ) : (
+              <Vacio>Sin oportunidad abierta.</Vacio>
+            )}
+          </Tarjeta>
+
+          <Tarjeta titulo="Próximas acciones">
             {p.tareasPendientes.length > 0 ? (
-              <ul className="divide-y divide-neutral-100 text-sm">
-                {p.tareasPendientes.map((t) => (
-                  <li
-                    key={t.id}
-                    className="flex items-start justify-between gap-2 py-1.5"
-                  >
-                    <span className="min-w-0 break-words text-neutral-800">
-                      {t.titulo}
+              <ul className="space-y-2 text-sm">
+                {p.tareasPendientes.slice(0, 4).map((t) => (
+                  <li key={t.id} className="flex items-start gap-2">
+                    <ListChecks
+                      size={14}
+                      aria-hidden="true"
+                      className="mt-0.5 shrink-0 text-neutral-400"
+                    />
+                    <span className="min-w-0">
+                      <span className="block break-words text-neutral-800">
+                        {t.titulo}
+                      </span>
+                      <span className="text-xs text-neutral-400">
+                        {t.vence ? fechaCorta(t.vence) : "Sin fecha"} ·{" "}
+                        {PRIORIDAD[t.prioridad] ?? t.prioridad}
+                      </span>
                     </span>
-                    <Badge tone="neutral">
-                      {PRIORIDAD[t.prioridad] ?? t.prioridad}
-                    </Badge>
                   </li>
                 ))}
               </ul>
             ) : (
               <Vacio>Nada pendiente.</Vacio>
             )}
-          </Panel>
+          </Tarjeta>
 
-          <Panel titulo="Actividad reciente">
-            {p.actividad.length > 0 ? (
-              <ul className="divide-y divide-neutral-100 text-sm">
-                {p.actividad.map((a, i) => (
-                  <li
-                    key={`${a.fecha}-${i}`}
-                    className="flex justify-between gap-3 py-1.5"
-                  >
-                    <span className="min-w-0 break-words text-neutral-700">
-                      {a.descripcion}
-                    </span>
-                    <span className="shrink-0 text-xs text-neutral-400">
-                      {fechaLarga(a.fecha)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+          <Tarjeta titulo="Contexto de conversación">
+            {p.conversacion ? (
+              <div className="space-y-2 text-sm">
+                <dl className="space-y-1.5">
+                  <Dato
+                    etiqueta="Estado"
+                    valor={
+                      ESTADO_CONVERSACION[p.conversacion.estado] ??
+                      p.conversacion.estado
+                    }
+                  />
+                  <Dato
+                    etiqueta="Asesor"
+                    valor={p.conversacion.asesor?.nombre ?? "Sin asignar"}
+                  />
+                  <Dato
+                    etiqueta="Bot"
+                    valor={p.conversacion.pausada ? "En pausa" : "Activo"}
+                  />
+                </dl>
+                {p.conversacion.ultimoMensaje && (
+                  <p className="break-words rounded-md bg-neutral-50 px-2.5 py-2 text-xs text-neutral-600">
+                    {p.conversacion.ultimoMensaje.entrante
+                      ? "Escribió: "
+                      : "Respondimos: "}
+                    {p.conversacion.ultimoMensaje.cuerpo || "(sin texto)"}
+                  </p>
+                )}
+                <Link
+                  href={enlaceAlChat(p.conversacion.id)}
+                  className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm text-white outline-none transition-colors duration-150 hover:bg-primary-900 focus-visible:ring-2 focus-visible:ring-line-focus"
+                >
+                  <MessageSquare size={14} aria-hidden="true" />
+                  Ir al chat
+                </Link>
+              </div>
             ) : (
-              <Vacio>Sin movimientos todavía.</Vacio>
+              <Vacio>Todavía no hay conversación.</Vacio>
             )}
-          </Panel>
+          </Tarjeta>
         </div>
       </div>
     </div>
+  );
+}
+
+function LineaDeTiempo({
+  actividad,
+}: {
+  actividad: PerfilComercial["actividad"];
+}) {
+  if (actividad.length === 0) {
+    return <Vacio>Sin movimientos todavía.</Vacio>;
+  }
+  return (
+    <ol className="relative space-y-3 border-l border-neutral-200 pl-4 text-sm">
+      {actividad.map((a, i) => (
+        <li key={`${a.fecha}-${i}`} className="relative">
+          <span
+            aria-hidden="true"
+            className="absolute -left-[21px] top-1.5 h-2 w-2 rounded-full bg-brand-secondary"
+          />
+          <p className="break-words text-neutral-800">{a.descripcion}</p>
+          <p className="text-xs text-neutral-400">{fechaCorta(a.fecha)}</p>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function Metrica({
+  icono: Icono,
+  titulo,
+  valor,
+  detalle,
+  onIr,
+  etiquetaIr,
+}: {
+  icono: typeof Activity;
+  titulo: string;
+  valor: string;
+  detalle: string;
+  onIr: () => void;
+  etiquetaIr: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onIr}
+      aria-label={etiquetaIr}
+      className="flex items-center gap-3 rounded-lg border border-neutral-200 bg-white p-3 text-left outline-none transition-colors duration-150 hover:border-neutral-300 hover:bg-neutral-50 focus-visible:ring-2 focus-visible:ring-line-focus"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary-50 text-brand-primary">
+        <Icono size={16} aria-hidden="true" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-xs text-neutral-500">{titulo}</span>
+        <span className="block truncate font-mono text-base font-semibold text-neutral-900">
+          {valor}
+        </span>
+        <span className="block truncate text-[11px] text-neutral-400">
+          {detalle}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function Tarjeta({
+  titulo,
+  children,
+}: {
+  titulo: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-neutral-200 bg-white p-4">
+      <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
+        {titulo}
+      </h2>
+      {children}
+    </section>
   );
 }
 
@@ -375,12 +813,7 @@ function Dato({
 }
 
 function Vacio({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="flex items-center gap-1.5 text-sm text-neutral-400">
-      <UserRound size={14} aria-hidden="true" />
-      {children}
-    </p>
-  );
+  return <p className="text-sm text-neutral-400">{children}</p>;
 }
 
 /**

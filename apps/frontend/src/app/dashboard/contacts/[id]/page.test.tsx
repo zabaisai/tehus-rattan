@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Perfil360Page from "./page";
 
@@ -59,8 +60,76 @@ const perfil = (extra: Record<string, unknown> = {}) => ({
   camposPersonalizados: [],
   pulso: null,
   actividad: [],
+  resumen: {
+    valorAbierto: 0,
+    conversaciones: 0,
+    oportunidades: 0,
+    tareasPendientes: 0,
+    cotizaciones: 0,
+    documentos: 0,
+  },
+  conversaciones: [],
+  oportunidades: [],
+  documentos: [],
+  ultimaInteraccionEn: null,
   ...extra,
 });
+
+/** Un contacto con de todo, para las pestañas y las métricas. */
+const perfilCompleto = () =>
+  perfil({
+    oportunidad: {
+      id: 'lead-3',
+      titulo: 'Comedor para terraza',
+      valor: 8400000,
+      estado: 'OPEN',
+      pipeline: { id: 'emb-1', nombre: 'Ventas' },
+      etapa: { id: 's1', nombre: 'Negociación', color: null },
+      asesor: { id: 'u1', nombre: 'Ana Administradora' },
+    },
+    conversacion: {
+      id: 'conv-7',
+      estado: 'OPEN',
+      pausada: false,
+      asesor: { id: 'u1', nombre: 'Ana Administradora' },
+      ultimoMensaje: {
+        cuerpo: '¿Me confirma el precio?',
+        entrante: true,
+        fecha: '2026-08-14T17:00:00.000Z',
+      },
+    },
+    tareasPendientes: [
+      { id: 't1', titulo: 'Enviar cotización', vence: '2026-08-15T12:00:00.000Z', prioridad: 'HIGH' },
+    ],
+    cotizaciones: [
+      { id: 'q1', numero: 'COT-0021', estado: 'SENT', total: 12400000, creadaEn: '2026-08-10T12:00:00.000Z' },
+      { id: 'q2', numero: 'COT-0022', estado: 'DRAFT', total: 900000, creadaEn: '2026-08-12T12:00:00.000Z' },
+    ],
+    documentos: [
+      { id: 'q1', numero: 'COT-0021', estado: 'SENT', creadaEn: '2026-08-10T12:00:00.000Z' },
+    ],
+    conversaciones: [
+      { id: 'conv-7', canal: 'whatsapp', estado: 'OPEN', pausada: false, ultimoMensajeEn: '2026-08-14T17:00:00.000Z', asesor: { id: 'u1', nombre: 'Ana Administradora' } },
+      { id: 'conv-8', canal: 'whatsapp', estado: 'ARCHIVED', pausada: false, ultimoMensajeEn: '2026-06-01T17:00:00.000Z', asesor: null },
+    ],
+    oportunidades: [
+      { id: 'lead-3', titulo: 'Comedor para terraza', valor: 8400000, estado: 'OPEN', pipeline: { id: 'emb-1', nombre: 'Ventas' }, etapa: { id: 's1', nombre: 'Negociación', color: null }, asesor: { id: 'u1', nombre: 'Ana Administradora' }, actualizadaEn: '2026-08-14T17:00:00.000Z' },
+      { id: 'lead-4', titulo: 'Sala anterior', valor: 3000000, estado: 'WON', pipeline: { id: 'emb-1', nombre: 'Ventas' }, etapa: { id: 's5', nombre: 'Ganado', color: null }, asesor: null, actualizadaEn: '2026-05-14T17:00:00.000Z' },
+    ],
+    actividad: [
+      { tipo: 'etapa', descripcion: 'Pasó a «Negociación»', fecha: '2026-08-13T17:00:00.000Z' },
+      { tipo: 'cotizacion', descripcion: 'Cotización COT-0021', fecha: '2026-08-10T12:00:00.000Z' },
+    ],
+    ultimaInteraccionEn: '2026-08-14T17:00:00.000Z',
+    resumen: {
+      valorAbierto: 8400000,
+      conversaciones: 2,
+      oportunidades: 2,
+      tareasPendientes: 1,
+      cotizaciones: 2,
+      documentos: 1,
+    },
+  });
 
 /**
  * `params` es una promesa en Next 16 y el componente la consume con `use()`,
@@ -163,7 +232,156 @@ describe("Perfil 360 — enlaces al objeto exacto", () => {
   it("sin oportunidad lo dice en vez de inventar una", async () => {
     await montar();
     await screen.findByRole("heading", { name: "Laura Martínez" });
-    expect(screen.getByText(/sin oportunidad abierta/i)).toBeInTheDocument();
+    // Se dice dos veces a proposito: en la accion del encabezado, que queda
+    // inerte, y en la tarjeta de la columna derecha.
+    expect(screen.getAllByText(/sin oportunidad abierta/i).length).toBeGreaterThan(0);
+  });
+});
+
+
+describe('Perfil 360 — estructura del mockup 18', () => {
+  it('las métricas salen de los conteos del servidor, no de las listas recortadas', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    await screen.findByRole('heading', { name: 'Laura Martínez' });
+    // Valor abierto, cotizaciones, tareas y conversaciones.
+    expect(screen.getByLabelText(/ver oportunidades/i)).toHaveTextContent('8.400.000');
+    expect(screen.getByLabelText(/ver cotizaciones/i)).toHaveTextContent('2');
+    expect(screen.getByLabelText(/ver tareas/i)).toHaveTextContent('1');
+    expect(screen.getByLabelText(/ver conversaciones/i)).toHaveTextContent('2');
+  });
+
+  it('tiene las seis pestañas con sus conteos reales', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    const tablist = await screen.findByRole('tablist', {
+      name: /objetos relacionados/i,
+    });
+    const nombres = within(tablist)
+      .getAllByRole('tab')
+      .map((t) => (t.textContent || '').trim());
+    expect(nombres).toEqual([
+      'Actividad',
+      'Conversaciones2',
+      'Oportunidades2',
+      'Tareas1',
+      'Cotizaciones2',
+      'Documentos1',
+    ]);
+  });
+
+  it('la pestaña de conversaciones lista cada hilo y lo abre exacto', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    const user = userEvent.setup();
+    await montar();
+
+    await user.click(await screen.findByRole('tab', { name: /conversaciones/i }));
+
+    const enlaces = screen.getAllByRole('link', { name: 'Abrir' });
+    expect(enlaces).toHaveLength(2);
+    expect(enlaces[0].getAttribute('href')).toContain('c=conv-7');
+    expect(enlaces[1].getAttribute('href')).toContain('c=conv-8');
+  });
+
+  it('la pestaña de oportunidades lista TODAS, no solo la abierta', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    const user = userEvent.setup();
+    await montar();
+
+    await user.click(await screen.findByRole('tab', { name: /oportunidades/i }));
+
+    // El titulo tambien esta en la tarjeta de la columna derecha; aqui se mira
+    // solo dentro de la pestaña.
+    const panel = screen.getByRole('tab', { name: /oportunidades/i })
+      .closest('div')?.parentElement as HTMLElement;
+    expect(within(panel).getAllByText('Comedor para terraza').length).toBe(1);
+    expect(within(panel).getByText('Sala anterior')).toBeInTheDocument();
+    const ver = screen.getAllByRole('link', { name: 'Ver' });
+    expect(ver[0].getAttribute('href')).toContain('lead=lead-3');
+  });
+
+  it('los documentos son los PDF emitidos, y se dice', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    const user = userEvent.setup();
+    await montar();
+
+    await user.click(await screen.findByRole('tab', { name: /documentos/i }));
+
+    expect(screen.getByText('COT-0021')).toBeInTheDocument();
+    expect(screen.getByText(/PDF de una cotización emitida/i)).toBeInTheDocument();
+  });
+
+  it('pulsar una métrica lleva a su pestaña', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    const user = userEvent.setup();
+    await montar();
+
+    await user.click(await screen.findByLabelText(/ver cotizaciones/i));
+
+    expect(
+      screen.getByRole('tab', { name: /cotizaciones/i }),
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('la columna derecha enseña la oportunidad activa con etapa, valor y responsable', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    await screen.findByRole('heading', { name: 'Laura Martínez' });
+    const oportunidad = screen
+      .getAllByRole('heading', { name: /oportunidad activa/i })[0]
+      .closest('section') as HTMLElement;
+
+    expect(within(oportunidad).getByText('Negociación')).toBeInTheDocument();
+    expect(within(oportunidad).getByText(/8\.400\.000/)).toBeInTheDocument();
+    expect(
+      within(oportunidad).getByText('Ana Administradora'),
+    ).toBeInTheDocument();
+    expect(
+      within(oportunidad).getByRole('link', { name: /abrir en pipeline/i }),
+    ).toHaveAttribute('href', expect.stringContaining('lead=lead-3'));
+  });
+
+  it('el contexto de conversación lleva al hilo exacto', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    const enlace = await screen.findByRole('link', { name: /ir al chat/i });
+    expect(enlace.getAttribute('href')).toContain('c=conv-7');
+  });
+
+  it('el encabezado enseña responsable y última interacción reales', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    const cabecera = (
+      await screen.findByRole('heading', { name: 'Laura Martínez' })
+    ).closest('header') as HTMLElement;
+    expect(cabecera).toHaveTextContent('Ana Administradora');
+    expect(cabecera).toHaveTextContent(/Última interacción/);
+  });
+
+  it('sin nada, las seis pestañas siguen ahí en cero con estados honestos', async () => {
+    await montar();
+
+    const tablist = await screen.findByRole('tablist', {
+      name: /objetos relacionados/i,
+    });
+    expect(within(tablist).getAllByRole('tab')).toHaveLength(6);
+    expect(screen.getByText(/sin movimientos todavía/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/ver conversaciones/i)).toHaveTextContent('0');
+  });
+
+  it('no inventa las cifras que el producto no tiene', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    await screen.findByRole('heading', { name: 'Laura Martínez' });
+    expect(screen.queryByText(/calidad de datos/i)).toBeNull();
+    expect(screen.queryByText(/relación activa/i)).toBeNull();
+    expect(screen.queryByText(/última compra/i)).toBeNull();
   });
 });
 
@@ -222,10 +440,16 @@ describe("Perfil 360 — estados honestos", () => {
   });
 
   it("las secciones vacías se dicen, no se ocultan", async () => {
+    const user = userEvent.setup();
     await montar();
     await screen.findByRole("heading", { name: "Laura Martínez" });
-    expect(screen.getByText(/todavía no se ha cotizado/i)).toBeInTheDocument();
-    expect(screen.getByText(/nada pendiente/i)).toBeInTheDocument();
+
+    // La actividad es la pestaña de entrada.
     expect(screen.getByText(/sin movimientos todavía/i)).toBeInTheDocument();
+    // Y la columna derecha lo dice sin tener que buscar.
+    expect(screen.getAllByText(/nada pendiente/i).length).toBeGreaterThan(0);
+
+    await user.click(screen.getByRole("tab", { name: /cotizaciones/i }));
+    expect(screen.getByText(/todavía no se ha cotizado/i)).toBeInTheDocument();
   });
 });
