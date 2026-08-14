@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ConversationsPage from "./page";
@@ -407,9 +407,31 @@ describe("Inbox — la ficha del contacto", () => {
     const user = userEvent.setup();
     montar("/dashboard/conversations?c=conv-1&perfil=1");
 
+    // Hay dos formas de cerrar: la equis del panel y el telón que lo cubre por
+    // debajo de xl. Aquí se usa la del panel.
+    const panel = await screen.findByRole("complementary", {
+      name: /perfil del contacto/i,
+    });
     await user.click(
-      await screen.findByRole("button", { name: /cerrar el perfil/i }),
+      within(panel).getByRole("button", { name: /cerrar el perfil/i }),
     );
+
+    expect(replace).toHaveBeenCalledWith(
+      expect.stringContaining("c=conv-1"),
+      expect.anything(),
+    );
+    expect(replace).not.toHaveBeenCalledWith(
+      expect.stringContaining("perfil=1"),
+      expect.anything(),
+    );
+  });
+
+  it("Escape cierra la ficha sin cerrar la conversación", async () => {
+    const user = userEvent.setup();
+    montar("/dashboard/conversations?c=conv-1&perfil=1");
+    await screen.findByRole("complementary", { name: /perfil del contacto/i });
+
+    await user.keyboard("{Escape}");
 
     expect(replace).toHaveBeenCalledWith(
       expect.stringContaining("c=conv-1"),

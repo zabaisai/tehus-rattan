@@ -126,6 +126,17 @@ function InboxContenido() {
     [],
   );
 
+  // Escape cierra la ficha, como cualquier cajón. No cierra la conversación:
+  // son dos cosas distintas y confundirlas hace perder el hilo que se leía.
+  useEffect(() => {
+    if (!perfilAbierto) return;
+    const alPulsar = (e: KeyboardEvent) => {
+      if (e.key === "Escape") navegar({ perfilAbierto: false }, "replace");
+    };
+    window.addEventListener("keydown", alPulsar);
+    return () => window.removeEventListener("keydown", alPulsar);
+  }, [perfilAbierto, navegar]);
+
   // Con canal abierto los mensajes llegan solos; el polling se relaja pero no
   // desaparece, por si se pierde algun evento.
   const { enVivo } = useRealtime(conversacionId);
@@ -561,6 +572,18 @@ function InboxContenido() {
       </section>
 
       {/* ── Panel derecho: la ficha ─────────────────────────────── */}
+      {/* Telón solo por debajo de xl, que es donde la ficha se superpone al
+          hilo. Sin él, el cajón tapa el chat y no hay forma evidente de
+          quitarlo salvo dar con la equis. Desde xl la ficha es una columna más
+          y un telón sobre la pantalla entera sería absurdo. */}
+      {perfilAbierto && selectedConversation?.contact?.id && (
+        <button
+          type="button"
+          aria-label="Cerrar el perfil"
+          onClick={() => navegar({ perfilAbierto: false }, "replace")}
+          className="fixed inset-0 z-30 cursor-default bg-neutral-900/30 xl:hidden"
+        />
+      )}
       {perfilAbierto && selectedConversation?.contact?.id && (
         <PerfilComercial
           key={selectedConversation.contact.id}
