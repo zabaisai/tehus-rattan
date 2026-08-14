@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   PESTANAS,
   aplicarCambios,
+  fichaVisible,
   leerEstadoDeBandeja,
   pestanaActiva,
   queryDeEstado,
@@ -24,7 +25,8 @@ describe('leerEstadoDeBandeja', () => {
   it('sin parámetros deja la bandeja en «Todas», sin selección y sin perfil', () => {
     const e = leer('');
     expect(e.conversacionId).toBeNull();
-    expect(e.perfilAbierto).toBe(false);
+    // Sin decidir: ni abierta ni cerrada. Lo decide el ancho.
+    expect(e.perfilAbierto).toBeNull();
     expect(e.filtros).toEqual({});
     expect(pestanaActiva(e.filtros)).toBe('todas');
   });
@@ -60,11 +62,18 @@ describe('leerEstadoDeBandeja', () => {
     expect(e.perfilAbierto).toBe(true);
     expect(e.volverA).toBe('/dashboard/pipeline');
   });
+
+  it('distingue «cerrada por decisión» de «todavía sin decidir»', () => {
+    expect(leer('c=conv-1&perfil=0').perfilAbierto).toBe(false);
+    expect(leer('c=conv-1').perfilAbierto).toBeNull();
+  });
 });
 
 describe('queryDeEstado', () => {
   it('no escribe los valores por defecto: una bandeja limpia es una URL limpia', () => {
-    expect(queryDeEstado({ filtros: {}, conversacionId: null, perfilAbierto: false })).toBe('');
+    expect(
+      queryDeEstado({ filtros: {}, conversacionId: null, perfilAbierto: null }),
+    ).toBe('');
   });
 
   it('ida y vuelta conserva todo lo significativo', () => {
@@ -73,16 +82,39 @@ describe('queryDeEstado', () => {
     expect(leerEstadoDeBandeja(new URLSearchParams(q))).toEqual(original);
   });
 
-  it('conserva volverA para poder regresar al embudo', () => {
+  it('una ficha cerrada a mano SÍ se escribe: es una decisión', () => {
     const q = queryDeEstado({
       filtros: {},
       conversacionId: 'conv-1',
       perfilAbierto: false,
+    });
+    expect(q).toContain('perfil=0');
+  });
+
+  it('conserva volverA para poder regresar al embudo', () => {
+    const q = queryDeEstado({
+      filtros: {},
+      conversacionId: 'conv-1',
+      perfilAbierto: null,
       volverA: '/dashboard/pipeline?embudo=e1',
     });
     expect(leerEstadoDeBandeja(new URLSearchParams(q)).volverA).toBe(
       '/dashboard/pipeline?embudo=e1',
     );
+  });
+});
+
+describe('fichaVisible', () => {
+  it('sin decisión, manda el ancho', () => {
+    expect(fichaVisible(null, true)).toBe(true);
+    expect(fichaVisible(null, false)).toBe(false);
+  });
+
+  it('con decisión, manda la persona', () => {
+    // Cerrarla en una pantalla ancha tiene que quedarse cerrada; abrirla en una
+    // estrecha tiene que abrirse.
+    expect(fichaVisible(false, true)).toBe(false);
+    expect(fichaVisible(true, false)).toBe(true);
   });
 });
 

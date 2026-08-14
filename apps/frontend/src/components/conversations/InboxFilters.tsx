@@ -52,29 +52,31 @@ export function InboxFilters({
 
   return (
     <div className="border-b border-neutral-200 bg-white">
-      {/* Las pestanas SE ENVUELVEN, no se desplazan.
-          La columna de la bandeja mide 288 px y las cuatro no caben en una
-          linea: con `overflow-x-auto` quedaban recortadas y con flechas, es
-          decir, dos de los cuatro filtros principales invisibles hasta que
-          alguien descubriera que la barra se desplaza. Dos filas de pestanas
-          en una columna estrecha no molestan; un filtro que no se ve, si. */}
-      <div className="flex flex-wrap gap-1 px-2 pt-2">
+      {/* LAS CUATRO PESTAÑAS, EN UNA FILA.
+          Antes se envolvían y «Sin leer» caía a una segunda línea, que no es lo
+          que enseña el mockup 03. Caben las cuatro repartiéndose el ancho a
+          partes iguales (`flex-1` con `min-w-0`) y recortando el relleno, no el
+          tamaño de letra: encoger el texto para que quepa es pagar la fila con
+          legibilidad. Nada se desplaza en horizontal, así que no hay filtro
+          escondido detrás de un scroll invisible. */}
+      <div className="flex items-stretch gap-0.5 px-1.5 pt-2">
         {pestanas.map((p) => (
           <button
             key={p.clave}
             type="button"
             onClick={() => onChange({ pestana: p.clave })}
             aria-current={activa === p.clave ? 'true' : undefined}
-            className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+            title={p.etiqueta}
+            className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-md px-1 py-1.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-line-focus ${
               activa === p.clave
                 ? 'bg-neutral-100 text-neutral-900'
                 : 'text-neutral-500 hover:bg-neutral-50'
             }`}
           >
-            {p.etiqueta}
+            <span className="truncate">{p.etiqueta}</span>
             {p.total !== undefined && p.total > 0 && (
               <span
-                className={`rounded-full px-1.5 text-[10px] ${
+                className={`shrink-0 rounded-full px-1 text-[10px] leading-4 ${
                   p.clave === 'sinleer'
                     ? 'bg-secondary-500 text-brand-primary'
                     : 'bg-neutral-200 text-neutral-600'

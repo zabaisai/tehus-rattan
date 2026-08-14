@@ -17,6 +17,32 @@ import ConversationsPage from "./page";
  */
 
 let urlActual = "/dashboard/conversations";
+let anchoDeVentana = 1920;
+
+/**
+ * jsdom no trae `matchMedia`. La pantalla lo consulta para decidir si la ficha
+ * cabe como columna, asi que aqui se responde segun `anchoDeVentana`.
+ */
+function instalarMatchMedia() {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    configurable: true,
+    value: (consulta: string) => {
+      const m = /min-width:\s*(\d+)px/.exec(consulta);
+      const minimo = m ? Number(m[1]) : 0;
+      return {
+        matches: anchoDeVentana >= minimo,
+        media: consulta,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        onchange: null,
+        dispatchEvent: () => false,
+      };
+    },
+  });
+}
 const historial: string[] = [];
 
 const push = vi.fn((url: string) => {
@@ -58,6 +84,16 @@ vi.mock("@/lib/conversations", async () => {
   };
 });
 vi.mock("@/lib/users", () => ({ getCompanyUsers: () => Promise.resolve([]) }));
+const getEstadoDeWhatsApp = vi.fn();
+vi.mock("@/lib/whatsapp", async () => {
+  const real = await vi.importActual<typeof import("@/lib/whatsapp")>(
+    "@/lib/whatsapp",
+  );
+  return {
+    ...real,
+    getWhatsAppConnectionStatus: () => getEstadoDeWhatsApp(),
+  };
+});
 vi.mock("@/lib/use-realtime", () => ({
   useRealtime: () => ({ enVivo: false }),
   intervaloDeRefresco: () => false,
@@ -137,6 +173,8 @@ function montar(url = "/dashboard/conversations") {
 beforeEach(() => {
   vi.clearAllMocks();
   historial.length = 0;
+  anchoDeVentana = 1920;
+  instalarMatchMedia();
   getInbox.mockResolvedValue({
     items: [conversacion(), conversacion({ id: "conv-2", contact: { id: "k2", name: "Juan Camilo", phone: "+573001110005" } })],
     hasMore: false,
@@ -158,6 +196,7 @@ beforeEach(() => {
     },
   ]);
   markConversationRead.mockResolvedValue({});
+  getEstadoDeWhatsApp.mockResolvedValue({ status: "CONNECTED" });
   getConversation.mockRejectedValue({ response: { status: 404 } });
 });
 
@@ -179,7 +218,9 @@ describe("Inbox — los tres paneles", () => {
     await waitFor(() => expect(cabecera.parentElement).toHaveTextContent("2"));
   });
 
-  it("la ficha no se monta hasta que se pide", async () => {
+  it("en pantallas donde no cabe como columna, la ficha no se monta sola", async () => {
+    // A 1024 la ficha seria un cajon encima del hilo. Ahi empieza cerrada.
+    anchoDeVentana = 1024;
     montar("/dashboard/conversations?c=conv-1");
     await screen.findByRole("log");
     expect(screen.queryByRole("complementary")).toBeNull();
@@ -377,10 +418,123 @@ describe("Inbox — archivadas aparte", () => {
   });
 });
 
+
+describe("Inbox — la ficha se abre sola cuando cabe", () => {
+  it("en 1920 con una conversación abierta, el perfil está visible sin pulsar nada", async () => {
+    // El mockup 03 enseña tres paneles. Que la ficha empiece cerrada obliga a
+    // descubrir un icono para ver algo que el diseño da por presente.
+    anchoDeVentana = 1920;
+    montar("/dashboard/conversations?c=conv-1");
+
+    expect(
+      await screen.findByRole("complementary", { name: /perfil del contacto/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("en 1280 también", async () => {
+    anchoDeVentana = 1280;
+    montar("/dashboard/conversations?c=conv-1");
+
+    expect(
+      await screen.findByRole("complementary", { name: /perfil del contacto/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("en 1024 empieza cerrada: ahí es un cajón que taparía el hilo", async () => {
+    anchoDeVentana = 1024;
+    montar("/dashboard/conversations?c=conv-1");
+
+    await screen.findByRole("log");
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("sin conversación no se abre nada, por ancho que sea la pantalla", async () => {
+    anchoDeVentana = 1920;
+    montar();
+
+    await screen.findByRole("button", { name: /laura martínez/i });
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("cerrarla es una decisión explícita que sobrevive: perfil=0 en la URL", async () => {
+    anchoDeVentana = 1920;
+    const user = userEvent.setup();
+    montar("/dashboard/conversations?c=conv-1");
+    await screen.findByRole("complementary", { name: /perfil del contacto/i });
+
+    const panel = screen.getByRole("complementary", {
+      name: /perfil del contacto/i,
+    });
+    await user.click(
+      within(panel).getByRole("button", { name: /cerrar el perfil/i }),
+    );
+
+    expect(replace).toHaveBeenCalledWith(
+      expect.stringContaining("perfil=0"),
+      expect.anything(),
+    );
+    // Y no cambia el hilo.
+    expect(replace).toHaveBeenCalledWith(
+      expect.stringContaining("c=conv-1"),
+      expect.anything(),
+    );
+  });
+
+  it("con perfil=0 en la URL sigue cerrada aunque quepa", async () => {
+    anchoDeVentana = 1920;
+    montar("/dashboard/conversations?c=conv-1&perfil=0");
+
+    await screen.findByRole("log");
+    expect(screen.queryByRole("complementary")).toBeNull();
+  });
+
+  it("abrirla y cerrarla no llena el historial", async () => {
+    anchoDeVentana = 1920;
+    const user = userEvent.setup();
+    montar("/dashboard/conversations?c=conv-1&perfil=0");
+
+    await user.click(
+      await screen.findByRole("button", { name: /ver la ficha/i }),
+    );
+
+    expect(push).not.toHaveBeenCalled();
+  });
+});
+
+describe("Inbox — el compositor no promete lo que no puede", () => {
+  it("sin integración de WhatsApp el hilo queda en solo lectura", async () => {
+    getEstadoDeWhatsApp.mockResolvedValue({ status: "NOT_CONNECTED" });
+    montar("/dashboard/conversations?c=conv-1");
+
+    expect(
+      await screen.findByText(/modo solo lectura/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/escribe un mensaje/i)).toBeNull();
+  });
+
+  it("con la integración conectada el compositor está disponible", async () => {
+    getEstadoDeWhatsApp.mockResolvedValue({ status: "CONNECTED" });
+    montar("/dashboard/conversations?c=conv-1");
+
+    expect(
+      await screen.findByPlaceholderText(/escribe un mensaje/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/modo solo lectura/i)).toBeNull();
+  });
+
+  it("una integración que exige reconexión tampoco deja escribir", async () => {
+    getEstadoDeWhatsApp.mockResolvedValue({ status: "REAUTH_REQUIRED" });
+    montar("/dashboard/conversations?c=conv-1");
+
+    expect(await screen.findByText(/modo solo lectura/i)).toBeInTheDocument();
+  });
+});
+
 describe("Inbox — la ficha del contacto", () => {
   it("abrir la ficha NO cambia la conversación", async () => {
     const user = userEvent.setup();
-    montar("/dashboard/conversations?c=conv-1");
+    // Se parte de una ficha cerrada a mano, para poder abrirla.
+    montar("/dashboard/conversations?c=conv-1&perfil=0");
 
     await user.click(
       await screen.findByRole("button", { name: /ver la ficha/i }),

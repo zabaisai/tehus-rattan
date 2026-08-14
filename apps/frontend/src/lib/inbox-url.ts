@@ -39,9 +39,34 @@ export const ESTADOS_DE_CONVERSACION = [
 export interface EstadoDeBandeja {
   filtros: FiltrosBandeja;
   conversacionId: string | null;
-  perfilAbierto: boolean;
+  /**
+   * Tri-estado a propósito.
+   *
+   * `null` = nadie ha decidido: la pantalla abre la ficha si cabe como columna
+   * y la deja cerrada si sería un cajón encima del hilo. `true` y `false` son
+   * decisiones de una persona, y esas mandan sobre el ancho.
+   *
+   * Con un booleano no se puede distinguir «cerrada porque la cerré» de
+   * «cerrada porque todavía no he hecho nada», y entonces o no se abre nunca
+   * sola o se reabre cada vez que se cierra.
+   */
+  perfilAbierto: boolean | null;
   /** Ruta de regreso ya codificada, para volver por donde se vino. */
   volverA?: string | null;
+}
+
+/**
+ * Si la ficha se ve, combinando la decisión de la persona con el ancho.
+ *
+ * La regla vive aquí, junto al códec, y no dentro de la pantalla: es la misma
+ * pregunta que responde la URL y conviene poder comprobarla sin montar nada.
+ */
+export function fichaVisible(
+  decision: boolean | null,
+  cabeComoColumna: boolean,
+): boolean {
+  if (decision !== null) return decision;
+  return cabeComoColumna;
 }
 
 /** Qué pestaña corresponde a unos filtros. Deriva; no se guarda dos veces. */
@@ -62,6 +87,12 @@ function filtrosDePestana(clave: string): FiltrosBandeja {
   return {};
 }
 
+function leerPerfil(valor: string | null): boolean | null {
+  if (valor === '1') return true;
+  if (valor === '0') return false;
+  return null;
+}
+
 export function leerEstadoDeBandeja(params: URLSearchParams): EstadoDeBandeja {
   const filtros: FiltrosBandeja = filtrosDePestana(params.get('vista') ?? '');
 
@@ -76,7 +107,7 @@ export function leerEstadoDeBandeja(params: URLSearchParams): EstadoDeBandeja {
   return {
     filtros,
     conversacionId: params.get('c'),
-    perfilAbierto: params.get('perfil') === '1',
+    perfilAbierto: leerPerfil(params.get('perfil')),
     volverA: params.get('volverA'),
   };
 }
@@ -93,7 +124,8 @@ export function queryDeEstado(estado: EstadoDeBandeja): string {
   if (estado.filtros.search?.trim()) params.set('q', estado.filtros.search.trim());
   if (estado.filtros.status) params.set('estado', estado.filtros.status);
   if (estado.conversacionId) params.set('c', estado.conversacionId);
-  if (estado.perfilAbierto) params.set('perfil', '1');
+  if (estado.perfilAbierto === true) params.set('perfil', '1');
+  if (estado.perfilAbierto === false) params.set('perfil', '0');
   if (estado.volverA) params.set('volverA', estado.volverA);
 
   return params.toString();
@@ -104,7 +136,7 @@ export interface CambiosDeBandeja {
   search?: string;
   status?: string;
   conversacionId?: string | null;
-  perfilAbierto?: boolean;
+  perfilAbierto?: boolean | null;
 }
 
 /**

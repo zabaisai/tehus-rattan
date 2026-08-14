@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   PanelRight,
   MessagesSquare,
+  PlugZap,
 } from "lucide-react";
 import {
   getInbox,
@@ -26,10 +27,13 @@ import {
 } from "@/lib/conversations";
 import {
   aplicarCambios,
+  fichaVisible,
   leerEstadoDeBandeja,
   queryDeEstado,
   type CambiosDeBandeja,
 } from "@/lib/inbox-url";
+import { ANCHO_TRES_PANELES, useConsultaDeMedios } from "@/lib/use-ancho";
+import { getWhatsAppConnectionStatus } from "@/lib/whatsapp";
 import { getCompanyUsers } from "@/lib/users";
 import { ConversationList } from "@/components/conversations/ConversationList";
 import { MessageThread } from "@/components/conversations/MessageThread";
@@ -72,7 +76,18 @@ function InboxContenido() {
     () => leerEstadoDeBandeja(new URLSearchParams(params.toString())),
     [params],
   );
-  const { filtros, conversacionId, perfilAbierto, volverA } = estado;
+  const { filtros, conversacionId, volverA } = estado;
+
+  /**
+   * La ficha se abre SOLA cuando cabe como columna.
+   *
+   * El mockup 03 enseña tres paneles; que empezara cerrada obligaba a descubrir
+   * un icono para ver algo que el diseño da por presente. La decisión de una
+   * persona —abrir o cerrar a mano— manda sobre el ancho y viaja en la URL como
+   * `perfil=1` o `perfil=0`; mientras nadie decide, decide la pantalla.
+   */
+  const cabeComoColumna = useConsultaDeMedios(ANCHO_TRES_PANELES);
+  const perfilAbierto = fichaVisible(estado.perfilAbierto, cabeComoColumna);
 
   const navegar = useCallback(
     (cambios: CambiosDeBandeja, modo: "push" | "replace" = "push") => {
@@ -155,6 +170,22 @@ function InboxContenido() {
     queryFn: getInboxCounters,
     refetchInterval,
   });
+
+  /**
+   * Si se puede escribir de verdad.
+   *
+   * Sin integración conectada, el mensaje no sale: se guarda marcado como
+   * fallido. Enseñar un compositor operativo en esa situación es prometer un
+   * envío que no va a ocurrir. Se reutiliza el contrato que ya existe para la
+   * pantalla de WhatsApp; es una foto sin tokens y con el número enmascarado.
+   */
+  const conexion = useQuery({
+    queryKey: ["whatsapp", "estado-conexion"],
+    queryFn: getWhatsAppConnectionStatus,
+    staleTime: 5 * 60_000,
+    retry: false,
+  });
+  const puedeEnviar = conexion.data?.status === "CONNECTED";
 
   const { data: asesores } = useQuery({
     queryKey: ["users"],
@@ -566,7 +597,27 @@ function InboxContenido() {
               <MessageThread messages={mensajes.data ?? []} />
             )}
 
-            <MessageInput onSend={handleSend} />
+            {puedeEnviar ? (
+              <MessageInput onSend={handleSend} />
+            ) : (
+              <div className="border-t border-neutral-200 bg-neutral-50 px-4 py-3">
+                <p className="flex items-center gap-2 text-xs text-neutral-600">
+                  <PlugZap
+                    size={14}
+                    aria-hidden="true"
+                    className="shrink-0 text-status-warning-strong"
+                  />
+                  <span>
+                    <span className="font-medium">
+                      Sin integración de WhatsApp
+                    </span>
+                    {" · "}
+                    conversación en modo solo lectura. El historial se puede
+                    leer; para responder hay que conectar el número en Empresa.
+                  </span>
+                </p>
+              </div>
+            )}
           </>
         )}
       </section>
