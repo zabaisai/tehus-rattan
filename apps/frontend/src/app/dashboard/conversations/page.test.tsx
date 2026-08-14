@@ -45,6 +45,11 @@ function instalarMatchMedia() {
 }
 const historial: string[] = [];
 
+/**
+ * La pantalla cambia SOLO los parámetros, y lo hace con la History API porque
+ * `router.replace` no llegaba a aplicarse en el build de producción. Aquí se
+ * espían las dos funciones del navegador, que es lo que ahora se usa.
+ */
 const push = vi.fn((url: string) => {
   historial.push(urlActual);
   urlActual = url;
@@ -53,8 +58,23 @@ const replace = vi.fn((url: string) => {
   urlActual = url;
 });
 
+function instalarHistorial() {
+  Object.defineProperty(window, "history", {
+    writable: true,
+    configurable: true,
+    value: {
+      pushState: (_s: unknown, _t: string, url: string) => push(url),
+      replaceState: (_s: unknown, _t: string, url: string) => replace(url),
+      back: vi.fn(),
+      forward: vi.fn(),
+      length: 1,
+      state: null,
+    },
+  });
+}
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, replace, back: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }),
   usePathname: () => urlActual.split("?")[0],
   useSearchParams: () => new URLSearchParams(urlActual.split("?")[1] ?? ""),
 }));
@@ -175,6 +195,7 @@ beforeEach(() => {
   historial.length = 0;
   anchoDeVentana = 1920;
   instalarMatchMedia();
+  instalarHistorial();
   getInbox.mockResolvedValue({
     items: [conversacion(), conversacion({ id: "conv-2", contact: { id: "k2", name: "Juan Camilo", phone: "+573001110005" } })],
     hasMore: false,
@@ -236,10 +257,7 @@ describe("Inbox — la URL manda", () => {
       await screen.findByRole("button", { name: /laura martínez/i }),
     );
 
-    expect(push).toHaveBeenCalledWith(
-      "/dashboard/conversations?c=conv-1",
-      expect.anything(),
-    );
+    expect(push).toHaveBeenCalledWith("/dashboard/conversations?c=conv-1");
   });
 
   it("una URL con conversación abre el hilo directamente, sin clic", async () => {
@@ -271,11 +289,9 @@ describe("Inbox — la URL manda", () => {
 
     expect(push).toHaveBeenCalledWith(
       expect.stringContaining("c=conv-1"),
-      expect.anything(),
     );
     expect(push).toHaveBeenCalledWith(
       expect.stringContaining("vista=mias"),
-      expect.anything(),
     );
   });
 
@@ -471,12 +487,10 @@ describe("Inbox — la ficha se abre sola cuando cabe", () => {
 
     expect(replace).toHaveBeenCalledWith(
       expect.stringContaining("perfil=0"),
-      expect.anything(),
     );
     // Y no cambia el hilo.
     expect(replace).toHaveBeenCalledWith(
       expect.stringContaining("c=conv-1"),
-      expect.anything(),
     );
   });
 
@@ -554,11 +568,9 @@ describe("Inbox — la ficha del contacto", () => {
 
     expect(replace).toHaveBeenCalledWith(
       expect.stringContaining("c=conv-1"),
-      expect.anything(),
     );
     expect(replace).toHaveBeenCalledWith(
       expect.stringContaining("perfil=1"),
-      expect.anything(),
     );
   });
 
@@ -584,11 +596,9 @@ describe("Inbox — la ficha del contacto", () => {
 
     expect(replace).toHaveBeenCalledWith(
       expect.stringContaining("c=conv-1"),
-      expect.anything(),
     );
     expect(replace).not.toHaveBeenCalledWith(
       expect.stringContaining("perfil=1"),
-      expect.anything(),
     );
   });
 
@@ -601,11 +611,9 @@ describe("Inbox — la ficha del contacto", () => {
 
     expect(replace).toHaveBeenCalledWith(
       expect.stringContaining("c=conv-1"),
-      expect.anything(),
     );
     expect(replace).not.toHaveBeenCalledWith(
       expect.stringContaining("perfil=1"),
-      expect.anything(),
     );
   });
 

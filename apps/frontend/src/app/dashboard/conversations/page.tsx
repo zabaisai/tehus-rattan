@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import { useSearchParams, usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   PauseCircle,
@@ -59,7 +59,6 @@ function codigoDeEstado(e: unknown): number | null {
 
 function InboxContenido() {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
 
@@ -89,14 +88,26 @@ function InboxContenido() {
   const cabeComoColumna = useConsultaDeMedios(ANCHO_TRES_PANELES);
   const perfilAbierto = fichaVisible(estado.perfilAbierto, cabeComoColumna);
 
+  /**
+   * Navegación de SOLO query, con la History API del navegador.
+   *
+   * `router.push`/`router.replace` es lo natural para cambiar de ruta, pero
+   * aquí la ruta no cambia: solo cambian los parámetros. Medido en el build de
+   * producción, esas llamadas no llegaban a aplicarse —la barra de direcciones
+   * se quedaba igual y la ficha no se cerraba— mientras que un enlace normal sí
+   * navegaba. Next 15+ observa `history.pushState`/`replaceState`, y
+   * `useSearchParams` se actualiza con ellos, que es justo lo que hace falta:
+   * cambiar los parámetros sin volver a pedir la ruta al servidor.
+   */
   const navegar = useCallback(
     (cambios: CambiosDeBandeja, modo: "push" | "replace" = "push") => {
       const q = queryDeEstado(aplicarCambios(estado, cambios));
       const url = q ? `${pathname}?${q}` : pathname;
-      if (modo === "push") router.push(url, { scroll: false });
-      else router.replace(url, { scroll: false });
+      if (typeof window === "undefined") return;
+      if (modo === "push") window.history.pushState(null, "", url);
+      else window.history.replaceState(null, "", url);
     },
-    [estado, pathname, router],
+    [estado, pathname],
   );
 
   const [sendNotice, setSendNotice] = useState<string | null>(null);
