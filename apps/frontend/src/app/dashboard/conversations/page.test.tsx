@@ -117,6 +117,11 @@ const conversacion = (extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+async function montarEsperando(url = "/dashboard/conversations") {
+  montar(url);
+  await screen.findByRole("heading", { name: "Conversaciones" });
+}
+
 function montar(url = "/dashboard/conversations") {
   urlActual = url;
   const client = new QueryClient({
@@ -335,6 +340,40 @@ describe("Inbox — estados de la lista", () => {
         expect.objectContaining({ limit: 60 }),
       ),
     );
+  });
+});
+
+describe("Inbox — archivadas aparte", () => {
+  it("lo archivado no se mezcla con lo activo: el contador y la lista dirían cifras distintas", async () => {
+    getInbox.mockResolvedValue({
+      items: [
+        conversacion(),
+        conversacion({
+          id: "conv-vieja",
+          status: "ARCHIVED",
+          contact: { id: "k3", name: "Hernán Salazar", phone: "+573001110302" },
+        }),
+      ],
+      hasMore: false,
+    });
+    await montarEsperando();
+
+    const seccion = await screen.findByRole("heading", { name: "Archivado" });
+    expect(seccion).toBeInTheDocument();
+    // La archivada vive DESPUÉS del encabezado, no entre las activas.
+    const listas = screen.getAllByRole("list");
+    expect(listas.length).toBeGreaterThan(1);
+  });
+
+  it("al filtrar por «Archivadas» no se separa nada: es justo lo que se pidió", async () => {
+    getInbox.mockResolvedValue({
+      items: [conversacion({ id: "conv-vieja", status: "ARCHIVED" })],
+      hasMore: false,
+    });
+    montar("/dashboard/conversations?estado=ARCHIVED");
+
+    await screen.findByRole("button", { name: /laura martínez/i });
+    expect(screen.queryByRole("heading", { name: "Archivado" })).toBeNull();
   });
 });
 

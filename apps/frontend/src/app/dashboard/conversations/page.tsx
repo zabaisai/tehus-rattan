@@ -157,6 +157,34 @@ function InboxContenido() {
     () => bandeja.data?.items ?? [],
     [bandeja.data],
   );
+
+  /**
+   * Archivadas y cerradas van APARTE, como en el mockup.
+   *
+   * No es cosmético: `inbox/counters` cuenta solo las activas, así que con
+   * todas mezcladas la pestaña decía «Todas 6» encima de una lista de siete.
+   * Quien lo ve no sabe cuál de los dos números creer. Cuando se filtra por un
+   * estado concreto no se separa nada: ahí lo archivado es justo lo que se pidió.
+   */
+  const separar = !filtros.status;
+  const activas = useMemo(
+    () =>
+      separar
+        ? conversations.filter(
+            (c) => c.status !== "ARCHIVED" && c.status !== "CLOSED",
+          )
+        : conversations,
+    [conversations, separar],
+  );
+  const cerradas = useMemo(
+    () =>
+      separar
+        ? conversations.filter(
+            (c) => c.status === "ARCHIVED" || c.status === "CLOSED",
+          )
+        : [],
+    [conversations, separar],
+  );
   const enLaLista = conversations.find((c) => c.id === conversacionId) ?? null;
 
   /**
@@ -204,6 +232,11 @@ function InboxContenido() {
       cancelado = true;
     };
   }, [conversacionId, mensajes.data, refrescarBandeja]);
+
+  function elegirConversacion(id: string) {
+    setSendNotice(null);
+    navegar({ conversacionId: id });
+  }
 
   function alternarSeleccion(id: string) {
     setSeleccionadas((previas) =>
@@ -253,7 +286,7 @@ function InboxContenido() {
       {/* ── Panel izquierdo: la bandeja ─────────────────────────── */}
       <section
         aria-label="Conversaciones"
-        className={`flex min-h-0 w-full shrink-0 flex-col border-neutral-200 md:flex md:w-[19rem] md:border-r ${
+        className={`flex min-h-0 w-full shrink-0 flex-col border-neutral-200 md:flex md:w-[17rem] md:border-r 2xl:w-[19rem] ${
           conversacionId ? "hidden md:flex" : "flex"
         }`}
       >
@@ -317,15 +350,27 @@ function InboxContenido() {
               {totalMostrado > 0 && (
                 <>
                   <ConversationList
-                    conversations={conversations}
+                    conversations={activas}
                     selectedId={conversacionId}
-                    onSelect={(id) => {
-                      setSendNotice(null);
-                      navegar({ conversacionId: id });
-                    }}
+                    onSelect={elegirConversacion}
                     seleccionadas={seleccionadas}
                     onToggleSeleccion={alternarSeleccion}
                   />
+
+                  {cerradas.length > 0 && (
+                    <>
+                      <h3 className="border-y border-neutral-100 bg-neutral-50 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-500">
+                        Archivado
+                      </h3>
+                      <ConversationList
+                        conversations={cerradas}
+                        selectedId={conversacionId}
+                        onSelect={elegirConversacion}
+                        seleccionadas={seleccionadas}
+                        onToggleSeleccion={alternarSeleccion}
+                      />
+                    </>
+                  )}
 
                   <div className="px-3 py-3 text-center">
                     {bandeja.data?.hasMore && limite < TOPE ? (
@@ -342,7 +387,9 @@ function InboxContenido() {
                       <p className="text-[11px] text-neutral-400">
                         {bandeja.data?.hasMore
                           ? `Mostrando las ${totalMostrado} más recientes. Usa los filtros o la búsqueda para acotar.`
-                          : `Mostrando ${totalMostrado} de ${totalMostrado}`}
+                          : `Mostrando ${activas.length} activa${activas.length === 1 ? "" : "s"}${
+                              cerradas.length ? ` y ${cerradas.length} archivada${cerradas.length === 1 ? "" : "s"}` : ""
+                            }`}
                       </p>
                     )}
                   </div>

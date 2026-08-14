@@ -505,7 +505,7 @@ export function PerfilComercial({
       // ancho la ficha se superpone sobre el hilo y se cierra.
       className={
         variante === "cajon"
-          ? "fixed inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col border-l border-neutral-200 bg-white shadow-xl xl:static xl:inset-auto xl:w-80 xl:max-w-none xl:shrink-0 xl:shadow-none"
+          ? "fixed inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col border-l border-neutral-200 bg-white shadow-xl xl:static xl:inset-auto xl:w-72 xl:max-w-none xl:shrink-0 xl:shadow-none 2xl:w-80"
           : "fixed inset-0 z-40 flex flex-col bg-white lg:static lg:inset-auto lg:w-80 lg:shrink-0 lg:border-l lg:border-neutral-200"
       }
       aria-label="Perfil del contacto"
