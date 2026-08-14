@@ -15,6 +15,13 @@
        se aplican a SU material, nunca al armazón del producto.
    ───────────────────────────────────────────────────────────── */
 @theme {
+  /* Un corte propio a 1440 px.
+     Tailwind salta de 1280 (`xl`) a 1536 (`2xl`), y justo en medio está el
+     portátil de 1440 en el que se revisa este producto. Sin este corte, el
+     perfil 360 tendría que elegir entre apretar tres columnas ya a 1280 —donde
+     la barra de seis pestañas no cabe— o renunciar a las tres hasta 1536. */
+  --breakpoint-ancho: 1440px;
+
   /* Marca */
   --color-brand-primary: #131c4a;
   --color-brand-secondary: #ff6a00;

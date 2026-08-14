@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, use, useMemo, useState } from "react";
+import { Suspense, use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -21,6 +21,7 @@ import { canalLegible } from "@/lib/conversations";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { ForbiddenState } from "@/components/ui/ForbiddenState";
+import { TextoLargo } from "@/components/ui/TextoLargo";
 
 /**
  * Perfil 360 de un contacto (mockup 18).
@@ -102,6 +103,22 @@ function Perfil360({ contactId }: { contactId: string }) {
   const params = useSearchParams();
   const volverA = params.get("volverA");
   const [pestana, setPestana] = useState<Pestana>("actividad");
+  const refActiva = useRef<HTMLButtonElement>(null);
+
+  /**
+   * La pestaña activa, siempre a la vista.
+   *
+   * En pantallas donde la barra se desplaza, cambiar de pestaña desde una
+   * métrica podía dejarla fuera del recuadro visible: se veía el contenido
+   * cambiar sin ver cuál se había activado. Solo mueve el scroll de la barra,
+   * no el de la página.
+   */
+  useEffect(() => {
+    refActiva.current?.scrollIntoView?.({
+      inline: "nearest",
+      block: "nearest",
+    });
+  }, [pestana]);
 
   /**
    * Un enlace viejo puede apuntar a un contacto ABSORBIDO por una fusión. En
@@ -234,8 +251,8 @@ function Perfil360({ contactId }: { contactId: string }) {
               {p.contacto.telefono}
             </p>
             {p.contacto.email && (
-              <p className="truncate text-sm text-neutral-500">
-                {p.contacto.email}
+              <p className="text-sm text-neutral-500">
+                <TextoLargo valor={p.contacto.email} />
               </p>
             )}
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -257,7 +274,7 @@ function Perfil360({ contactId }: { contactId: string }) {
               <span>
                 Responsable:{" "}
                 <span className="text-neutral-800">
-                  {responsable ?? "Sin asignar"}
+                  <TextoLargo valor={responsable ?? "Sin asignar"} />
                 </span>
               </span>
               <span>
@@ -344,10 +361,15 @@ function Perfil360({ contactId }: { contactId: string }) {
         />
       </div>
 
-      {/* ── Cuerpo: tres columnas ────────────────────────────────── */}
-      <div className="grid gap-4 xl:grid-cols-12">
+      {/* ── Cuerpo ───────────────────────────────────────────────────
+          Tres columnas desde 1440 px. A 1280 la columna central se quedaba en
+          unos 550 px y la barra de seis pestañas no cabía: se desplazaba, que
+          es justo lo que no debe pasar a ese ancho. Ahí la columna derecha
+          BAJA —a lo ancho, con sus tres tarjetas en fila— y el centro respira.
+          Mantener tres columnas a cualquier precio es lo que rompía palabras. */}
+      <div className="grid gap-4 max-ancho:xl:grid-cols-9 ancho:grid-cols-10">
         {/* Izquierda: quién es */}
-        <div className="flex flex-col gap-4 xl:col-span-3">
+        <div className="flex flex-col gap-4 max-ancho:xl:col-span-3 ancho:col-span-2">
           <Tarjeta titulo="Información del contacto">
             <dl className="space-y-1.5 text-sm">
               <Dato etiqueta="Teléfono" valor={p.contacto.telefono} mono />
@@ -399,10 +421,14 @@ function Perfil360({ contactId }: { contactId: string }) {
         {/* Centro: lo relacionado, en pestañas con conteos reales */}
         <div className="min-w-0 xl:col-span-6">
           <div className="rounded-lg border border-neutral-200 bg-white">
+            {/* UNA SOLA FILA. Envolviendo, «Documentos 0» caía abajo y la
+                barra dejaba de leerse como una barra. Cuando no cabe —1024—
+                se desplaza dentro de sí misma, que es lo que se espera de
+                unas pestañas, en vez de reordenarse sola. */}
             <div
               role="tablist"
               aria-label="Objetos relacionados"
-              className="flex flex-wrap gap-1 border-b border-neutral-200 px-2 pt-2"
+              className="flex flex-nowrap gap-0.5 overflow-x-auto overflow-y-hidden border-b border-neutral-200 px-1.5 pt-2 [scrollbar-width:thin]"
             >
               {PESTANAS.map((t) => (
                 <button
@@ -411,7 +437,8 @@ function Perfil360({ contactId }: { contactId: string }) {
                   role="tab"
                   aria-selected={pestana === t.clave}
                   onClick={() => setPestana(t.clave)}
-                  className={`-mb-px flex items-center gap-1.5 border-b-2 px-2.5 py-1.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-line-focus ${
+                  ref={pestana === t.clave ? refActiva : undefined}
+                  className={`-mb-px flex shrink-0 items-center gap-1 whitespace-nowrap border-b-2 px-1.5 py-1.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-line-focus ${
                     pestana === t.clave
                       ? "border-brand-secondary text-neutral-900"
                       : "border-transparent text-neutral-500 hover:text-neutral-800"
@@ -419,7 +446,7 @@ function Perfil360({ contactId }: { contactId: string }) {
                 >
                   {t.etiqueta}
                   {t.total !== undefined && (
-                    <span className="rounded-full bg-neutral-100 px-1.5 text-[10px] text-neutral-600">
+                    <span className="rounded-full bg-neutral-100 px-1 text-[10px] tabular-nums text-neutral-600">
                       {t.total}
                     </span>
                   )}
@@ -476,8 +503,8 @@ function Perfil360({ contactId }: { contactId: string }) {
                         className="flex items-center justify-between gap-3 py-2"
                       >
                         <span className="flex min-w-0 flex-col">
-                          <span className="truncate text-neutral-800">
-                            {o.titulo}
+                          <span className="min-w-0 text-neutral-800">
+                            <TextoLargo valor={o.titulo} />
                           </span>
                           <span className="text-xs text-neutral-500">
                             {o.pipeline.nombre} · {o.etapa.nombre} ·{" "}
@@ -511,8 +538,8 @@ function Perfil360({ contactId }: { contactId: string }) {
                         className="flex items-start justify-between gap-3 py-2"
                       >
                         <span className="flex min-w-0 flex-col">
-                          <span className="break-words text-neutral-800">
-                            {t.titulo}
+                          <span className="min-w-0 text-neutral-800">
+                            <TextoLargo valor={t.titulo} />
                           </span>
                           <span className="text-xs text-neutral-400">
                             Vence: {fechaCorta(t.vence)}
@@ -600,13 +627,13 @@ function Perfil360({ contactId }: { contactId: string }) {
           </div>
         </div>
 
-        {/* Derecha: qué hacer ahora */}
-        <div className="flex flex-col gap-4 xl:col-span-3">
+        {/* Derecha: qué hacer ahora. A 1280 baja y se pone en fila. */}
+        <div className="flex flex-col gap-4 max-ancho:xl:col-span-9 max-ancho:xl:flex-row ancho:col-span-2">
           <Tarjeta titulo="Oportunidad activa">
             {p.oportunidad ? (
               <div className="space-y-2 text-sm">
-                <p className="break-words font-medium text-neutral-900">
-                  {p.oportunidad.titulo}
+                <p className="font-medium text-neutral-900">
+                  <TextoLargo valor={p.oportunidad.titulo} />
                 </p>
                 <dl className="space-y-1.5">
                   <Dato etiqueta="Embudo" valor={p.oportunidad.pipeline.nombre} />
@@ -780,7 +807,7 @@ function Tarjeta({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-lg border border-neutral-200 bg-white p-4">
+    <section className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white p-4">
       <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-neutral-500">
         {titulo}
       </h2>
@@ -799,17 +826,14 @@ function Dato({
   mono?: boolean;
 }) {
   return (
-    // Apilado en columna estrecha, en una linea cuando hay sitio. Enfrentar
-    // etiqueta y valor en 210 px parte los valores largos a mitad de palabra:
-    // «PREVIEW_BRANDI / NG_Embudo comercial» no se lee.
-    <div className="flex flex-col gap-0.5 2xl:flex-row 2xl:justify-between 2xl:gap-3">
-      <dt className="shrink-0 text-neutral-500">{etiqueta}</dt>
-      <dd
-        className={`min-w-0 break-words text-neutral-900 2xl:text-right ${
-          mono ? "font-mono" : ""
-        }`}
-      >
-        {valor}
+    // SIEMPRE apilado en las columnas laterales: enfrentar etiqueta y valor
+    // deja al valor unos 190 px, y ahí «PREVIEW_BRANDING_Muebles del Valle»
+    // se parte como «Mueb / les». La etiqueta va arriba, pequeña, y el valor
+    // dispone del ancho entero de la tarjeta.
+    <div className="flex flex-col gap-0.5">
+      <dt className="text-xs text-neutral-500">{etiqueta}</dt>
+      <dd className="min-w-0 text-neutral-900">
+        <TextoLargo valor={valor} mono={mono} />
       </dd>
     </div>
   );

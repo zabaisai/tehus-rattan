@@ -272,6 +272,45 @@ describe('Perfil 360 — estructura del mockup 18', () => {
     ]);
   });
 
+  it('la barra de pestañas no se envuelve: se desplaza si no cabe', async () => {
+    // Envolviendo, «Documentos 0» caia a una segunda fila y la barra dejaba de
+    // leerse como una barra.
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    const tablist = await screen.findByRole('tablist', {
+      name: /objetos relacionados/i,
+    });
+    expect(tablist.className).toContain('flex-nowrap');
+    expect(tablist.className).toContain('overflow-x-auto');
+    expect(tablist.className).not.toContain('flex-wrap');
+  });
+
+  it('ninguna pestaña se parte en dos lineas', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+
+    const tablist = await screen.findByRole('tablist', {
+      name: /objetos relacionados/i,
+    });
+    for (const t of within(tablist).getAllByRole('tab')) {
+      expect(t.className).toContain('whitespace-nowrap');
+      expect(t.className).toContain('shrink-0');
+    }
+  });
+
+  it('los valores largos llevan su valor completo accesible', async () => {
+    getPerfilComercial.mockResolvedValue(perfilCompleto());
+    await montar();
+    await screen.findByRole('heading', { name: 'Laura Martínez' });
+
+    const conTitulo = [...document.querySelectorAll('[title]')].map((e) =>
+      e.getAttribute('title'),
+    );
+    expect(conTitulo).toContain('laura@example.invalid');
+    expect(conTitulo).toContain('Muebles del Valle');
+  });
+
   it('la pestaña de conversaciones lista cada hilo y lo abre exacto', async () => {
     getPerfilComercial.mockResolvedValue(perfilCompleto());
     const user = userEvent.setup();
