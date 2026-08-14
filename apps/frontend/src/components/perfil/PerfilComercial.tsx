@@ -9,6 +9,7 @@ import {
   ArchiveRestore,
   Bot,
   ArrowLeft,
+  ExternalLink,
   FileText,
   Loader2,
   MessageSquare,
@@ -63,22 +64,45 @@ function fechaCorta(iso: string): string {
  * `origen` decide qué acción de navegación tiene sentido: desde el Pipeline se
  * ofrece saltar al chat; desde el chat, volver al embudo por donde se vino.
  */
+type Pestana = "resumen" | "datos" | "actividad";
+
+const PESTANAS: ReadonlyArray<{ clave: Pestana; etiqueta: string }> = [
+  { clave: "resumen", etiqueta: "Resumen" },
+  { clave: "datos", etiqueta: "Datos" },
+  { clave: "actividad", etiqueta: "Actividad" },
+];
+
 export function PerfilComercial({
   contactId,
   origen,
   volverA,
+  rutaDeRegreso,
+  variante = "lateral",
   onCerrar,
 }: {
   contactId: string;
   origen: "pipeline" | "conversacion";
   /** Ruta de regreso, ya codificada. Conserva embudo, filtros y scroll. */
   volverA?: string | null;
+  /**
+   * Dónde volver desde el perfil completo. Lleva la conversación abierta y los
+   * filtros, para que «Ver perfil completo» y luego «Volver» devuelva al MISMO
+   * hilo y no a la bandeja de cero.
+   */
+  rutaDeRegreso?: string;
+  /**
+   * `lateral`: columna fija desde `lg` (embudo). `cajon`: columna fija desde
+   * `xl` y cajón superpuesto por debajo — a 1024 los tres paneles no caben sin
+   * dejar el hilo inservible, así que la ficha se superpone.
+   */
+  variante?: "lateral" | "cajon";
   onCerrar: () => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pestana, setPestana] = useState<Pestana>("resumen");
 
   const {
     data: perfil,
@@ -263,9 +287,35 @@ export function PerfilComercial({
             </p>
           )}
 
+          {/* Pestañas del mockup: la ficha lateral es estrecha y apilarlo todo
+              obliga a desplazarse para llegar a lo que se venía a mirar. Es
+              agrupación, no contenido nuevo: nada desaparece. */}
+          <div
+            role="tablist"
+            aria-label="Secciones del perfil"
+            className="flex gap-1 border-b border-neutral-200"
+          >
+            {PESTANAS.map((p) => (
+              <button
+                key={p.clave}
+                type="button"
+                role="tab"
+                aria-selected={pestana === p.clave}
+                onClick={() => setPestana(p.clave)}
+                className={`-mb-px border-b-2 px-2.5 py-1.5 text-xs font-medium outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-line-focus ${
+                  pestana === p.clave
+                    ? "border-brand-secondary text-neutral-900"
+                    : "border-transparent text-neutral-500 hover:text-neutral-800"
+                }`}
+              >
+                {p.etiqueta}
+              </button>
+            ))}
+          </div>
+
           {/* Pulso: qué hace el bot AHORA. Va arriba porque decide si se
               puede escribir sin pisar al bot. */}
-          {perfil.pulso && (
+          {pestana === "resumen" && perfil.pulso && (
             <Seccion titulo={NOMBRE_PULSO}>
               <div className="space-y-1 text-sm">
                 <p className="flex items-center gap-2">
@@ -293,7 +343,7 @@ export function PerfilComercial({
             </Seccion>
           )}
 
-          {/* Oportunidad */}
+          {pestana === "resumen" && (
           <Seccion titulo="Oportunidad">
             {perfil.oportunidad ? (
               <div className="space-y-1 text-sm">
@@ -322,8 +372,9 @@ export function PerfilComercial({
               <Vacio>Sin oportunidad abierta.</Vacio>
             )}
           </Seccion>
+          )}
 
-          {/* Último mensaje */}
+          {pestana === "resumen" && (
           <Seccion titulo="Último mensaje">
             {perfil.conversacion?.ultimoMensaje ? (
               <div className="text-sm">
@@ -343,12 +394,15 @@ export function PerfilComercial({
               <Vacio>Todavía no hay mensajes.</Vacio>
             )}
           </Seccion>
+          )}
 
           {/* Propuestas: van ANTES de las tareas porque son lo que espera una
               decisión, y una decisión pendiente es más urgente que una lista. */}
-          <SugerenciasDeTarea contactId={contactId} titulo="Propuestas" />
+          {pestana === "resumen" && (
+            <SugerenciasDeTarea contactId={contactId} titulo="Propuestas" />
+          )}
 
-          {/* Tareas */}
+          {pestana === "resumen" && (
           <Seccion
             titulo={`Tareas pendientes (${perfil.tareasPendientes.length})`}
           >
@@ -370,8 +424,9 @@ export function PerfilComercial({
               <Vacio>Nada pendiente.</Vacio>
             )}
           </Seccion>
+          )}
 
-          {/* Cotizaciones */}
+          {pestana === "datos" && (
           <Seccion titulo="Cotizaciones">
             {perfil.cotizaciones.length > 0 ? (
               <ul className="space-y-1.5 text-sm">
@@ -399,9 +454,10 @@ export function PerfilComercial({
               <Vacio>Todavía no se ha cotizado.</Vacio>
             )}
           </Seccion>
+          )}
 
           {/* Campos personalizados */}
-          {perfil.camposPersonalizados.length > 0 && (
+          {pestana === "datos" && perfil.camposPersonalizados.length > 0 && (
             <Seccion titulo="Datos adicionales">
               <div className="space-y-1 text-sm">
                 {perfil.camposPersonalizados.map((c) => (
@@ -411,7 +467,7 @@ export function PerfilComercial({
             </Seccion>
           )}
 
-          {/* Actividad */}
+          {pestana === "actividad" && (
           <Seccion titulo="Actividad">
             {perfil.actividad.length > 0 ? (
               <ul className="space-y-1.5 text-sm">
@@ -431,16 +487,27 @@ export function PerfilComercial({
               <Vacio>Sin movimientos todavía.</Vacio>
             )}
           </Seccion>
+          )}
         </div>
       )}
     </>
   );
 
+  const enlacePerfilCompleto = `/dashboard/contacts/${contactId}${
+    rutaDeRegreso ? `?volverA=${encodeURIComponent(rutaDeRegreso)}` : ""
+  }`;
+
   return (
     <aside
-      // Cajón a pantalla completa en móvil, lateral en escritorio. La misma
-      // pieza: dos componentes distintos acabarían divergiendo.
-      className="fixed inset-0 z-40 flex flex-col bg-white lg:static lg:inset-auto lg:w-80 lg:shrink-0 lg:border-l lg:border-neutral-200"
+      // Dos presentaciones de LA MISMA pieza. `lateral` es la del embudo, que
+      // ya funcionaba. `cajon` retrasa la columna fija hasta `xl` porque a
+      // 1024 px tres columnas dejan el hilo en una rendija: por debajo de ese
+      // ancho la ficha se superpone sobre el hilo y se cierra.
+      className={
+        variante === "cajon"
+          ? "fixed inset-y-0 right-0 z-40 flex w-full max-w-sm flex-col border-l border-neutral-200 bg-white shadow-xl xl:static xl:inset-auto xl:w-80 xl:max-w-none xl:shrink-0 xl:shadow-none"
+          : "fixed inset-0 z-40 flex flex-col bg-white lg:static lg:inset-auto lg:w-80 lg:shrink-0 lg:border-l lg:border-neutral-200"
+      }
       aria-label="Perfil del contacto"
     >
       <div className="flex items-center justify-between gap-2 border-b border-neutral-200 px-4 py-3">
@@ -449,14 +516,28 @@ export function PerfilComercial({
           Perfil
         </span>
         <button
+          type="button"
           onClick={onCerrar}
           aria-label="Cerrar el perfil"
-          className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          className="rounded p-1 text-neutral-400 outline-none hover:bg-neutral-100 hover:text-neutral-700 focus-visible:ring-2 focus-visible:ring-line-focus"
         >
           <X size={18} />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto">{cuerpo}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto">{cuerpo}</div>
+
+      {/* Al perfil 360. Va en un pie fijo y no al final del scroll: en la
+          ficha estrecha, «ver más» al fondo de una columna larga es un enlace
+          que nadie encuentra. */}
+      <div className="border-t border-neutral-200 px-4 py-2.5">
+        <Link
+          href={enlacePerfilCompleto}
+          className="inline-flex items-center gap-1.5 text-sm font-medium text-brand-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-line-focus"
+        >
+          <ExternalLink size={14} aria-hidden="true" />
+          Ver perfil completo
+        </Link>
+      </div>
     </aside>
   );
 }

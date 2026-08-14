@@ -121,8 +121,14 @@ describe("Perfil comercial", () => {
   afterEach(() => vi.clearAllMocks());
 
   it("enseña todo lo que promete, de una sola llamada", async () => {
+    // La ficha agrupa en pestañas —Resumen, Datos y Actividad— porque en una
+    // columna estrecha apilarlo todo obliga a desplazarse hasta lo que se venía
+    // a mirar. Agrupar NO es esconder: nada desaparece, y sigue viniendo de una
+    // sola llamada.
+    const user = userEvent.setup();
     pintar();
 
+    // Identidad y resumen: visibles al abrir, sin tocar nada.
     expect(await screen.findByText("Ana Restrepo")).toBeTruthy();
     expect(screen.getByText("+573001112233")).toBeTruthy();
     expect(screen.getByText("Tehus Rattan")).toBeTruthy();
@@ -132,12 +138,33 @@ describe("Perfil comercial", () => {
     expect(screen.getByText("Camila Ruiz")).toBeTruthy();
     expect(screen.getByText(/Me confirma el precio/)).toBeTruthy();
     expect(screen.getByText("Llamar mañana")).toBeTruthy();
+
+    await user.click(screen.getByRole("tab", { name: "Datos" }));
     expect(screen.getByText("COT-0007")).toBeTruthy();
     expect(screen.getByText("Medellín")).toBeTruthy();
+
+    await user.click(screen.getByRole("tab", { name: "Actividad" }));
     expect(screen.getByText("Pasó a «Cotizando»")).toBeTruthy();
 
-    // UNA sola llamada: el panel no se arma con consultas sueltas.
+    // UNA sola llamada: el panel no se arma con consultas sueltas, y cambiar
+    // de pestaña no vuelve a preguntar.
     expect(getPerfilComercial).toHaveBeenCalledTimes(1);
+  });
+
+  it("al abrir, la pestaña de resumen es la activa", async () => {
+    pintar();
+    expect(await screen.findByRole("tab", { name: "Resumen" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("ofrece el perfil completo del contacto", async () => {
+    pintar();
+    const enlace = await screen.findByRole("link", {
+      name: /ver perfil completo/i,
+    });
+    expect(enlace.getAttribute("href")).toContain("/dashboard/contacts/");
   });
 
   /**

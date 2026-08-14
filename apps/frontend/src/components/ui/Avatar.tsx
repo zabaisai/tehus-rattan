@@ -20,6 +20,9 @@ const TONOS = [
 const TAMANOS = {
   sm: 'h-7 w-7 text-[10px]',
   md: 'h-9 w-9 text-xs',
+  // Cabecera del perfil 360: ahí el avatar es el ancla visual de la ficha,
+  // no un adorno de fila.
+  lg: 'h-14 w-14 text-lg',
 } as const;
 
 export function iniciales(nombre: string | null | undefined): string {
