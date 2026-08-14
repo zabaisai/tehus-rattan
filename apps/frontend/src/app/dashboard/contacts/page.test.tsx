@@ -75,6 +75,7 @@ describe("Pantalla de contactos", () => {
   beforeEach(() => {
   replace.mockClear();
   push.mockClear();
+  window.history.replaceState(null, "", "/dashboard/contacts");
   parametrosDeUrl = new URLSearchParams();
   getCanonico.mockResolvedValue({
     solicitado: "c1",
@@ -206,9 +207,11 @@ describe("Pantalla de contactos", () => {
       });
       await userEvent.click(botones[0]);
 
-      // La pareja vive en la ruta: recargar vuelve a la misma comparación.
-      expect(replace).toHaveBeenCalledWith(
-        "/dashboard/contacts?fusionar=c1",
+      // La pareja vive en la RUTA, no en estado suelto: recargar vuelve a la
+      // misma comparación. La escribe `history.replaceState`, así que se
+      // comprueba sobre `window.location`.
+      expect(new URLSearchParams(window.location.search).get("fusionar")).toBe(
+        "c1",
       );
     });
 
@@ -226,6 +229,11 @@ describe("Pantalla de contactos", () => {
     it("un enlace a un contacto ABSORBIDO se reescribe por el canónico", async () => {
       rol = "ADMIN";
       getContacts.mockResolvedValue([contacto()]);
+      window.history.replaceState(
+        null,
+        "",
+        "/dashboard/contacts?fusionar=viejo&con=otro",
+      );
       parametrosDeUrl = new URLSearchParams("fusionar=viejo&con=otro");
       getCanonico.mockResolvedValue({
         solicitado: "viejo",
@@ -237,17 +245,18 @@ describe("Pantalla de contactos", () => {
       renderPage();
 
       await waitFor(() =>
-        expect(replace).toHaveBeenCalledWith("/dashboard/contacts?fusionar=c1"),
+        expect(
+          new URLSearchParams(window.location.search).get("fusionar"),
+        ).toBe("c1"),
       );
       // El `con` se descarta: pertenecía a la pareja anterior.
-      expect(replace).not.toHaveBeenCalledWith(
-        expect.stringContaining("con=otro"),
-      );
+      expect(new URLSearchParams(window.location.search).get("con")).toBeNull();
     });
 
     it("un id que NO fue absorbido no provoca ninguna redirección: sin bucles", async () => {
       rol = "ADMIN";
       getContacts.mockResolvedValue([contacto()]);
+      window.history.replaceState(null, "", "/dashboard/contacts?fusionar=c1");
       parametrosDeUrl = new URLSearchParams("fusionar=c1");
       getCanonico.mockResolvedValue({
         solicitado: "c1",
@@ -260,7 +269,10 @@ describe("Pantalla de contactos", () => {
 
       await screen.findAllByText("Ana Restrepo");
       await waitFor(() => expect(getCanonico).toHaveBeenCalledWith("c1"));
-      expect(replace).not.toHaveBeenCalled();
+      // Sin redirección: la ruta se queda como estaba.
+      expect(new URLSearchParams(window.location.search).get("fusionar")).toBe(
+        "c1",
+      );
     });
   });
 });

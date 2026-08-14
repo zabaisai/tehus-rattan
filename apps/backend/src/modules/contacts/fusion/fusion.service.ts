@@ -76,6 +76,18 @@ interface SnapshotFusion {
   recuento: RecuentoRelaciones;
 }
 
+/** Suma dos recuentos clave a clave. */
+function sumarRecuentos(
+  a: RecuentoRelaciones,
+  b: RecuentoRelaciones,
+): RecuentoRelaciones {
+  const claves = Object.keys(a) as (keyof RecuentoRelaciones)[];
+  return claves.reduce(
+    (acc, k) => ({ ...acc, [k]: (a[k] ?? 0) + (b[k] ?? 0) }),
+    {} as RecuentoRelaciones,
+  );
+}
+
 const SELECCION_CONTACTO = {
   id: true,
   name: true,
@@ -269,6 +281,17 @@ export class FusionContactosService {
     duplicadoId: string,
     companyId: string,
   ): Promise<VistaPreviaFusion> {
+    // Comparar un contacto CONSIGO MISMO no es una comparación, es un espejo:
+    // `cargarPareja` devolvería la misma fila en los dos lados y la vista
+    // previa saldría perfectamente formada —dos tarjetas iguales, «mismo
+    // correo» como razón de coincidencia y el recuento de relaciones del
+    // propio contacto—, que es exactamente lo que se vio en pantalla cuando
+    // un cliente pidió esta combinación. `fusionar` ya lo rechazaba; leer
+    // tenía que rechazarlo también, porque de una lectura que miente salen
+    // decisiones que nadie tomaría.
+    if (principalId === duplicadoId)
+      throw new BadRequestException('Hay que comparar dos contactos distintos');
+
     const { principal, duplicado } = await this.cargarPareja(
       this.prisma,
       principalId,
@@ -300,11 +323,18 @@ export class FusionContactosService {
         companyId,
       );
 
-    const relaciones = await this.contarRelaciones(
-      this.prisma,
-      duplicado.id,
-      companyId,
-    );
+    // LO QUE SE CONSERVARA ES LA SUMA DE LOS DOS, no el historial de uno.
+    //
+    // Contar solo el del duplicado hacia que el resumen cambiara al invertir
+    // el principal —de siete filas a una, en la pareja de QA—, cuando lo que
+    // la etiqueta promete es lo que tendra el contacto resultante. Ese total
+    // es el mismo mirado desde cualquiera de los dos lados, que es justo la
+    // propiedad que una persona espera de un resumen antes de decidir.
+    const [delPrincipal, delDuplicado] = await Promise.all([
+      this.contarRelaciones(this.prisma, principal.id, companyId),
+      this.contarRelaciones(this.prisma, duplicado.id, companyId),
+    ]);
+    const relaciones = sumarRecuentos(delPrincipal, delDuplicado);
 
     const razones: string[] = [];
     let nivel: NivelDeCoincidencia = 'sugerida';

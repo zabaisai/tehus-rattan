@@ -83,31 +83,266 @@ const RELACIONES_VISIBLES: Array<{ clave: keyof RecuentoRelaciones; etiqueta: st
   { clave: 'ejecucionesDeBot', etiqueta: 'ejecuciones de bot' },
 ];
 
+/**
+ * SUBCOMPONENTES A NIVEL DE MODULO, NO DENTRO DEL RENDER.
+ *
+ * Estaban declarados dentro de `FusionDeDuplicados`. Cada render creaba
+ * funciones nuevas, React las veia como TIPOS distintos y desmontaba y volvia
+ * a montar todo el subarbol: los nodos del DOM se reemplazaban en cada cambio
+ * de estado. Ademas de tirar el foco, eso hacia que un clic pudiera aterrizar
+ * en un nodo ya desconectado y no llegara nunca a su manejador — que es
+ * exactamente lo que le pasaba al boton de cambiar el contacto principal.
+ *
+ * Fuera del render, el tipo es estable y React actualiza en vez de remontar.
+ */
+function Pasos({ actual }: { actual: Paso }) {
+  const indice = PASOS_VISIBLES.findIndex((p) => p.id === actual);
+  return (
+    <ol className="mb-5 flex items-center gap-2 text-xs" aria-label="Pasos de la fusión">
+      {PASOS_VISIBLES.map((p, i) => {
+        const hecho = i < indice;
+        const activo = i === indice;
+        return (
+          <li key={p.id} className="flex items-center gap-2">
+            <span
+              aria-current={activo ? 'step' : undefined}
+              className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
+                activo
+                  ? 'bg-brand-primary font-medium text-white'
+                  : hecho
+                    ? 'bg-status-success-surface text-status-success-strong'
+                    : 'bg-neutral-100 text-content-secondary'
+              }`}
+            >
+              {hecho ? (
+                <Check size={12} aria-hidden="true" />
+              ) : (
+                <span aria-hidden="true">{i + 1}</span>
+              )}
+              {p.etiqueta}
+              {hecho && <span className="sr-only">(completado)</span>}
+            </span>
+            {i < PASOS_VISIBLES.length - 1 && (
+              <span aria-hidden="true" className="h-px w-4 bg-line-default" />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+function TarjetaContacto({
+  c,
+  rol,
+  seleccionable,
+  onInvertir,
+}: {
+  c: ContactoResumen;
+  rol: 'principal' | 'duplicado';
+  seleccionable?: boolean;
+  onInvertir?: () => void;
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-3 ${
+        rol === 'principal'
+          ? 'border-brand-primary bg-primary-50'
+          : 'border-line-default bg-surface-default'
+      }`}
+    >
+      <p className="mb-2 text-xs font-medium text-content-secondary">
+        {rol === 'principal' ? 'Contacto principal' : 'Posible duplicado'}
+      </p>
+      <div className="flex items-start gap-2">
+        <Avatar nombre={c.name} size="md" />
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-content-primary">
+            {nombreDe(c)}
+          </p>
+          <p className="font-mono text-xs text-content-secondary">{c.phone}</p>
+          {c.email && (
+            <p className="truncate text-xs text-content-secondary">{c.email}</p>
+          )}
+          <p className="mt-1 text-xs text-content-secondary">
+            Creado el {fecha(c.createdAt)}
+          </p>
+          {c.archivedAt && (
+            <p className="mt-1 inline-flex items-center gap-1 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-content-secondary">
+              <Info size={11} aria-hidden="true" /> Archivado
+            </p>
+          )}
+        </div>
+      </div>
+      {seleccionable && (
+        <button
+          type="button"
+          onClick={onInvertir}
+          className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-line-default px-2.5 py-1 text-xs text-content-primary transition-colors duration-rapida ease-standard hover:bg-neutral-50"
+        >
+          <ArrowLeftRight size={12} aria-hidden="true" />
+          Cambiar contacto principal
+        </button>
+      )}
+    </div>
+  );
+}
+
+function FilaDeCampo({
+  campo,
+  lado,
+  onElegir,
+}: {
+  campo: CampoComparado;
+  /** De que lado sale hoy el valor final. Lo decide quien renderiza. */
+  lado: Lado;
+  onElegir: (lado: Lado) => void;
+}) {
+  const valorFinal =
+    lado === 'duplicado' ? campo.valorDuplicado : campo.valorPrincipal;
+  const nombreGrupo = `campo-${campo.campo}`;
+
+  return (
+    <fieldset className="border-t border-line-default py-2.5">
+      <legend className="sr-only">{campo.etiqueta}</legend>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[9rem_1fr_1fr_1fr] sm:items-center">
+        <span
+          aria-hidden="true"
+          className="text-xs font-medium text-content-secondary"
+        >
+          {campo.etiqueta}
+          {campo.requiereDecision && (
+            <span className="ml-1 text-status-warning-strong">
+              <AlertTriangle
+                size={11}
+                aria-hidden="true"
+                className="inline align-[-1px]"
+              />
+              <span className="sr-only">Requiere decisión</span>
+            </span>
+          )}
+        </span>
+
+        {(['principal', 'duplicado'] as Lado[]).map((cual) => {
+          const valor =
+            cual === 'principal' ? campo.valorPrincipal : campo.valorDuplicado;
+          return (
+            <label key={cual} className="flex items-center gap-2 text-sm">
+              <input
+                type="radio"
+                name={nombreGrupo}
+                checked={lado === cual}
+                disabled={campo.iguales || valor == null}
+                onChange={() => onElegir(cual)}
+                aria-label={`${campo.etiqueta}: usar «${valor ?? 'sin valor'}» del ${
+                  cual === 'principal' ? 'contacto principal' : 'posible duplicado'
+                }`}
+              />
+              <span className="truncate text-content-primary">
+                {valor ?? <span className="text-content-secondary">—</span>}
+              </span>
+            </label>
+          );
+        })}
+
+        <span className="text-sm">
+          <span className="sr-only">Resultado final: </span>
+          <span className="font-medium text-content-primary">
+            {valorFinal ?? '—'}
+          </span>
+          {campo.iguales && (
+            <span className="ml-1.5 text-xs text-status-success-strong">
+              {campo.nota ?? 'Coincide'}
+            </span>
+          )}
+        </span>
+      </div>
+    </fieldset>
+  );
+}
+
+function ResumenRelaciones({ r }: { r: RecuentoRelaciones }) {
+  const conValor = RELACIONES_VISIBLES.filter((x) => (r[x.clave] ?? 0) > 0);
+  return (
+    <section
+      aria-labelledby="fusion-relaciones"
+      className="rounded-md border border-line-default bg-neutral-50 p-3"
+    >
+      <h4 id="fusion-relaciones" className="text-xs font-semibold text-content-primary">
+        Todo esto se conservará
+      </h4>
+      {conValor.length === 0 ? (
+        <p className="mt-1 text-xs text-content-secondary">
+          El posible duplicado no tiene historial relacionado.
+        </p>
+      ) : (
+        <ul className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
+          {conValor.map((x) => (
+            <li key={x.clave} className="flex justify-between gap-2">
+              <span className="text-content-secondary">{x.etiqueta}</span>
+              <span className="font-mono tabular-nums text-content-primary">
+                {r[x.clave]}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="mt-2 text-xs text-content-secondary">
+        Las conversaciones no se mezclan por texto: se conservan completas y
+        separadas, con su canal y su fecha.
+      </p>
+    </section>
+  );
+}
+
 export function FusionDeDuplicados({
   contactoId,
   duplicadoInicialId,
   puedeEjecutar,
   onCerrar,
   onFusionado,
-  onCambioDeDuplicado,
+  onCambioDeSeleccion,
+  pasoInicial,
 }: {
   contactoId: string;
   duplicadoInicialId?: string | null;
+  /** Paso que venia en la URL, para que una recarga no vuelva al principio. */
+  pasoInicial?: Paso | null;
   /** ADMIN y MANAGER. Un AGENT puede mirar, no ejecutar. */
   puedeEjecutar: boolean;
   onCerrar: () => void;
   /** Se llama con el id canónico para navegar al contacto resultante. */
   onFusionado: (canonicoId: string) => void;
-  /** Mantiene el duplicado elegido en la URL, para sobrevivir a una recarga. */
-  onCambioDeDuplicado?: (duplicadoId: string | null) => void;
+  /**
+   * LA SELECCION ENTERA, NO SOLO EL DUPLICADO.
+   *
+   * Antes esto avisaba unicamente del duplicado, y la pantalla —que seguia
+   * creyendo que el principal era el de siempre— escribia los dos parametros
+   * con el MISMO id al intercambiar. El resultado era comparar un contacto
+   * consigo mismo. Un intercambio cambia los dos extremos a la vez, asi que
+   * el aviso tiene que llevarlos a la vez.
+   */
+  onCambioDeSeleccion?: (seleccion: {
+    principalId: string;
+    duplicadoId: string | null;
+    paso?: Paso;
+  }) => void;
 }) {
   const queryClient = useQueryClient();
 
-  const [principalId, setPrincipalId] = useState(contactoId);
-  const [duplicadoId, setDuplicadoId] = useState<string | null>(
-    duplicadoInicialId ?? null,
+  /**
+   * EL PAR NO SE GUARDA AQUI: llega por props desde la ruta.
+   *
+   * Cuando vivia en `useState`, intercambiar el principal actualizaba la
+   * pantalla pero la URL se quedaba con la pareja anterior, asi que una
+   * recarga deshacia el intercambio en silencio. Con la ruta como unica
+   * fuente de verdad no hay dos versiones de la verdad que puedan divergir.
+   */
+  const principalId = contactoId;
+  const duplicadoId = duplicadoInicialId ?? null;
+  const [paso, setPaso] = useState<Paso>(
+    duplicadoInicialId ? (pasoInicial ?? 'comparar') : 'elegir',
   );
-  const [paso, setPaso] = useState<Paso>(duplicadoInicialId ? 'comparar' : 'elegir');
   const [elecciones, setElecciones] = useState<EleccionesFusion>({});
   const [conservarAlternativas, setConservarAlternativas] = useState(true);
   const [confirmado, setConfirmado] = useState(false);
@@ -118,9 +353,16 @@ export function FusionDeDuplicados({
   const [avisoDeCierre, setAvisoDeCierre] = useState(false);
   const [busqueda, setBusqueda] = useState('');
   const [deshaciendo, setDeshaciendo] = useState(false);
-  const [estadoDeshacer, setEstadoDeshacer] = useState<
-    'disponible' | 'hecho' | 'vencido' | 'bloqueado'
-  >('disponible');
+  /**
+   * Solo el DESENLACE EXPLÍCITO se guarda: que alguien la deshizo, o que el
+   * servidor se negó. «Vencido» y «disponible» no son estados propios sino
+   * una consecuencia del reloj, así que se derivan más abajo. Guardarlos
+   * obligaba a un efecto que llamaba a `setState` para pasar de uno a otro,
+   * y eso son renders en cascada para representar algo que ya se sabía.
+   */
+  const [desenlaceDeshacer, setDesenlaceDeshacer] = useState<
+    'hecho' | 'bloqueado' | null
+  >(null);
 
   const candidatos = useQuery({
     queryKey: clavesDeFusion.candidatos(contactoId),
@@ -137,7 +379,14 @@ export function FusionDeDuplicados({
   const comparacion = useQuery({
     queryKey: clavesDeFusion.comparacion(principalId, duplicadoId ?? ''),
     queryFn: () => compararContactos(principalId, duplicadoId!),
-    enabled: Boolean(duplicadoId) && paso !== 'elegir' && paso !== 'resultado',
+    // `duplicadoId !== principalId`: comparar un contacto consigo mismo no es
+    // una comparación, es un espejo. El servidor ya lo rechaza; no pedirlo
+    // evita además enseñar dos tarjetas iguales mientras llega el error.
+    enabled:
+      Boolean(duplicadoId) &&
+      duplicadoId !== principalId &&
+      paso !== 'elegir' &&
+      paso !== 'resultado',
     retry: false,
   });
 
@@ -147,18 +396,17 @@ export function FusionDeDuplicados({
   // el servidor. Un `setInterval` que reste diez minutos desde el navegador
   // enseñaría tiempo restante después de que la ventana ya hubiera vencido.
   const [ahora, setAhora] = useState(() => Date.now());
+  const segundos = resultado ? segundosParaDeshacer(resultado, ahora) : 0;
+
+  /** Derivado, no guardado: el reloj ya dice si la ventana sigue abierta. */
+  const estadoDeshacer: 'disponible' | 'hecho' | 'vencido' | 'bloqueado' =
+    desenlaceDeshacer ?? (segundos > 0 ? 'disponible' : 'vencido');
+
   useEffect(() => {
-    if (paso !== 'resultado' || !resultado || estadoDeshacer !== 'disponible')
-      return;
+    if (paso !== 'resultado' || !resultado || desenlaceDeshacer) return;
     const t = setInterval(() => setAhora(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [paso, resultado, estadoDeshacer]);
-
-  const segundos = resultado ? segundosParaDeshacer(resultado, ahora) : 0;
-  useEffect(() => {
-    if (estadoDeshacer === 'disponible' && resultado && segundos === 0)
-      setEstadoDeshacer('vencido');
-  }, [segundos, estadoDeshacer, resultado]);
+  }, [paso, resultado, desenlaceDeshacer]);
 
   const hayDecisiones =
     Object.keys(elecciones.campos ?? {}).length > 0 ||
@@ -169,24 +417,42 @@ export function FusionDeDuplicados({
     setAvisoDeCierre(true);
   }
 
+  /**
+   * Cambia de paso y lo deja escrito en la URL.
+   *
+   * Solo se persisten `comparar` y `resolver`. `confirmar` no: una recarga
+   * volveria a la pantalla de confirmar con la casilla desmarcada y una vista
+   * previa recien pedida, que es justo el sitio donde no conviene devolver a
+   * nadie. `resultado` tampoco: la fusion ya ocurrio y su registro vive en el
+   * servidor, no en la barra de direcciones.
+   */
+  function irAPaso(siguiente: Paso) {
+    setPaso(siguiente);
+    if (siguiente === 'comparar' || siguiente === 'resolver')
+      onCambioDeSeleccion?.({ principalId, duplicadoId, paso: siguiente });
+  }
+
   function elegirDuplicado(id: string) {
-    setDuplicadoId(id);
-    onCambioDeDuplicado?.(id);
     setPaso('comparar');
     setError(null);
     setConflicto(false);
+    onCambioDeSeleccion?.({ principalId, duplicadoId: id, paso: 'comparar' });
   }
 
   function invertirPrincipal() {
-    if (!duplicadoId) return;
-    const anterior = principalId;
-    setPrincipalId(duplicadoId);
-    setDuplicadoId(anterior);
-    onCambioDeDuplicado?.(anterior);
+    if (!duplicadoId || duplicadoId === principalId) return;
     // Las decisiones se toman «respecto al principal»: si cambia el principal,
     // ya no significan lo mismo y arrastrarlas sería aplicar en silencio algo
-    // que nadie eligió.
+    // que nadie eligió. Al cambiar la ruta el componente se remonta y se
+    // reinician solas, pero se limpian aquí también para no depender de eso.
     setElecciones({});
+    // LOS DOS EXTREMOS, EN EL MISMO AVISO. Mandar solo uno dejaba a la
+    // pantalla escribiendo el mismo id en los dos parámetros.
+    onCambioDeSeleccion?.({
+      principalId: duplicadoId,
+      duplicadoId: principalId,
+      paso: paso === 'resolver' ? 'resolver' : 'comparar',
+    });
   }
 
   function elegirCampo(campo: string, lado: Lado, personalizado = false) {
@@ -218,9 +484,8 @@ export function FusionDeDuplicados({
         queryKey: clavesDeFusion.candidatos(contactoId),
       });
       if (duplicadoId === otroId) {
-        setDuplicadoId(null);
-        onCambioDeDuplicado?.(null);
         setPaso('elegir');
+        onCambioDeSeleccion?.({ principalId, duplicadoId: null });
       }
     } catch (e) {
       setError(leerErrorDeFusion(e).mensaje);
@@ -240,7 +505,8 @@ export function FusionDeDuplicados({
         elecciones: { ...elecciones, conservarAlternativas },
       });
       setResultado(r);
-      setEstadoDeshacer(segundosParaDeshacer(r) > 0 ? 'disponible' : 'vencido');
+      setDesenlaceDeshacer(null);
+      setAhora(Date.now());
       setPaso('resultado');
       invalidarTrasFusion(queryClient);
     } catch (e) {
@@ -258,7 +524,7 @@ export function FusionDeDuplicados({
     setError(null);
     try {
       await deshacerFusion(resultado.mergeId);
-      setEstadoDeshacer('hecho');
+      setDesenlaceDeshacer('hecho');
       invalidarTrasFusion(queryClient);
     } catch (e) {
       const err = leerErrorDeFusion(e);
@@ -269,9 +535,8 @@ export function FusionDeDuplicados({
       // Solo se deja la alerta genérica cuando el motivo NO tiene su propio
       // bloque explicándolo: si no, la pantalla dice dos veces lo mismo.
       setError(conocido ? null : err.mensaje);
-      setEstadoDeshacer(
-        err.codigo === 'VENTANA_VENCIDA' ? 'vencido' : 'bloqueado',
-      );
+      // Una ventana vencida NO es un desenlace: el reloj ya lo dice solo.
+      if (err.codigo !== 'VENTANA_VENCIDA') setDesenlaceDeshacer('bloqueado');
     } finally {
       setDeshaciendo(false);
     }
@@ -341,7 +606,7 @@ export function FusionDeDuplicados({
                 onClick={() => {
                   setConflicto(false);
                   setError(null);
-                  setPaso('comparar');
+                  irAPaso('comparar');
                   comparacion.refetch();
                 }}
                 className="ml-2 underline"
@@ -362,96 +627,7 @@ export function FusionDeDuplicados({
 
   // ── Piezas ────────────────────────────────────────────────────────────
 
-  function Pasos({ actual }: { actual: Paso }) {
-    const indice = PASOS_VISIBLES.findIndex((p) => p.id === actual);
-    return (
-      <ol className="mb-5 flex items-center gap-2 text-xs" aria-label="Pasos de la fusión">
-        {PASOS_VISIBLES.map((p, i) => {
-          const hecho = i < indice;
-          const activo = i === indice;
-          return (
-            <li key={p.id} className="flex items-center gap-2">
-              <span
-                aria-current={activo ? 'step' : undefined}
-                className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 ${
-                  activo
-                    ? 'bg-brand-primary font-medium text-white'
-                    : hecho
-                      ? 'bg-status-success-surface text-status-success-strong'
-                      : 'bg-neutral-100 text-content-secondary'
-                }`}
-              >
-                {hecho ? (
-                  <Check size={12} aria-hidden="true" />
-                ) : (
-                  <span aria-hidden="true">{i + 1}</span>
-                )}
-                {p.etiqueta}
-                {hecho && <span className="sr-only">(completado)</span>}
-              </span>
-              {i < PASOS_VISIBLES.length - 1 && (
-                <span aria-hidden="true" className="h-px w-4 bg-line-default" />
-              )}
-            </li>
-          );
-        })}
-      </ol>
-    );
-  }
 
-  function TarjetaContacto({
-    c,
-    rol,
-    seleccionable,
-  }: {
-    c: ContactoResumen;
-    rol: 'principal' | 'duplicado';
-    seleccionable?: boolean;
-  }) {
-    return (
-      <div
-        className={`rounded-lg border p-3 ${
-          rol === 'principal'
-            ? 'border-brand-primary bg-primary-50'
-            : 'border-line-default bg-surface-default'
-        }`}
-      >
-        <p className="mb-2 text-xs font-medium text-content-secondary">
-          {rol === 'principal' ? 'Contacto principal' : 'Posible duplicado'}
-        </p>
-        <div className="flex items-start gap-2">
-          <Avatar nombre={c.name} size="md" />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-content-primary">
-              {nombreDe(c)}
-            </p>
-            <p className="font-mono text-xs text-content-secondary">{c.phone}</p>
-            {c.email && (
-              <p className="truncate text-xs text-content-secondary">{c.email}</p>
-            )}
-            <p className="mt-1 text-xs text-content-secondary">
-              Creado el {fecha(c.createdAt)}
-            </p>
-            {c.archivedAt && (
-              <p className="mt-1 inline-flex items-center gap-1 rounded bg-neutral-100 px-1.5 py-0.5 text-xs text-content-secondary">
-                <Info size={11} aria-hidden="true" /> Archivado
-              </p>
-            )}
-          </div>
-        </div>
-        {seleccionable && (
-          <button
-            type="button"
-            onClick={invertirPrincipal}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-line-default px-2.5 py-1 text-xs text-content-primary transition-colors duration-rapida ease-standard hover:bg-neutral-50"
-          >
-            <ArrowLeftRight size={12} aria-hidden="true" />
-            Cambiar contacto principal
-          </button>
-        )}
-      </div>
-    );
-  }
 
   function pasoElegir() {
     if (candidatos.isLoading)
@@ -635,7 +811,12 @@ export function FusionDeDuplicados({
         </p>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <TarjetaContacto c={v.principal} rol="principal" seleccionable />
+          <TarjetaContacto
+            c={v.principal}
+            rol="principal"
+            seleccionable
+            onInvertir={invertirPrincipal}
+          />
           <TarjetaContacto c={v.duplicado} rol="duplicado" />
         </div>
 
@@ -644,76 +825,6 @@ export function FusionDeDuplicados({
     );
   }
 
-  function FilaDeCampo({
-    campo,
-    personalizado,
-  }: {
-    campo: CampoComparado;
-    personalizado?: boolean;
-  }) {
-    const lado = ladoDe(campo, personalizado);
-    const valorFinal =
-      lado === 'duplicado' ? campo.valorDuplicado : campo.valorPrincipal;
-    const nombreGrupo = `campo-${personalizado ? 'p-' : ''}${campo.campo}`;
-
-    return (
-      <fieldset className="border-t border-line-default py-2.5">
-        <legend className="sr-only">{campo.etiqueta}</legend>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-[9rem_1fr_1fr_1fr] sm:items-center">
-          <span
-            aria-hidden="true"
-            className="text-xs font-medium text-content-secondary"
-          >
-            {campo.etiqueta}
-            {campo.requiereDecision && (
-              <span className="ml-1 text-status-warning-strong">
-                <AlertTriangle
-                  size={11}
-                  aria-hidden="true"
-                  className="inline align-[-1px]"
-                />
-                <span className="sr-only">Requiere decisión</span>
-              </span>
-            )}
-          </span>
-
-          {(['principal', 'duplicado'] as Lado[]).map((cual) => {
-            const valor =
-              cual === 'principal' ? campo.valorPrincipal : campo.valorDuplicado;
-            return (
-              <label key={cual} className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name={nombreGrupo}
-                  checked={lado === cual}
-                  disabled={campo.iguales || valor == null}
-                  onChange={() => elegirCampo(campo.campo, cual, personalizado)}
-                  aria-label={`${campo.etiqueta}: usar «${valor ?? 'sin valor'}» del ${
-                    cual === 'principal' ? 'contacto principal' : 'posible duplicado'
-                  }`}
-                />
-                <span className="truncate text-content-primary">
-                  {valor ?? <span className="text-content-secondary">—</span>}
-                </span>
-              </label>
-            );
-          })}
-
-          <span className="text-sm">
-            <span className="sr-only">Resultado final: </span>
-            <span className="font-medium text-content-primary">
-              {valorFinal ?? '—'}
-            </span>
-            {campo.iguales && (
-              <span className="ml-1.5 text-xs text-status-success-strong">
-                {campo.nota ?? 'Coincide'}
-              </span>
-            )}
-          </span>
-        </div>
-      </fieldset>
-    );
-  }
 
   function bloqueResolver(v: VistaPreviaFusion) {
     return (
@@ -724,10 +835,20 @@ export function FusionDeDuplicados({
           </h4>
           <div className="mt-1">
             {v.campos.map((c) => (
-              <FilaDeCampo key={c.campo} campo={c} />
+              <FilaDeCampo
+                key={c.campo}
+                campo={c}
+                lado={ladoDe(c)}
+                onElegir={(lado) => elegirCampo(c.campo, lado)}
+              />
             ))}
             {v.camposPersonalizados.map((c) => (
-              <FilaDeCampo key={c.campo} campo={c} personalizado />
+              <FilaDeCampo
+                key={c.campo}
+                campo={c}
+                lado={ladoDe(c, true)}
+                onElegir={(lado) => elegirCampo(c.campo, lado, true)}
+              />
             ))}
           </div>
           {v.camposPersonalizados.length === 0 && (
@@ -853,39 +974,6 @@ export function FusionDeDuplicados({
     );
   }
 
-  function ResumenRelaciones({ r }: { r: RecuentoRelaciones }) {
-    const conValor = RELACIONES_VISIBLES.filter((x) => (r[x.clave] ?? 0) > 0);
-    return (
-      <section
-        aria-labelledby="fusion-relaciones"
-        className="rounded-md border border-line-default bg-neutral-50 p-3"
-      >
-        <h4 id="fusion-relaciones" className="text-xs font-semibold text-content-primary">
-          Todo esto se conservará
-        </h4>
-        {conValor.length === 0 ? (
-          <p className="mt-1 text-xs text-content-secondary">
-            El posible duplicado no tiene historial relacionado.
-          </p>
-        ) : (
-          <ul className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-3">
-            {conValor.map((x) => (
-              <li key={x.clave} className="flex justify-between gap-2">
-                <span className="text-content-secondary">{x.etiqueta}</span>
-                <span className="font-mono tabular-nums text-content-primary">
-                  {r[x.clave]}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <p className="mt-2 text-xs text-content-secondary">
-          Las conversaciones no se mezclan por texto: se conservan completas y
-          separadas, con su canal y su fecha.
-        </p>
-      </section>
-    );
-  }
 
   function pasoResultado() {
     if (!resultado) return null;
@@ -1001,7 +1089,7 @@ export function FusionDeDuplicados({
             onClick={
               paso === 'comparar'
                 ? intentarCerrar
-                : () => setPaso(paso === 'resolver' ? 'comparar' : 'resolver')
+                : () => irAPaso(paso === 'resolver' ? 'comparar' : 'resolver')
             }
             className="rounded-md border border-line-default px-3 py-2 text-sm"
           >
@@ -1011,7 +1099,7 @@ export function FusionDeDuplicados({
             <button
               type="button"
               disabled={!vista}
-              onClick={() => setPaso(paso === 'comparar' ? 'resolver' : 'confirmar')}
+              onClick={() => irAPaso(paso === 'comparar' ? 'resolver' : 'confirmar')}
               className="rounded-md bg-brand-primary px-3 py-2 text-sm text-white disabled:opacity-60"
             >
               {paso === 'comparar' ? 'Resolver diferencias' : 'Continuar a confirmación'}

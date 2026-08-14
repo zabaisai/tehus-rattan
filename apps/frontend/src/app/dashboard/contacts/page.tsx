@@ -61,24 +61,93 @@ function ContactsPageContent() {
   // pareja en vez de al listado, y el enlace se puede pegar en un mensaje.
   const router = useRouter();
   const parametros = useSearchParams();
-  const fusionarId = parametros.get("fusionar");
-  const duplicadoId = parametros.get("con");
   const puedeUnirDuplicados = puedeFusionar(rol);
 
-  function abrirFusion(id: string, con?: string | null) {
-    const q = new URLSearchParams(parametros.toString());
-    q.set("fusionar", id);
-    if (con) q.set("con", con);
+  /**
+   * LA SELECCION SE LEE DE LA RUTA Y SE ESCRIBE EN LA RUTA.
+   *
+   * Se guarda ademas en estado porque `router.replace` NO actualiza la barra
+   * de direcciones en esta pantalla —medido en navegador: los manejadores de
+   * React se ejecutan, el paso cambia, y `location.search` se queda igual—,
+   * asi que confiar solo en el router dejaba la interfaz congelada. El estado
+   * manda la pantalla al instante y `history.replaceState` deja la URL en su
+   * sitio para que una recarga o un enlace pegado abran la misma pareja.
+   *
+   * `replaceState` y no `pushState`: cambiar de principal es corregir la
+   * misma decision, no navegar a otro sitio, y llenar el historial obligaria
+   * a pulsar «atras» una vez por cada rectificacion.
+   */
+  const [seleccion, setSeleccion] = useState<{
+    principal: string | null;
+    duplicado: string | null;
+    paso: string | null;
+  }>(() => ({
+    principal: parametros.get("fusionar"),
+    duplicado: parametros.get("con"),
+    paso: parametros.get("paso"),
+  }));
+
+  // LA RUTA MANDA CUANDO CAMBIA POR FUERA: enlace pegado, atras o adelante.
+  //
+  // Se ajusta durante el RENDER y no en un efecto —mismo patron que Tareas—:
+  // un efecto que llama a `setState` provoca un render en cascada y la pareja
+  // aparecia un fotograma tarde. `claveAplicada` hace que ocurra una sola vez
+  // por cambio de URL, de modo que un intercambio no se deshaga solo.
+  const claveDeUrl = `${parametros.get("fusionar") ?? ""}|${parametros.get("con") ?? ""}|${parametros.get("paso") ?? ""}`;
+  const [claveAplicada, setClaveAplicada] = useState(claveDeUrl);
+  if (claveDeUrl !== claveAplicada) {
+    setClaveAplicada(claveDeUrl);
+    const [p, d, pa] = claveDeUrl.split("|");
+    setSeleccion({
+      principal: p || null,
+      duplicado: d || null,
+      paso: pa || null,
+    });
+  }
+
+  const fusionarId = seleccion.principal;
+  const duplicadoId = seleccion.duplicado;
+  const pasoDeFusion = seleccion.paso;
+
+  /**
+   * Escribe la seleccion COMPLETA en la ruta: principal, duplicado y paso.
+   *
+   * Los tres van juntos a proposito. Cuando solo viajaba el duplicado, un
+   * intercambio dejaba `fusionar` con el principal anterior y `con` con ese
+   * mismo id, y la pantalla acababa comparando un contacto consigo mismo.
+   */
+  function escribirRuta(
+    principal: string | null,
+    duplicado: string | null,
+    paso: string | null,
+  ) {
+    setSeleccion({ principal, duplicado, paso });
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search);
+    if (principal) q.set("fusionar", principal);
+    else q.delete("fusionar");
+    if (duplicado) q.set("con", duplicado);
     else q.delete("con");
-    router.replace(`/dashboard/contacts?${q.toString()}`);
+    if (paso) q.set("paso", paso);
+    else q.delete("paso");
+    const cadena = q.toString();
+    window.history.replaceState(
+      null,
+      "",
+      `/dashboard/contacts${cadena ? `?${cadena}` : ""}`,
+    );
+  }
+
+  function abrirFusion(
+    principal: string,
+    duplicado?: string | null,
+    paso?: string | null,
+  ) {
+    escribirRuta(principal, duplicado ?? null, paso ?? null);
   }
 
   function cerrarFusion() {
-    const q = new URLSearchParams(parametros.toString());
-    q.delete("fusionar");
-    q.delete("con");
-    const cadena = q.toString();
-    router.replace(`/dashboard/contacts${cadena ? `?${cadena}` : ""}`);
+    escribirRuta(null, null, null);
   }
 
   // UN ENLACE ANTIGUO A UN CONTACTO ABSORBIDO SE REESCRIBE POR EL CANÓNICO.
@@ -94,10 +163,7 @@ function ContactsPageContent() {
     getCanonico(fusionarId)
       .then((r) => {
         if (!vigente || !r.fueFusionado || r.canonicoId === fusionarId) return;
-        const q = new URLSearchParams(parametros.toString());
-        q.set("fusionar", r.canonicoId);
-        q.delete("con");
-        router.replace(`/dashboard/contacts?${q.toString()}`);
+        escribirRuta(r.canonicoId, null, null);
         setAviso(
           "Ese contacto se había fusionado: te llevamos a la ficha que lo absorbió.",
         );
@@ -106,7 +172,9 @@ function ContactsPageContent() {
     return () => {
       vigente = false;
     };
-  }, [fusionarId, parametros, router]);
+    // Solo depende del id: resolver el canonico otra vez porque cambio
+    // cualquier otra cosa seria una llamada al servidor sin motivo.
+  }, [fusionarId]);
 
   // La eliminación definitiva no es una limpieza de escritorio. El servidor
   // la restringe igualmente; esconder el botón solo evita ofrecer algo que
@@ -439,9 +507,12 @@ function ContactsPageContent() {
           key={`${fusionarId}:${duplicadoId ?? ""}`}
           contactoId={fusionarId}
           duplicadoInicialId={duplicadoId}
+          pasoInicial={pasoDeFusion as never}
           puedeEjecutar={puedeUnirDuplicados}
           onCerrar={cerrarFusion}
-          onCambioDeDuplicado={(id) => abrirFusion(fusionarId, id)}
+          onCambioDeSeleccion={(sel) =>
+            abrirFusion(sel.principalId, sel.duplicadoId, sel.paso)
+          }
           onFusionado={async (canonicoId) => {
             cerrarFusion();
             await refrescar();

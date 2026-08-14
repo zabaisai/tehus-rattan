@@ -369,6 +369,21 @@ describe('Fusión de contactos duplicados (e2e, base real)', () => {
       ).rejects.toMatchObject({ status: 409 });
     });
 
+    it('comparar un contacto consigo mismo se rechaza: no es una comparacion, es un espejo', async () => {
+      // DEFECTO DE CONTRATO destapado por la revision de la interfaz. Al
+      // intercambiar el principal, la pantalla llego a pedir la comparacion
+      // con el MISMO id en los dos extremos y el servidor respondio una vista
+      // previa perfectamente formada: dos tarjetas iguales, «Mismo correo»
+      // como razon de coincidencia y el recuento de relaciones del propio
+      // contacto. La interfaz ya no lo pide, pero el contrato tiene que
+      // rechazarlo igual: cualquier cliente puede construir esa URL.
+      const P = await contacto(empresaA, { name: `${PREFIJO} Espejo` });
+
+      await expect(fusion.comparar(P.id, P.id, empresaA)).rejects.toMatchObject(
+        { status: 400 },
+      );
+    });
+
     it('no se fusiona un contacto consigo mismo', async () => {
       const P = await contacto(empresaA, { name: `${PREFIJO} Eva` });
       await expect(
@@ -870,8 +885,12 @@ describe('Fusión de contactos duplicados (e2e, base real)', () => {
 
       const vista = await fusion.comparar(P.c.id, D.c.id, empresaA);
 
-      expect(vista.relaciones.conversaciones).toBe(1);
-      expect(vista.relaciones.mensajes).toBe(1);
+      // `relaciones` es lo que TENDRA el contacto resultante: la suma de los
+      // dos. `trasladadas`, en el resultado, es lo que se movio de verdad —el
+      // historial del duplicado—. Son dos preguntas distintas y por eso son
+      // dos cifras distintas.
+      expect(vista.relaciones.conversaciones).toBe(2);
+      expect(vista.relaciones.mensajes).toBe(2);
       expect(vista.decisionesPendientes).toBeGreaterThan(0);
       const correo = vista.campos.find((c) => c.campo === 'email');
       expect(correo?.requiereDecision).toBe(true);
@@ -884,9 +903,29 @@ describe('Fusión de contactos duplicados (e2e, base real)', () => {
         elecciones: {},
         versiones: vista.versiones,
       });
-      expect(r.trasladadas.conversaciones).toBe(
-        vista.relaciones.conversaciones,
+      expect(r.trasladadas.conversaciones).toBe(1);
+      expect(vista.relaciones.conversaciones).toBe(
+        r.trasladadas.conversaciones + 1,
       );
+    });
+
+    it('el resumen de lo que se conservara NO depende de quien sea el principal', async () => {
+      // DEFECTO DE CONTRATO destapado por la revision. `relaciones` contaba
+      // solo el historial del DUPLICADO, asi que al intercambiar el principal
+      // el resumen cambiaba de siete filas a una. Pero la etiqueta dice «todo
+      // esto se conservara», y lo que se conserva es la suma de los dos: el
+      // principal no pierde lo suyo por fusionar. El total tiene que ser el
+      // mismo mirado desde cualquiera de los dos lados.
+      const P = await conHistorial(empresaA, { name: `${PREFIJO} Simetria A` });
+      const D = await conHistorial(empresaA, { name: `${PREFIJO} Simetria B` });
+
+      const ab = await fusion.comparar(P.c.id, D.c.id, empresaA);
+      const ba = await fusion.comparar(D.c.id, P.c.id, empresaA);
+
+      expect(ba.relaciones).toEqual(ab.relaciones);
+      // Y es la suma real de los dos, no el historial de uno solo.
+      expect(ab.relaciones.conversaciones).toBe(2);
+      expect(ab.relaciones.mensajes).toBe(2);
     });
 
     it('un teléfono igual en otro formato no cuenta como diferencia', async () => {

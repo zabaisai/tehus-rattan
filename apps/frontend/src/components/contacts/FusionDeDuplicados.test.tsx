@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -138,27 +139,51 @@ function resultadoConVentana(minutos = 9) {
   };
 }
 
+/**
+ * El componente es CONTROLADO: el par de contactos llega por props y vive en
+ * la ruta, no en su estado. Aquí se monta con un padre mínimo que hace lo
+ * mismo que la pantalla real —guardar lo que le avisan y volver a pasarlo—,
+ * porque si nadie responde al aviso el componente se queda quieto, que es
+ * exactamente lo que debe pasar.
+ */
 function montar(props: Partial<Parameters<typeof FusionDeDuplicados>[0]> = {}) {
   const onCerrar = vi.fn();
   const onFusionado = vi.fn();
-  const onCambioDeDuplicado = vi.fn();
+  const onCambioDeSeleccion = vi.fn();
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const utils = render(
-    <QueryClientProvider client={client}>
+
+  function Padre() {
+    const [sel, setSel] = useState<{
+      principalId: string;
+      duplicadoId: string | null;
+    }>({
+      principalId: (props.contactoId as string) ?? 'p1',
+      duplicadoId: (props.duplicadoInicialId as string | null) ?? null,
+    });
+    return (
       <FusionDeDuplicados
-        contactoId="p1"
-        duplicadoInicialId={null}
         puedeEjecutar
         onCerrar={onCerrar}
         onFusionado={onFusionado}
-        onCambioDeDuplicado={onCambioDeDuplicado}
         {...props}
+        contactoId={sel.principalId}
+        duplicadoInicialId={sel.duplicadoId}
+        onCambioDeSeleccion={(s) => {
+          onCambioDeSeleccion(s);
+          setSel({ principalId: s.principalId, duplicadoId: s.duplicadoId });
+        }}
       />
+    );
+  }
+
+  const utils = render(
+    <QueryClientProvider client={client}>
+      <Padre />
     </QueryClientProvider>,
   );
-  return { ...utils, onCerrar, onFusionado, onCambioDeDuplicado };
+  return { ...utils, onCerrar, onFusionado, onCambioDeSeleccion };
 }
 
 beforeEach(() => {
@@ -266,7 +291,7 @@ describe('FusionDeDuplicados — flujo del mockup 22', () => {
 
     it('cambiar el principal invierte la pareja y descarta las decisiones previas', async () => {
       const user = userEvent.setup();
-      const { onCambioDeDuplicado } = montar();
+      const { onCambioDeSeleccion } = montar();
       await irAResolver(user);
 
       // Se decide un campo…
@@ -282,7 +307,12 @@ describe('FusionDeDuplicados — flujo del mockup 22', () => {
         screen.getByRole('button', { name: 'Cambiar contacto principal' }),
       );
 
-      expect(onCambioDeDuplicado).toHaveBeenLastCalledWith('p1');
+      // LOS DOS EXTREMOS EN EL MISMO AVISO: el que era duplicado pasa a
+      // principal y viceversa. Mandar solo uno fue lo que produjo la
+      // comparación de un contacto consigo mismo.
+      expect(onCambioDeSeleccion).toHaveBeenLastCalledWith(
+        expect.objectContaining({ principalId: 'd1', duplicadoId: 'p1' }),
+      );
       await waitFor(() => expect(compararContactos).toHaveBeenCalledWith('d1', 'p1'));
     });
   });
