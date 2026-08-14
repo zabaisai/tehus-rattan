@@ -7,7 +7,7 @@
 ## Última actualización
 
 - Fecha: 14 de agosto de 2026 · America/Bogota
-- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` (**EN REVISIÓN HUMANA**)
+- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` (**EN REVISIÓN HUMANA**)
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
@@ -1044,6 +1044,11 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-14 | 3.y | Backend | no se ejecutó: **no cambió** |
 | 2026-08-14 | 3.y | QA de navegador 1920/1440/1280/1024 con viewport corto | 0 desborde horizontal, 0 desplazamiento del documento, 4 zonas independientes, consola limpia |
 | 2026-08-14 | 3.y | Recorrido funcional en navegador (filtros, enlace profundo, historial, 360) | sin hallazgos |
+| 2026-08-14 | 3.y (2ª ronda) | E2E del perfil ampliado contra PostgreSQL real | **16/16** (8 rojas primero) |
+| 2026-08-14 | 3.y (2ª ronda) | `npx jest` backend completo | **2149/2149** en 131 suites |
+| 2026-08-14 | 3.y (2ª ronda) | `vitest run` (frontend completo) | **794/794** en 77 archivos |
+| 2026-08-14 | 3.y (2ª ronda) | `typecheck` + `lint` + `build` en ambos | sin errores (1 warning previo) |
+| 2026-08-14 | 3.y (2ª ronda) | QA de navegador 1920/1440/1280/1024 | 4 pestañas en 1 fila, ficha abierta por defecto en ≥1280, 0 desborde, consola limpia |
 
 ---
 
@@ -1333,6 +1338,59 @@ y `QA_MERGE_` quedaron intactos.**
 conversaciones, la tarea, las dos conversaciones, la oportunidad y los dos
 contactos, en ese orden. No se limpian antes de la revisión humana.
 
+### Segunda ronda de revisión humana: funcionaba, pero no era el mockup
+
+La revisión encontró que la entrega funcional estaba, y que visualmente todavía
+no alcanzaba los mockups. Seis defectos, con su causa:
+
+| Defecto observado | Causa raíz | Corrección |
+|---|---|---|
+| «Sin leer» caía a una segunda línea | Las pestañas se envolvían a propósito: se había decidido que dos filas eran mejor que un scroll horizontal invisible. Pero el mockup enseña una fila | Las cuatro se reparten el ancho a partes iguales (`flex-1` + `min-w-0`) y se recorta el **relleno**, no el tamaño de letra |
+| La ficha derecha empezaba cerrada | `perfil` era un booleano: no distinguía «cerrada porque la cerré» de «cerrada porque nadie ha decidido». Con un booleano, o no se abre nunca sola o se reabre cada vez que se cierra | Tri-estado en la URL: sin decidir manda el ancho; `perfil=1` y `perfil=0` son decisiones que mandan sobre el ancho |
+| El pie «Ver perfil completo» se superponía | El pie es fijo, pero nada garantizaba que el cuerpo pudiera encoger | Prueba estructural: el pie vive **fuera** del elemento con `overflow-y-auto`, y el cuerpo lleva `min-h-0 flex-1` |
+| El compositor parecía operativo sin integración | La pantalla nunca preguntaba por el estado de la conexión | Se consume el contrato que ya existía (`whatsapp-integrations/me/connection-status`, sin tokens y con el número enmascarado). Sin conexión, el hilo pasa a solo lectura y lo dice |
+| El perfil 360 no enseñaba la oportunidad ni las conversaciones | El **contrato** solo devolvía «la oportunidad abierta» y «la conversación más reciente». Una pestaña «Conversaciones 3» solo se podía escribir inventando el 3 | Se demostró el hueco con **8 pruebas E2E rojas** y se amplió `/contacts/:id/perfil` con `resumen`, `conversaciones`, `oportunidades`, `documentos` y `ultimaInteraccionEn` |
+| Gran zona desperdiciada | La página estaba limitada a `max-w-6xl` y agrupaba todo en dos columnas | Retícula de 12 columnas (3 · 6 · 3 desde `xl`), cuatro métricas accionables y seis pestañas con conteos reales |
+
+**Ampliación del contrato, y por qué es la mínima.** Los conteos se piden a la
+base y no se derivan de las listas: derivarlos daría «Conversaciones 10» en
+cuanto alguien tuviera once. `valorAbierto` suma solo las oportunidades
+**abiertas**. Y los **documentos** del producto son los PDF de cotizaciones
+emitidas —no hay modelo `Document` en el repositorio y un borrador todavía no es
+un documento—, cosa que la pestaña dice en una línea en vez de dejarlo implícito.
+
+### Verificación por ancho, después de la corrección
+
+Medido en navegador real contra el build de producción, `deviceScaleFactor: 1`.
+
+| Ancho | Pestañas del inbox | Ficha por defecto | Desborde horizontal | Scroll del documento | Consola |
+|---|---|---|---|---|---|
+| 1920 | 4 en **1 fila** | columna 320 px | 0 | 0 | limpia |
+| 1440 | 4 en **1 fila** | columna 288 px | 0 | 0 | limpia |
+| 1280 | 4 en **1 fila** | columna 288 px | 0 | 0 | limpia |
+| 1024 | 4 en **1 fila** | **cerrada** (sería cajón) | 0 | 0 | limpia |
+
+Perfil 360 en los cuatro anchos: desborde horizontal **0**, **6 pestañas**, y la
+página ocupa el ancho completo disponible (1024 / 1280 / 1440 / 1920 px de ancho
+usado). A 1024 la retícula colapsa a una columna y la columna derecha baja.
+
+### Datos reales que enseña el perfil 360 de la revisión
+
+Contacto `QA_INBOX_ Marcela Tobón`, todo del contrato, nada inventado:
+
+| Elemento | Valor real |
+|---|---|
+| Responsable | `PREVIEW_BRANDING_Administrador` (del asesor de la oportunidad) |
+| Última interacción | 14 de agosto de 2026, del último mensaje |
+| Valor abierto | **$ 8.400.000**, suma de oportunidades abiertas |
+| Oportunidad activa | «QA_INBOX_ Comedor para terraza» · Negociación · con enlace al embudo exacto |
+| Próxima acción | «QA_INBOX_ Enviar cotización con transporte» · vence 15-ago · Alta |
+| Contexto de conversación | Abierta · asesor real · bot activo · último mensaje |
+| Pestañas | Actividad · Conversaciones **1** · Oportunidades **1** · Tareas **1** · Cotizaciones **0** · Documentos **0** |
+
+Los ceros se enseñan como ceros, con su estado vacío. No hay «calidad de datos
+96 %», «relación activa 82 %» ni «última compra»: esas cifras no existen.
+
 ### Diferencias deliberadas con los mockups 03 y 18
 
 | Mockup | Implementación | Motivo |
@@ -1341,6 +1399,7 @@ contactos, en ese orden. No se limpian antes de la revisión humana.
 | 03: tarjeta de cotización dentro del hilo, «Catálogo», «Respuestas guardadas», emojis y adjuntos en el compositor | No se añaden | Son capacidades de otros incrementos (mockup 19) y de fase 5. Fingirlas daría botones que no hacen nada |
 | 03: «En línea» del contacto | No se enseña | No hay señal de presencia en el producto |
 | 18: «Calidad de datos 96 %», «Relación activa 82 %», «Última compra» | No se enseñan | Esas cifras no existen. Inventarlas es peor que no ponerlas |
+| 18: «Nueva tarea» y «Crear cotización» en el encabezado | No se dibujan | Solo se ofrecen acciones con un flujo real detrás; esos dos viven en sus pantallas y traerlos aquí sería un botón nuevo, no una reutilización |
 | 18: «1 posible duplicado · Revisar y fusionar» | No se enlaza desde aquí | La fusión (3.x) vive en Contactos; duplicarla aquí sería un segundo camino a la misma acción |
 | Teléfono enmascarado según permisos | Se enseña completo a quien ve la conversación | **No existe ninguna regla de permiso que lo distinga**: el contrato de bandeja ya devuelve el teléfono a cualquier usuario de la empresa. Inventar el enmascarado dejaría al asesor sin poder llamar. Se anota como decisión de producto pendiente |
 
