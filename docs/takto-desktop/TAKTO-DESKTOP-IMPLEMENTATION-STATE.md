@@ -7,6 +7,7 @@
 ## Última actualización
 
 - Fecha: 14 de agosto de 2026 · America/Bogota
+- Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` (**EN REVISIÓN HUMANA**)
 - Rama: `feature/takto-brand-ui-integration`
 - HEAD al empezar la fase 0: `3da29143e0ef8b798282f9d19bb0e0cab475139a`
 - HEAD al cerrar el incremento 2.1: `a98229d382d6b1df93278213e1aff1839844d6b6`
@@ -69,7 +70,7 @@
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
-| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados (3.x, mockup 22): HECHO y aprobado el 14-ago-2026 sobre `397dab9`** | Falta el inbox de tres paneles (mockups 03 y 18) |
+| 3. Contactos, conversaciones y perfil 360 | PARCIAL | Listado, papelera, restauración y perfil existen. **Fusión de duplicados (3.x, mockup 22): HECHO y aprobado el 14-ago-2026 sobre `397dab9`** | Inbox de tres paneles y perfil 360 (3.y, mockups 03 y 18): **entregado, EN REVISIÓN HUMANA** |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
@@ -1038,6 +1039,11 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-14 | 3.x | CI sobre `397dab9` | **run `31822358130`** — Backend y Frontend `success` |
 | 2026-08-14 | 3.x | **Revisión humana sobre `397dab9`** | **APROBADO** — ver «Aprobación humana — 14 de agosto de 2026» |
 | 2026-08-14 | 3.x | Estado de la pareja QA tras el segundo Deshacer (`READ ONLY`) | todo restaurado; 0 alias, 0 outbox, auditorías conservadas |
+| 2026-08-14 | 3.y | `vitest run` (frontend completo) | **766/766** en 77 archivos (+79) |
+| 2026-08-14 | 3.y | `typecheck` + `lint` + `build` frontend | sin errores (1 warning previo) |
+| 2026-08-14 | 3.y | Backend | no se ejecutó: **no cambió** |
+| 2026-08-14 | 3.y | QA de navegador 1920/1440/1280/1024 con viewport corto | 0 desborde horizontal, 0 desplazamiento del documento, 4 zonas independientes, consola limpia |
+| 2026-08-14 | 3.y | Recorrido funcional en navegador (filtros, enlace profundo, historial, 360) | sin hallazgos |
 
 ---
 
@@ -1050,7 +1056,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Inicio (mockup 01, incremento 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 13-ago-2026 |
 | Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
 | Contactos |  |  |  |  |  |  | PENDIENTE |
-| Conversaciones |  |  |  |  |  |  | PENDIENTE |
+| Inbox de tres paneles (mockups 03 y 18, 3.y) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **EN REVISIÓN HUMANA** |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
 | TAKTO Pulso |  |  |  |  |  |  | PENDIENTE |
 | Tareas |  |  |  |  |  |  | PENDIENTE |
@@ -1219,15 +1225,145 @@ ejecutarlo **después del último archivo tocado**, incluidos los de prueba.
 
 ---
 
-## Próximo incremento seguro: `3.y — Inbox de tres paneles con perfil colapsable y URL profunda`
+## Incremento 3.y — Inbox de tres paneles con perfil colapsable y URL profunda · **EN REVISIÓN HUMANA**
 
-**Registrado, no iniciado.** Mockups **03** y **18**. Es el tercero de los
-cuatro incrementos que el master sugiere para la fase 3 (§«Fase 3»); los otros
-tres —listado/papelera/restauración, perfil 360 y fusión de duplicados— ya
-están.
+Mockups **03** y **18**. **Entregado de extremo a extremo. Pendiente de
+revisión visual. No cerrar.**
 
-Su diseño y su implementación **no se redactan aquí**: se abren cuando se
-arranque el incremento, con su propio preflight §2.
+**Commits:** `f3dc3c8` (bandeja) · `02f0863` (perfil 360 y ficha) · `53b5e03`
+(archivadas aparte y anchos) · `6dcd6de` (cajón a 1024).
+
+### Auditoría acotada, antes de escribir nada
+
+| Pieza | Estado | Evidencia |
+|---|---|---|
+| Endpoints de bandeja (`inbox`, `inbox/counters`, `:id/messages`, `bulk`, `read/unread`, `pause/resume`, `handoff`) | **HECHO** | `modules/conversations/`. Cubren búsqueda, estado, asignación, no-leídos, `withLead`, canal y paginación `limit/offset` con `hasMore` |
+| `GET /conversations/:id` | **HECHO** | Ya existía; es lo que hace posible el enlace profundo sin API nueva |
+| `GET /contacts/:id/perfil` | **HECHO** | Un contrato para las dos pantallas |
+| `GET /contacts/:id/canonico` | **HECHO** | De 3.x; resuelve enlaces a contactos absorbidos |
+| `ConversationList`, `InboxFilters`, `InboxBulkBar`, `MessageInput`, `ConversationOpportunity` | **PARCIAL** | Existían y se reutilizan; la fila y los filtros se completaron |
+| `MessageThread` | **PARCIAL** | Sin separadores de día ni nombre de los adjuntos |
+| `PerfilComercial` | **PARCIAL** | Completo de contenido; sin pestañas, sin enlace al perfil completo y sin variante de cajón |
+| Perfil 360 (mockup 18) | **FALTANTE** | **No existía `/dashboard/contacts/[id]`**. Por eso «Ver perfil completo» no se podía ofrecer |
+| URL como fuente de verdad | **PARCIAL** | Solo viajaba `?c=`; filtros y ficha vivían en estado de React |
+| Tres paneles y comportamiento por ancho | **FALTANTE** | La ficha se metía dentro del hilo y no había ruptura a 1024 |
+
+**Backend sin tocar.** Cero cambios en `apps/backend`: el contrato ya daba todo
+lo que la pantalla necesita.
+
+### Defectos reales que salieron al escribir las pruebas
+
+| Defecto | Por qué pasaba |
+|---|---|
+| Un enlace profundo a una conversación fuera de la página cargada —archivada, fuera del filtro o más allá de las 30 primeras— mostraba «Selecciona una conversación» | La conversación se buscaba **solo** dentro de la lista ya cargada. Ahora, si no está, se pide suelta con `GET /conversations/:id` |
+| El hilo entero dejaba de renderizarse si `scrollIntoView` no existía | Se llamaba sin comprobar |
+| La pestaña decía «Todas 6» encima de siete filas | `inbox/counters` cuenta solo activas; la lista sin filtro de estado traía también las archivadas. Ahora van bajo «Archivado», como el mockup |
+| A 1280 px el hilo quedaba en 366 px | Lista 304 + ficha 320 + barra lateral 265. Lista a 17rem y ficha a 18rem hasta 2xl: el hilo pasa a 430 px |
+| A 1024 el cajón tapaba el hilo sin telón ni salida evidente | Se añadieron telón (solo por debajo de xl) y Escape |
+
+### Lo que la URL lleva ahora
+
+`?c=` conversación · `?vista=` pestaña · `?q=` búsqueda · `?estado=` estado ·
+`?perfil=1` ficha abierta · `?volverA=` ruta de regreso. El códec son funciones
+puras en `lib/inbox-url.ts`, comprobables sin montar los tres paneles.
+
+Seleccionar y cambiar de pestaña usan `push` —para que Atrás y Adelante
+funcionen—; teclear en la búsqueda y abrir o cerrar la ficha usan `replace`,
+porque una entrada de historial por pulsación deja el botón Atrás inservible.
+
+### Evidencia de pruebas
+
+| Comando/gate | Resultado |
+|---|---|
+| `vitest run` (frontend completo) | **766/766** en 77 archivos (+79) |
+| `npm run typecheck` | sin errores |
+| `npm run lint` | 0 errores (1 warning previo, ajeno) |
+| `npm run build` | compila; aparece la ruta `/dashboard/contacts/[id]` |
+| Backend | **no se ejecutó porque no cambió**: `git status apps/backend` vacío |
+
+Archivos de prueba nuevos: `lib/inbox-url.test.ts` (17),
+`conversations/MessageThread.test.tsx` (14),
+`dashboard/conversations/page.test.tsx` (27),
+`dashboard/contacts/[id]/page.test.tsx` (12), más los añadidos a
+`ConversationList` y `PerfilComercial`.
+
+### QA de navegador (build de producción, `deviceScaleFactor: 1`)
+
+Viewport de **560 px de alto a propósito**, para forzar que los paneles
+desborden y comprobar que cada uno se desplaza por su cuenta.
+
+| Ancho | Desborde horizontal del documento | Desplazamiento del documento | Zonas independientes | Hilo | Ficha | Consola |
+|---|---|---|---|---|---|---|
+| 1920 | 0 | 0 | 4 | 1006 px | columna 320 px | limpia |
+| 1440 | 0 | 0 | 4 | 590 px | columna 288 px | limpia |
+| 1280 | 0 | 0 | 4 | 430 px | columna 288 px | limpia |
+| 1024 | 0 | 0 | 4 | 462 px | **cajón superpuesto** 384 px | limpia |
+
+Las cuatro zonas son barra lateral, lista, hilo y ficha. **El documento nunca
+se desplaza** en ningún ancho, así que no hay segunda barra. Foco visible
+comprobado tabulando: el anillo aparece en los cuatro anchos.
+
+Comprobación funcional a 1440, en navegador real: «Todas» 6 activas más 1
+archivada aparte · «Mías» 1 · «Sin asignar» 5 · «Archivadas» 1 · búsqueda
+«Marcela» 1 · búsqueda sin resultados con mensaje propio · enlace profundo a una
+conversación archivada **con «Mías» activo** abre el hilo · Atrás y Adelante
+restauran la selección · una conversación inexistente da estado seguro · el
+perfil 360 enlaza al hilo exacto y a la oportunidad exacta, y «Volver» regresa a
+`?c=…&vista=mias`. Consola limpia en todo el recorrido.
+
+### Datos QA creados
+
+Prefijo `QA_INBOX_`, solo en la empresa de la vista previa
+(`cmsoy6e7l0008v2fsvfa1xiur`), con teléfonos del rango de pruebas y correos en
+`example.invalid`. Sin integración, sin tokens, sin envíos. **`PREVIEW_BRANDING_`
+y `QA_MERGE_` quedaron intactos.**
+
+| Objeto | Id |
+|---|---|
+| Contacto con oportunidad | `cmstafxee0001v2y8ydl7ehv3` |
+| Contacto de la conversación archivada | `cmstafxfz000fv2y8v43cnpg6` |
+| Oportunidad (etapa Negociación) | `cmstafxen0003v2y8ag5urrn5` |
+| Conversación principal | `cmstafxf00005v2y8wubfxh06` |
+| Conversación archivada | `cmstafxg6000hv2y8clxv5frq` |
+| Mensajes | `cmstafxf80007v2y8r4amv4at`, `cmstafxfh0009v2y87ojuq5ea`, `cmstafxfn000bv2y8ybhp2gp0`, `cmstafxft000dv2y8efqmi3qd` |
+| Mensaje de la archivada | `cmstafxgd000jv2y8bw0wq96o` |
+| Tarea pendiente | `cmstafxgj000lv2y8jx0onkk6` |
+
+**Limpieza futura, por id exacto y solo estos:** borrar los mensajes de las dos
+conversaciones, la tarea, las dos conversaciones, la oportunidad y los dos
+contactos, en ese orden. No se limpian antes de la revisión humana.
+
+### Diferencias deliberadas con los mockups 03 y 18
+
+| Mockup | Implementación | Motivo |
+|---|---|---|
+| 03: «TAKTO Pulso transfirió la conversación a Ana» como evento en el hilo | No se dibuja | En el esquema **no hay mensajes de tipo SYSTEM**. Sin contrato detrás sería decorado; la entrega a una persona tiene su propio endpoint |
+| 03: tarjeta de cotización dentro del hilo, «Catálogo», «Respuestas guardadas», emojis y adjuntos en el compositor | No se añaden | Son capacidades de otros incrementos (mockup 19) y de fase 5. Fingirlas daría botones que no hacen nada |
+| 03: «En línea» del contacto | No se enseña | No hay señal de presencia en el producto |
+| 18: «Calidad de datos 96 %», «Relación activa 82 %», «Última compra» | No se enseñan | Esas cifras no existen. Inventarlas es peor que no ponerlas |
+| 18: «1 posible duplicado · Revisar y fusionar» | No se enlaza desde aquí | La fusión (3.x) vive en Contactos; duplicarla aquí sería un segundo camino a la misma acción |
+| Teléfono enmascarado según permisos | Se enseña completo a quien ve la conversación | **No existe ninguna regla de permiso que lo distinga**: el contrato de bandeja ya devuelve el teléfono a cualquier usuario de la empresa. Inventar el enmascarado dejaría al asesor sin poder llamar. Se anota como decisión de producto pendiente |
+
+### Limitaciones honestas
+
+- **La paginación llega a 100** (`LIMITE_MAXIMO` del backend). Más allá, la
+  pantalla lo dice y pide acotar con filtros en vez de fingir scroll infinito.
+- **La separación de archivadas es de presentación.** El contrato solo filtra
+  por estado exacto, así que una página de 30 puede repartirse entre las dos
+  secciones. Con bandejas grandes conviene un filtro «activas» en el backend.
+- **El compositor sigue siendo el que había.** No se tocó: con la integración de
+  WhatsApp sin token, un envío queda marcado como fallido en la conversación,
+  que es lo que ya hacía y lo que se ve en la vista previa.
+- **La ficha lateral y el perfil 360 comparten contrato pero no diseño.** El 360
+  es más ancho a propósito; si divergen en contenido, el que manda es el
+  contrato.
+
+### Ruta exacta para la revisión
+
+- Bandeja sin selección: `http://localhost:3000/dashboard/conversations`
+- Conversación abierta: `http://localhost:3000/dashboard/conversations?c=cmstafxf00005v2y8wubfxh06`
+- Con la ficha abierta: `http://localhost:3000/dashboard/conversations?c=cmstafxf00005v2y8wubfxh06&perfil=1`
+- Perfil 360: `http://localhost:3000/dashboard/contacts/cmstafxee0001v2y8ydl7ehv3`
 
 ---
 
@@ -1242,9 +1378,15 @@ git rev-parse origin/feature/takto-brand-ui-integration
 # 3.x - Fusion de contactos duplicados (mockup 22): APROBADO el 14-ago-2026
 # sobre 397dab9, CI verde (run 31822358130). Mockup 22 completado.
 #
-# Proximo incremento registrado y NO iniciado:
-#   3.y - Inbox de tres paneles con perfil colapsable y URL profunda
-#   (mockups 03 y 18). Abrirlo exige su propio preflight §2.
+# 3.y - Inbox de tres paneles con perfil colapsable y URL profunda
+# (mockups 03 y 18): ENTREGADO, EN REVISION HUMANA. No cerrarlo hasta que haya
+# veredicto, y no abrir el incremento siguiente.
+#
+# Rutas para revisar 3.y, con los datos QA_INBOX_:
+#   http://localhost:3000/dashboard/conversations
+#   http://localhost:3000/dashboard/conversations?c=cmstafxf00005v2y8wubfxh06
+#   http://localhost:3000/dashboard/conversations?c=cmstafxf00005v2y8wubfxh06&perfil=1
+#   http://localhost:3000/dashboard/contacts/cmstafxee0001v2y8ydl7ehv3
 #
 # Ruta para volver a recorrer el flujo con los datos QA_MERGE_:
 #   http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d&con=cmss4x9af0005v2v0y1jb80ik
