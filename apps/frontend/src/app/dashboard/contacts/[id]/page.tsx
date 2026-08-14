@@ -799,10 +799,13 @@ function Dato({
   mono?: boolean;
 }) {
   return (
-    <div className="flex justify-between gap-3">
+    // Apilado en columna estrecha, en una linea cuando hay sitio. Enfrentar
+    // etiqueta y valor en 210 px parte los valores largos a mitad de palabra:
+    // «PREVIEW_BRANDI / NG_Embudo comercial» no se lee.
+    <div className="flex flex-col gap-0.5 2xl:flex-row 2xl:justify-between 2xl:gap-3">
       <dt className="shrink-0 text-neutral-500">{etiqueta}</dt>
       <dd
-        className={`min-w-0 break-words text-right text-neutral-900 ${
+        className={`min-w-0 break-words text-neutral-900 2xl:text-right ${
           mono ? "font-mono" : ""
         }`}
       >
