@@ -20,6 +20,7 @@ import {
 import { getPerfilComercial, clavePerfil } from "@/lib/perfil";
 import { archiveContact, restoreContact } from "@/lib/contacts";
 import { Badge } from "@/components/ui/Badge";
+import { TextoLargo } from "@/components/ui/TextoLargo";
 import { SugerenciasDeTarea } from "@/components/tasks/SugerenciasDeTarea";
 import { mensajeDeError } from "@/components/ui/ListState";
 import { NOMBRE_PULSO } from "@/lib/producto";
@@ -178,12 +179,12 @@ export function PerfilComercial({
               {perfil.contacto.telefono}
             </p>
             {perfil.contacto.email && (
-              <p className="truncate text-sm text-neutral-500">
-                {perfil.contacto.email}
+              <p className="text-sm text-neutral-500">
+                <TextoLargo valor={perfil.contacto.email} />
               </p>
             )}
             <p className="mt-1 text-xs text-neutral-400">
-              {perfil.empresa.nombre}
+              <TextoLargo valor={perfil.empresa.nombre} />
             </p>
 
             {perfil.contacto.etiquetas.length > 0 && (
@@ -524,7 +525,7 @@ export function PerfilComercial({
           <X size={18} />
         </button>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">{cuerpo}</div>
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">{cuerpo}</div>
 
       {/* Al perfil 360. Va en un pie fijo y no al final del scroll: en la
           ficha estrecha, «ver más» al fondo de una columna larga es un enlace
@@ -569,12 +570,13 @@ function Fila({
   mono?: boolean;
 }) {
   return (
-    <p className="flex justify-between gap-2">
-      <span className="text-neutral-500">{etiqueta}</span>
-      <span
-        className={`text-right text-neutral-900 ${mono ? "font-mono" : ""}`}
-      >
-        {valor}
+    // Etiqueta arriba, valor debajo. Enfrentados en una ficha de 288 px, un
+    // «PREVIEW_BRANDING_Administrador» empujaba el panel y le salia scroll
+    // horizontal propio. Apilados, el valor dispone del ancho entero.
+    <p className="flex flex-col gap-0.5">
+      <span className="text-xs text-neutral-500">{etiqueta}</span>
+      <span className="min-w-0 text-neutral-900">
+        <TextoLargo valor={valor} mono={mono} />
       </span>
     </p>
   );
