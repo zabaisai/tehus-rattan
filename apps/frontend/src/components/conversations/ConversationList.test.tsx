@@ -115,6 +115,129 @@ describe('ConversationList', () => {
     expect(screen.getByText('+573001112233')).toBeInTheDocument();
   });
 
+  describe('la fila del mockup 03', () => {
+    it('el avatar de iniciales acompaña al nombre', () => {
+      render(
+        <ConversationList
+          conversations={[conversacion()]}
+          selectedId={null}
+          onSelect={vi.fn()}
+        />,
+      );
+
+      // Decorativo: el nombre ya está escrito al lado.
+      expect(screen.getByText('AN')).toHaveAttribute('aria-hidden', 'true');
+    });
+
+    it('muestra un extracto del último mensaje', () => {
+      render(
+        <ConversationList
+          conversations={[
+            conversacion({
+              messages: [
+                {
+                  id: 'm1',
+                  body: '¿Me puedes enviar la cotización?',
+                  direction: 'INBOUND',
+                  createdAt: new Date().toISOString(),
+                } as never,
+              ],
+            }),
+          ]}
+          selectedId={null}
+          onSelect={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByText('¿Me puedes enviar la cotización?'),
+      ).toBeInTheDocument();
+    });
+
+    it('sin mensajes lo dice, en vez de dejar la fila coja', () => {
+      render(
+        <ConversationList
+          conversations={[conversacion({ messages: [] })]}
+          selectedId={null}
+          onSelect={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText(/sin mensajes/i)).toBeInTheDocument();
+    });
+
+    it('el canal se nombra en la fila', () => {
+      render(
+        <ConversationList
+          conversations={[conversacion({ channel: 'whatsapp' })]}
+          selectedId={null}
+          onSelect={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText('WhatsApp')).toBeInTheDocument();
+    });
+
+    it('con oportunidad enseña su etapa', () => {
+      render(
+        <ConversationList
+          conversations={[
+            conversacion({
+              lead: {
+                id: 'l1',
+                title: 'Sala Toscana',
+                status: 'OPEN',
+                stage: { id: 's1', name: 'Negociación', color: null },
+              } as never,
+            }),
+          ]}
+          selectedId={null}
+          onSelect={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText('Negociación')).toBeInTheDocument();
+    });
+
+    it('sin oportunidad no inventa una etapa', () => {
+      render(
+        <ConversationList
+          conversations={[conversacion({ lead: null })]}
+          selectedId={null}
+          onSelect={vi.fn()}
+        />,
+      );
+
+      expect(screen.queryByText('Negociación')).toBeNull();
+    });
+
+    it('la conversación abierta se anuncia como la actual', () => {
+      render(
+        <ConversationList
+          conversations={[conversacion()]}
+          selectedId="c1"
+          onSelect={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.getByRole('button', { name: /ana/i }),
+      ).toHaveAttribute('aria-current', 'true');
+    });
+
+    it('la lista es una lista, para que el lector anuncie cuántas hay', () => {
+      render(
+        <ConversationList
+          conversations={[conversacion(), conversacion({ id: 'c2' })]}
+          selectedId={null}
+          onSelect={vi.fn()}
+        />,
+      );
+
+      expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    });
+  });
+
   describe('selección para acciones masivas', () => {
     it('no hay casillas si el llamador no permite seleccionar', () => {
       render(

@@ -2,6 +2,7 @@
 
 import { Search, X } from 'lucide-react';
 import type { ContadoresBandeja, FiltrosBandeja } from '@/lib/conversations';
+import { PESTANAS, pestanaActiva, type CambiosDeBandeja } from '@/lib/inbox-url';
 
 const ESTADOS = [
   { valor: '', etiqueta: 'Todos los estados' },
@@ -24,39 +25,30 @@ const ESTADOS = [
 export function InboxFilters({
   filtros,
   contadores,
+  textoBusqueda,
+  onBuscar,
   onChange,
 }: {
   filtros: FiltrosBandeja;
   contadores?: ContadoresBandeja;
-  onChange: (siguiente: FiltrosBandeja) => void;
+  /**
+   * Lo que hay escrito AHORA en el campo. Se separa de `filtros.search` —que
+   * es lo ya aplicado— porque la búsqueda viaja a la URL con retardo: leer el
+   * valor aplicado haría que el campo pareciera trabado al teclear.
+   */
+  textoBusqueda?: string;
+  onBuscar?: (texto: string) => void;
+  /** Cambios sobre el estado de la URL. La pantalla decide cómo navegar. */
+  onChange: (cambios: CambiosDeBandeja) => void;
 }) {
-  const pestanas = [
-    { clave: 'todas', etiqueta: 'Todas', total: contadores?.total },
-    { clave: 'mias', etiqueta: 'Mías', total: contadores?.mine },
-    { clave: 'libres', etiqueta: 'Sin asignar', total: contadores?.unassigned },
-    { clave: 'sinleer', etiqueta: 'Sin leer', total: contadores?.unread },
-  ] as const;
+  const pestanas = PESTANAS.map((p) => ({
+    ...p,
+    total: contadores?.[p.contador],
+  }));
 
-  const activa = filtros.unread
-    ? 'sinleer'
-    : filtros.assigned === 'me'
-      ? 'mias'
-      : filtros.assigned === 'unassigned'
-        ? 'libres'
-        : 'todas';
-
-  function elegirPestana(clave: (typeof pestanas)[number]['clave']) {
-    // Cada pestaña reemplaza asignación y no-leídos a la vez: dejar restos de
-    // la anterior produce combinaciones que el usuario no pidió y que luego
-    // no sabe deshacer.
-    const base = { ...filtros, assigned: undefined, unread: false };
-    if (clave === 'mias') onChange({ ...base, assigned: 'me' });
-    else if (clave === 'libres') onChange({ ...base, assigned: 'unassigned' });
-    else if (clave === 'sinleer') onChange({ ...base, unread: true });
-    else onChange(base);
-  }
-
-  const hayFiltrosExtra = Boolean(filtros.search || filtros.status);
+  const activa = pestanaActiva(filtros);
+  const valorBusqueda = textoBusqueda ?? filtros.search ?? '';
+  const hayFiltrosExtra = Boolean(valorBusqueda || filtros.status);
 
   return (
     <div className="border-b border-neutral-200 bg-white">
@@ -70,7 +62,8 @@ export function InboxFilters({
         {pestanas.map((p) => (
           <button
             key={p.clave}
-            onClick={() => elegirPestana(p.clave)}
+            type="button"
+            onClick={() => onChange({ pestana: p.clave })}
             aria-current={activa === p.clave ? 'true' : undefined}
             className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
               activa === p.clave
@@ -101,8 +94,12 @@ export function InboxFilters({
             className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-neutral-400"
           />
           <input
-            value={filtros.search ?? ''}
-            onChange={(e) => onChange({ ...filtros, search: e.target.value })}
+            value={valorBusqueda}
+            onChange={(e) =>
+              onBuscar
+                ? onBuscar(e.target.value)
+                : onChange({ search: e.target.value })
+            }
             placeholder="Buscar por nombre o teléfono"
             aria-label="Buscar conversaciones"
             className="w-full rounded-md border border-neutral-300 py-1.5 pl-7 pr-2 text-xs text-neutral-900 outline-none focus:border-neutral-500"
@@ -111,9 +108,7 @@ export function InboxFilters({
 
         <select
           value={filtros.status ?? ''}
-          onChange={(e) =>
-            onChange({ ...filtros, status: e.target.value || undefined })
-          }
+          onChange={(e) => onChange({ status: e.target.value })}
           aria-label="Estado"
           className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs text-neutral-900 outline-none focus:border-neutral-500"
         >
@@ -126,9 +121,11 @@ export function InboxFilters({
 
         {hayFiltrosExtra && (
           <button
-            onClick={() =>
-              onChange({ ...filtros, search: undefined, status: undefined })
-            }
+            type="button"
+            onClick={() => {
+              onBuscar?.('');
+              onChange({ search: '', status: '' });
+            }}
             className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
           >
             <X size={12} />

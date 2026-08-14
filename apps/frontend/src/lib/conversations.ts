@@ -37,6 +37,30 @@ export async function resumeConversation(id: string) {
   return data;
 }
 
+/**
+ * Nombre del canal para una persona.
+ *
+ * En la base viaja en minúsculas (`whatsapp`) porque es lo que manda el
+ * proveedor. Enseñarlo tal cual en la bandeja convierte un dato técnico en
+ * ruido; y escribirlo a mano en cada pantalla acaba dando «Whatsapp» en una y
+ * «WHATSAPP» en otra.
+ */
+export function canalLegible(canal: string | null | undefined): string {
+  const limpio = (canal ?? '').trim();
+  if (!limpio) return 'Sin canal';
+  const conocidos: Record<string, string> = {
+    whatsapp: 'WhatsApp',
+    web: 'Web',
+    instagram: 'Instagram',
+    facebook: 'Facebook',
+    manual: 'Manual',
+  };
+  return (
+    conocidos[limpio.toLowerCase()] ??
+    limpio.charAt(0).toUpperCase() + limpio.slice(1).toLowerCase()
+  );
+}
+
 // ── Bandeja ────────────────────────────────────────────────────
 
 export interface FiltrosBandeja {

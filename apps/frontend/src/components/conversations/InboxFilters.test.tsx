@@ -2,6 +2,20 @@ import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InboxFilters } from './InboxFilters';
+import { aplicarCambios } from '@/lib/inbox-url';
+import type { FiltrosBandeja } from '@/lib/conversations';
+
+/**
+ * El componente ya no emite filtros completos: emite el CAMBIO, y quien navega
+ * lo aplica sobre el estado de la URL. Para que estas pruebas sigan hablando de
+ * comportamiento y no de la forma del objeto, aplican el cambio igual que lo
+ * hace la pantalla y comprueban el resultado.
+ */
+const resultado = (previos: FiltrosBandeja, cambios: unknown) =>
+  aplicarCambios(
+    { filtros: previos, conversacionId: null, perfilAbierto: false },
+    cambios as Parameters<typeof aplicarCambios>[1],
+  ).filtros;
 
 const contadores = { total: 12, mine: 3, unassigned: 4, unread: 5 };
 
@@ -56,9 +70,9 @@ describe('InboxFilters', () => {
 
       await user.click(screen.getByRole('button', { name: /mías/i }));
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ assigned: 'me', unread: false }),
-      );
+      const f = resultado({ unread: true }, onChange.mock.calls[0][0]);
+      expect(f.assigned).toBe('me');
+      expect(f.unread).toBeUndefined();
     });
 
     it('«Sin leer» apaga el filtro de asignación', async () => {
@@ -74,9 +88,9 @@ describe('InboxFilters', () => {
 
       await user.click(screen.getByRole('button', { name: /sin leer/i }));
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ unread: true, assigned: undefined }),
-      );
+      const f = resultado({ assigned: 'me' }, onChange.mock.calls[0][0]);
+      expect(f.unread).toBe(true);
+      expect(f.assigned).toBeUndefined();
     });
 
     it('«Todas» limpia ambos', async () => {
@@ -92,9 +106,12 @@ describe('InboxFilters', () => {
 
       await user.click(screen.getByRole('button', { name: /todas/i }));
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ assigned: undefined, unread: false }),
+      const f = resultado(
+        { assigned: 'me', unread: true },
+        onChange.mock.calls[0][0],
       );
+      expect(f.assigned).toBeUndefined();
+      expect(f.unread).toBeUndefined();
     });
 
     it('conserva la búsqueda al cambiar de pestaña', async () => {
@@ -112,7 +129,9 @@ describe('InboxFilters', () => {
 
       await user.click(screen.getByRole('button', { name: /mías/i }));
 
-      expect(onChange.mock.calls[0][0].search).toBe('Ana');
+      expect(resultado({ search: 'Ana' }, onChange.mock.calls[0][0]).search).toBe(
+        'Ana',
+      );
     });
   });
 
@@ -126,9 +145,7 @@ describe('InboxFilters', () => {
 
       await user.type(screen.getByLabelText(/buscar conversaciones/i), 'A');
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ search: 'A' }),
-      );
+      expect(resultado({}, onChange.mock.calls[0][0]).search).toBe('A');
     });
 
     it('elegir «todos los estados» quita el filtro en vez de mandar vacío', async () => {
@@ -146,9 +163,9 @@ describe('InboxFilters', () => {
 
       await user.selectOptions(screen.getByLabelText('Estado'), '');
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ status: undefined }),
-      );
+      expect(
+        resultado({ status: 'OPEN' }, onChange.mock.calls[0][0]).status,
+      ).toBeUndefined();
     });
 
     it('«Limpiar» solo aparece cuando hay algo que limpiar', () => {
@@ -182,9 +199,12 @@ describe('InboxFilters', () => {
 
       await user.click(screen.getByRole('button', { name: /limpiar/i }));
 
-      expect(onChange).toHaveBeenCalledWith(
-        expect.objectContaining({ search: undefined, assigned: 'me' }),
+      const f = resultado(
+        { search: 'x', assigned: 'me' },
+        onChange.mock.calls[0][0],
       );
+      expect(f.search).toBeUndefined();
+      expect(f.assigned).toBe('me');
     });
   });
 });
