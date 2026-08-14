@@ -300,6 +300,141 @@ describe('Perfil comercial (e2e, base real)', () => {
 
   // ── aislamiento multiempresa ────────────────────────────────────
 
+  /**
+   * EL PERFIL 360 (mockup 18) NECESITA MAS DE LO QUE EL CONTRATO DABA.
+   *
+   * El panel lateral se conforma con «la oportunidad abierta» y «la
+   * conversacion mas reciente». La pantalla completa necesita las LISTAS y los
+   * CONTEOS: cuantas conversaciones hay, cuantas oportunidades, cuanto vale lo
+   * abierto. Sin eso, una pestaña «Conversaciones 3» solo se puede escribir
+   * inventando el 3.
+   */
+  describe('lo que el perfil 360 necesita', () => {
+    it('resume con conteos reales, no con lo que quepa en el panel', async () => {
+      const e = await escenarioCompleto(empresaA, asesorA);
+      const p = await servicio.perfil(e.contacto.id, empresaA);
+
+      expect(p.resumen).toBeDefined();
+      expect(p.resumen.conversaciones).toBeGreaterThanOrEqual(1);
+      expect(p.resumen.oportunidades).toBeGreaterThanOrEqual(1);
+      expect(p.resumen.cotizaciones).toBeGreaterThanOrEqual(1);
+      expect(p.resumen.tareasPendientes).toBeGreaterThanOrEqual(1);
+      expect(typeof p.resumen.valorAbierto).toBe('number');
+    });
+
+    it('el valor abierto suma SOLO las oportunidades abiertas', async () => {
+      const e = await escenarioCompleto(empresaA, asesorA);
+      await prisma.lead.create({
+        data: {
+          companyId: empresaA,
+          contactId: e.contacto.id,
+          pipelineId: e.pipeline.id,
+          stageId: e.etapa.id,
+          title: `${PREFIJO} Ganada`,
+          value: '9000000',
+          status: 'WON',
+        },
+      });
+
+      const p = await servicio.perfil(e.contacto.id, empresaA);
+
+      // La ganada cuenta en la lista, pero no en el valor abierto.
+      expect(p.resumen.oportunidades).toBe(2);
+      expect(p.resumen.valorAbierto).toBe(4500000.5);
+    });
+
+    it('lista las conversaciones con canal y estado, para poder abrir cada una', async () => {
+      const e = await escenarioCompleto(empresaA, asesorA);
+      const p = await servicio.perfil(e.contacto.id, empresaA);
+
+      expect(p.conversaciones.length).toBeGreaterThanOrEqual(1);
+      expect(p.conversaciones[0]).toMatchObject({
+        id: expect.any(String),
+        canal: expect.any(String),
+        estado: expect.any(String),
+      });
+    });
+
+    it('lista TODAS las oportunidades, no solo la abierta', async () => {
+      const e = await escenarioCompleto(empresaA, asesorA);
+      await prisma.lead.create({
+        data: {
+          companyId: empresaA,
+          contactId: e.contacto.id,
+          pipelineId: e.pipeline.id,
+          stageId: e.etapa.id,
+          title: `${PREFIJO} Perdida`,
+          value: '100',
+          status: 'LOST',
+        },
+      });
+
+      const p = await servicio.perfil(e.contacto.id, empresaA);
+
+      expect(p.oportunidades.length).toBe(2);
+      expect(p.oportunidades.map((o) => o.estado).sort()).toEqual([
+        'LOST',
+        'OPEN',
+      ]);
+      expect(p.oportunidades[0].etapa.nombre).toBeTruthy();
+    });
+
+    it('los documentos del producto son los PDF de cotizaciones emitidas', async () => {
+      // No hay modelo `Document` en el repositorio. Un borrador todavia no es
+      // un documento; una cotizacion enviada si tiene PDF.
+      const e = await escenarioCompleto(empresaA, asesorA);
+      const p = await servicio.perfil(e.contacto.id, empresaA);
+
+      expect(Array.isArray(p.documentos)).toBe(true);
+      expect(p.documentos.every((d) => d.estado !== 'DRAFT')).toBe(true);
+      expect(p.resumen.documentos).toBe(p.documentos.length);
+    });
+
+    it('la ultima interaccion sale del ultimo mensaje real', async () => {
+      const e = await escenarioCompleto(empresaA, asesorA);
+      const p = await servicio.perfil(e.contacto.id, empresaA);
+
+      expect(p.ultimaInteraccionEn).toEqual(expect.any(String));
+    });
+
+    it('un contacto sin nada devuelve ceros y listas vacias, no undefined', async () => {
+      const solo = await prisma.contact.create({
+        data: {
+          companyId: empresaA,
+          phone: telefono(),
+          name: `${PREFIJO} Solo`,
+        },
+      });
+
+      const p = await servicio.perfil(solo.id, empresaA);
+
+      expect(p.resumen).toEqual({
+        valorAbierto: 0,
+        conversaciones: 0,
+        oportunidades: 0,
+        tareasPendientes: 0,
+        cotizaciones: 0,
+        documentos: 0,
+      });
+      expect(p.conversaciones).toEqual([]);
+      expect(p.oportunidades).toEqual([]);
+      expect(p.documentos).toEqual([]);
+      expect(p.ultimaInteraccionEn).toBeNull();
+    });
+
+    it('los conteos NO cruzan empresas', async () => {
+      const a = await escenarioCompleto(empresaA, asesorA);
+      const b = await escenarioCompleto(empresaB);
+
+      const pa = await servicio.perfil(a.contacto.id, empresaA);
+      const pb = await servicio.perfil(b.contacto.id, empresaB);
+
+      expect(pa.resumen.conversaciones).toBe(1);
+      expect(pb.resumen.conversaciones).toBe(1);
+      expect(pa.conversaciones[0].id).not.toBe(pb.conversaciones[0].id);
+    });
+  });
+
   it('NO se puede ver el perfil de un contacto de otra empresa', async () => {
     const { contacto } = await escenarioCompleto(empresaA, asesorA);
 

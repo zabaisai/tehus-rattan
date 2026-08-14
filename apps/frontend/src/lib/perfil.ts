@@ -56,6 +56,41 @@ export interface PerfilComercial {
     total: number;
     creadaEn: string;
   }>;
+  /** Conteos reales, contados en la base y no derivados de las listas. */
+  resumen: {
+    valorAbierto: number;
+    conversaciones: number;
+    oportunidades: number;
+    tareasPendientes: number;
+    cotizaciones: number;
+    documentos: number;
+  };
+  conversaciones: Array<{
+    id: string;
+    canal: string;
+    estado: string;
+    pausada: boolean;
+    ultimoMensajeEn: string | null;
+    asesor: { id: string; nombre: string } | null;
+  }>;
+  oportunidades: Array<{
+    id: string;
+    titulo: string;
+    valor: number;
+    estado: string;
+    pipeline: { id: string; nombre: string };
+    etapa: { id: string; nombre: string; color: string | null };
+    asesor: { id: string; nombre: string } | null;
+    actualizadaEn: string;
+  }>;
+  /** Los documentos del producto son los PDF de cotizaciones emitidas. */
+  documentos: Array<{
+    id: string;
+    numero: string;
+    estado: string;
+    creadaEn: string;
+  }>;
+  ultimaInteraccionEn: string | null;
   camposPersonalizados: Array<{
     key: string;
     label: string;

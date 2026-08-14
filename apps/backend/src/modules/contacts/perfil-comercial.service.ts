@@ -64,6 +64,58 @@ export interface PerfilComercial {
     total: number;
     creadaEn: string;
   }>;
+  /**
+   * Conteos REALES de todo lo relacionado.
+   *
+   * El panel lateral se conformaba con la oportunidad abierta y la conversacion
+   * mas reciente. La pantalla de perfil completo necesita las cifras: una
+   * pestaña «Conversaciones 3» solo se puede escribir sabiendo que son tres. Se
+   * cuentan en la base, acotadas por empresa, y no derivando de las listas
+   * recortadas de abajo.
+   */
+  resumen: {
+    /** Suma de las oportunidades ABIERTAS. Lo cerrado ya no esta en juego. */
+    valorAbierto: number;
+    conversaciones: number;
+    oportunidades: number;
+    tareasPendientes: number;
+    cotizaciones: number;
+    documentos: number;
+  };
+  /** Todas las conversaciones del contacto, para poder abrir cada hilo. */
+  conversaciones: Array<{
+    id: string;
+    canal: string;
+    estado: string;
+    pausada: boolean;
+    ultimoMensajeEn: string | null;
+    asesor: { id: string; nombre: string } | null;
+  }>;
+  /** Todas las oportunidades, no solo la abierta: el historial tambien cuenta. */
+  oportunidades: Array<{
+    id: string;
+    titulo: string;
+    valor: number;
+    estado: string;
+    pipeline: { id: string; nombre: string };
+    etapa: { id: string; nombre: string; color: string | null };
+    asesor: { id: string; nombre: string } | null;
+    actualizadaEn: string;
+  }>;
+  /**
+   * Los documentos del producto SON los PDF de cotizaciones emitidas.
+   *
+   * No hay modelo `Document` en el repositorio. Un borrador todavia no es un
+   * documento —no ha salido nada—, asi que solo cuentan las que se emitieron.
+   */
+  documentos: Array<{
+    id: string;
+    numero: string;
+    estado: string;
+    creadaEn: string;
+  }>;
+  /** Fecha del ultimo mensaje, entrante o saliente. Null si nunca hubo. */
+  ultimaInteraccionEn: string | null;
   camposPersonalizados: Array<{
     key: string;
     label: string;
@@ -92,6 +144,13 @@ export interface PerfilComercial {
 }
 
 const LIMITE_ACTIVIDAD = 8;
+/**
+ * Cuantos elementos viajan en cada lista del perfil completo.
+ *
+ * El conteo real va aparte, en `resumen`: la pantalla puede decir «10 de 23»
+ * sin traerse las veintitres.
+ */
+const LIMITE_LISTA = 10;
 
 @Injectable()
 export class PerfilComercialService {
@@ -108,54 +167,114 @@ export class PerfilComercialService {
     // contacto ya esta acotado, pero repetirlo cuesta nada y significa que
     // ninguna de estas consultas puede cruzar empresas si alguien reordena el
     // codigo mas adelante.
-    const [oportunidad, conversacion, tareas, cotizaciones, valores] =
-      await Promise.all([
-        this.prisma.lead.findFirst({
-          where: { contactId, companyId, status: 'OPEN' },
-          orderBy: { updatedAt: 'desc' },
-          include: {
-            pipeline: { select: { id: true, name: true } },
-            stage: { select: { id: true, name: true, color: true } },
-            agent: { select: { id: true, name: true } },
+    const [
+      oportunidad,
+      conversacion,
+      tareas,
+      cotizaciones,
+      valores,
+      conversaciones,
+      oportunidades,
+      conteos,
+      abierto,
+    ] = await Promise.all([
+      this.prisma.lead.findFirst({
+        where: { contactId, companyId, status: 'OPEN' },
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          pipeline: { select: { id: true, name: true } },
+          stage: { select: { id: true, name: true, color: true } },
+          agent: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.conversation.findFirst({
+        where: { contactId, companyId },
+        orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          agent: { select: { id: true, name: true } },
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { body: true, direction: true, createdAt: true },
           },
-        }),
-        this.prisma.conversation.findFirst({
-          where: { contactId, companyId },
-          orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
-          include: {
-            agent: { select: { id: true, name: true } },
-            messages: {
-              orderBy: { createdAt: 'desc' },
-              take: 1,
-              select: { body: true, direction: true, createdAt: true },
-            },
-          },
-        }),
-        this.prisma.task.findMany({
+        },
+      }),
+      this.prisma.task.findMany({
+        where: { contactId, companyId, status: 'PENDING' },
+        orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
+        take: LIMITE_LISTA,
+        select: { id: true, title: true, dueDate: true, priority: true },
+      }),
+      this.prisma.quote.findMany({
+        where: { companyId, lead: { contactId } },
+        orderBy: { createdAt: 'desc' },
+        take: LIMITE_LISTA,
+        select: {
+          id: true,
+          number: true,
+          status: true,
+          total: true,
+          createdAt: true,
+        },
+      }),
+      this.prisma.customFieldValue.findMany({
+        where: { contactId, companyId },
+        include: {
+          definition: { select: { key: true, label: true, type: true } },
+        },
+      }),
+      // Las LISTAS del perfil completo. Acotadas igual que todo lo demas.
+      this.prisma.conversation.findMany({
+        where: { contactId, companyId },
+        orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
+        take: LIMITE_LISTA,
+        select: {
+          id: true,
+          channel: true,
+          status: true,
+          isPaused: true,
+          lastMessageAt: true,
+          agent: { select: { id: true, name: true } },
+        },
+      }),
+      this.prisma.lead.findMany({
+        where: { contactId, companyId },
+        orderBy: { updatedAt: 'desc' },
+        take: LIMITE_LISTA,
+        include: {
+          pipeline: { select: { id: true, name: true } },
+          stage: { select: { id: true, name: true, color: true } },
+          agent: { select: { id: true, name: true } },
+        },
+      }),
+      // Los CONTEOS se piden a la base. Derivarlos de las listas de arriba
+      // daria «Conversaciones 10» en cuanto alguien tuviera once.
+      Promise.all([
+        this.prisma.conversation.count({ where: { contactId, companyId } }),
+        this.prisma.lead.count({ where: { contactId, companyId } }),
+        this.prisma.task.count({
           where: { contactId, companyId, status: 'PENDING' },
-          orderBy: [{ dueDate: 'asc' }, { createdAt: 'asc' }],
-          take: 5,
-          select: { id: true, title: true, dueDate: true, priority: true },
         }),
-        this.prisma.quote.findMany({
+        this.prisma.quote.count({
           where: { companyId, lead: { contactId } },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          select: {
-            id: true,
-            number: true,
-            status: true,
-            total: true,
-            createdAt: true,
-          },
         }),
-        this.prisma.customFieldValue.findMany({
-          where: { contactId, companyId },
-          include: {
-            definition: { select: { key: true, label: true, type: true } },
-          },
+        this.prisma.quote.count({
+          where: { companyId, lead: { contactId }, status: { not: 'DRAFT' } },
         }),
-      ]);
+      ]),
+      this.prisma.lead.aggregate({
+        where: { contactId, companyId, status: 'OPEN' },
+        _sum: { value: true },
+      }),
+    ]);
+
+    const [
+      nConversaciones,
+      nOportunidades,
+      nTareasPendientes,
+      nCotizaciones,
+      nDocumentos,
+    ] = conteos;
 
     const actividad = await this.actividad(
       contactId,
@@ -239,6 +358,46 @@ export class PerfilComercialService {
         total: aNumeroParaMostrar(c.total),
         creadaEn: c.createdAt.toISOString(),
       })),
+      resumen: {
+        valorAbierto: aNumeroParaMostrar(abierto._sum.value ?? 0),
+        conversaciones: nConversaciones,
+        oportunidades: nOportunidades,
+        tareasPendientes: nTareasPendientes,
+        cotizaciones: nCotizaciones,
+        documentos: nDocumentos,
+      },
+      conversaciones: conversaciones.map((c) => ({
+        id: c.id,
+        canal: c.channel,
+        estado: c.status,
+        pausada: c.isPaused,
+        ultimoMensajeEn: c.lastMessageAt?.toISOString() ?? null,
+        asesor: c.agent ? { id: c.agent.id, nombre: c.agent.name } : null,
+      })),
+      oportunidades: oportunidades.map((o) => ({
+        id: o.id,
+        titulo: o.title,
+        valor: aNumeroParaMostrar(o.value),
+        estado: o.status,
+        pipeline: { id: o.pipeline.id, nombre: o.pipeline.name },
+        etapa: {
+          id: o.stage.id,
+          nombre: o.stage.name,
+          color: o.stage.color,
+        },
+        asesor: o.agent ? { id: o.agent.id, nombre: o.agent.name } : null,
+        actualizadaEn: o.updatedAt.toISOString(),
+      })),
+      documentos: cotizaciones
+        .filter((c) => c.status !== 'DRAFT')
+        .map((c) => ({
+          id: c.id,
+          numero: c.number,
+          estado: c.status,
+          creadaEn: c.createdAt.toISOString(),
+        })),
+      ultimaInteraccionEn:
+        conversacion?.messages[0]?.createdAt.toISOString() ?? null,
       camposPersonalizados: valores.map((v) => ({
         key: v.definition.key,
         label: v.definition.label,
