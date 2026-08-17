@@ -1,6 +1,58 @@
 import api from "./axios";
 import { Contact, ImpactoDeContacto } from "@/types";
 
+/** Una fila del listado de Contactos, ya resuelta por el servidor. */
+export interface ContactoDeListado {
+  id: string;
+  nombre: string | null;
+  telefono: string;
+  email: string | null;
+  etiquetas: string[];
+  bloqueado: boolean;
+  anonimizado: boolean;
+  creadoEn: string;
+  archivadoEn: string | null;
+  motivoDeArchivo: string | null;
+  asesor: { id: string; nombre: string } | null;
+  etapa: { id: string; nombre: string; color: string | null } | null;
+  conversacionId: string | null;
+  ultimaInteraccionEn: string | null;
+  tareasPendientes: number;
+}
+
+export interface ListadoDeContactos {
+  items: ContactoDeListado[];
+  total: number;
+  contadores: { activos: number; archivados: number };
+}
+
+/**
+ * El listado de la PANTALLA de contactos: una llamada, todo resuelto.
+ *
+ * Distinto de `getContacts`, que se queda como está para los selectores de
+ * Tareas, Oportunidades y Fusión. Aquí la búsqueda y la paginación las hace
+ * el SERVIDOR: filtrar en el navegador solo encuentra dentro de lo que ya se
+ * había descargado, que es exactamente el defecto que esto corrige.
+ */
+export async function getListadoDeContactos(opciones: {
+  vista: "activos" | "papelera";
+  search?: string;
+  limit: number;
+  offset: number;
+}): Promise<ListadoDeContactos> {
+  const params = new URLSearchParams({
+    vista: opciones.vista,
+    limit: String(opciones.limit),
+    offset: String(opciones.offset),
+  });
+  if (opciones.search?.trim()) params.set("search", opciones.search.trim());
+
+  const { data } = await api.get<ListadoDeContactos>(
+    `/contacts/listado?${params.toString()}`,
+  );
+  return data;
+}
+
 /**
  * Los contactos ACTIVOS. Sin parámetros a propósito: se pasa tal cual como
  * `queryFn` en varias pantallas, y react-query invoca su `queryFn` con un
