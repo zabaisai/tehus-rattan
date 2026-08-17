@@ -1835,13 +1835,25 @@ Lo que **no** se pudo comprobar: el log del job. Descargarlo por API exige
 permisos de administración del repositorio (`403 Must have admin rights`), y
 las anotaciones públicas solo dicen `Process completed with exit code 1`.
 
-**Conclusión honesta:** todo apunta a una inestabilidad del entorno del CI
-—el propio `ci.yml` documenta que estas E2E dependen de un Redis y un
-PostgreSQL de servicio, y que su ausencia se manifestaba como 47 tests rojos
-sin parecerse a la causa—, pero **no está demostrado**, y no se declara verde
-lo que salió rojo. Si el CI del SHA siguiente vuelve a caer en el mismo paso,
-deja de ser una sospecha razonable y hay que investigarlo con el log delante,
-que es algo que sí puede hacer quien tenga acceso al repositorio.
+**Resuelto en el SHA siguiente.** El criterio que se dejó escrito era: si el CI
+del siguiente SHA vuelve a caer en el mismo paso, hay un problema real. **No
+cayó.** El CI de `9a49bab` —commit de solo documentación, con el backend otra
+vez byte a byte idéntico— salió **Frontend y Backend `success`, incluido el
+paso E2E** (run `32045401228`).
+
+Con eso, el rojo de `1769e0f` queda caracterizado como **inestabilidad del
+entorno del CI**, no como regresión: mismo código, tres ejecuciones, dos verdes
+y una roja. El propio `ci.yml` documenta que estas E2E dependen de un Redis y
+un PostgreSQL de servicio y que su ausencia se manifestaba como decenas de
+tests rojos sin parecerse a la causa.
+
+**Queda como deuda observacional, no bloqueante:** no se pudo leer el log
+(`403 Must have admin rights`), así que la causa exacta de esa ejecución sigue
+sin conocerse. Si vuelve a aparecer, conviene mirarlo con el log delante.
+
+> El CI de **este** cierre documental se lee del historial de la rama, por la
+> misma razón que el resto: anotarlo antes de publicar es el error que corrigió
+> la nota de «Última actualización».
 
 ### Rutas exactas para la revisión
 
