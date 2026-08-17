@@ -75,6 +75,25 @@ export interface PropsBoton
   size?: TamanoBoton;
 }
 
+/**
+ * Las clases de un botón, para lo que NO es un `<button>`.
+ *
+ * Existe porque «Abrir chat» navega: es un enlace, y convertirlo en botón con
+ * un `router.push` le quitaría a quien lo usa el clic central, el «abrir en
+ * pestaña nueva» y el menú contextual del navegador. La alternativa era
+ * copiar la cadena de clases en cada sitio, que es como el foco acabó siendo
+ * distinto en tres pantallas antes de que existieran estas primitivas.
+ *
+ * Devuelve clases, no un componente: quien lo use pone el elemento correcto.
+ */
+export function clasesDeBoton(
+  variant: VarianteBoton = 'primary',
+  size: TamanoBoton = 'md',
+  extra = '',
+): string {
+  return `${BASE} ${VARIANTES[variant]} ${TAMANOS[size]} ${extra}`;
+}
+
 export const Button = forwardRef<HTMLButtonElement, PropsBoton>(
   function Button(
     { variant = 'primary', size = 'md', className = '', type, ...resto },
