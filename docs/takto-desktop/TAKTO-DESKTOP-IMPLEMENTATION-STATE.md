@@ -1086,7 +1086,12 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-17 | 3.z | Datos QA en `READ ONLY` antes y después | `PREVIEW_BRANDING_` 5, `QA_MERGE_` 2, `QA_INBOX_` 2, 11 empresas, outbox 0, 0 restos E2E |
 | 2026-08-17 | 3.z | CI sobre `77c51d9` | **run `32043183678`** — Backend y Frontend `success` |
 | 2026-08-17 | 3.z | QA de navegador 1920/1440/1280/1024 | **NO EJECUTADA** — la pantalla exige sesión y no hay credenciales disponibles |
-| 2026-08-17 | 3.z | **Revisión humana** | **PENDIENTE** |
+| 2026-08-17 | 3.z (2ª ronda) | **Revisión humana sobre `cb6f046`** | **DEFECTO**: icono sin explicación en la papelera que resultó ser la eliminación definitiva |
+| 2026-08-17 | 3.z (2ª ronda) | `vitest run` (frontend completo) | **877/877** en 82 archivos (+26) |
+| 2026-08-17 | 3.z (2ª ronda) | frontend `typecheck` + `lint` + `build` | sin errores (1 aviso previo ajeno) |
+| 2026-08-17 | 3.z (2ª ronda) | Regresión backend, sin haberlo tocado | 70/70 e2e de contactos · 51/51 unitarias del módulo · **904/904 e2e completas** |
+| 2026-08-17 | 3.z (2ª ronda) | CI sobre `1769e0f` | ⚠️ **Backend `failure` en el paso E2E** con el backend **byte a byte idéntico** al de `cb6f046`, que estaba verde. Ver «Un CI rojo que no reproduce» |
+| 2026-08-17 | 3.z | **Revisión humana final** | **PENDIENTE** |
 
 ---
 
@@ -1749,6 +1754,94 @@ que es exactamente lo que exige la regla de no borrar auditorías.
 - **`getContacts` sigue existiendo** y lo usan Tareas, Oportunidades y el
   selector de la fusión. No se unificó a propósito: son preguntas distintas y
   unificarlas habría cambiado tres pantallas ajenas a este incremento.
+
+### Segunda ronda de revisión humana: un icono que no decía nada
+
+**Hallazgo, en `?vista=papelera`:** a la derecha de «Restaurar» aparecía un
+icono pequeño de papelera que al pasar el cursor no mostraba texto ni tooltip.
+No se pulsó.
+
+**Eran dos problemas, y el grave no era el tooltip.**
+
+1. **Ese icono ejecutaba la ELIMINACIÓN DEFINITIVA**
+   (`DELETE /contacts/:id/definitivo`): irreversible, solo ADMIN y con frase
+   exacta de confirmación. Está **explícitamente fuera del alcance aprobado de
+   3.z**, que cubre archivar y restaurar. Venía heredado de la pantalla
+   anterior y no se retiró al reescribirla — un descuido de la primera entrega
+   de este mismo incremento, no una deuda antigua. Un borrado irreversible
+   detrás de un icono de 15 px sin texto es exactamente lo que no puede pasar.
+2. **`title` no sirve para explicar un icono**, y esta revisión lo demostró:
+   tarda alrededor de un segundo, **no aparece nunca al llegar por teclado**,
+   lo pinta el sistema operativo y no se puede medir con el arnés de QA.
+
+**Qué se hizo, y qué NO.** Se retiró de la interfaz el camino a la eliminación
+definitiva. **El backend no se tocó**: el endpoint, sus permisos, su auditoría
+y sus e2e siguen igual, y `EliminarContactoDialog` se queda en el repositorio
+para el incremento que sea dueño de esa capacidad. **La acción no se ejecutó
+con ningún dato.**
+
+**Primitiva `Tooltip`, y por qué ahora sí.** `TAKTO-BRANDING-ESTADO-2026-08-11`
+§11 dejó constancia de que `Tooltip` **no se creaba a propósito**, porque la QA
+de entonces no encontró ni tres implementaciones repetidas ni un defecto que lo
+justificara. Esta es la demanda que faltaba. Es mínima y sin librerías nuevas:
+cubre ratón **y** foco, describe con `aria-describedby` sin robarle el nombre
+accesible al botón, se cierra con Escape sin mover el foco, y escucha los
+eventos en el envoltorio para que un control inerte también pueda explicarse.
+
+Se posiciona con `position: fixed` desde el rectángulo del disparador. Un
+`absolute` dentro de la fila quedaría **recortado**: la tabla vive en un
+contenedor con `overflow-x: auto`, y en CSS eso convierte el otro eje en `auto`
+también. Es la misma trampa que costó una ronda entera en 2.3.
+
+**Revisión de todos los controles de solo icono:**
+
+| Control | Antes | Ahora |
+|---|---|---|
+| Editar | `title="Editar"` | Nombre con el contacto dentro, explicación al hover y al foco, anillo de foco |
+| Fusionar duplicado | `title="Fusionar duplicado"` | Ídem |
+| Archivar | `title="Archivar"` | Ídem |
+| Eliminar definitivamente | icono de papelera, sin explicación | **retirado de 3.z** |
+| Restaurar (anonimizado) | **se ocultaba** | Se enseña deshabilitado con su motivo |
+
+**`Restaurar` de un contacto anonimizado pasa de ocultarse a verse
+deshabilitado.** Una fila sin ningún control no distingue «no tienes permiso»
+de «no se puede» ni de «está rota»: tres respuestas para la misma pantalla en
+blanco. Va con `aria-disabled` y no con `disabled` porque un botón
+deshabilitado de verdad sale del orden de tabulación, y entonces quien navega
+con teclado nunca llegaría al motivo — justo el caso en el que más falta hace.
+
+Los iconos **mantienen su tamaño**: el mockup 02 los pone discretos al final de
+la fila, y convertirlos en botones con texto habría cambiado la estructura.
+
+**Pruebas, rojas primero:** 8 de la primitiva, 17 de la tabla
+(`ContactosTabla.test.tsx`, nuevo) y 1 de pantalla que reproduce el defecto con
+rol ADMIN. Frontend **877/877** en 82 archivos (+26). Backend sin cambios; se
+ejecutaron igualmente sus regresiones: 70/70 e2e de contactos, 51/51 unitarias
+del módulo y **904/904 e2e completas**.
+
+### Un CI rojo que no reproduce, y lo que se sabe de él
+
+El CI de `1769e0f` salió **Frontend `success` / Backend `failure`**, y el paso
+que cayó fue **E2E**. Lo que se puede afirmar con evidencia:
+
+- El commit **no toca `apps/backend`**: `git diff --name-only cb6f046 1769e0f`
+  devuelve seis archivos, los seis bajo `apps/frontend/`.
+- El backend es por tanto **byte a byte el mismo** que el de `cb6f046`, cuyo CI
+  fue **verde** (run `32043468854`).
+- En local, la suite completa pasa **904/904 en 62 suites**, ejecutada dos
+  veces con `--runInBand` y `QUEUE_ENABLED=false`, que es lo que hace el CI.
+
+Lo que **no** se pudo comprobar: el log del job. Descargarlo por API exige
+permisos de administración del repositorio (`403 Must have admin rights`), y
+las anotaciones públicas solo dicen `Process completed with exit code 1`.
+
+**Conclusión honesta:** todo apunta a una inestabilidad del entorno del CI
+—el propio `ci.yml` documenta que estas E2E dependen de un Redis y un
+PostgreSQL de servicio, y que su ausencia se manifestaba como 47 tests rojos
+sin parecerse a la causa—, pero **no está demostrado**, y no se declara verde
+lo que salió rojo. Si el CI del SHA siguiente vuelve a caer en el mismo paso,
+deja de ser una sospecha razonable y hay que investigarlo con el log delante,
+que es algo que sí puede hacer quien tenga acceso al repositorio.
 
 ### Rutas exactas para la revisión
 
