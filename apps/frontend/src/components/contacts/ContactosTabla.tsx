@@ -8,13 +8,14 @@ import {
   Merge,
   MessageCircle,
   Pencil,
-  Trash2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { ContactoDeListado } from "@/lib/contacts";
 import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { Button, clasesDeBoton } from "@/components/ui/Button";
 import { TextoLargo } from "@/components/ui/TextoLargo";
+import { Tooltip } from "@/components/ui/Tooltip";
 import { antiguedadEnPalabras, timeAgo } from "@/lib/tiempo";
 
 /**
@@ -60,21 +61,54 @@ export interface AccionesDeFila {
   onRestaurar: (c: ContactoDeListado) => void;
   onEditar: (c: ContactoDeListado) => void;
   onFusionar: (c: ContactoDeListado) => void;
-  onEliminarDefinitivo: (c: ContactoDeListado) => void;
+}
+
+/**
+ * Un control de solo icono, explicado.
+ *
+ * Mismo tamaño que antes —el mockup 02 pone iconos discretos al final de la
+ * fila, no botones con texto— pero ahora con nombre accesible, explicación al
+ * ratón Y al foco de teclado, y anillo de foco visible.
+ *
+ * Sin `title`: era exactamente el defecto. Tarda un segundo, nunca aparece al
+ * tabular y lo pinta el sistema operativo.
+ */
+function BotonDeIcono({
+  icono: Icono,
+  nombre,
+  explicacion,
+  onClick,
+}: {
+  icono: LucideIcon;
+  /** El nombre accesible, con el contacto dentro: nunca «Editar» a secas. */
+  nombre: string;
+  explicacion: string;
+  onClick: () => void;
+}) {
+  return (
+    <Tooltip texto={explicacion}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={nombre}
+        className="rounded p-1.5 text-content-disabled outline-none hover:bg-surface-subtle hover:text-content-primary focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1"
+      >
+        <Icono size={15} aria-hidden="true" />
+      </button>
+    </Tooltip>
+  );
 }
 
 export function ContactosTabla({
   contactos,
   enPapelera,
   puedeFusionar,
-  puedeEliminarDefinitivo,
   rutaDeRegreso,
   acciones,
 }: {
   contactos: ContactoDeListado[];
   enPapelera: boolean;
   puedeFusionar: boolean;
-  puedeEliminarDefinitivo: boolean;
   /** Dónde vuelve el perfil 360. Es la lista tal y como se está viendo. */
   rutaDeRegreso: string;
   acciones: AccionesDeFila;
@@ -273,29 +307,43 @@ export function ContactosTabla({
               <td className="px-4 py-2.5">
                 <div className="flex items-center justify-end gap-1">
                   {enPapelera ? (
-                    <>
-                      {!c.anonimizado && (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => acciones.onRestaurar(c)}
-                        >
-                          <ArchiveRestore size={14} aria-hidden="true" />
-                          Restaurar
-                        </Button>
-                      )}
-                      {puedeEliminarDefinitivo && !c.anonimizado && (
-                        <button
-                          type="button"
-                          onClick={() => acciones.onEliminarDefinitivo(c)}
-                          aria-label={`Eliminar definitivamente a ${nombreDe(c)}`}
-                          title="Eliminar definitivamente"
-                          className="rounded p-1.5 text-content-disabled hover:bg-status-error-surface hover:text-status-error"
-                        >
-                          <Trash2 size={15} aria-hidden="true" />
-                        </button>
-                      )}
-                    </>
+                    // En la papelera solo se RESTAURA. La eliminación
+                    // definitiva existe en el backend pero no se ofrece aquí:
+                    // el alcance aprobado de este incremento es archivar y
+                    // restaurar, y un borrado irreversible detrás de un icono
+                    // de 15 px no es algo que se descubra por accidente.
+                    <Tooltip
+                      texto={
+                        c.anonimizado
+                          ? "Un contacto anonimizado ya no conserva datos personales, así que no se puede devolver a la lista de activos."
+                          : `Devuelve a ${nombreDe(c)} a la lista de contactos activos.`
+                      }
+                    >
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        // `aria-disabled` y no `disabled`: un botón
+                        // deshabilitado de verdad sale del orden de
+                        // tabulación, y entonces quien navega con teclado no
+                        // llega nunca al motivo. Ocultarlo era peor todavía:
+                        // una fila sin ningún control no dice si falta un
+                        // permiso, si está rota o si es que no se puede.
+                        aria-disabled={c.anonimizado || undefined}
+                        aria-label={`Restaurar a ${nombreDe(c)}`}
+                        onClick={() => {
+                          if (c.anonimizado) return;
+                          acciones.onRestaurar(c);
+                        }}
+                        className={
+                          c.anonimizado
+                            ? "cursor-not-allowed opacity-50"
+                            : undefined
+                        }
+                      >
+                        <ArchiveRestore size={14} aria-hidden="true" />
+                        Restaurar
+                      </Button>
+                    </Tooltip>
                   ) : (
                     <>
                       {c.conversacionId ? (
@@ -316,35 +364,26 @@ export function ContactosTabla({
                           Sin conversación
                         </span>
                       )}
-                      <button
-                        type="button"
+                      <BotonDeIcono
+                        icono={Pencil}
+                        nombre={`Editar a ${nombreDe(c)}`}
+                        explicacion="Editar nombre y correo del contacto."
                         onClick={() => acciones.onEditar(c)}
-                        aria-label={`Editar a ${nombreDe(c)}`}
-                        title="Editar"
-                        className="rounded p-1.5 text-content-disabled hover:bg-surface-subtle hover:text-content-primary"
-                      >
-                        <Pencil size={15} aria-hidden="true" />
-                      </button>
+                      />
                       {puedeFusionar && (
-                        <button
-                          type="button"
+                        <BotonDeIcono
+                          icono={Merge}
+                          nombre={`Fusionar duplicado de ${nombreDe(c)}`}
+                          explicacion="Unir este contacto con otro duplicado, decidiendo campo por campo."
                           onClick={() => acciones.onFusionar(c)}
-                          aria-label={`Fusionar duplicado de ${nombreDe(c)}`}
-                          title="Fusionar duplicado"
-                          className="rounded p-1.5 text-content-disabled hover:bg-surface-subtle hover:text-content-primary"
-                        >
-                          <Merge size={15} aria-hidden="true" />
-                        </button>
+                        />
                       )}
-                      <button
-                        type="button"
+                      <BotonDeIcono
+                        icono={Archive}
+                        nombre={`Archivar a ${nombreDe(c)}`}
+                        explicacion="Archivar: sale de la lista de activos y pasa a la papelera. Su historial se conserva."
                         onClick={() => acciones.onArchivar(c)}
-                        aria-label={`Archivar a ${nombreDe(c)}`}
-                        title="Archivar"
-                        className="rounded p-1.5 text-content-disabled hover:bg-surface-subtle hover:text-content-primary"
-                      >
-                        <Archive size={15} aria-hidden="true" />
-                      </button>
+                      />
                     </>
                   )}
                 </div>

@@ -14,7 +14,7 @@ import {
 } from "@/lib/contacts";
 import { Contact } from "@/types";
 import { ContactModal } from "@/components/contacts/ContactModal";
-import { EliminarContactoDialog } from "@/components/contacts/EliminarContactoDialog";
+
 import { FusionDeDuplicados } from "@/components/contacts/FusionDeDuplicados";
 import { ContactosTabla } from "@/components/contacts/ContactosTabla";
 import { Button } from "@/components/ui/Button";
@@ -51,10 +51,16 @@ function ContactsPageContent() {
   );
   const enPapelera = estado.vista === "papelera";
   const puedeUnirDuplicados = puedeFusionar(rol);
-  // La eliminación definitiva no es una limpieza de escritorio. El servidor
-  // la restringe igualmente; esconder el botón solo evita ofrecer algo que
-  // acabaría en un 403.
-  const puedeEliminarDefinitivo = rol === "ADMIN" || rol === "SUPER_ADMIN";
+
+  // LA ELIMINACIÓN DEFINITIVA NO SE OFRECE DESDE AQUÍ.
+  //
+  // El endpoint existe (`DELETE /contacts/:id/definitivo`, solo ADMIN y con
+  // frase exacta de confirmación) y `EliminarContactoDialog` sigue en el
+  // repositorio, pero esta pantalla no lleva a ellos: el alcance aprobado de
+  // 3.z es archivar y restaurar. Estaba heredado de la pantalla anterior y se
+  // coló al reescribirla; la revisión humana lo encontró como un icono de
+  // papelera de 15 px, sin texto, junto a «Restaurar». Un borrado
+  // irreversible no puede ser algo que se descubra pulsando.
 
   /**
    * Navegación de SOLO query, con la History API del navegador.
@@ -113,7 +119,6 @@ function ContactsPageContent() {
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [aEliminar, setAEliminar] = useState<ContactoDeListado | null>(null);
   const [aArchivar, setAArchivar] = useState<ContactoDeListado | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
@@ -386,7 +391,6 @@ function ContactsPageContent() {
                 contactos={contactos}
                 enPapelera={enPapelera}
                 puedeFusionar={puedeUnirDuplicados}
-                puedeEliminarDefinitivo={puedeEliminarDefinitivo}
                 rutaDeRegreso={rutaActual}
                 acciones={{
                   onArchivar: setAArchivar,
@@ -409,7 +413,6 @@ function ContactsPageContent() {
                     setModalOpen(true);
                   },
                   onFusionar: (c) => escribirFusion(c.id, null, null),
-                  onEliminarDefinitivo: setAEliminar,
                 }}
               />
 
@@ -531,34 +534,6 @@ function ContactsPageContent() {
         />
       )}
 
-      {aEliminar && (
-        <EliminarContactoDialog
-          contact={
-            {
-              id: aEliminar.id,
-              name: aEliminar.nombre,
-              phone: aEliminar.telefono,
-              email: aEliminar.email,
-              tags: aEliminar.etiquetas,
-              isBlocked: aEliminar.bloqueado,
-              createdAt: aEliminar.creadoEn,
-              archivedAt: aEliminar.archivadoEn,
-              archivedReason: aEliminar.motivoDeArchivo,
-              anonymizedAt: null,
-            } satisfies Contact
-          }
-          onClose={() => setAEliminar(null)}
-          onDone={async (accion) => {
-            setAEliminar(null);
-            await refrescar();
-            setAviso(
-              accion === "borrado"
-                ? "El contacto se eliminó por completo."
-                : "Se eliminaron los datos personales. El registro comercial se conservó.",
-            );
-          }}
-        />
-      )}
     </div>
   );
 }

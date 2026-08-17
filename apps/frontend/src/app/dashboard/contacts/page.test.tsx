@@ -249,6 +249,33 @@ describe("Pantalla de contactos (mockup 02)", () => {
       ).toBeInTheDocument();
     });
 
+    it("un ADMIN TAMPOCO ve la eliminación definitiva: está fuera del alcance de 3.z", async () => {
+      // El defecto que encontró la revisión humana: a la derecha de
+      // «Restaurar» quedaba un icono de papelera, heredado de la pantalla
+      // anterior, que ejecutaba `DELETE /contacts/:id/definitivo`. El alcance
+      // aprobado de este incremento cubre archivar y restaurar y EXCLUYE el
+      // borrado definitivo. El endpoint sigue existiendo; lo que ya no existe
+      // es la forma de llegar a él desde aquí.
+      rol = "ADMIN";
+      window.history.replaceState(null, "", "/dashboard/contacts?vista=papelera");
+      getListadoDeContactos.mockResolvedValue(
+        listado([
+          fila({
+            id: "c2",
+            nombre: "Carlos Mesa",
+            archivadoEn: new Date().toISOString(),
+          }),
+        ]),
+      );
+      renderPage();
+
+      await screen.findByRole("button", { name: /Restaurar/ });
+      expect(
+        screen.queryByRole("button", { name: /eliminar definitivamente/i }),
+      ).toBeNull();
+      expect(screen.queryByRole("button", { name: /eliminar/i })).toBeNull();
+    });
+
     it("un contacto anonimizado no se restaura ni se vuelve a eliminar", async () => {
       window.history.replaceState(null, "", "/dashboard/contacts?vista=papelera");
       getListadoDeContactos.mockResolvedValue(
@@ -264,7 +291,13 @@ describe("Pantalla de contactos (mockup 02)", () => {
       renderPage();
 
       await screen.findByText(/Datos personales eliminados/i);
-      expect(screen.queryByRole("button", { name: /Restaurar/ })).toBeNull();
+
+      // Cambió respecto a la primera entrega de 3.z, y a mejor: antes se
+      // OCULTABA «Restaurar» y la fila se quedaba sin ningún control, lo que
+      // no distingue «no tienes permiso» de «no se puede» ni de «está rota».
+      // Ahora se enseña deshabilitado y con su motivo.
+      const restaurar = screen.getByRole("button", { name: /Restaurar/ });
+      expect(restaurar).toHaveAttribute("aria-disabled", "true");
       expect(
         screen.queryByRole("button", { name: /Eliminar definitivamente/i }),
       ).toBeNull();
