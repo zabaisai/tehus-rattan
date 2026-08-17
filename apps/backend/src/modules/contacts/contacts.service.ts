@@ -9,9 +9,87 @@ import {
   phoneLookupVariants,
 } from '../../common/phone/e164.util';
 
+/** Una fila del listado de Contactos, ya resuelta por el servidor. */
+export interface ContactoDeListado {
+  id: string;
+  nombre: string | null;
+  telefono: string;
+  email: string | null;
+  etiquetas: string[];
+  bloqueado: boolean;
+  anonimizado: boolean;
+  creadoEn: string;
+  archivadoEn: string | null;
+  motivoDeArchivo: string | null;
+  /** Del lead ABIERTO más reciente. Es el asesor que atiende hoy. */
+  asesor: { id: string; nombre: string } | null;
+  etapa: { id: string; nombre: string; color: string | null } | null;
+  /** Para «Abrir chat»: el hilo más reciente, o null si nunca hubo. */
+  conversacionId: string | null;
+  ultimaInteraccionEn: string | null;
+  tareasPendientes: number;
+}
+
+export interface ListadoDeContactos {
+  items: ContactoDeListado[];
+  total: number;
+  /** Los dos contadores de la cabecera. Siempre del total, no de la página. */
+  contadores: { activos: number; archivados: number };
+}
+
+export type VistaDeContactos = 'activos' | 'papelera';
+
 @Injectable()
 export class ContactsService {
   constructor(private prisma: PrismaService) {}
+
+  /**
+   * EL FILTRO DE «QUÉ CONTACTOS SON CONTACTOS», en un solo sitio.
+   *
+   * Lo comparten `findAll` y `listado`. Cuando cada uno tenía el suyo, una
+   * regla nueva —los alias de fusión, por ejemplo— había que recordarla dos
+   * veces, y la lista y su contador podían acabar diciendo cosas distintas
+   * sobre los mismos datos.
+   */
+  private filtro(opciones: {
+    companyId: string;
+    incluirArchivados?: boolean;
+    soloArchivados?: boolean;
+    search?: string;
+  }) {
+    const { companyId, incluirArchivados, soloArchivados, search } = opciones;
+    const termino = search?.trim();
+
+    return {
+      companyId,
+      // Un contacto ABSORBIDO por una fusion no es un contacto: es un alias
+      // que solo existe para que sus enlaces antiguos sigan resolviendo. No
+      // sale en activos y tampoco en papelera, porque no esta archivado sino
+      // fusionado, y ofrecerlo para acciones nuevas seria volver a partir en
+      // dos a la persona que se acaba de unificar.
+      mergedIntoId: null,
+      // Los archivados NO salen salvo que se pidan. Verlos mezclados con los
+      // activos hace dudar de cuales siguen vivos, que es justo lo que
+      // archivar pretende resolver.
+      ...(soloArchivados
+        ? { archivedAt: { not: null } as const }
+        : incluirArchivados
+          ? {}
+          : { archivedAt: null }),
+      ...(termino && {
+        OR: [
+          { name: { contains: termino, mode: 'insensitive' as const } },
+          { phone: { contains: termino, mode: 'insensitive' as const } },
+          { email: { contains: termino, mode: 'insensitive' as const } },
+          // Compatibilidad: buscar sin "+" debe encontrar al contacto ya
+          // normalizado, y al revés, mientras convivan ambas formas.
+          ...phoneLookupVariants(termino).map((v) => ({
+            phone: { contains: v, mode: 'insensitive' as const },
+          })),
+        ],
+      }),
+    };
+  }
 
   async findAll(
     companyId: string,
@@ -25,34 +103,121 @@ export class ContactsService {
     const pagination = this.parsePagination(filters.limit, filters.offset);
 
     return this.prisma.contact.findMany({
-      where: {
+      where: this.filtro({
         companyId,
-        // Un contacto ABSORBIDO por una fusion no es un contacto: es un alias
-        // que solo existe para que sus enlaces antiguos sigan resolviendo. No
-        // sale en activos y tampoco en papelera, porque no esta archivado sino
-        // fusionado, y ofrecerlo para acciones nuevas seria volver a partir en
-        // dos a la persona que se acaba de unificar.
-        mergedIntoId: null,
-        // Los archivados NO salen salvo que se pidan. Verlos mezclados con los
-        // activos hace dudar de cuales siguen vivos, que es justo lo que
-        // archivar pretende resolver.
-        ...(filters.includeArchived ? {} : { archivedAt: null }),
-        ...(filters.search && {
-          OR: [
-            { name: { contains: filters.search, mode: 'insensitive' } },
-            { phone: { contains: filters.search, mode: 'insensitive' } },
-            { email: { contains: filters.search, mode: 'insensitive' } },
-            // Compatibilidad: buscar sin "+" debe encontrar al contacto ya
-            // normalizado, y al revés, mientras convivan ambas formas.
-            ...phoneLookupVariants(filters.search).map((v) => ({
-              phone: { contains: v, mode: 'insensitive' as const },
-            })),
-          ],
-        }),
-      },
+        incluirArchivados: filters.includeArchived,
+        search: filters.search,
+      }),
       orderBy: { createdAt: 'desc' },
       ...pagination,
     });
+  }
+
+  /**
+   * EL LISTADO DE LA PANTALLA DE CONTACTOS: una consulta, todo resuelto.
+   *
+   * `findAll` devuelve la fila desnuda y lo seguirá haciendo: lo consumen los
+   * selectores de contacto de Tareas, Oportunidades y Fusión, que solo
+   * necesitan nombre y teléfono. Cambiar su forma para que la pantalla pudiera
+   * pintar asesor y etapa habría roto esas tres.
+   *
+   * Esto es otra pregunta sobre los MISMOS datos: quién atiende a esta
+   * persona, en qué etapa está y cuándo se habló por última vez. Se resuelve
+   * en el servidor porque hacerlo en el navegador significaría una petición
+   * por fila —siete filas, ocho viajes— y porque la búsqueda tiene que mirar
+   * TODOS los contactos, no los que ya se hubieran descargado.
+   *
+   * El aislamiento va en el `where` de cada consulta, incluidas las de los
+   * contadores. Nada se filtra en memoria.
+   */
+  async listado(
+    companyId: string,
+    opciones: {
+      vista?: VistaDeContactos;
+      search?: string;
+      limit?: string;
+      offset?: string;
+    } = {},
+  ): Promise<ListadoDeContactos> {
+    const enPapelera = opciones.vista === 'papelera';
+    const pagination = this.parsePagination(opciones.limit, opciones.offset);
+    const where = this.filtro({
+      companyId,
+      soloArchivados: enPapelera,
+      search: opciones.search,
+    });
+
+    const [filas, total, activos, archivados] = await Promise.all([
+      this.prisma.contact.findMany({
+        where,
+        // En papelera manda cuándo se archivó: lo último que salió de en medio
+        // es lo primero que alguien viene a recuperar.
+        orderBy: enPapelera ? { archivedAt: 'desc' } : { createdAt: 'desc' },
+        ...pagination,
+        include: {
+          leads: {
+            where: { status: 'OPEN' },
+            orderBy: { updatedAt: 'desc' },
+            take: 1,
+            select: {
+              stage: { select: { id: true, name: true, color: true } },
+              agent: { select: { id: true, name: true } },
+            },
+          },
+          conversations: {
+            orderBy: [{ lastMessageAt: 'desc' }, { createdAt: 'desc' }],
+            take: 1,
+            select: { id: true, lastMessageAt: true },
+          },
+          // Conteo filtrado en la BASE. Traerse las tareas para contarlas en
+          // memoria sería traerse el historial entero de cada contacto para
+          // enseñar un número de una cifra.
+          _count: { select: { tasks: { where: { status: 'PENDING' } } } },
+        },
+      }),
+      this.prisma.contact.count({ where }),
+      this.prisma.contact.count({
+        where: this.filtro({ companyId }),
+      }),
+      this.prisma.contact.count({
+        where: this.filtro({ companyId, soloArchivados: true }),
+      }),
+    ]);
+
+    return {
+      items: filas.map((c) => {
+        const lead = c.leads[0];
+        const conversacion = c.conversations[0];
+        return {
+          id: c.id,
+          nombre: c.name,
+          telefono: c.phone,
+          email: c.email,
+          etiquetas: c.tags,
+          bloqueado: c.isBlocked,
+          anonimizado: c.anonymizedAt !== null,
+          creadoEn: c.createdAt.toISOString(),
+          archivadoEn: c.archivedAt?.toISOString() ?? null,
+          motivoDeArchivo: c.archivedReason,
+          asesor: lead?.agent
+            ? { id: lead.agent.id, nombre: lead.agent.name }
+            : null,
+          etapa: lead?.stage
+            ? {
+                id: lead.stage.id,
+                nombre: lead.stage.name,
+                color: lead.stage.color,
+              }
+            : null,
+          conversacionId: conversacion?.id ?? null,
+          ultimaInteraccionEn:
+            conversacion?.lastMessageAt?.toISOString() ?? null,
+          tareasPendientes: c._count.tasks,
+        };
+      }),
+      total,
+      contadores: { activos, archivados },
+    };
   }
 
   async findById(id: string, companyId: string) {

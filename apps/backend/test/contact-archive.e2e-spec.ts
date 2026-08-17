@@ -13,6 +13,8 @@ import { ContactsService } from '../src/modules/contacts/contacts.service';
  */
 const prisma = new PrismaClient();
 const PREFIJO = 'E2E-ARCH';
+/** Sufijo por ejecucion, para las claves unicas globales (correo de usuario). */
+const corrida = process.pid.toString(36);
 
 describe('Archivado seguro de contactos (e2e, base real)', () => {
   const servicio = new ContactsService(prisma as unknown as PrismaService);
@@ -60,11 +62,28 @@ describe('Archivado seguro de contactos (e2e, base real)', () => {
     await prisma.message.deleteMany({
       where: { conversation: { companyId: { in: empresas } } },
     });
+    await prisma.task.deleteMany({ where: { companyId: { in: empresas } } });
     await prisma.lead.deleteMany({ where: { companyId: { in: empresas } } });
     await prisma.conversation.deleteMany({
       where: { companyId: { in: empresas } },
     });
+    // Los alias primero: `mergedInto` es `Restrict` y el borrado en bloque
+    // fallaria mientras una fila siga apuntando a otra.
+    await prisma.contact.deleteMany({
+      where: { companyId: { in: empresas }, mergedIntoId: { not: null } },
+    });
     await prisma.contact.deleteMany({ where: { companyId: { in: empresas } } });
+    // Embudos, etapas y usuarios se crean dentro de algunas pruebas. Se
+    // limpian TAMBIEN aqui y no solo en linea: si una prueba falla a mitad, su
+    // limpieza no llega a ejecutarse y la corrida siguiente se encuentra la
+    // empresa imposible de borrar por clave foranea.
+    await prisma.pipelineStage.deleteMany({
+      where: { pipeline: { companyId: { in: empresas } } },
+    });
+    await prisma.pipeline.deleteMany({
+      where: { companyId: { in: empresas } },
+    });
+    await prisma.user.deleteMany({ where: { companyId: { in: empresas } } });
     await prisma.company.deleteMany({ where: { id: { in: empresas } } });
     await prisma.$disconnect();
   });
@@ -210,5 +229,251 @@ describe('Archivado seguro de contactos (e2e, base real)', () => {
       select: { isBlocked: true },
     });
     expect(fila?.isBlocked).toBe(false);
+  });
+
+  /**
+   * EL LISTADO DE LA PANTALLA (incremento 3.z, mockup 02).
+   *
+   * Va en este archivo y no en uno nuevo porque prueba el MISMO motor sobre
+   * la MISMA base: archivar, restaurar y listar son la misma historia contada
+   * desde tres sitios, y separarlas invitaría a que una cambiara sin la otra.
+   */
+  describe('listado de la pantalla de Contactos', () => {
+    it('activos excluye archivados; papelera trae SOLO archivados', async () => {
+      const { contacto: activo } = await contactoConHistorial(empresaA);
+      const { contacto: archivado } = await contactoConHistorial(empresaA);
+      await servicio.remove(archivado.id, empresaA, 'para la papelera');
+
+      const activos = await servicio.listado(empresaA, { vista: 'activos' });
+      const papelera = await servicio.listado(empresaA, { vista: 'papelera' });
+
+      expect(activos.items.map((c) => c.id)).toContain(activo.id);
+      expect(activos.items.map((c) => c.id)).not.toContain(archivado.id);
+      expect(papelera.items.map((c) => c.id)).toContain(archivado.id);
+      expect(papelera.items.map((c) => c.id)).not.toContain(activo.id);
+    });
+
+    it('los contadores son del TOTAL, no de la página que se pidió', async () => {
+      // Es la diferencia entre «12 archivados» y «los 5 que caben en pantalla».
+      // Derivarlos de la página daría un número que cambia al pasar de hoja.
+      const { contacto } = await contactoConHistorial(empresaA);
+      await servicio.remove(contacto.id, empresaA);
+
+      const pagina = await servicio.listado(empresaA, {
+        vista: 'activos',
+        limit: '1',
+      });
+
+      expect(pagina.items).toHaveLength(1);
+      expect(pagina.contadores.activos).toBeGreaterThan(1);
+      expect(pagina.contadores.archivados).toBeGreaterThanOrEqual(1);
+      // El total es el de la VISTA pedida, no el de la página.
+      expect(pagina.total).toBe(pagina.contadores.activos);
+    });
+
+    it('la búsqueda la resuelve el SERVIDOR, no la página ya descargada', async () => {
+      // El defecto que corrige: la pantalla filtraba en memoria lo que ya se
+      // había traído, así que un contacto fuera de esa tanda era invisible
+      // por mucho que se escribiera su nombre entero.
+      const raro = await prisma.contact.create({
+        data: {
+          companyId: empresaA,
+          phone: telefono(),
+          name: `${PREFIJO} Wenceslao Zubizarreta`,
+        },
+      });
+
+      const encontrado = await servicio.listado(empresaA, {
+        vista: 'activos',
+        search: 'Zubizarreta',
+        limit: '5',
+      });
+
+      expect(encontrado.items.map((c) => c.id)).toContain(raro.id);
+      expect(encontrado.total).toBe(1);
+    });
+
+    it('busca por teléfono y por correo, y también dentro de la papelera', async () => {
+      const contacto = await prisma.contact.create({
+        data: {
+          companyId: empresaA,
+          phone: telefono(),
+          name: `${PREFIJO} Buscable`,
+          email: 'buscable@example.invalid',
+        },
+      });
+      await servicio.remove(contacto.id, empresaA);
+
+      const porCorreo = await servicio.listado(empresaA, {
+        vista: 'papelera',
+        search: 'buscable@example.invalid',
+      });
+      const porTelefono = await servicio.listado(empresaA, {
+        vista: 'papelera',
+        search: contacto.phone,
+      });
+
+      expect(porCorreo.items.map((c) => c.id)).toContain(contacto.id);
+      expect(porTelefono.items.map((c) => c.id)).toContain(contacto.id);
+    });
+
+    it('resuelve asesor, etapa, conversación y tareas pendientes en una sola llamada', async () => {
+      const { contacto, conversacion } = await contactoConHistorial(empresaA);
+      const asesor = await prisma.user.create({
+        data: {
+          companyId: empresaA,
+          // `email` es unico GLOBAL, no por empresa: un sufijo por corrida
+          // evita que una ejecucion anterior interrumpida bloquee la
+          // siguiente con un choque de clave.
+          email: `asesor-${corrida}-${n++}@example.invalid`,
+          password: 'no-es-una-credencial-real',
+          name: `${PREFIJO} Asesora`,
+          role: 'AGENT',
+        },
+      });
+      const pipeline = await prisma.pipeline.create({
+        data: { companyId: empresaA, name: `${PREFIJO}-pipe-l`, order: 0 },
+      });
+      const etapa = await prisma.pipelineStage.create({
+        data: {
+          pipelineId: pipeline.id,
+          name: 'Negociación',
+          order: 0,
+          color: '#131C4A',
+        },
+      });
+      const lead = await prisma.lead.create({
+        data: {
+          companyId: empresaA,
+          contactId: contacto.id,
+          pipelineId: pipeline.id,
+          stageId: etapa.id,
+          // El campo se llama `assignedTo`; `agent` es solo la relacion.
+          assignedTo: asesor.id,
+          title: `${PREFIJO} oportunidad viva`,
+          status: 'OPEN',
+        },
+      });
+      const tarea = await prisma.task.create({
+        data: {
+          companyId: empresaA,
+          contactId: contacto.id,
+          title: `${PREFIJO} llamar`,
+          status: 'PENDING',
+        },
+      });
+
+      const fila = (
+        await servicio.listado(empresaA, { vista: 'activos' })
+      ).items.find((c) => c.id === contacto.id);
+
+      expect(fila?.asesor).toEqual({ id: asesor.id, nombre: asesor.name });
+      expect(fila?.etapa?.nombre).toBe('Negociación');
+      expect(fila?.etapa?.color).toBe('#131C4A');
+      expect(fila?.conversacionId).toBe(conversacion.id);
+      expect(fila?.tareasPendientes).toBe(1);
+
+      await prisma.task.deleteMany({ where: { id: tarea.id } });
+      await prisma.lead.deleteMany({ where: { id: lead.id } });
+      await prisma.pipelineStage.deleteMany({ where: { id: etapa.id } });
+      await prisma.pipeline.deleteMany({ where: { id: pipeline.id } });
+      await prisma.user.deleteMany({ where: { id: asesor.id } });
+    });
+
+    it('CERO FUGAS: el contacto de otra empresa no sale ni buscándolo por su nombre exacto', async () => {
+      const ajeno = await prisma.contact.create({
+        data: {
+          companyId: empresaB,
+          phone: telefono(),
+          name: `${PREFIJO} Secreto de la empresa B`,
+        },
+      });
+
+      const activos = await servicio.listado(empresaA, { vista: 'activos' });
+      const buscado = await servicio.listado(empresaA, {
+        vista: 'activos',
+        search: 'Secreto de la empresa B',
+      });
+      const papelera = await servicio.listado(empresaA, { vista: 'papelera' });
+
+      expect(activos.items.map((c) => c.id)).not.toContain(ajeno.id);
+      expect(buscado.items).toHaveLength(0);
+      expect(buscado.total).toBe(0);
+      expect(papelera.items.map((c) => c.id)).not.toContain(ajeno.id);
+    });
+
+    it('un alias de fusión no aparece en activos ni en papelera', async () => {
+      const principal = await prisma.contact.create({
+        data: {
+          companyId: empresaA,
+          phone: telefono(),
+          name: `${PREFIJO} Principal`,
+        },
+      });
+      const absorbido = await prisma.contact.create({
+        data: {
+          companyId: empresaA,
+          phone: telefono(),
+          name: `${PREFIJO} Absorbido`,
+          mergedIntoId: principal.id,
+          mergedAt: new Date(),
+          archivedAt: new Date(),
+        },
+      });
+
+      const activos = await servicio.listado(empresaA, { vista: 'activos' });
+      const papelera = await servicio.listado(empresaA, { vista: 'papelera' });
+
+      expect(activos.items.map((c) => c.id)).not.toContain(absorbido.id);
+      expect(papelera.items.map((c) => c.id)).not.toContain(absorbido.id);
+      expect(activos.items.map((c) => c.id)).toContain(principal.id);
+
+      // El alias se retira AQUI: `mergedInto` es `Restrict`, asi que el
+      // borrado en bloque del `afterAll` fallaria mientras esta fila apunte
+      // al principal.
+      await prisma.contact.deleteMany({ where: { id: absorbido.id } });
+    });
+
+    it('archivar y restaurar devuelven EL MISMO id con sus relaciones intactas', async () => {
+      const { contacto, conversacion } = await contactoConHistorial(empresaA);
+
+      await servicio.remove(contacto.id, empresaA, 'se va a la papelera');
+      const enPapelera = (
+        await servicio.listado(empresaA, { vista: 'papelera' })
+      ).items.find((c) => c.id === contacto.id);
+      expect(enPapelera?.motivoDeArchivo).toBe('se va a la papelera');
+      expect(enPapelera?.conversacionId).toBe(conversacion.id);
+
+      await servicio.restore(contacto.id, empresaA);
+      const devuelto = (
+        await servicio.listado(empresaA, { vista: 'activos' })
+      ).items.find((c) => c.id === contacto.id);
+
+      // El mismo id: restaurar no crea un contacto nuevo.
+      expect(devuelto?.id).toBe(contacto.id);
+      expect(devuelto?.archivadoEn).toBeNull();
+      expect(devuelto?.conversacionId).toBe(conversacion.id);
+      // Y sigue habiendo UNA sola fila con ese teléfono en la empresa.
+      expect(
+        await prisma.contact.count({
+          where: { companyId: empresaA, phone: contacto.phone },
+        }),
+      ).toBe(1);
+    });
+
+    it('restaurar dos veces no duplica nada y avisa de que ya estaba', async () => {
+      const { contacto } = await contactoConHistorial(empresaA);
+      await servicio.remove(contacto.id, empresaA);
+
+      const primera = await servicio.restore(contacto.id, empresaA);
+      const segunda = await servicio.restore(contacto.id, empresaA);
+
+      expect(primera.restaurado).toBe(true);
+      expect(segunda.restaurado).toBe(false);
+      expect(segunda.yaEstaba).toBe(true);
+      expect(await prisma.contact.count({ where: { id: contacto.id } })).toBe(
+        1,
+      );
+    });
   });
 });

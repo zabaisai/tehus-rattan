@@ -50,6 +50,30 @@ export class ContactsController {
     });
   }
 
+  /**
+   * El listado de la PANTALLA de contactos: filas ya resueltas + contadores.
+   *
+   * VA ANTES QUE `@Get(':id')` A PROPOSITO. Nest resuelve por orden de
+   * declaracion, asi que puesta despues, `/contacts/listado` la capturaria la
+   * ruta con parametro y el servidor respondería «Contacto no encontrado»
+   * buscando un contacto llamado `listado`. Hay una e2e que fija este orden.
+   */
+  @Get('listado')
+  listado(
+    @Request() req: any,
+    @Query('vista') vista?: string,
+    @Query('search') search?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.contactsService.listado(req.user.companyId, {
+      vista: vista === 'papelera' ? 'papelera' : 'activos',
+      search,
+      limit,
+      offset,
+    });
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @Request() req: any) {
     return this.contactsService.findById(id, req.user.companyId);
