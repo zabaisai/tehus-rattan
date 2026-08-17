@@ -7,20 +7,27 @@
 ## Última actualización
 
 - Fecha: **17 de agosto de 2026** · America/Bogota
-- **Incremento en curso: `3.z — Contactos: listado, papelera y restauración` (mockup 02). Estado: EN REVISIÓN HUMANA.**
-- Commits de 3.z: `cd3c2e1` (modelo de lectura) · `5cc66ed` (primitivas) · `334f3da` (URL) · `77c51d9` (pantalla)
+- **`3.z — Contactos: listado, papelera y restauración` (mockup 02): HECHO y APROBADO por revisión humana el 17 de agosto de 2026.**
+- **SHA aprobado de 3.z: `910f6b2baf9af21ab7f9daf7ea90632292ad62e1` · CI verde, run [`32045702872`](https://github.com/zabaisai/tehus-rattan/actions/runs/32045702872)**
+- Commits de 3.z: `cd3c2e1` (modelo de lectura) · `5cc66ed` (primitivas) · `334f3da` (URL) · `77c51d9` (pantalla) · **2ª ronda:** `1769e0f` (retirar el borrado definitivo y explicar los iconos)
+- **Con ello la FASE 3 queda HECHA: sus cuatro mockups —02, 03, 18 y 22— están entregados y aprobados.**
 
-> **Por qué la fase 3 vuelve a EN CURSO.** El 14-ago se cerró la fase 3 tras
-> aprobar 3.y. La revisión de continuidad del 17-ago encontró que el cierre era
-> prematuro: el master asigna a la fase 3 los mockups **02, 03, 18 y 22**, y solo
-> se habían entregado 22 (3.x) y 03+18 (3.y). El propio documento lo decía en dos
+> **La fase 3 estuvo EN_CURSO entre el 14 y el 17 de agosto, y conviene que
+> quede escrito por qué.** El 14-ago se cerró tras aprobar 3.y, y el cierre era
+> prematuro: el master le asigna los mockups **02, 03, 18 y 22**, y solo se
+> habían entregado 22 (3.x) y 03+18 (3.y). El propio documento lo decía en dos
 > sitios que contradecían al semáforo —la tabla «QA visual desktop» tenía
 > **«Contactos» en PENDIENTE** y el inventario mantenía «Contactos / papelera /
-> fusión: **PARCIAL**»—. 3.z cierra ese hueco.
+> fusión: **PARCIAL**»—. 3.z cerró ese hueco y ahora sí está completa.
 >
-> **3.x y 3.y no se reabren ni se ponen en duda.** Siguen aprobados sobre
-> `397dab9` y `7a1e0a1`, con su CI verde, y este incremento incluye pruebas de
-> regresión de los dos. Lo que cambia es que la fase 3 no estaba completa.
+> **3.x y 3.y nunca se reabrieron ni se pusieron en duda.** Siguen aprobados
+> sobre `397dab9` y `7a1e0a1`, con su CI verde, y 3.z incluye pruebas de
+> regresión de los dos.
+>
+> **Lección para los próximos cierres:** una fase no se cierra por haber
+> aprobado su último incremento, sino cuando sus mockups están todos cubiertos.
+> Antes de marcar una fase HECHA, comprobar su lista de mockups en el §6 del
+> master contra la tabla de QA visual de este documento.
 
 ### Fecha del cierre anterior: 14 de agosto de 2026
 - Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` · `c9c4bc5` (navegación) · **3ª ronda:** `7c7b857` · `3bd4585` · `e44ef82` · `d36c5b4`
@@ -87,9 +94,9 @@
 | Fase | Estado | Evidencia | Bloqueador |
 |---|---|---|---|
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
-| 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
+| 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real, y **tooltip en 3.z** con su demanda demostrada; faltan tabla, drawer, tabs, toast y swatches | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
-| 3. Contactos, conversaciones y perfil 360 | **EN_CURSO** | **Fusión (3.x, mockup 22) aprobada sobre `397dab9`** e **inbox + perfil 360 (3.y, mockups 03 y 18) aprobados sobre `7a1e0a1`**, los dos intactos. Falta **solo la revisión humana del mockup 02**, entregado en 3.z sobre `77c51d9` | Revisión humana de 3.z |
+| 3. Contactos, conversaciones y perfil 360 | **HECHO** | Sus **cuatro** mockups entregados y aprobados: **22** (3.x, `397dab9`), **03 y 18** (3.y, `7a1e0a1`) y **02** (3.z, `910f6b2`, aprobado el 17-ago-2026) | — |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
@@ -108,9 +115,9 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 
 | Capacidad | Estado | Evidencia/ruta |
 |---|---|---|
-| Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); 12 primitivas en `components/ui/`. Faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar de iniciales, swatches, tooltip |
+| Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); primitivas en `components/ui/`, con skeleton, forbidden, avatar de iniciales y **tooltip** ya entregados. Faltan tabla, drawer, tabs, toast y swatches |
 | Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
-| Contactos / papelera / fusión | **EN REVISIÓN** | 11 endpoints previos, 7 de fusión y **`GET /contacts/listado`** (3.z). **Fusión: HECHO** (mockup 22, aprobado el 14-ago sobre `397dab9`). **Listado, papelera y restauración (mockup 02): entregado en 3.z sobre `77c51d9`, pendiente de revisión humana** — `app/dashboard/contacts/page.tsx`, `components/contacts/ContactosTabla.tsx`, `lib/contactos-url.ts` |
+| Contactos / papelera / fusión | **HECHO** (mockups 02 y 22) | 11 endpoints previos, 7 de fusión y **`GET /contacts/listado`** (3.z). **Fusión** aprobada el 14-ago sobre `397dab9`; **listado, papelera y restauración** aprobados el 17-ago sobre `910f6b2` — `app/dashboard/contacts/page.tsx`, `components/contacts/ContactosTabla.tsx`, `lib/contactos-url.ts`, `components/ui/Tooltip.tsx` |
 | Conversaciones / perfil lateral | **HECHO** (mockups 03 y 18) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
 | Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
 | Tareas y sugerencias | **PARCIAL** | 9 endpoints con `:id/aprobar` y `:id/rechazar`; `SugerenciasDeTarea` en frontend. Falta la vista del mockup 07 con pendientes/completadas/sugeridas separadas |
@@ -1085,13 +1092,17 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-17 | 3.z | frontend `typecheck` + `lint` + `build` | sin errores (1 aviso previo ajeno) |
 | 2026-08-17 | 3.z | Datos QA en `READ ONLY` antes y después | `PREVIEW_BRANDING_` 5, `QA_MERGE_` 2, `QA_INBOX_` 2, 11 empresas, outbox 0, 0 restos E2E |
 | 2026-08-17 | 3.z | CI sobre `77c51d9` | **run `32043183678`** — Backend y Frontend `success` |
-| 2026-08-17 | 3.z | QA de navegador 1920/1440/1280/1024 | **NO EJECUTADA** — la pantalla exige sesión y no hay credenciales disponibles |
+| 2026-08-17 | 3.z | QA de navegador automatizada 1920/1440/1280/1024 | **NO EJECUTADA** — la pantalla exige sesión y no había credenciales disponibles. La cubrió la revisión humana |
 | 2026-08-17 | 3.z (2ª ronda) | **Revisión humana sobre `cb6f046`** | **DEFECTO**: icono sin explicación en la papelera que resultó ser la eliminación definitiva |
 | 2026-08-17 | 3.z (2ª ronda) | `vitest run` (frontend completo) | **877/877** en 82 archivos (+26) |
 | 2026-08-17 | 3.z (2ª ronda) | frontend `typecheck` + `lint` + `build` | sin errores (1 aviso previo ajeno) |
 | 2026-08-17 | 3.z (2ª ronda) | Regresión backend, sin haberlo tocado | 70/70 e2e de contactos · 51/51 unitarias del módulo · **904/904 e2e completas** |
 | 2026-08-17 | 3.z (2ª ronda) | CI sobre `1769e0f` | ⚠️ **Backend `failure` en el paso E2E** con el backend **byte a byte idéntico** al de `cb6f046`, que estaba verde. Ver «Un CI rojo que no reproduce» |
-| 2026-08-17 | 3.z | **Revisión humana final** | **PENDIENTE** |
+| 2026-08-17 | 3.z (2ª ronda) | CI sobre `9a49bab` y sobre `910f6b2` | **verde entero** — runs `32045401228` y **`32045702872`** |
+| 2026-08-17 | 3.z | QA humana en escritorio: 1920 / 1440 / 1280 / 1024 | **APROBADO** — ver «Aprobación humana — 17 de agosto de 2026» |
+| 2026-08-17 | 3.z | Recorrido archivar → papelera → restaurar con `QA_CONTACTS_Archivo temporal` | 8→7→8 activos y 2→3→2 archivados; auditoría sobre el mismo id |
+| 2026-08-17 | 3.z | Estado de los datos tras el recorrido (`READ ONLY`) | 1 sola fila, sin duplicado; protegidos sin escritura del 17-ago; outbox 0 |
+| 2026-08-17 | 3.z | **Revisión humana sobre `910f6b2`** | **APROBADO** — «todo me parece bien». Mockup 02 completado y **fase 3 HECHA** |
 
 ---
 
@@ -1103,7 +1114,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Inicio (mockup 01, incremento 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 13-ago-2026 |
 | Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
-| Contactos (mockup 02, 3.z) | — | — | — | — | — | — | **EN REVISIÓN HUMANA** · sin QA de navegador (ver 3.z) |
+| Contactos: activos y papelera (mockup 02, 3.z) | ✅ | ✅ | ✅¹ | ✅ | ✅ | ✅ | **HECHO** · aprobado 17-ago-2026 |
 | Inbox de tres paneles (mockups 03 y 18, 3.y) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
 | TAKTO Pulso |  |  |  |  |  |  | PENDIENTE |
@@ -1114,6 +1125,14 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Automatizaciones |  |  |  |  |  |  | PENDIENTE |
 | WhatsApp |  |  |  |  |  |  | PENDIENTE |
 | Empresa/Datos/Equipo |  |  |  |  |  |  | PENDIENTE |
+
+> ¹ **Contactos a 1280 px, matizado y aprobado tal cual.** La pestaña Papelera
+> se ve completa. La de Activos, con sus nueve columnas, usa **una sola barra
+> horizontal interna de la tabla**: la persona revisora comprobó que todas las
+> acciones quedan alcanzables al desplazarla y lo dio por bueno. **La página no
+> tiene desplazamiento horizontal** —la barra es de la tabla, dentro de su
+> caja—, que es la condición que el plan exige y la razón por la que se diseñó
+> así. A 1440 y 1920 no aparece.
 
 > Nota: la QA anterior de esta rama se hizo en 1440/1280/1024/768/390. El plan
 > desktop pide **1920** y retira 768/390, así que las pantallas ya migradas
@@ -1585,11 +1604,78 @@ impresión.
 
 ---
 
-## Incremento 3.z — Contactos: listado, papelera y restauración (mockup 02)
+## Incremento cerrado: 3.z — Contactos: listado, papelera y restauración (mockup 02)
 
-**Estado: ENTREGADO DE EXTREMO A EXTREMO · EN REVISIÓN HUMANA. No cerrar.**
+**Estado: HECHO · APROBADO EN REVISIÓN HUMANA. Mockup 02 completado.**
 
-**SHA de implementación:** `77c51d9224ce9d8fb233e95d0a313b2548062a57`
+**SHA aprobado: `910f6b2baf9af21ab7f9daf7ea90632292ad62e1`.**
+**CI de ese SHA: verde — run
+[`32045702872`](https://github.com/zabaisai/tehus-rattan/actions/runs/32045702872)**
+(Frontend: pruebas, typecheck incluidos los tests, lint y build; Backend:
+prisma generate/validate, typecheck incluidos los specs, lint, unitarias,
+build, migraciones en base aislada y E2E).
+
+### Aprobación humana — 17 de agosto de 2026
+
+Veredicto de la persona revisora: **«todo me parece bien»**.
+
+| Qué se probó | Veredicto |
+|---|---|
+| Activos y Papelera contra el mockup 02 | Coinciden visualmente |
+| Búsqueda «marcela»: devuelve solo el contacto correcto | Aprobado |
+| Esa búsqueda **persiste tras recargar** | Aprobado — es la URL como fuente de verdad |
+| Búsqueda «zzzz»: estado vacío correcto | Aprobado |
+| Tooltips de las acciones, visibles y accesibles | Aprobado |
+| La eliminación definitiva ya no está en la interfaz | Confirmado |
+
+**Anchos verificados por la persona revisora:**
+
+| Ancho | Resultado |
+|---|---|
+| 1920 | Activos y Papelera aprobados |
+| 1440 | Los dos completos, sin desbordamiento |
+| 1280 | Papelera completa. Activos usa **una sola barra horizontal interna de la tabla**, con todas las acciones alcanzables al desplazarla. **La página no desplaza en horizontal** |
+| 1024 | Aprobado |
+
+**Recorrido de archivar y restaurar, con un contacto desechable.** Se creó
+`QA_CONTACTS_Archivo temporal` (teléfono `+573001119901`, correo en
+`example.invalid`) para no tocar ninguno de los tres conjuntos protegidos:
+
+| Paso | Evidencia |
+|---|---|
+| Archivado | activos **8 → 7**, papelera **2 → 3** |
+| En la papelera | apareció junto a los dos contactos protegidos |
+| Restauración | activos **7 → 8**, papelera **3 → 2**, inmediata |
+| Mismo contacto | volvió a Activos, sin duplicado |
+
+**Verificado después en una transacción `READ ONLY`:**
+
+| Comprobación | Resultado |
+|---|---|
+| Id real del contacto QA | **`cmsxgiivt0001v2jk4hixewc3`** |
+| Filas que coinciden por nombre, por teléfono exacto y por variantes | **1, 1 y 1** — sin duplicado |
+| Estado final | activo, `archivedAt` nulo, `mergedIntoId` nulo, sin anonimizar |
+| Auditoría | `contact.archive` 16:39:56.618 → `contact.restore` 16:41:10.562, **el mismo `entityId`**, rol ADMIN, en ese orden |
+| Última escritura sobre la fila | `updatedAt` 16:41:10.558, que es la restauración: nada la tocó después |
+| Teléfono y correo | `+573001119901` y `qa.contacts.archivo@example.invalid`, intactos |
+| `PREVIEW_BRANDING_Fernanda Lara` | archivada, `updatedAt` del **12-ago** — sin escritura del 17 |
+| `QA_MERGE_ Valentina O.` | archivada, `updatedAt` del **14-ago** (el deshacer de 3.x) — sin escritura del 17 |
+| Conteos finales | **8 activos / 2 archivados**, 0 alias |
+| Outbox y efectos externos | 0 eventos, 0 mensajes salientes hoy, 0 ejecuciones de Pulso |
+
+> **Una corrección sobre el identificador.** El cierre se pidió citando el id
+> `cmstpf5dg0007v2ttkxpo3h1g`. Ese id **no existe** en la base: la consulta
+> devuelve 0 filas. El contacto real —una sola fila, con el teléfono citado y
+> con las dos auditorías— es **`cmsxgiivt0001v2jk4hixewc3`**, que es el que se
+> anota aquí. Se deja constancia para que nadie busque después un id que nunca
+> estuvo.
+
+**El contacto QA se CONSERVA.** No se limpia: es lo que hace repetible el
+recorrido de archivar y restaurar sin tocar los tres conjuntos protegidos.
+
+### Registro de la entrega
+
+**SHA de implementación inicial:** `77c51d9224ce9d8fb233e95d0a313b2548062a57`
 **CI de ese SHA: verde — run
 [`32043183678`](https://github.com/zabaisai/tehus-rattan/actions/runs/32043183678)**
 (Frontend: pruebas, typecheck incluidos los tests, lint y build; Backend:
@@ -1711,10 +1797,17 @@ ya tiene 7 contactos activos y 2 archivados —`PREVIEW_BRANDING_Fernanda Lara` 
 tareas reales: alcanza para revisar listado, papelera, búsqueda, estados,
 «Abrir chat» y el perfil 360 sin escribir nada.
 
-Lo único que no se puede recorrer con ellos es **archivar de verdad**, porque
+Lo único que no se podía recorrer con ellos es **archivar de verdad**, porque
 los tres conjuntos protegidos no se tocan. Crear un `QA_CONTACTS_` exige una
-sesión en esa empresa, y las credenciales no están a mi alcance ni deben
-estarlo. Queda pendiente de decisión del revisor (ver «Instrucciones de QA»).
+sesión en esa empresa, y las credenciales no estaban a mi alcance ni deben
+estarlo.
+
+> **Resuelto en la revisión.** La persona revisora creó
+> `QA_CONTACTS_Archivo temporal` (**`cmsxgiivt0001v2jk4hixewc3`**, teléfono
+> `+573001119901`) desde su propia sesión y recorrió archivar y restaurar con
+> él. Ese contacto **se conserva**: es el desechable que hace repetible el
+> recorrido sin tocar nada protegido. Los detalles y su verificación en
+> `READ ONLY` están en «Aprobación humana — 17 de agosto de 2026».
 
 **Verificado en `READ ONLY` antes y después de todo el trabajo, incluida la
 suite e2e completa:**
@@ -1735,17 +1828,21 @@ que es exactamente lo que exige la regla de no borrar auditorías.
 
 ### Limitaciones honestas
 
-- **Sin QA de navegador en los cuatro anchos.** Es la parte del alcance que no
-  se entregó. La pantalla exige sesión y no dispongo de credenciales de la
-  empresa de la vista previa; medir 1920/1440/1280/1024 con el arnés CDP
-  requiere estar dentro. Lo que sí está medido es todo lo que no depende de
-  ello: el HTML se sirve con 200, el arranque no tiene errores y la consola del
-  servidor está limpia. **La revisión visual queda íntegramente en manos
-  humanas**, y por eso el incremento no se marca como HECHO.
+- **Sin QA de navegador AUTOMATIZADA en los cuatro anchos.** La pantalla exige
+  sesión y no dispuse de credenciales de la empresa de la vista previa; medir
+  1920/1440/1280/1024 con el arnés CDP requiere estar dentro. **Lo cubrió la
+  revisión humana**, que aprobó los cuatro anchos en escritorio. Queda como
+  diferencia respecto a 2.3, 3.x y 3.y, donde sí hubo mediciones por CDP: aquí
+  no hay cifras de desbordamiento ni de zonas de desplazamiento, solo el juicio
+  de una persona mirando la pantalla. Es suficiente para aprobar, y conviene
+  saber que la evidencia es de otra clase.
 - **La tabla tiene ancho mínimo de 56 rem y se desplaza dentro de su caja.** Es
-  deliberado —así el documento nunca tiene barra horizontal— pero significa que
-  por debajo de ~900 px de contenido hay desplazamiento lateral *de la tabla*.
-  No está medido en navegador; es lo primero que conviene mirar a 1024.
+  deliberado —así el documento nunca tiene barra horizontal—. **Comprobado en
+  la revisión: a 1280 px la pestaña Activos usa esa barra interna**, todas las
+  acciones quedan alcanzables al desplazarla y la página no desplaza en
+  horizontal. Aprobado tal cual. Si algún día molesta, la salida no es quitar
+  columnas sino decidir cuáles se ocultan por debajo de cierto ancho, y eso es
+  una decisión de producto.
 - **El asesor y la etapa salen de la oportunidad ABIERTA más reciente.** Un
   contacto con dos oportunidades abiertas enseña la última que se movió. Es una
   simplificación consciente: la fila tiene una casilla, no una lista.
@@ -1869,15 +1966,25 @@ sin conocerse. Si vuelve a aparecer, conviene mirarlo con el log delante.
 
 ## Próximo incremento seguro: `4.1 — Pipeline vertical (mockup 04)`
 
-**Registrado, no iniciado. BLOQUEADO hasta que se apruebe 3.z.** La fase 3 no
-está cerrada: le faltaba el mockup 02, que entrega 3.z y que sigue pendiente de
-revisión humana. Abrir la fase 4 antes de esa aprobación repetiría el error de
-cierre prematuro que corrigió este incremento.
+**PROPUESTO. No iniciado, no abierto y no EN_CURSO.**
 
-Cuando 3.z quede aprobado, el master pasa a la **fase 4 — pipeline vertical,
-tareas y acciones desde chat** (mockups 04, 07, 19, 20, 21). Su primer punto es
-el pipeline vertical, que el inventario ya señala como el hueco: el kanban
-existe pero es **horizontal**, y el mockup 04 lo pide vertical.
+Con 3.z aprobado el 17-ago, la **fase 3 queda HECHA** —sus cuatro mockups, 02,
+03, 18 y 22, están entregados y aprobados— y el master pasa a la **fase 4 —
+pipeline vertical, tareas y acciones desde chat** (mockups 04, 07, 19, 20, 21).
+Su primer punto es el pipeline vertical, que el inventario ya señala como el
+hueco: el kanban existe pero es **horizontal**, y el mockup 04 lo pide vertical.
+
+Su diseño y su implementación **no se redactan aquí**: se abren cuando se
+arranque el incremento, con su propio preflight §2.
+
+> **Dos condiciones antes de abrirlo, y ninguna es técnica.**
+>
+> 1. Una **autorización explícita** para empezarlo. Este documento lo deja
+>    propuesto, no en curso.
+> 2. El gap **«Pipeline vertical»** sigue abierto en «Gaps que requieren
+>    decisión de producto»: *«cambia la interacción de arrastre ya probada;
+>    conviene confirmar antes de reescribir»*. Es una decisión humana previa,
+>    no algo que se resuelva durante la implementación.
 
 > Además, el gap **«Pipeline vertical»** sigue abierto en «Gaps que requieren
 > decisión de producto» —«cambia la interacción de arrastre ya probada; conviene
@@ -1904,18 +2011,21 @@ git rev-parse origin/feature/takto-brand-ui-integration
 # (mockups 03 y 18): APROBADO el 14-ago-2026 sobre 7a1e0a1, CI verde
 # (run 31844338412).
 #
-# 3.z - Contactos: listado, papelera y restauracion (mockup 02):
-# ENTREGADO sobre 77c51d9, CI verde (run 32043183678). EN REVISION HUMANA.
-# NO marcar 3.z ni la fase 3 como HECHOS antes de esa revision.
+# 3.z - Contactos: listado, papelera y restauracion (mockup 02): APROBADO el
+# 17-ago-2026 sobre 910f6b2, CI verde (run 32045702872). Mockup 02 completado.
 #
-# La FASE 3 esta EN_CURSO: se cerro el 14-ago sin el mockup 02, que es lo que
-# entrega 3.z. 3.x y 3.y siguen aprobados e intactos.
+# Con el, la FASE 3 queda HECHA: sus cuatro mockups -02, 03, 18 y 22- estan
+# entregados y aprobados.
 #
-# Proximo incremento registrado, NO iniciado y BLOQUEADO hasta aprobar 3.z:
-#   4.1 - Pipeline vertical (mockup 04). Abrirlo exige su propio preflight §2
-#   y, antes, la decision humana sobre el gap "Pipeline vertical".
+# Proximo incremento PROPUESTO, no iniciado y no EN_CURSO:
+#   4.1 - Pipeline vertical (mockup 04). Abrirlo exige una autorizacion
+#   explicita, su propio preflight §2 y, antes, la decision humana sobre el
+#   gap "Pipeline vertical" que sigue abierto.
 #
 # Los datos QA_INBOX_ se CONSERVAN: son los que hacen revisable el inbox.
+# El contacto QA_CONTACTS_Archivo temporal (id cmsxgiivt0001v2jk4hixewc3,
+# telefono +573001119901) tambien se CONSERVA: es el desechable con el que se
+# recorre archivar y restaurar sin tocar los tres conjuntos protegidos.
 #
 # Rutas de QA de 3.z (mockup 02):
 #   http://localhost:3000/dashboard/contacts
