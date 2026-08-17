@@ -26,12 +26,16 @@ const B = 'contacto-b';
 
 const getContacts = vi.fn();
 const getPapelera = vi.fn();
+const getListadoDeContactos = vi.fn();
 vi.mock('@/lib/contacts', async () => {
   const real = await vi.importActual<typeof import('@/lib/contacts')>('@/lib/contacts');
   return {
     ...real,
     getContacts: () => getContacts(),
     getPapelera: () => getPapelera(),
+    // La pantalla de Contactos lista por aqui desde 3.z; el selector de
+    // candidatos de la fusion sigue usando `getContacts`.
+    getListadoDeContactos: () => getListadoDeContactos(),
     archiveContact: vi.fn(),
     restoreContact: vi.fn(),
     createContact: vi.fn(),
@@ -61,6 +65,7 @@ const push = vi.fn();
 let parametrosDeUrl = new URLSearchParams();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace, push, prefetch: vi.fn() }),
+  usePathname: () => '/dashboard/contacts',
   useSearchParams: () => parametrosDeUrl,
 }));
 
@@ -160,6 +165,11 @@ beforeEach(() => {
   parametrosDeUrl = new URLSearchParams(`fusionar=${A}&con=${B}`);
   getContacts.mockResolvedValue([contacto(A)]);
   getPapelera.mockResolvedValue({ items: [], total: 0 });
+  getListadoDeContactos.mockResolvedValue({
+    items: [],
+    total: 0,
+    contadores: { activos: 0, archivados: 0 },
+  });
   getCandidatos.mockResolvedValue([]);
   getCanonico.mockImplementation((id: string) =>
     Promise.resolve({

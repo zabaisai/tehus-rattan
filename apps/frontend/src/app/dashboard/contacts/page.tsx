@@ -1,169 +1,180 @@
 "use client";
 
-import { Suspense, useEffect, useState, useMemo } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Plus, Search, Users } from "lucide-react";
 import {
-  Plus,
-  Search,
-  Archive,
-  ArchiveRestore,
-  Trash2,
-  Pencil,
-  Users,
-  Merge,
-} from "lucide-react";
-import {
-  getContacts,
-  getPapelera,
   createContact,
   updateContact,
   archiveContact,
   restoreContact,
+  getListadoDeContactos,
+  type ContactoDeListado,
 } from "@/lib/contacts";
 import { Contact } from "@/types";
 import { ContactModal } from "@/components/contacts/ContactModal";
 import { EliminarContactoDialog } from "@/components/contacts/EliminarContactoDialog";
 import { FusionDeDuplicados } from "@/components/contacts/FusionDeDuplicados";
-import { EmptyState } from "@/components/ui/EmptyState";
+import { ContactosTabla } from "@/components/contacts/ContactosTabla";
+import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ListState } from "@/components/ui/ListState";
+import { ForbiddenState } from "@/components/ui/ForbiddenState";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { TextoLargo } from "@/components/ui/TextoLargo";
 import { getCanonico, puedeFusionar } from "@/lib/fusion";
 import { useAuthStore } from "@/store/auth.store";
+import {
+  PESTANAS,
+  POR_PAGINA,
+  aplicarEnQuery,
+  leerEstadoDeContactos,
+  offsetDe,
+  rangoMostrado,
+  rutaDeContactos,
+  totalDePaginas,
+  type CambiosDeContactos,
+} from "@/lib/contactos-url";
 
-type Vista = "activos" | "papelera";
+const RETARDO_DE_BUSQUEDA = 300;
 
 function ContactsPageContent() {
   const queryClient = useQueryClient();
   const rol = useAuthStore((s) => s.user?.role);
-  const [vista, setVista] = useState<Vista>("activos");
+  const router = useRouter();
+  const pathname = usePathname();
+  const parametros = useSearchParams();
 
-  const activos = useQuery({
-    queryKey: ["contacts"],
-    queryFn: getContacts,
-    enabled: vista === "activos",
+  const estado = leerEstadoDeContactos(
+    new URLSearchParams(parametros.toString()),
+  );
+  const enPapelera = estado.vista === "papelera";
+  const puedeUnirDuplicados = puedeFusionar(rol);
+  // La eliminación definitiva no es una limpieza de escritorio. El servidor
+  // la restringe igualmente; esconder el botón solo evita ofrecer algo que
+  // acabaría en un 403.
+  const puedeEliminarDefinitivo = rol === "ADMIN" || rol === "SUPER_ADMIN";
+
+  /**
+   * Navegación de SOLO query, con la History API del navegador.
+   *
+   * Misma lección que la bandeja (3.y): aquí la ruta no cambia, solo cambian
+   * los parámetros, y `router.push`/`router.replace` no llegaban a aplicarse
+   * en el build de producción —la barra de direcciones se quedaba igual—.
+   * Next 15+ observa `history.pushState`/`replaceState`, y `useSearchParams`
+   * se actualiza con ellos.
+   *
+   * `push` para pestaña y paginación, que son sitios distintos y deben
+   * poder deshacerse con Atrás. `replace` para teclear en el buscador: una
+   * entrada de historial por pulsación deja el botón Atrás inservible.
+   */
+  const navegar = useCallback(
+    (cambios: CambiosDeContactos, modo: "push" | "replace" = "push") => {
+      if (typeof window === "undefined") return;
+      const q = aplicarEnQuery(
+        new URLSearchParams(window.location.search),
+        cambios,
+      );
+      const url = q ? `${pathname}?${q}` : pathname;
+      if (modo === "push") window.history.pushState(null, "", url);
+      else window.history.replaceState(null, "", url);
+    },
+    [pathname],
+  );
+
+  const listado = useQuery({
+    // La clave incluye TODO lo que cambia el resultado. Sin la búsqueda y la
+    // página dentro, react-query serviría la lista anterior desde caché y la
+    // pantalla enseñaría resultados de otra consulta.
+    queryKey: [
+      "contacts",
+      "listado",
+      estado.vista,
+      estado.search,
+      estado.pagina,
+      estado.porPagina,
+    ],
+    queryFn: () =>
+      getListadoDeContactos({
+        vista: estado.vista,
+        search: estado.search,
+        limit: estado.porPagina,
+        offset: offsetDe(estado),
+      }),
+    // Al cambiar de página o de pestaña se conserva lo anterior mientras llega
+    // lo nuevo: sin esto la tabla desaparece y la página da un salto.
+    placeholderData: (previo) => previo,
   });
-  const papelera = useQuery({
-    queryKey: ["contacts", "papelera"],
-    queryFn: getPapelera,
-    enabled: vista === "papelera",
-  });
 
-  const enPapelera = vista === "papelera";
-  const isLoading = enPapelera ? papelera.isLoading : activos.isLoading;
+  const estadoHttp = (listado.error as { response?: { status?: number } })
+    ?.response?.status;
+  const sinPermiso = estadoHttp === 403;
 
-  const [search, setSearch] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
-  const [aEliminar, setAEliminar] = useState<Contact | null>(null);
+  const [aEliminar, setAEliminar] = useState<ContactoDeListado | null>(null);
+  const [aArchivar, setAArchivar] = useState<ContactoDeListado | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  // LA SELECCIÓN VIVE EN LA URL, no en el estado de React: `?fusionar=<id>` y
-  // `?con=<id>`. Así una recarga a mitad de la comparación devuelve a la misma
-  // pareja en vez de al listado, y el enlace se puede pegar en un mensaje.
-  const router = useRouter();
-  const parametros = useSearchParams();
-  const puedeUnirDuplicados = puedeFusionar(rol);
-
   /**
-   * LA SELECCION SE LEE DE LA RUTA Y SE ESCRIBE EN LA RUTA.
+   * El texto del buscador se teclea en local y viaja a la URL con retardo.
    *
-   * Se guarda ademas en estado porque `router.replace` NO actualiza la barra
-   * de direcciones en esta pantalla —medido en navegador: los manejadores de
-   * React se ejecutan, el paso cambia, y `location.search` se queda igual—,
-   * asi que confiar solo en el router dejaba la interfaz congelada. El estado
-   * manda la pantalla al instante y `history.replaceState` deja la URL en su
-   * sitio para que una recarga o un enlace pegado abran la misma pareja.
-   *
-   * `replaceState` y no `pushState`: cambiar de principal es corregir la
-   * misma decision, no navegar a otro sitio, y llenar el historial obligaria
-   * a pulsar «atras» una vez por cada rectificacion.
+   * Leerlo directamente de la URL con retardo haría que el campo pareciera
+   * trabado. Cuando la URL cambia por fuera —Atrás, un enlace pegado— el
+   * campo se resincroniza.
    */
-  const [seleccion, setSeleccion] = useState<{
-    principal: string | null;
-    duplicado: string | null;
-    paso: string | null;
-  }>(() => ({
-    principal: parametros.get("fusionar"),
-    duplicado: parametros.get("con"),
-    paso: parametros.get("paso"),
-  }));
-
-  // LA RUTA MANDA CUANDO CAMBIA POR FUERA: enlace pegado, atras o adelante.
-  //
-  // Se ajusta durante el RENDER y no en un efecto —mismo patron que Tareas—:
-  // un efecto que llama a `setState` provoca un render en cascada y la pareja
-  // aparecia un fotograma tarde. `claveAplicada` hace que ocurra una sola vez
-  // por cambio de URL, de modo que un intercambio no se deshaga solo.
-  const claveDeUrl = `${parametros.get("fusionar") ?? ""}|${parametros.get("con") ?? ""}|${parametros.get("paso") ?? ""}`;
-  const [claveAplicada, setClaveAplicada] = useState(claveDeUrl);
-  if (claveDeUrl !== claveAplicada) {
-    setClaveAplicada(claveDeUrl);
-    const [p, d, pa] = claveDeUrl.split("|");
-    setSeleccion({
-      principal: p || null,
-      duplicado: d || null,
-      paso: pa || null,
-    });
+  const [textoBusqueda, setTextoBusqueda] = useState(estado.search);
+  const [busquedaAplicada, setBusquedaAplicada] = useState(estado.search);
+  if (estado.search !== busquedaAplicada) {
+    setBusquedaAplicada(estado.search);
+    setTextoBusqueda(estado.search);
   }
 
-  const fusionarId = seleccion.principal;
-  const duplicadoId = seleccion.duplicado;
-  const pasoDeFusion = seleccion.paso;
-
-  /**
-   * Escribe la seleccion COMPLETA en la ruta: principal, duplicado y paso.
-   *
-   * Los tres van juntos a proposito. Cuando solo viajaba el duplicado, un
-   * intercambio dejaba `fusionar` con el principal anterior y `con` con ese
-   * mismo id, y la pantalla acababa comparando un contacto consigo mismo.
-   */
-  function escribirRuta(
-    principal: string | null,
-    duplicado: string | null,
-    paso: string | null,
-  ) {
-    setSeleccion({ principal, duplicado, paso });
-    if (typeof window === "undefined") return;
-    const q = new URLSearchParams(window.location.search);
-    if (principal) q.set("fusionar", principal);
-    else q.delete("fusionar");
-    if (duplicado) q.set("con", duplicado);
-    else q.delete("con");
-    if (paso) q.set("paso", paso);
-    else q.delete("paso");
-    const cadena = q.toString();
-    window.history.replaceState(
-      null,
-      "",
-      `/dashboard/contacts${cadena ? `?${cadena}` : ""}`,
+  useEffect(() => {
+    if (textoBusqueda.trim() === estado.search) return;
+    const t = setTimeout(
+      () => navegar({ search: textoBusqueda }, "replace"),
+      RETARDO_DE_BUSQUEDA,
     );
-  }
+    return () => clearTimeout(t);
+  }, [textoBusqueda, estado.search, navegar]);
 
-  function abrirFusion(
-    principal: string,
-    duplicado?: string | null,
-    paso?: string | null,
-  ) {
-    escribirRuta(principal, duplicado ?? null, paso ?? null);
-  }
+  // ── Fusión de duplicados (3.x). Se conserva tal cual: vive en la URL ──────
+  const fusionarId = parametros.get("fusionar");
+  const duplicadoId = parametros.get("con");
+  const pasoDeFusion = parametros.get("paso");
 
-  function cerrarFusion() {
-    escribirRuta(null, null, null);
-  }
+  const escribirFusion = useCallback(
+    (principal: string | null, duplicado: string | null, paso: string | null) => {
+      if (typeof window === "undefined") return;
+      const q = new URLSearchParams(window.location.search);
+      if (principal) q.set("fusionar", principal);
+      else q.delete("fusionar");
+      if (duplicado) q.set("con", duplicado);
+      else q.delete("con");
+      if (paso) q.set("paso", paso);
+      else q.delete("paso");
+      const cadena = q.toString();
+      // `replaceState` y no `pushState`: cambiar de principal es corregir la
+      // misma decisión, no navegar a otro sitio.
+      window.history.replaceState(
+        null,
+        "",
+        cadena ? `${pathname}?${cadena}` : pathname,
+      );
+    },
+    [pathname],
+  );
 
   // UN ENLACE ANTIGUO A UN CONTACTO ABSORBIDO SE REESCRIBE POR EL CANÓNICO.
-  //
-  // Se resuelve contra el servidor, que es quien sabe si ese id sigue siendo
-  // un contacto o ya es un alias, y se usa `replace` para no dejar la URL
-  // muerta en el historial —volver atrás la reabriría—. La condición
-  // `canonicoId !== fusionarId` evita el bucle: una vez reescrita, la
-  // resolución siguiente devuelve el mismo id y no vuelve a navegar.
   useEffect(() => {
     if (!fusionarId) return;
     let vigente = true;
     getCanonico(fusionarId)
       .then((r) => {
         if (!vigente || !r.fueFusionado || r.canonicoId === fusionarId) return;
-        escribirRuta(r.canonicoId, null, null);
+        escribirFusion(r.canonicoId, null, null);
         setAviso(
           "Ese contacto se había fusionado: te llevamos a la ficha que lo absorbió.",
         );
@@ -172,40 +183,7 @@ function ContactsPageContent() {
     return () => {
       vigente = false;
     };
-    // Solo depende del id: resolver el canonico otra vez porque cambio
-    // cualquier otra cosa seria una llamada al servidor sin motivo.
-  }, [fusionarId]);
-
-  // La eliminación definitiva no es una limpieza de escritorio. El servidor
-  // la restringe igualmente; esconder el botón solo evita ofrecer algo que
-  // acabaría en un 403.
-  const puedeEliminarDefinitivo = rol === "ADMIN" || rol === "SUPER_ADMIN";
-
-  const filtered = useMemo(() => {
-    // La lista se elige DENTRO del memo: fuera se recreaba en cada render y
-    // arrastraba consigo el filtrado, que es lo que este memo evita.
-    const lista: Contact[] = enPapelera
-      ? (papelera.data?.items ?? [])
-      : (activos.data ?? []);
-    const term = search.toLowerCase();
-    if (!term) return lista;
-    return lista.filter(
-      (c) =>
-        (c.name?.toLowerCase().includes(term) ?? false) ||
-        c.phone.includes(term) ||
-        (c.email?.toLowerCase().includes(term) ?? false),
-    );
-  }, [enPapelera, papelera.data, activos.data, search]);
-
-  function openCreateModal() {
-    setEditingContact(null);
-    setModalOpen(true);
-  }
-
-  function openEditModal(contact: Contact) {
-    setEditingContact(contact);
-    setModalOpen(true);
-  }
+  }, [fusionarId, escribirFusion]);
 
   async function refrescar() {
     await queryClient.invalidateQueries({ queryKey: ["contacts"] });
@@ -232,131 +210,123 @@ function ContactsPageContent() {
     setModalOpen(false);
   }
 
-  /**
-   * ARCHIVA. El botón dice lo que hace: el contacto sale de las listas de
-   * trabajo y su historial se queda donde está.
-   */
-  async function handleArchive(contact: Contact) {
-    const nombre = contact.name || contact.phone;
-    if (
-      !confirm(
-        `¿Archivar a ${nombre}?\n\n` +
-          "Saldrá de la lista de contactos activos. Sus conversaciones, " +
-          "mensajes y oportunidades se conservan, y puedes restaurarlo desde " +
-          "la papelera cuando quieras.",
-      )
-    )
-      return;
-    await archiveContact(contact.id);
-    await refrescar();
-    setAviso(`${nombre} está archivado. Puedes restaurarlo desde la papelera.`);
-  }
-
-  async function handleRestore(contact: Contact) {
-    await restoreContact(contact.id);
+  async function confirmarArchivado() {
+    if (!aArchivar) return;
+    const nombre = aArchivar.nombre || aArchivar.telefono;
+    const r = await archiveContact(aArchivar.id);
+    setAArchivar(null);
     await refrescar();
     setAviso(
-      `${contact.name || contact.phone} volvió a los contactos activos.`,
+      r.yaEstaba
+        ? `${nombre} ya estaba archivado.`
+        : `${nombre} está archivado. Puedes restaurarlo desde la papelera.`,
     );
   }
 
-  const acciones = (contact: Contact, tamaño: number) => (
-    <div className="flex shrink-0 justify-end gap-1">
-      {enPapelera ? (
-        <>
-          {!contact.anonymizedAt && (
-            <button
-              onClick={() => handleRestore(contact)}
-              aria-label={`Restaurar a ${contact.name || contact.phone}`}
-              title="Restaurar"
-              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-            >
-              <ArchiveRestore size={tamaño} />
-            </button>
-          )}
-          {puedeEliminarDefinitivo && !contact.anonymizedAt && (
-            <button
-              onClick={() => setAEliminar(contact)}
-              aria-label={`Eliminar definitivamente a ${contact.name || contact.phone}`}
-              title="Eliminar definitivamente"
-              className="rounded p-1.5 text-neutral-400 hover:bg-status-error-surface hover:text-status-error"
-            >
-              <Trash2 size={tamaño} />
-            </button>
-          )}
-        </>
-      ) : (
-        <>
-          <button
-            onClick={() => openEditModal(contact)}
-            aria-label={`Editar a ${contact.name || contact.phone}`}
-            title="Editar"
-            className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-          >
-            <Pencil size={tamaño} />
-          </button>
-          {puedeUnirDuplicados && (
-            <button
-              onClick={() => abrirFusion(contact.id)}
-              aria-label={`Fusionar duplicado de ${contact.name || contact.phone}`}
-              title="Fusionar duplicado"
-              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-            >
-              <Merge size={tamaño} />
-            </button>
-          )}
-          <button
-            onClick={() => handleArchive(contact)}
-            aria-label={`Archivar a ${contact.name || contact.phone}`}
-            title="Archivar"
-            className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-          >
-            <Archive size={tamaño} />
-          </button>
-        </>
-      )}
-    </div>
-  );
+  async function handleRestore(c: ContactoDeListado) {
+    const nombre = c.nombre || c.telefono;
+    const r = await restoreContact(c.id);
+    await refrescar();
+    setAviso(
+      r.yaEstaba
+        ? `${nombre} ya estaba en los contactos activos.`
+        : `${nombre} volvió a los contactos activos.`,
+    );
+  }
+
+  const datos = listado.data;
+  const contactos = datos?.items ?? [];
+  const rango = rangoMostrado(estado, contactos.length, datos?.total ?? 0);
+  const paginas = totalDePaginas(estado, datos?.total ?? 0);
+  // Sale de `useSearchParams` y NO de `window.location`: leer `window` durante
+  // el render da un valor en el servidor y otro al hidratar, y eso es un aviso
+  // de hidratación en la consola además de un `volverA` equivocado en el
+  // primer pintado.
+  const rutaActual = rutaDeContactos(parametros.toString());
+
+  const mensajeVacio = enPapelera
+    ? estado.search
+      ? "Ningún contacto archivado coincide con la búsqueda."
+      : "No hay contactos archivados."
+    : estado.search
+      ? "Ningún contacto coincide con la búsqueda."
+      : "No hay contactos todavía.";
 
   return (
     <div>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-xl font-semibold text-neutral-900">Contactos</h2>
-        <button
-          onClick={openCreateModal}
-          className="flex items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900"
-        >
-          <Plus size={16} />
-          Nuevo contacto
-        </button>
+      {/* ── Cabecera ─────────────────────────────────────────────────── */}
+      <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-content-primary">
+            Contactos
+          </h2>
+          <p className="mt-0.5 text-sm text-content-secondary">
+            Personas, conversaciones y oportunidades en un solo lugar
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <dl className="flex items-center gap-2">
+            {PESTANAS.map((p) => (
+              <div
+                key={p.clave}
+                className="rounded-lg border border-line-default bg-surface-default px-3 py-2 text-center"
+              >
+                <dd className="font-mono text-base font-semibold text-content-primary">
+                  {datos ? (
+                    datos.contadores[p.contador]
+                  ) : (
+                    <Skeleton className="mx-auto h-5 w-8" />
+                  )}
+                </dd>
+                <dt className="text-xs text-content-secondary">
+                  {p.clave === "activos" ? "activos" : "archivados"}
+                </dt>
+              </div>
+            ))}
+          </dl>
+
+          <Button
+            variant="accent"
+            onClick={() => {
+              setEditingContact(null);
+              setModalOpen(true);
+            }}
+          >
+            <Plus size={16} aria-hidden="true" />
+            Nuevo contacto
+          </Button>
+        </div>
       </div>
 
+      {/* ── Pestañas ─────────────────────────────────────────────────── */}
       <div
-        className="mb-4 flex gap-1 border-b border-neutral-200"
+        className="mb-4 flex gap-1 border-b border-line-default"
         role="tablist"
         aria-label="Contactos activos o archivados"
       >
-        {(
-          [
-            ["activos", "Activos"],
-            ["papelera", "Papelera"],
-          ] as const
-        ).map(([clave, etiqueta]) => (
+        {PESTANAS.map((p) => (
           <button
-            key={clave}
+            key={p.clave}
+            type="button"
             role="tab"
-            aria-selected={vista === clave}
+            aria-selected={estado.vista === p.clave}
             onClick={() => {
-              setVista(clave);
               setAviso(null);
+              navegar({ vista: p.clave });
             }}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm ${
-              vista === clave
+            className={`-mb-px flex items-center gap-1.5 border-b-2 px-3 py-2 text-sm ${
+              estado.vista === p.clave
                 ? "border-brand-primary font-medium text-brand-primary"
-                : "border-transparent text-neutral-500 hover:text-neutral-800"
+                : "border-transparent text-content-secondary hover:text-content-primary"
             }`}
           >
-            {etiqueta}
+            {p.etiqueta}
+            {datos && (
+              <span className="font-mono text-xs text-content-secondary">
+                {datos.contadores[p.contador]}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -364,133 +334,169 @@ function ContactsPageContent() {
       {aviso && (
         <div
           role="status"
-          className="mb-4 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700"
+          className="mb-4 rounded-md border border-line-default bg-surface-subtle px-3 py-2 text-sm text-content-secondary"
         >
           {aviso}
         </div>
       )}
 
       {enPapelera && (
-        <p className="mb-4 text-sm text-neutral-600">
+        <p className="mb-4 text-sm text-content-secondary">
           Los contactos archivados no aparecen en las listas de trabajo y los
-          bots no arrancan solos con ellos. Su historial sigue intacto.
+          bots no arrancan solos con ellos. Su historial sigue intacto y puedes
+          restaurarlos cuando quieras.
         </p>
       )}
 
-      <div className="relative mb-4 sm:max-w-xs">
+      {/* ── Buscador ─────────────────────────────────────────────────── */}
+      <div className="relative mb-4 sm:max-w-sm">
         <Search
           size={15}
-          className="absolute left-2.5 top-2.5 text-neutral-400"
+          aria-hidden="true"
+          className="pointer-events-none absolute left-2.5 top-2.5 text-content-disabled"
         />
         <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          type="search"
+          value={textoBusqueda}
+          onChange={(e) => setTextoBusqueda(e.target.value)}
           placeholder="Buscar por nombre, teléfono o correo"
           aria-label="Buscar contactos"
-          className="w-full rounded-md border border-neutral-300 py-2 pl-8 pr-3 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+          className="w-full rounded-md border border-line-default bg-surface-default py-2 pl-8 pr-3 text-sm text-content-primary outline-none focus:border-line-focus focus:ring-1 focus:ring-line-focus"
         />
       </div>
 
-      {isLoading && (
-        <p className="py-10 text-center text-sm text-neutral-400">
-          Cargando...
-        </p>
-      )}
-
-      {!isLoading && filtered.length === 0 && (
-        <EmptyState
-          icon={Users}
-          message={
-            enPapelera
-              ? "No hay contactos archivados."
-              : search
-                ? "Ningún contacto coincide con la búsqueda."
-                : "No hay contactos."
-          }
-        />
-      )}
-
-      {!isLoading && filtered.length > 0 && (
+      {/* ── Contenido ────────────────────────────────────────────────── */}
+      {sinPermiso ? (
+        <ForbiddenState detalle="Pide acceso a un administrador de tu empresa." />
+      ) : (
         <>
-          {/* Móvil: tarjetas apiladas en vez de tabla */}
-          <div className="flex flex-col gap-2 sm:hidden">
-            {filtered.map((contact) => (
-              <div
-                key={contact.id}
-                className="rounded-lg border border-neutral-200 bg-white p-3"
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-neutral-900">
-                      {contact.name || "—"}
-                    </p>
-                    <p className="mt-0.5 text-xs text-neutral-600">
-                      {contact.phone}
-                    </p>
-                    {contact.email && (
-                      <p className="truncate text-xs text-neutral-500">
-                        {contact.email}
-                      </p>
-                    )}
-                    {contact.anonymizedAt && (
-                      <p className="mt-1 text-xs text-neutral-500">
-                        Datos personales eliminados
-                      </p>
-                    )}
-                  </div>
-                  {acciones(contact, 15)}
+          <ListState
+            isLoading={listado.isLoading}
+            isError={listado.isError}
+            isEmpty={contactos.length === 0}
+            error={listado.error}
+            onRetry={() => listado.refetch()}
+            icon={Users}
+            emptyMessage={mensajeVacio}
+          />
+
+          {!listado.isLoading && !listado.isError && contactos.length > 0 && (
+            <>
+              <ContactosTabla
+                contactos={contactos}
+                enPapelera={enPapelera}
+                puedeFusionar={puedeUnirDuplicados}
+                puedeEliminarDefinitivo={puedeEliminarDefinitivo}
+                rutaDeRegreso={rutaActual}
+                acciones={{
+                  onArchivar: setAArchivar,
+                  onRestaurar: handleRestore,
+                  onEditar: (c) => {
+                    // El modal de edición trabaja con la fila cruda; se le
+                    // pasa lo que necesita sin inventar campos.
+                    setEditingContact({
+                      id: c.id,
+                      name: c.nombre,
+                      phone: c.telefono,
+                      email: c.email,
+                      tags: c.etiquetas,
+                      isBlocked: c.bloqueado,
+                      createdAt: c.creadoEn,
+                      archivedAt: c.archivadoEn,
+                      archivedReason: c.motivoDeArchivo,
+                      anonymizedAt: c.anonimizado ? c.creadoEn : null,
+                    });
+                    setModalOpen(true);
+                  },
+                  onFusionar: (c) => escribirFusion(c.id, null, null),
+                  onEliminarDefinitivo: setAEliminar,
+                }}
+              />
+
+              {/* ── Paginación ───────────────────────────────────────── */}
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p
+                  className="text-sm text-content-secondary"
+                  aria-live="polite"
+                >
+                  Mostrando{" "}
+                  <span className="font-mono">{rango.desde}</span> a{" "}
+                  <span className="font-mono">{rango.hasta}</span> de{" "}
+                  <span className="font-mono">{rango.total}</span>{" "}
+                  {rango.total === 1 ? "contacto" : "contactos"}
+                </p>
+
+                <div className="flex items-center gap-3">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={estado.pagina <= 1}
+                    onClick={() => navegar({ pagina: estado.pagina - 1 })}
+                  >
+                    Anterior
+                  </Button>
+                  <span className="text-sm text-content-secondary">
+                    Página <span className="font-mono">{estado.pagina}</span> de{" "}
+                    <span className="font-mono">{paginas}</span>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={estado.pagina >= paginas}
+                    onClick={() => navegar({ pagina: estado.pagina + 1 })}
+                  >
+                    Siguiente
+                  </Button>
+
+                  <label className="flex items-center gap-1.5 text-sm text-content-secondary">
+                    <span className="sr-only sm:not-sr-only">Por página</span>
+                    <select
+                      value={estado.porPagina}
+                      aria-label="Contactos por página"
+                      onChange={(e) =>
+                        navegar({ porPagina: Number(e.target.value) })
+                      }
+                      className="rounded-md border border-line-default bg-surface-default px-2 py-1 text-sm outline-none focus:border-line-focus focus:ring-1 focus:ring-line-focus"
+                    >
+                      {POR_PAGINA.map((n) => (
+                        <option key={n} value={n}>
+                          {n}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
               </div>
-            ))}
-          </div>
-
-          {/* Escritorio/tablet: tabla tradicional */}
-          <div className="hidden overflow-x-auto rounded-lg border border-neutral-200 bg-white sm:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-neutral-200 bg-neutral-50 text-left text-xs text-neutral-500">
-                  <th className="px-4 py-2.5 font-medium">Nombre</th>
-                  <th className="px-4 py-2.5 font-medium">Teléfono</th>
-                  <th className="px-4 py-2.5 font-medium">Correo</th>
-                  {enPapelera && (
-                    <th className="px-4 py-2.5 font-medium">Motivo</th>
-                  )}
-                  <th className="px-4 py-2.5 font-medium"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((contact) => (
-                  <tr
-                    key={contact.id}
-                    className="border-b border-neutral-100 last:border-0"
-                  >
-                    <td className="px-4 py-2.5 text-neutral-800">
-                      {contact.name || "—"}
-                      {contact.anonymizedAt && (
-                        <span className="ml-2 text-xs text-neutral-500">
-                          datos personales eliminados
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 text-neutral-600">
-                      {contact.phone}
-                    </td>
-                    <td className="px-4 py-2.5 text-neutral-600">
-                      {contact.email || "—"}
-                    </td>
-                    {enPapelera && (
-                      <td className="px-4 py-2.5 text-neutral-500">
-                        {contact.archivedReason || "—"}
-                      </td>
-                    )}
-                    <td className="px-4 py-2.5">{acciones(contact, 14)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            </>
+          )}
         </>
+      )}
+
+      {/* ── Diálogos ─────────────────────────────────────────────────── */}
+      {aArchivar && (
+        <ConfirmDialog
+          title={`¿Archivar a ${aArchivar.nombre || aArchivar.telefono}?`}
+          confirmLabel="Archivar"
+          confirmVariant="primary"
+          message={
+            <>
+              <p>
+                <TextoLargo valor={aArchivar.nombre || aArchivar.telefono} />{" "}
+                saldrá de la lista de contactos activos y pasará a la papelera.
+              </p>
+              {/* La promesa exacta del mockup, y la que cumple el backend. */}
+              <p className="mt-2">
+                <strong className="font-medium text-content-primary">
+                  No se elimina su historial.
+                </strong>{" "}
+                Se conservan sus conversaciones, mensajes, oportunidades,
+                tareas y cotizaciones, y puedes restaurarlo cuando quieras.
+              </p>
+            </>
+          }
+          onClose={() => setAArchivar(null)}
+          onConfirm={confirmarArchivado}
+        />
       )}
 
       {modalOpen && (
@@ -509,22 +515,38 @@ function ContactsPageContent() {
           duplicadoInicialId={duplicadoId}
           pasoInicial={pasoDeFusion as never}
           puedeEjecutar={puedeUnirDuplicados}
-          onCerrar={cerrarFusion}
+          onCerrar={() => escribirFusion(null, null, null)}
           onCambioDeSeleccion={(sel) =>
-            abrirFusion(sel.principalId, sel.duplicadoId, sel.paso)
+            escribirFusion(sel.principalId, sel.duplicadoId, sel.paso ?? null)
           }
           onFusionado={async (canonicoId) => {
-            cerrarFusion();
+            escribirFusion(null, null, null);
             await refrescar();
             setAviso("Fusión completada. Este es el contacto principal.");
-            router.push(`/dashboard/pipeline?perfil=${canonicoId}`);
+            // Ahora existe `/dashboard/contacts/[id]` (3.y): el resultado de
+            // una fusión abre el perfil del contacto, no el embudo, que era
+            // el destino de cuando esa ruta no existía.
+            router.push(`/dashboard/contacts/${canonicoId}`);
           }}
         />
       )}
 
       {aEliminar && (
         <EliminarContactoDialog
-          contact={aEliminar}
+          contact={
+            {
+              id: aEliminar.id,
+              name: aEliminar.nombre,
+              phone: aEliminar.telefono,
+              email: aEliminar.email,
+              tags: aEliminar.etiquetas,
+              isBlocked: aEliminar.bloqueado,
+              createdAt: aEliminar.creadoEn,
+              archivedAt: aEliminar.archivadoEn,
+              archivedReason: aEliminar.motivoDeArchivo,
+              anonymizedAt: null,
+            } satisfies Contact
+          }
           onClose={() => setAEliminar(null)}
           onDone={async (accion) => {
             setAEliminar(null);
@@ -549,7 +571,9 @@ export default function ContactsPage() {
   return (
     <Suspense
       fallback={
-        <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>
+        <p className="py-10 text-center text-sm text-content-disabled">
+          Cargando…
+        </p>
       }
     >
       <ContactsPageContent />

@@ -1,11 +1,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ContactsPage from "./page";
 
-const getContacts = vi.fn();
-const getPapelera = vi.fn();
+const getListadoDeContactos = vi.fn();
 const archiveContact = vi.fn();
 const restoreContact = vi.fn();
 
@@ -14,8 +13,7 @@ vi.mock("@/lib/contacts", async () => {
     await vi.importActual<typeof import("@/lib/contacts")>("@/lib/contacts");
   return {
     ...real,
-    getContacts: () => getContacts(),
-    getPapelera: () => getPapelera(),
+    getListadoDeContactos: (o: unknown) => getListadoDeContactos(o),
     createContact: vi.fn(),
     updateContact: vi.fn(),
     archiveContact: (id: string) => archiveContact(id),
@@ -23,20 +21,26 @@ vi.mock("@/lib/contacts", async () => {
   };
 });
 
-// La pantalla guarda la pareja a fusionar en la URL (`?fusionar=` / `?con=`),
-// así que ahora usa el router. Se controla desde aquí para poder afirmar sobre
-// la ruta a la que se navega.
-const replace = vi.fn();
+/**
+ * `useSearchParams` LEE DE `window.location`, como en el navegador.
+ *
+ * La pantalla escribe la pestaña, la búsqueda y la página con
+ * `history.pushState`/`replaceState` —la corrección de 3.y—, así que un doble
+ * que devuelva un objeto fijo no podría comprobar nada de eso. Leyendo de
+ * `window.location` se puede afirmar sobre la URL real y volver a renderizar
+ * para ver qué se pide después.
+ */
 const push = vi.fn();
-let parametrosDeUrl = new URLSearchParams();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace, push, prefetch: vi.fn() }),
-  useSearchParams: () => parametrosDeUrl,
+  useRouter: () => ({ replace: vi.fn(), push, prefetch: vi.fn() }),
+  usePathname: () => "/dashboard/contacts",
+  useSearchParams: () => new URLSearchParams(window.location.search),
 }));
 
 const getCanonico = vi.fn();
 vi.mock("@/lib/fusion", async () => {
-  const real = await vi.importActual<typeof import("@/lib/fusion")>("@/lib/fusion");
+  const real =
+    await vi.importActual<typeof import("@/lib/fusion")>("@/lib/fusion");
   return { ...real, getCanonico: (id: string) => getCanonico(id) };
 });
 
@@ -46,18 +50,32 @@ vi.mock("@/store/auth.store", () => ({
     selector({ user: { role: rol } }),
 }));
 
-function contacto(overrides = {}) {
+function fila(overrides = {}) {
   return {
     id: "c1",
-    name: "Ana Restrepo",
-    phone: "+573001112233",
-    email: "ana@example.com",
-    tags: [],
-    isBlocked: false,
-    createdAt: new Date().toISOString(),
-    archivedAt: null,
-    archivedReason: null,
-    anonymizedAt: null,
+    nombre: "Ana Restrepo",
+    telefono: "+573001112233",
+    email: "ana@example.invalid",
+    etiquetas: [] as string[],
+    bloqueado: false,
+    anonimizado: false,
+    creadoEn: "2026-03-04T10:00:00.000Z",
+    archivadoEn: null as string | null,
+    motivoDeArchivo: null as string | null,
+    asesor: null as { id: string; nombre: string } | null,
+    etapa: null as { id: string; nombre: string; color: string | null } | null,
+    conversacionId: null as string | null,
+    ultimaInteraccionEn: null as string | null,
+    tareasPendientes: 0,
+    ...overrides,
+  };
+}
+
+function listado(items: ReturnType<typeof fila>[], overrides = {}) {
+  return {
+    items,
+    total: items.length,
+    contadores: { activos: items.length, archivados: 0 },
     ...overrides,
   };
 }
@@ -71,24 +89,31 @@ function renderPage() {
   );
 }
 
-describe("Pantalla de contactos", () => {
+/** La query de la última llamada al listado. */
+const ultimaConsulta = () =>
+  getListadoDeContactos.mock.calls.at(-1)?.[0] as {
+    vista: string;
+    search?: string;
+    limit: number;
+    offset: number;
+  };
+
+const query = () => new URLSearchParams(window.location.search);
+
+describe("Pantalla de contactos (mockup 02)", () => {
   beforeEach(() => {
-  replace.mockClear();
-  push.mockClear();
-  window.history.replaceState(null, "", "/dashboard/contacts");
-  parametrosDeUrl = new URLSearchParams();
-  getCanonico.mockResolvedValue({
-    solicitado: "c1",
-    canonicoId: "c1",
-    fueFusionado: false,
-    fusionadoEn: null,
-  });
+    push.mockClear();
+    window.history.replaceState(null, "", "/dashboard/contacts");
     rol = "ADMIN";
-    getContacts.mockResolvedValue([contacto()]);
-    getPapelera.mockResolvedValue({ items: [], total: 0 });
+    getCanonico.mockResolvedValue({
+      solicitado: "c1",
+      canonicoId: "c1",
+      fueFusionado: false,
+      fusionadoEn: null,
+    });
+    getListadoDeContactos.mockResolvedValue(listado([fila()]));
     archiveContact.mockResolvedValue({ archivado: true, yaEstaba: false });
     restoreContact.mockResolvedValue({ restaurado: true, yaEstaba: false });
-    vi.spyOn(window, "confirm").mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -96,145 +121,409 @@ describe("Pantalla de contactos", () => {
     vi.clearAllMocks();
   });
 
-  /**
-   * ESTA ES LA REGRESIÓN QUE IMPORTA.
-   *
-   * El botón decía «Eliminar contacto» y lo que hacía era archivar. El
-   * archivado es la conducta correcta —el historial no se destruye—, pero la
-   * etiqueta mentía: quien la pulsaba creía haber borrado datos que seguían
-   * ahí. Si alguien vuelve a poner «Eliminar» en la acción principal, esto
-   * tiene que ponerse rojo.
-   */
-  it("la acción principal se llama «Archivar», no «Eliminar»", async () => {
-    renderPage();
-
-    const archivar = await screen.findAllByRole("button", {
-      name: /archivar a ana restrepo/i,
-    });
-    expect(archivar.length).toBeGreaterThan(0);
-
-    expect(
-      screen.queryByRole("button", { name: /^eliminar contacto$/i }),
-    ).toBeNull();
-  });
-
-  it("al archivar avisa de que el historial se conserva", async () => {
-    renderPage();
-    const boton = (
-      await screen.findAllByRole("button", { name: /archivar a ana/i })
-    )[0];
-
-    await userEvent.click(boton);
-
-    const aviso = (window.confirm as unknown as { mock: { calls: string[][] } })
-      .mock.calls[0][0];
-    expect(aviso).toMatch(/se conservan/i);
-    await waitFor(() => expect(archiveContact).toHaveBeenCalledWith("c1"));
-  });
-
-  it("la papelera lista los archivados y permite restaurarlos", async () => {
-    getPapelera.mockResolvedValue({
-      items: [
-        contacto({
-          id: "c2",
-          name: "Carlos Mesa",
-          archivedAt: new Date().toISOString(),
-          archivedReason: "ya no es cliente",
-        }),
-      ],
-      total: 1,
-    });
-    renderPage();
-
-    await userEvent.click(await screen.findByRole("tab", { name: "Papelera" }));
-
-    expect(await screen.findAllByText("Carlos Mesa")).not.toHaveLength(0);
-    expect(screen.getAllByText("ya no es cliente").length).toBeGreaterThan(0);
-
-    await userEvent.click(
-      screen.getAllByRole("button", { name: /restaurar a carlos mesa/i })[0],
-    );
-    await waitFor(() => expect(restoreContact).toHaveBeenCalledWith("c2"));
-  });
-
-  it("un AGENT no ve la eliminación definitiva", async () => {
-    rol = "AGENT";
-    getPapelera.mockResolvedValue({
-      items: [contacto({ id: "c2", archivedAt: new Date().toISOString() })],
-      total: 1,
-    });
-    renderPage();
-
-    await userEvent.click(await screen.findByRole("tab", { name: "Papelera" }));
-    await screen.findAllByRole("button", { name: /restaurar/i });
-
-    expect(
-      screen.queryByRole("button", { name: /eliminar definitivamente/i }),
-    ).toBeNull();
-  });
-
-  it("un contacto anonimizado no se puede restaurar ni volver a eliminar", async () => {
-    getPapelera.mockResolvedValue({
-      items: [
-        contacto({
-          id: "c3",
-          name: "Contacto anonimizado",
-          archivedAt: new Date().toISOString(),
-          anonymizedAt: new Date().toISOString(),
-        }),
-      ],
-      total: 1,
-    });
-    renderPage();
-
-    await userEvent.click(await screen.findByRole("tab", { name: "Papelera" }));
-    await screen.findAllByText(/datos personales eliminados/i);
-
-    expect(screen.queryByRole("button", { name: /restaurar/i })).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /eliminar definitivamente/i }),
-    ).toBeNull();
-  });
-
-  describe("fusión de duplicados", () => {
-    it("un ADMIN ve la acción de fusionar y la abre en la URL, no en estado suelto", async () => {
-      rol = "ADMIN";
-      getContacts.mockResolvedValue([contacto()]);
+  describe("listado de activos", () => {
+    it("pide los ACTIVOS y enseña las columnas del mockup", async () => {
+      getListadoDeContactos.mockResolvedValue(
+        listado([
+          fila({
+            asesor: { id: "u1", nombre: "Ana Administradora" },
+            etapa: { id: "s1", nombre: "Negociación", color: "#131C4A" },
+            ultimaInteraccionEn: new Date().toISOString(),
+            tareasPendientes: 2,
+            etiquetas: ["Cliente VIP"],
+          }),
+        ]),
+      );
       renderPage();
 
-      const botones = await screen.findAllByRole("button", {
-        name: /Fusionar duplicado de Ana Restrepo/,
-      });
-      await userEvent.click(botones[0]);
+      expect(await screen.findByText("Ana Restrepo")).toBeInTheDocument();
+      expect(ultimaConsulta().vista).toBe("activos");
+      expect(screen.getByText("+573001112233")).toBeInTheDocument();
+      expect(screen.getByText("Ana Administradora")).toBeInTheDocument();
+      expect(screen.getByText("Negociación")).toBeInTheDocument();
+      expect(screen.getByText("Cliente VIP")).toBeInTheDocument();
+      expect(screen.getByText("2")).toBeInTheDocument();
+    });
 
-      // La pareja vive en la RUTA, no en estado suelto: recargar vuelve a la
-      // misma comparación. La escribe `history.replaceState`, así que se
-      // comprueba sobre `window.location`.
-      expect(new URLSearchParams(window.location.search).get("fusionar")).toBe(
-        "c1",
+    it("el estado se dice con TEXTO, no solo con color", async () => {
+      renderPage();
+      expect(await screen.findByText("Activa")).toBeInTheDocument();
+    });
+
+    it("«Sin asignar» se marca cuando no hay asesor", async () => {
+      renderPage();
+      expect(await screen.findByText("Sin asignar")).toBeInTheDocument();
+    });
+
+    it("el nombre ABRE EL PERFIL 360 y lleva la vuelta al listado", async () => {
+      // El hueco que cerraba este incremento: 3.y construyó
+      // `/dashboard/contacts/[id]` y Contactos nunca enlazaba a él.
+      window.history.replaceState(null, "", "/dashboard/contacts?vista=papelera");
+      renderPage();
+
+      const enlace = await screen.findByRole("link", { name: /Ana Restrepo/ });
+      expect(enlace).toHaveAttribute(
+        "href",
+        `/dashboard/contacts/c1?volverA=${encodeURIComponent("/dashboard/contacts?vista=papelera")}`,
       );
+    });
+
+    it("«Abrir chat» lleva a la conversación EXACTA", async () => {
+      getListadoDeContactos.mockResolvedValue(
+        listado([fila({ conversacionId: "conv-9" })]),
+      );
+      renderPage();
+
+      const enlace = await screen.findByRole("link", { name: /Abrir chat/ });
+      expect(enlace.getAttribute("href")).toContain(
+        "/dashboard/conversations?c=conv-9",
+      );
+    });
+
+    it("sin conversación NO se dibuja un botón que no lleva a ningún sitio", async () => {
+      renderPage();
+      await screen.findByText("Ana Restrepo");
+      expect(screen.queryByRole("link", { name: /Abrir chat/ })).toBeNull();
+      expect(screen.getByText("Sin conversación")).toBeInTheDocument();
+    });
+  });
+
+  describe("papelera", () => {
+    it("la pestaña viaja a la URL y cambia lo que se pide al servidor", async () => {
+      const { rerender } = renderPage();
+      await screen.findByText("Ana Restrepo");
+
+      await userEvent.click(screen.getByRole("tab", { name: /Papelera/ }));
+
+      expect(query().get("vista")).toBe("papelera");
+
+      getListadoDeContactos.mockResolvedValue(
+        listado(
+          [
+            fila({
+              id: "c2",
+              nombre: "Carlos Mesa",
+              archivadoEn: new Date().toISOString(),
+              motivoDeArchivo: "ya no es cliente",
+            }),
+          ],
+          { contadores: { activos: 0, archivados: 1 } },
+        ),
+      );
+      rerender(
+        <QueryClientProvider
+          client={
+            new QueryClient({ defaultOptions: { queries: { retry: false } } })
+          }
+        >
+          <ContactsPage />
+        </QueryClientProvider>,
+      );
+
+      await waitFor(() => expect(ultimaConsulta().vista).toBe("papelera"));
+      expect(await screen.findByText("Carlos Mesa")).toBeInTheDocument();
+      expect(screen.getByText("ya no es cliente")).toBeInTheDocument();
+      expect(screen.getByText("Archivada")).toBeInTheDocument();
+    });
+
+    it("restaurar devuelve el contacto y lo dice", async () => {
+      window.history.replaceState(null, "", "/dashboard/contacts?vista=papelera");
+      getListadoDeContactos.mockResolvedValue(
+        listado([
+          fila({
+            id: "c2",
+            nombre: "Carlos Mesa",
+            archivadoEn: new Date().toISOString(),
+          }),
+        ]),
+      );
+      renderPage();
+
+      await userEvent.click(
+        await screen.findByRole("button", { name: /Restaurar/ }),
+      );
+
+      await waitFor(() => expect(restoreContact).toHaveBeenCalledWith("c2"));
+      expect(
+        await screen.findByText(/volvió a los contactos activos/i),
+      ).toBeInTheDocument();
+    });
+
+    it("un contacto anonimizado no se restaura ni se vuelve a eliminar", async () => {
+      window.history.replaceState(null, "", "/dashboard/contacts?vista=papelera");
+      getListadoDeContactos.mockResolvedValue(
+        listado([
+          fila({
+            id: "c3",
+            nombre: "Contacto anonimizado",
+            archivadoEn: new Date().toISOString(),
+            anonimizado: true,
+          }),
+        ]),
+      );
+      renderPage();
+
+      await screen.findByText(/Datos personales eliminados/i);
+      expect(screen.queryByRole("button", { name: /Restaurar/ })).toBeNull();
+      expect(
+        screen.queryByRole("button", { name: /Eliminar definitivamente/i }),
+      ).toBeNull();
+    });
+  });
+
+  describe("búsqueda", () => {
+    it("la resuelve el SERVIDOR y queda en la URL", async () => {
+      const { rerender } = renderPage();
+      await screen.findByText("Ana Restrepo");
+
+      await userEvent.type(
+        screen.getByRole("searchbox", { name: /Buscar contactos/i }),
+        "zubi",
+      );
+
+      await waitFor(() => expect(query().get("q")).toBe("zubi"));
+
+      rerender(
+        <QueryClientProvider
+          client={
+            new QueryClient({ defaultOptions: { queries: { retry: false } } })
+          }
+        >
+          <ContactsPage />
+        </QueryClientProvider>,
+      );
+      await waitFor(() => expect(ultimaConsulta().search).toBe("zubi"));
+    });
+
+    it("busca DENTRO de la papelera sin salirse de la pestaña", async () => {
+      window.history.replaceState(
+        null,
+        "",
+        "/dashboard/contacts?vista=papelera&q=mesa",
+      );
+      renderPage();
+
+      await waitFor(() => {
+        expect(ultimaConsulta().vista).toBe("papelera");
+        expect(ultimaConsulta().search).toBe("mesa");
+      });
+    });
+
+    it("sin resultados dice que es la BÚSQUEDA, no que no haya contactos", async () => {
+      window.history.replaceState(null, "", "/dashboard/contacts?q=nadie");
+      getListadoDeContactos.mockResolvedValue(
+        listado([], { contadores: { activos: 7, archivados: 2 } }),
+      );
+      renderPage();
+
+      expect(
+        await screen.findByText(/Ningún contacto coincide con la búsqueda/i),
+      ).toBeInTheDocument();
+    });
+
+    it("sin contactos y sin búsqueda, el mensaje es otro", async () => {
+      getListadoDeContactos.mockResolvedValue(
+        listado([], { contadores: { activos: 0, archivados: 0 } }),
+      );
+      renderPage();
+
+      expect(
+        await screen.findByText(/No hay contactos todavía/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("archivar", () => {
+    it("pide confirmación en un DIÁLOGO real y promete que el historial se conserva", async () => {
+      // Antes era `window.confirm`: un modal del navegador que ni se puede
+      // maquetar, ni leer con lector de pantalla como parte de la página, ni
+      // conducir desde una QA automatizada.
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole("button", { name: /Archivar a Ana Restrepo/i }),
+      );
+
+      const dialogo = await screen.findByRole("dialog");
+      expect(dialogo).toHaveTextContent(/¿Archivar a Ana Restrepo\?/);
+      expect(dialogo).toHaveTextContent(/No se elimina su historial/i);
+      expect(dialogo).toHaveTextContent(/conversaciones/i);
+      expect(archiveContact).not.toHaveBeenCalled();
+    });
+
+    it("cancelar NO archiva", async () => {
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole("button", { name: /Archivar a Ana Restrepo/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Cancelar" }),
+      );
+
+      expect(archiveContact).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    });
+
+    it("confirmar archiva y lo dice", async () => {
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole("button", { name: /Archivar a Ana Restrepo/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Archivar" }),
+      );
+
+      await waitFor(() => expect(archiveContact).toHaveBeenCalledWith("c1"));
+      expect(
+        await screen.findByText(/Puedes restaurarlo desde la papelera/i),
+      ).toBeInTheDocument();
+    });
+
+    it("un doble clic en confirmar archiva UNA sola vez", async () => {
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole("button", { name: /Archivar a Ana Restrepo/i }),
+      );
+      const confirmar = await screen.findByRole("button", { name: "Archivar" });
+
+      fireEvent.click(confirmar);
+      fireEvent.click(confirmar);
+
+      await waitFor(() => expect(archiveContact).toHaveBeenCalledTimes(1));
+    });
+
+    it("si ya estaba archivado, lo dice en vez de fingir que hizo algo", async () => {
+      archiveContact.mockResolvedValue({ archivado: false, yaEstaba: true });
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole("button", { name: /Archivar a Ana Restrepo/i }),
+      );
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Archivar" }),
+      );
+
+      expect(
+        await screen.findByText(/ya estaba archivado/i),
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe("estado navegable y recargable", () => {
+    it("una URL profunda se abre tal cual, sin pasar por «activos»", async () => {
+      window.history.replaceState(
+        null,
+        "",
+        "/dashboard/contacts?vista=papelera&q=mesa&pagina=2&porPagina=50",
+      );
+      renderPage();
+
+      await waitFor(() => {
+        const c = ultimaConsulta();
+        expect(c.vista).toBe("papelera");
+        expect(c.search).toBe("mesa");
+        expect(c.limit).toBe(50);
+        // Página 2 con 50 por página → se saltan los 50 primeros.
+        expect(c.offset).toBe(50);
+      });
+    });
+
+    it("cambiar de pestaña CONSERVA la fusión abierta", async () => {
+      // El códec trabaja sobre la query existente justo por esto: rehacerla
+      // desde cero cerraba el modal de fusión al tocar una pestaña.
+      window.history.replaceState(
+        null,
+        "",
+        "/dashboard/contacts?fusionar=c1&paso=comparar",
+      );
+      renderPage();
+      await screen.findByText("Ana Restrepo");
+
+      await userEvent.click(screen.getByRole("tab", { name: /Papelera/ }));
+
+      expect(query().get("vista")).toBe("papelera");
+      expect(query().get("fusionar")).toBe("c1");
+      expect(query().get("paso")).toBe("comparar");
+    });
+
+    it("la paginación enseña el rango real y avanza por la URL", async () => {
+      getListadoDeContactos.mockResolvedValue(
+        listado([fila()], {
+          total: 60,
+          contadores: { activos: 60, archivados: 0 },
+        }),
+      );
+      renderPage();
+
+      expect(await screen.findByText(/Mostrando/)).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: "Siguiente" }));
+      expect(query().get("pagina")).toBe("2");
+    });
+  });
+
+  describe("estados y permisos", () => {
+    it("un error se anuncia como error", async () => {
+      getListadoDeContactos.mockRejectedValue(new Error("red caída"));
+      renderPage();
+
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
+    });
+
+    it("un 403 NO es un error: es falta de permiso, y no invita a reintentar", async () => {
+      getListadoDeContactos.mockRejectedValue({
+        response: { status: 403, data: { message: "prohibido" } },
+      });
+      renderPage();
+
+      expect(
+        await screen.findByText(/No tienes permiso para ver esto/i),
+      ).toBeInTheDocument();
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+
+    it("un AGENT no ve la eliminación definitiva", async () => {
+      rol = "AGENT";
+      window.history.replaceState(null, "", "/dashboard/contacts?vista=papelera");
+      getListadoDeContactos.mockResolvedValue(
+        listado([
+          fila({ id: "c2", archivadoEn: new Date().toISOString() }),
+        ]),
+      );
+      renderPage();
+
+      await screen.findByRole("button", { name: /Restaurar/ });
+      expect(
+        screen.queryByRole("button", { name: /Eliminar definitivamente/i }),
+      ).toBeNull();
+    });
+  });
+
+  describe("regresión de la fusión de duplicados (3.x)", () => {
+    it("un ADMIN la abre y la pareja queda en la URL", async () => {
+      renderPage();
+      await userEvent.click(
+        await screen.findByRole("button", {
+          name: /Fusionar duplicado de Ana Restrepo/,
+        }),
+      );
+
+      expect(query().get("fusionar")).toBe("c1");
     });
 
     it("un AGENT no ve la acción de fusionar", async () => {
       rol = "AGENT";
-      getContacts.mockResolvedValue([contacto()]);
       renderPage();
 
-      await screen.findAllByText("Ana Restrepo");
+      await screen.findByText("Ana Restrepo");
       expect(
         screen.queryAllByRole("button", { name: /Fusionar duplicado/ }),
       ).toHaveLength(0);
     });
 
     it("un enlace a un contacto ABSORBIDO se reescribe por el canónico", async () => {
-      rol = "ADMIN";
-      getContacts.mockResolvedValue([contacto()]);
       window.history.replaceState(
         null,
         "",
         "/dashboard/contacts?fusionar=viejo&con=otro",
       );
-      parametrosDeUrl = new URLSearchParams("fusionar=viejo&con=otro");
       getCanonico.mockResolvedValue({
         solicitado: "viejo",
         canonicoId: "c1",
@@ -244,35 +533,17 @@ describe("Pantalla de contactos", () => {
 
       renderPage();
 
-      await waitFor(() =>
-        expect(
-          new URLSearchParams(window.location.search).get("fusionar"),
-        ).toBe("c1"),
-      );
-      // El `con` se descarta: pertenecía a la pareja anterior.
-      expect(new URLSearchParams(window.location.search).get("con")).toBeNull();
+      await waitFor(() => expect(query().get("fusionar")).toBe("c1"));
+      expect(query().get("con")).toBeNull();
     });
 
-    it("un id que NO fue absorbido no provoca ninguna redirección: sin bucles", async () => {
-      rol = "ADMIN";
-      getContacts.mockResolvedValue([contacto()]);
+    it("un id que NO fue absorbido no provoca redirección: sin bucles", async () => {
       window.history.replaceState(null, "", "/dashboard/contacts?fusionar=c1");
-      parametrosDeUrl = new URLSearchParams("fusionar=c1");
-      getCanonico.mockResolvedValue({
-        solicitado: "c1",
-        canonicoId: "c1",
-        fueFusionado: false,
-        fusionadoEn: null,
-      });
-
       renderPage();
 
-      await screen.findAllByText("Ana Restrepo");
+      await screen.findByText("Ana Restrepo");
       await waitFor(() => expect(getCanonico).toHaveBeenCalledWith("c1"));
-      // Sin redirección: la ruta se queda como estaba.
-      expect(new URLSearchParams(window.location.search).get("fusionar")).toBe(
-        "c1",
-      );
+      expect(query().get("fusionar")).toBe("c1");
     });
   });
 });
