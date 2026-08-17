@@ -6,7 +6,23 @@
 
 ## Última actualización
 
-- Fecha: 14 de agosto de 2026 · America/Bogota
+- Fecha: **17 de agosto de 2026** · America/Bogota
+- **Incremento en curso: `3.z — Contactos: listado, papelera y restauración` (mockup 02). Estado: EN REVISIÓN HUMANA.**
+- Commits de 3.z: `cd3c2e1` (modelo de lectura) · `5cc66ed` (primitivas) · `334f3da` (URL) · `77c51d9` (pantalla)
+
+> **Por qué la fase 3 vuelve a EN CURSO.** El 14-ago se cerró la fase 3 tras
+> aprobar 3.y. La revisión de continuidad del 17-ago encontró que el cierre era
+> prematuro: el master asigna a la fase 3 los mockups **02, 03, 18 y 22**, y solo
+> se habían entregado 22 (3.x) y 03+18 (3.y). El propio documento lo decía en dos
+> sitios que contradecían al semáforo —la tabla «QA visual desktop» tenía
+> **«Contactos» en PENDIENTE** y el inventario mantenía «Contactos / papelera /
+> fusión: **PARCIAL**»—. 3.z cierra ese hueco.
+>
+> **3.x y 3.y no se reabren ni se ponen en duda.** Siguen aprobados sobre
+> `397dab9` y `7a1e0a1`, con su CI verde, y este incremento incluye pruebas de
+> regresión de los dos. Lo que cambia es que la fase 3 no estaba completa.
+
+### Fecha del cierre anterior: 14 de agosto de 2026
 - Commits de 3.y: `f3dc3c8` · `02f0863` · `53b5e03` · `6dcd6de` · **segunda ronda:** `b680206` (contrato) · `fa521d1` (inbox) · `f32df35` (perfil 360) · `6e02d2e` · `c9c4bc5` (navegación) · **3ª ronda:** `7c7b857` · `3bd4585` · `e44ef82` · `d36c5b4`
 - **SHA de 3.y aprobado por revisión humana: `7a1e0a16a340efd17393fc0869496ac8550dc015`**
 - **CI de ese SHA: verde — run [`31844338412`](https://github.com/zabaisai/tehus-rattan/actions/runs/31844338412)**
@@ -73,7 +89,7 @@
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
 | 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real; faltan tabla, drawer, tabs, toast, swatches, tooltip | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
-| 3. Contactos, conversaciones y perfil 360 | **HECHO** | Listado, papelera y restauración; **fusión de duplicados (3.x, mockup 22) aprobada sobre `397dab9`**; **inbox de tres paneles y perfil 360 (3.y, mockups 03 y 18) aprobados el 14-ago-2026 sobre `7a1e0a1`** | — |
+| 3. Contactos, conversaciones y perfil 360 | **EN_CURSO** | **Fusión (3.x, mockup 22) aprobada sobre `397dab9`** e **inbox + perfil 360 (3.y, mockups 03 y 18) aprobados sobre `7a1e0a1`**, los dos intactos. Falta **solo la revisión humana del mockup 02**, entregado en 3.z sobre `77c51d9` | Revisión humana de 3.z |
 | 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
@@ -94,7 +110,7 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 |---|---|---|
 | Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); 12 primitivas en `components/ui/`. Faltan tabla, drawer, tabs, toast, skeleton, forbidden, avatar de iniciales, swatches, tooltip |
 | Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
-| Contactos / papelera / fusión | **PARCIAL** | 11 endpoints previos más 7 de fusión (`:id/duplicados`, `:id/canonico`, `fusion/comparar`, `fusion/descartar`, `fusion/ejecutar`, `fusion/:id/deshacer`, `fusion/:id/estado`) y el flujo del mockup 22 en `components/contacts/FusionDeDuplicados.tsx`. **Fusión: HECHO** (mockup 22 completado, aprobado el 14-ago-2026 sobre `397dab9`) |
+| Contactos / papelera / fusión | **EN REVISIÓN** | 11 endpoints previos, 7 de fusión y **`GET /contacts/listado`** (3.z). **Fusión: HECHO** (mockup 22, aprobado el 14-ago sobre `397dab9`). **Listado, papelera y restauración (mockup 02): entregado en 3.z sobre `77c51d9`, pendiente de revisión humana** — `app/dashboard/contacts/page.tsx`, `components/contacts/ContactosTabla.tsx`, `lib/contactos-url.ts` |
 | Conversaciones / perfil lateral | **HECHO** (mockups 03 y 18) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
 | Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
 | Tareas y sugerencias | **PARCIAL** | 9 endpoints con `:id/aprobar` y `:id/rechazar`; `SugerenciasDeTarea` en frontend. Falta la vista del mockup 07 con pendientes/completadas/sugeridas separadas |
@@ -1059,6 +1075,18 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | 2026-08-14 | 3.y (3ª ronda) | Scroll horizontal de la ficha lateral 1024–1920 | **0** en los cuatro |
 | 2026-08-14 | 3.y | CI sobre `7a1e0a1` | **run `31844338412`** — Backend y Frontend `success` |
 | 2026-08-14 | 3.y | **Revisión humana en escritorio sobre `7a1e0a1`** | **APROBADO** — ver «Aprobación humana — 14 de agosto de 2026» |
+| 2026-08-17 | preflight 3.z | CI del SHA de partida `70c2287` | **verde** — run `31848367139`, Frontend y Backend `success` |
+| 2026-08-17 | 3.z | `npx jest --config test/jest-e2e.json contact-archive` | **17/17** contra PostgreSQL real (+8) |
+| 2026-08-17 | 3.z | `npx jest --config test/jest-e2e.json contactos-listado` | **11/11** HTTP con supertest (nuevo) |
+| 2026-08-17 | 3.z | `npx jest` backend completo | **2149/2149** en 131 suites |
+| 2026-08-17 | 3.z | `npm run test:e2e -- --runInBand` (completo) | **904/904** en 62 suites |
+| 2026-08-17 | 3.z | backend `typecheck` + `eslint --no-fix` + `build` + `prisma validate` | sin errores |
+| 2026-08-17 | 3.z | `vitest run` (frontend completo) | **851/851** en 80 archivos (+39) |
+| 2026-08-17 | 3.z | frontend `typecheck` + `lint` + `build` | sin errores (1 aviso previo ajeno) |
+| 2026-08-17 | 3.z | Datos QA en `READ ONLY` antes y después | `PREVIEW_BRANDING_` 5, `QA_MERGE_` 2, `QA_INBOX_` 2, 11 empresas, outbox 0, 0 restos E2E |
+| 2026-08-17 | 3.z | CI sobre `77c51d9` | **run `32043183678`** — Backend y Frontend `success` |
+| 2026-08-17 | 3.z | QA de navegador 1920/1440/1280/1024 | **NO EJECUTADA** — la pantalla exige sesión y no hay credenciales disponibles |
+| 2026-08-17 | 3.z | **Revisión humana** | **PENDIENTE** |
 
 ---
 
@@ -1070,7 +1098,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Crear rápidamente + recientes | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** |
 | Inicio (mockup 01, incremento 2.3) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 13-ago-2026 |
 | Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
-| Contactos |  |  |  |  |  |  | PENDIENTE |
+| Contactos (mockup 02, 3.z) | — | — | — | — | — | — | **EN REVISIÓN HUMANA** · sin QA de navegador (ver 3.z) |
 | Inbox de tres paneles (mockups 03 y 18, 3.y) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
 | Pipeline |  |  |  |  |  |  | PENDIENTE |
 | TAKTO Pulso |  |  |  |  |  |  | PENDIENTE |
@@ -1552,13 +1580,204 @@ impresión.
 
 ---
 
+## Incremento 3.z — Contactos: listado, papelera y restauración (mockup 02)
+
+**Estado: ENTREGADO DE EXTREMO A EXTREMO · EN REVISIÓN HUMANA. No cerrar.**
+
+**SHA de implementación:** `77c51d9224ce9d8fb233e95d0a313b2548062a57`
+**CI de ese SHA: verde — run
+[`32043183678`](https://github.com/zabaisai/tehus-rattan/actions/runs/32043183678)**
+(Frontend: pruebas, typecheck incluidos los tests, lint y build; Backend:
+prisma generate/validate, typecheck incluidos los specs, lint, unitarias,
+build, migraciones en base aislada y E2E).
+**Commits:** `cd3c2e1` (modelo de lectura) · `5cc66ed` (primitivas) · `334f3da`
+(URL como fuente de verdad) · `77c51d9` (pantalla)
+
+> El SHA de **este cierre documental** no se anota aquí a propósito: se lee del
+> historial de la rama. Anotarlo antes de publicar es el error que corrigió la
+> nota de «Última actualización».
+
+### Preflight §2
+
+| # | Comprobación | Resultado |
+|---|---|---|
+| 1 | Master y estado leídos completos | ✅ |
+| 2 | Continuidad vigente leída | ✅ `DESIGN-SYSTEM.md`, `TAKTO-BRANDING-ESTADO-2026-08-11.md`, `TAKTO-PAUSA-Y-REANUDACION-2026-08-10.md`, índice de mockups y el 02 en resolución original |
+| 3 | Rama, HEAD local = remoto, árbol, locks, operaciones a medias | ✅ `70c2287`, 0/0, árbol limpio, sin locks ni merge/rebase/cherry-pick |
+| 4 | CI del SHA exacto de partida | ✅ **verde** — run `31848367139`, Frontend y Backend `success`. El estado solo registraba el CI de `7a1e0a1`; el de `70c2287` se verificó aquí |
+| 5 | 26 mockups presentes | ✅ 26 + índice |
+| 6 | Docker, puertos y preview | ✅ `tehus_postgres`, `tehus_rattan-redis-1` (healthy) y volumen `tehus_rattan_postgres_data`; preview viva en 3000/3001 |
+| 7 | Base inspeccionada **solo** en transacciones `READ ONLY` | ✅ 7 activos, 2 archivados, 0 alias, 0 anonimizados en la empresa de la vista previa |
+
+### Auditoría acotada, antes de escribir nada
+
+| Pieza | Estado | Evidencia |
+|---|---|---|
+| `GET /contacts` con `search`, `limit`, `offset`, `includeArchived` | **HECHO** | El contrato ya lo aceptaba. **La pantalla no usaba ninguno de los cuatro** |
+| `DELETE /contacts/:id` (archiva, idempotente) y `POST /contacts/:id/restore` | **HECHO** | Devuelven `{archivado, yaEstaba}` / `{restaurado, yaEstaba}`; auditan `contact.archive` y `contact.restore` |
+| `GET /contacts/papelera/listado` | **HECHO** | Ya devolvía `{items, total}` |
+| Aislamiento y roles | **HECHO** | `AuthGuard('jwt') + BusinessTenantGuard + RolesGuard`; `companyId` en el `where`, nunca en memoria |
+| Perfil 360 `/dashboard/contacts/[id]` | **HECHO** (3.y) | **Contactos nunca enlazaba a él** |
+| Flujo de fusión (3.x) | **HECHO** | Se conserva entero, con su estado en la URL |
+| Búsqueda de la pantalla | **FALTANTE** | Filtraba en memoria la tanda ya descargada |
+| Pestaña y búsqueda en la URL | **FALTANTE** | Vivían en estado de React |
+| Confirmación de archivado | **DEFECTUOSA** | `window.confirm`, un modal del navegador |
+| Estados de error y sin permiso | **FALTANTE** | Solo había «Cargando…» y vacío |
+
+### Qué se entregó
+
+| Capa | Archivos |
+|---|---|
+| Contrato | `contacts.service.ts` (`listado`, filtro compartido), `contacts.controller.ts` (`GET /contacts/listado`) |
+| Consumidor | `lib/contacts.ts` → `getListadoDeContactos` |
+| Códec de URL | `lib/contactos-url.ts` (funciones puras) |
+| Pantalla | `app/dashboard/contacts/page.tsx`, `components/contacts/ContactosTabla.tsx` |
+| Primitiva | `components/ui/Button.tsx` → `clasesDeBoton` |
+
+**Sin migración.** `tags`, `archivedAt`, `archivedReason`, `anonymizedAt` y las
+relaciones con `Lead`, `Conversation` y `Task` ya existían en el esquema. No se
+ejecutó `migrate`, `db push`, `generate` ni seed.
+
+### Los cinco cambios que no son de aspecto
+
+1. **La búsqueda la resuelve el servidor.** Antes filtraba en memoria lo ya
+   descargado: un contacto fuera de esa tanda era invisible por mucho que se
+   escribiera su nombre entero. Hay una e2e contra PostgreSQL real que lo fija.
+2. **Archivar ya no usa `window.confirm`.** Un modal del navegador no se puede
+   maquetar, no se lee como parte de la página y **bloquea cualquier QA
+   automatizada**. Ahora es `ConfirmDialog`, que nombra al contacto y promete lo
+   que el backend cumple: no se elimina el historial.
+3. **El nombre abre el perfil 360**, con `volverA` para regresar a la lista tal y
+   como estaba. Por lo mismo, el resultado de una fusión ya abre el perfil en vez
+   del embudo, que era el destino de cuando esa ruta no existía (limitación
+   registrada en 2.1).
+4. **«Abrir chat» lleva a la conversación exacta**, y sin conversación no se
+   dibuja un botón que no lleva a ningún sitio: se dice por qué no está.
+5. **Estados completos**: cargando, vacío, búsqueda sin resultados, error y sin
+   permiso. Un 403 no es un error y no invita a reintentar.
+
+### Diferencias deliberadas con el mockup 02
+
+| Mockup | Implementación | Motivo |
+|---|---|---|
+| Fotografías de las personas | Iniciales (`Avatar`) | §3.1 del master lo prohíbe. Misma decisión que en 2.3 y 3.y |
+| Pestaña y contador «Sin asignar» | No están; «Sin asignar» sí se marca **en la fila** | Sería un filtro por asesor de la oportunidad, que el contrato no ofrece. Inventarlo es un tercer motor de consulta |
+| Botón «Importar» | No está | La importación es de la fase 5 (mockup 09) y queda fuera del alcance de este incremento |
+| Filtros Asesor / Etiqueta / Etapa / Última interacción | No están | El contrato filtra por texto, no por esas dimensiones. Dibujarlos daría desplegables que no filtran |
+| Selección múltiple y barra de acciones en lote | No está | Asignar asesor, aplicar etiqueta y cambiar etapa en lote no existen como contrato. Es un incremento propio |
+| Conmutador tabla/tarjetas | No está | Una segunda composición sin contenido distinto que enseñar |
+| Panel derecho con la ficha del contacto | Se abre el **perfil 360** de 3.y | Duplicar la ficha aquí sería un segundo camino a la misma pantalla, que es justo lo que 3.y rechazó para la fusión |
+| «Cliente desde abr 2024» | «Contacto desde abr 2024» | No existe el concepto de «cliente»: lo que hay es la fecha de creación del contacto |
+| Paginación con números de página | Anterior/Siguiente + rango real + tamaño de página | El contrato pagina por `offset`; los números exigen un total por página que sí hay, pero la lista de páginas era ruido para 9 contactos |
+
+### Evidencia de pruebas
+
+```
+apps/backend   2149/2149 unitarias en 131 suites · verde
+               904/904 e2e en 62 suites · verde  (+19 de este incremento)
+                 · contact-archive.e2e-spec.ts   17/17  (+8, contra PostgreSQL real)
+                 · contactos-listado.e2e-spec.ts 11/11  (nuevo, HTTP con supertest)
+               typecheck (incluye specs) · lint --no-fix · build · prisma validate
+apps/frontend  851/851 en 80 archivos · verde  (+39: 812 → 851)
+                 · page.test.tsx          28
+                 · contactos-url.test.ts  21
+                 · ConfirmDialog.test.tsx  2
+               typecheck · lint (0 errores, 1 aviso previo ajeno) · build
+```
+
+Secuencia ejecutada en el orden del CI y **después del último archivo tocado**,
+según la lección de `49f2141`.
+
+**Lo que cubren las pruebas, punto por punto:** listado activo con las columnas
+del mockup · entrada a papelera · búsqueda en las dos vistas y resuelta en el
+servidor · confirmar y cancelar el archivado · archivado que conserva
+conversación, mensajes y oportunidades · restauración con **el mismo id** ·
+doble clic sin duplicar efectos · archivar/restaurar dos veces (idempotencia) ·
+URL profunda y recarga · contacto ajeno invisible incluso buscándolo por su
+nombre exacto · matriz de roles (AGENT archiva y restaura, no elimina
+definitivamente) · estados vacío/error/sin permiso · **regresión de «Fusionar
+duplicados» y del perfil 360**.
+
+### Datos QA
+
+**No se creó ninguno, y conviene decir por qué.** La empresa de la vista previa
+ya tiene 7 contactos activos y 2 archivados —`PREVIEW_BRANDING_Fernanda Lara` y
+`QA_MERGE_ Valentina O.`—, con etiquetas, asesor, etapa, conversaciones y
+tareas reales: alcanza para revisar listado, papelera, búsqueda, estados,
+«Abrir chat» y el perfil 360 sin escribir nada.
+
+Lo único que no se puede recorrer con ellos es **archivar de verdad**, porque
+los tres conjuntos protegidos no se tocan. Crear un `QA_CONTACTS_` exige una
+sesión en esa empresa, y las credenciales no están a mi alcance ni deben
+estarlo. Queda pendiente de decisión del revisor (ver «Instrucciones de QA»).
+
+**Verificado en `READ ONLY` antes y después de todo el trabajo, incluida la
+suite e2e completa:**
+
+| Comprobación | Antes | Después |
+|---|---|---|
+| Contactos `PREVIEW_BRANDING_` | 5 | **5** |
+| Contactos `QA_MERGE_` | 2 | **2** |
+| Contactos `QA_INBOX_` | 2 | **2** |
+| Empresas | 11 | **11** |
+| Restos `E2E-*` | 0 | **0** |
+| Outbox pendiente | 0 | **0** |
+| Auditorías | 366 | 371 |
+
+Las 5 auditorías nuevas son de la suite e2e y **se conservan a propósito**: sus
+claves foráneas son `SET NULL`, así que sobreviven al borrado de sus empresas,
+que es exactamente lo que exige la regla de no borrar auditorías.
+
+### Limitaciones honestas
+
+- **Sin QA de navegador en los cuatro anchos.** Es la parte del alcance que no
+  se entregó. La pantalla exige sesión y no dispongo de credenciales de la
+  empresa de la vista previa; medir 1920/1440/1280/1024 con el arnés CDP
+  requiere estar dentro. Lo que sí está medido es todo lo que no depende de
+  ello: el HTML se sirve con 200, el arranque no tiene errores y la consola del
+  servidor está limpia. **La revisión visual queda íntegramente en manos
+  humanas**, y por eso el incremento no se marca como HECHO.
+- **La tabla tiene ancho mínimo de 56 rem y se desplaza dentro de su caja.** Es
+  deliberado —así el documento nunca tiene barra horizontal— pero significa que
+  por debajo de ~900 px de contenido hay desplazamiento lateral *de la tabla*.
+  No está medido en navegador; es lo primero que conviene mirar a 1024.
+- **El asesor y la etapa salen de la oportunidad ABIERTA más reciente.** Un
+  contacto con dos oportunidades abiertas enseña la última que se movió. Es una
+  simplificación consciente: la fila tiene una casilla, no una lista.
+- **La paginación no conserva la posición de desplazamiento** al cambiar de
+  página. Con 25 filas no se nota; con 100 sí.
+- **`getContacts` sigue existiendo** y lo usan Tareas, Oportunidades y el
+  selector de la fusión. No se unificó a propósito: son preguntas distintas y
+  unificarlas habría cambiado tres pantallas ajenas a este incremento.
+
+### Rutas exactas para la revisión
+
+- Listado activo: `http://localhost:3000/dashboard/contacts`
+- Papelera: `http://localhost:3000/dashboard/contacts?vista=papelera`
+- Búsqueda dentro de la papelera: `http://localhost:3000/dashboard/contacts?vista=papelera&q=valentina`
+- Búsqueda sin resultados: `http://localhost:3000/dashboard/contacts?q=zzzz`
+- Perfil 360 desde la lista: `http://localhost:3000/dashboard/contacts/cmstafxee0001v2y8ydl7ehv3`
+- Segunda página con 25 por página: `http://localhost:3000/dashboard/contacts?pagina=2`
+- Fusión, que debe seguir funcionando: `http://localhost:3000/dashboard/contacts?fusionar=cmss4x9a50003v2v0ndielk7d&con=cmss4x9af0005v2v0y1jb80ik`
+
+---
+
 ## Próximo incremento seguro: `4.1 — Pipeline vertical (mockup 04)`
 
-**Registrado, no iniciado.** Con 3.y aprobado, la **fase 3 queda cerrada** y el
-master pasa a la **fase 4 — pipeline vertical, tareas y acciones desde chat**
-(mockups 04, 07, 19, 20, 21). Su primer punto es el pipeline vertical, que el
-inventario ya señala como el hueco: el kanban existe pero es **horizontal**, y
-el mockup 04 lo pide vertical.
+**Registrado, no iniciado. BLOQUEADO hasta que se apruebe 3.z.** La fase 3 no
+está cerrada: le faltaba el mockup 02, que entrega 3.z y que sigue pendiente de
+revisión humana. Abrir la fase 4 antes de esa aprobación repetiría el error de
+cierre prematuro que corrigió este incremento.
+
+Cuando 3.z quede aprobado, el master pasa a la **fase 4 — pipeline vertical,
+tareas y acciones desde chat** (mockups 04, 07, 19, 20, 21). Su primer punto es
+el pipeline vertical, que el inventario ya señala como el hueco: el kanban
+existe pero es **horizontal**, y el mockup 04 lo pide vertical.
+
+> Además, el gap **«Pipeline vertical»** sigue abierto en «Gaps que requieren
+> decisión de producto» —«cambia la interacción de arrastre ya probada; conviene
+> confirmar antes de reescribir»—. Es una decisión humana previa, no algo que se
+> resuelva durante la implementación.
 
 Su diseño y su implementación **no se redactan aquí**: se abren cuando se
 arranque el incremento, con su propio preflight §2.
@@ -1578,12 +1797,27 @@ git rev-parse origin/feature/takto-brand-ui-integration
 #
 # 3.y - Inbox de tres paneles con perfil colapsable y URL profunda
 # (mockups 03 y 18): APROBADO el 14-ago-2026 sobre 7a1e0a1, CI verde
-# (run 31844338412). Con el, la FASE 3 queda HECHA.
+# (run 31844338412).
 #
-# Proximo incremento registrado y NO iniciado:
-#   4.1 - Pipeline vertical (mockup 04). Abrirlo exige su propio preflight §2.
+# 3.z - Contactos: listado, papelera y restauracion (mockup 02):
+# ENTREGADO sobre 77c51d9, CI verde (run 32043183678). EN REVISION HUMANA.
+# NO marcar 3.z ni la fase 3 como HECHOS antes de esa revision.
+#
+# La FASE 3 esta EN_CURSO: se cerro el 14-ago sin el mockup 02, que es lo que
+# entrega 3.z. 3.x y 3.y siguen aprobados e intactos.
+#
+# Proximo incremento registrado, NO iniciado y BLOQUEADO hasta aprobar 3.z:
+#   4.1 - Pipeline vertical (mockup 04). Abrirlo exige su propio preflight §2
+#   y, antes, la decision humana sobre el gap "Pipeline vertical".
 #
 # Los datos QA_INBOX_ se CONSERVAN: son los que hacen revisable el inbox.
+#
+# Rutas de QA de 3.z (mockup 02):
+#   http://localhost:3000/dashboard/contacts
+#   http://localhost:3000/dashboard/contacts?vista=papelera
+#   http://localhost:3000/dashboard/contacts?vista=papelera&q=valentina
+#   http://localhost:3000/dashboard/contacts?q=zzzz
+#   http://localhost:3000/dashboard/contacts?pagina=2
 #
 # Rutas de QA de 3.y, con los datos QA_INBOX_:
 #   http://localhost:3000/dashboard/conversations
@@ -1600,4 +1834,12 @@ git rev-parse origin/feature/takto-brand-ui-integration
 # Vista previa local (worker apagado, transporte falso, sin efectos externos):
 #   cd apps/backend  && node dist/src/main        # :3001, con las variables
 #   cd apps/frontend && npx next start -p 3000    # :3000
+#
+# Variables con las que se levanta la preview restrictiva (ninguna en disco):
+#   PORT / FRONTEND_URL / RELEASE_SHA / BUILD_TIME
+#   QUEUE_ENABLED=false          -> sin worker y sin consumidores de cola
+#   WORKER_ROLE sin definir      -> este proceso no consume nada
+#   FLOWBOT_REAL_WHATSAPP_ENABLED=false, FLOWBOT_WHATSAPP_DRY_RUN=true
+#   FLOWBOT_WHATSAPP_*_ALLOWLIST vacias, WHATSAPP_EMBEDDED_SIGNUP_ENABLED=false
+#   PASSWORD_RESET_ENABLED=false y sin SMTP_* -> correo deshabilitado
 ```
