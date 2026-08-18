@@ -18,11 +18,19 @@ export async function sembrarBaseline(
   autorId: string,
   asesorId: string,
 ): Promise<void> {
+  // `isDefault: true` NO es un adorno. `analytics/leads-by-stage` —lo que
+  // alimenta «Oportunidades abiertas» y el resumen del embudo en el Inicio—
+  // busca el embudo PREDETERMINADO de la empresa y, si no lo encuentra,
+  // devuelve una lista vacia. Sin esta linea el Inicio enseñaba «0
+  // oportunidades» y «el embudo no tiene etapas» mientras el valor abierto
+  // decia 26,5 M: dos cifras que no pueden ser ciertas a la vez. Todas las
+  // demas empresas de la base lo tienen puesto; la demo era la unica que no.
   const embudo = await tx.pipeline.create({
     data: {
       companyId: empresaId,
       name: `${PREFIJO}Embudo comercial`,
       order: 0,
+      isDefault: true,
     },
     select: { id: true },
   });
@@ -302,6 +310,69 @@ export async function sembrarBaseline(
       createdBy: autorId,
     },
   });
+
+  // ── Actividad reciente ────────────────────────────────────────────────
+  //
+  // El panel del Inicio lee la AUDITORIA de la empresa. Un baseline recien
+  // sembrado no ha registrado nada, asi que el panel salia vacio y la
+  // conclusion razonable de quien lo mira es que el producto no anota lo que
+  // pasa. Estos eventos son ficticios y existen solo para que esa pantalla
+  // sea demostrable.
+  //
+  // `entityType: 'DEMO_SOCIO_BASELINE'` es el marcador que permite
+  // REGENERARLOS en cada restauracion sin tocar una sola auditoria de verdad:
+  // si alguien archiva un contacto recorriendo la demo, ese registro es real
+  // y se conserva, como en cualquier otra empresa.
+  //
+  // Fechas fijas y escalonadas: el panel ordena por fecha, y con `now()` los
+  // cinco caerian en el mismo segundo y el orden seria arbitrario.
+  const momento = new Date('2026-08-17T15:10:00Z').getTime();
+  const eventos = [
+    {
+      action: 'contact.archive',
+      minutos: 0,
+      actor: autorId,
+      rol: 'ADMIN' as const,
+    },
+    {
+      action: 'contact.restore',
+      minutos: 55,
+      actor: asesorId,
+      rol: 'AGENT' as const,
+    },
+    {
+      action: 'flowbot.create',
+      minutos: 130,
+      actor: autorId,
+      rol: 'ADMIN' as const,
+    },
+    {
+      action: 'custom_field.create',
+      minutos: 240,
+      actor: autorId,
+      rol: 'ADMIN' as const,
+    },
+    {
+      action: 'CREATE_COMPANY',
+      minutos: 1440,
+      actor: autorId,
+      rol: 'ADMIN' as const,
+    },
+  ];
+  for (const e of eventos) {
+    await tx.auditLog.create({
+      data: {
+        affectedCompanyId: empresaId,
+        actorUserId: e.actor,
+        actorRole: e.rol,
+        action: e.action,
+        entityType: 'DEMO_SOCIO_BASELINE',
+        // Sin `entityId`, sin `reason`, sin `metadata`, sin IP y sin agente:
+        // nada que pueda parecer el dato de una persona.
+        createdAt: new Date(momento - e.minutos * 60_000),
+      },
+    });
+  }
 
   // Automatización en BORRADOR y sin ejecuciones: el alcance lo pide
   // explícitamente, y además una activa en modo demo no podría ejecutarse.

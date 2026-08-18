@@ -127,7 +127,10 @@ export async function asegurarEmpresaYCuentas(
               slug: SLUG_DEMO,
               isDemo: true,
               status: 'ACTIVE',
-              phone: TEL.empresa,
+              // El telefono de empresa es UNICO en toda la base. Solo lo toma el
+              // tenant demo canonico; un tenant demo de pruebas (con su propio
+              // slug) se queda sin el, que es cosmetico, en vez de chocar.
+              ...(SLUG_DEMO === 'demo-socio' ? { phone: TEL.empresa } : {}),
               email: `contacto@${DOMINIO}`,
               city: 'Ciudad Demo',
               country: 'Colombia',
@@ -210,6 +213,15 @@ export async function borrarDatosOperativos(
   await tx.pipeline.deleteMany({ where: dentro });
   await tx.outboxEvent.deleteMany({ where: dentro });
 
-  // Las AUDITORIAS no se borran nunca, ni siquiera las de la empresa demo:
-  // es la regla del proyecto y no tiene excepcion aqui.
+  // LAS AUDITORIAS REALES NO SE BORRAN NUNCA, tampoco las de la empresa demo:
+  // es la regla del proyecto y no tiene excepcion. Si alguien archiva un
+  // contacto recorriendo la demo, ese registro se queda.
+  //
+  // Lo unico que se retira es la actividad SEMBRADA por este baseline, que
+  // lleva su propio `entityType` y no es el rastro de nada: es atrezo para
+  // que el panel del Inicio tenga algo que enseñar. Regenerarla es lo que
+  // hace que restaurar sea determinista en vez de ir acumulando.
+  await tx.auditLog.deleteMany({
+    where: { affectedCompanyId: empresaId, entityType: 'DEMO_SOCIO_BASELINE' },
+  });
 }

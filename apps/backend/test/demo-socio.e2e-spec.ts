@@ -12,6 +12,8 @@ import {
   borrarDatosOperativos,
 } from '../scripts/demo-socio';
 import { sembrarBaseline } from '../scripts/demo-socio-baseline';
+import { AnalyticsService } from '../src/modules/analytics/analytics.service';
+import { PrismaService } from '../src/prisma/prisma.service';
 
 /**
  * LA EMPRESA DEMO, CONTRA LA BASE REAL.
@@ -361,6 +363,152 @@ describe('Empresa demo para un socio (e2e, base real)', () => {
     );
 
     await prisma.company.update({ where: { id }, data: { isDemo: true } });
+  });
+
+  describe('el Inicio y el Pipeline tienen que cuadrar', () => {
+    const analytics = () =>
+      new AnalyticsService(prisma as unknown as PrismaService);
+
+    it('el embudo demo es el PREDETERMINADO', async () => {
+      // Sin esto, `analytics/leads-by-stage` busca el embudo con
+      // `isDefault: true`, no lo encuentra y devuelve []. El Inicio entonces
+      // enseña «0 oportunidades abiertas» y «el embudo no tiene etapas»
+      // mientras el valor abierto dice 26,5 M, que es la incoherencia exacta
+      // que encontro la revision.
+      const id = await aprovisionar();
+      const embudos = await prisma.pipeline.findMany({
+        where: { companyId: id },
+        select: { isDefault: true },
+      });
+      expect(embudos).toHaveLength(1);
+      expect(embudos[0].isDefault).toBe(true);
+    });
+
+    it('4 abiertas y 1 ganada, todas con etapa válida del embudo demo', async () => {
+      const id = await aprovisionar();
+      const leads = await prisma.lead.findMany({
+        where: { companyId: id },
+        select: { status: true, stageId: true, pipelineId: true },
+      });
+      const embudo = await prisma.pipeline.findFirstOrThrow({
+        where: { companyId: id },
+        select: { id: true },
+      });
+      const etapas = await prisma.pipelineStage.findMany({
+        where: { pipelineId: embudo.id },
+        select: { id: true },
+      });
+      const idsDeEtapa = new Set(etapas.map((e) => e.id));
+
+      expect(leads.filter((l) => l.status === 'OPEN')).toHaveLength(4);
+      expect(leads.filter((l) => l.status === 'WON')).toHaveLength(1);
+      for (const l of leads) {
+        expect(l.pipelineId).toBe(embudo.id);
+        expect(idsDeEtapa.has(l.stageId)).toBe(true);
+      }
+    });
+
+    it('el valor abierto es la SUMA EXACTA de las cuatro abiertas', async () => {
+      const id = await aprovisionar();
+      const abiertas = await prisma.lead.findMany({
+        where: { companyId: id, status: 'OPEN' },
+        select: { value: true },
+      });
+      const suma = abiertas.reduce((a, l) => a + Number(l.value), 0);
+
+      const overview = await analytics().getOverview(id);
+      expect(overview.openValue).toBe(suma);
+      expect(suma).toBe(26_500_000);
+    });
+
+    it('el resumen del embudo cuadra con las abiertas, una por una', async () => {
+      const id = await aprovisionar();
+      const porEtapa = await analytics().getLeadsByStage(id);
+
+      // Lo primero que fallaba: venia vacio.
+      expect(porEtapa.length).toBeGreaterThan(0);
+
+      const totalContadas = porEtapa.reduce((a, e) => a + e.count, 0);
+      const totalValor = porEtapa.reduce((a, e) => a + e.totalValue, 0);
+      const abiertas = await prisma.lead.count({
+        where: { companyId: id, status: 'OPEN' },
+      });
+      const overview = await analytics().getOverview(id);
+
+      expect(totalContadas).toBe(abiertas);
+      expect(totalContadas).toBe(4);
+      // Y la aritmetica que el ojo hace en la pantalla: la suma del embudo
+      // es el valor abierto.
+      expect(totalValor).toBe(overview.openValue);
+    });
+
+    it('la conversión sale de datos reales, no de una cifra suelta', async () => {
+      const id = await aprovisionar();
+      const overview = await analytics().getOverview(id);
+      const ganadas = await prisma.lead.count({
+        where: { companyId: id, status: 'WON' },
+      });
+      const perdidas = await prisma.lead.count({
+        where: { companyId: id, status: 'LOST' },
+      });
+
+      expect(overview.wonCount).toBe(ganadas);
+      expect(overview.lostCount).toBe(perdidas);
+      const cerradas = ganadas + perdidas;
+      expect(overview.conversionRate).toBe(
+        cerradas === 0 ? 0 : Math.round((ganadas / cerradas) * 100),
+      );
+    });
+
+    it('la actividad reciente tiene eventos, y son todos del baseline demo', async () => {
+      const id = await aprovisionar();
+      const actividad = await analytics().getRecentActivity(id);
+
+      expect(actividad.length).toBeGreaterThan(0);
+      // Sin PII: el contrato solo devuelve accion, tipo, fecha y nombre del
+      // actor, y el actor es una cuenta demo.
+      for (const a of actividad) {
+        expect(a.actorName).toMatch(/DEMO_SOCIO_/);
+        expect(a).not.toHaveProperty('metadata');
+        expect(a).not.toHaveProperty('reason');
+      }
+    });
+
+    it('restaurar NO acumula actividad: la del baseline se regenera', async () => {
+      const id = await aprovisionar();
+      const primera = await prisma.auditLog.count({
+        where: { affectedCompanyId: id, entityType: 'DEMO_SOCIO_BASELINE' },
+      });
+
+      await aprovisionar();
+
+      expect(
+        await prisma.auditLog.count({
+          where: { affectedCompanyId: id, entityType: 'DEMO_SOCIO_BASELINE' },
+        }),
+      ).toBe(primera);
+    });
+
+    it('una auditoría REAL de la demo no se borra al restaurar', async () => {
+      // La regla del proyecto no tiene excepcion: lo que registro el producto
+      // se conserva. Solo se regenera la actividad SEMBRADA, marcada con su
+      // propio `entityType`.
+      const id = await aprovisionar();
+      const real = await prisma.auditLog.create({
+        data: {
+          affectedCompanyId: id,
+          actorRole: 'ADMIN',
+          action: 'contact.archive',
+          entityType: 'Contact',
+        },
+        select: { id: true },
+      });
+
+      await aprovisionar();
+
+      expect(await prisma.auditLog.count({ where: { id: real.id } })).toBe(1);
+      await prisma.auditLog.deleteMany({ where: { id: real.id } });
+    });
   });
 
   it('la empresa demo no tiene integración de WhatsApp', async () => {
