@@ -1,78 +1,51 @@
 import { PrismaClient } from '@prisma/client';
-import { SLUG_DEMO, empresaDemo, borrarDatosOperativos } from './demo-socio';
-import { sembrarBaseline } from './demo-socio-baseline';
+import { SLUG_DEMO } from './demo-socio';
+import { restablecer } from './demo-restablecer';
 import { contar } from './demo-aprovisionar';
 
 /**
- * RESTAURA la empresa demo a su baseline, y solo ella.
+ * ALIAS DE `demo:restablecer`. El nombre anterior del mismo comando.
  *
- * Lo que hace: borra los datos OPERATIVOS de esa empresa y los vuelve a
- * sembrar. Lo que NO hace, y es lo que lo vuelve seguro:
+ * POR QUE NO SE HA BORRADO: esta escrito en el documento de estado y en las
+ * notas de quien opera la demo. Un comando que un dia deja de existir se
+ * descubre a las malas, y normalmente el dia que hay prisa.
  *
- *   · no acepta ningun argumento que diga a quien borrar — la empresa se
- *     resuelve por `slug` unico y se verifica que `isDemo` sea cierto;
- *   · no borra por prefijo de nombre: todos los `deleteMany` van acotados por
- *     el `companyId` ya resuelto;
- *   · no hace `TRUNCATE`, ni `migrate reset`, ni toca otra empresa;
- *   · CONSERVA las dos cuentas demo y la fila de la empresa;
- *   · no borra auditorias, ni las suyas.
- *
- * Si no existe la empresa demo, no crea nada: falla y remite a aprovisionar.
- * Restaurar algo que no se ha aprovisionado no tiene un resultado obvio, y
- * adivinarlo es como un comando de reinicio acaba creando datos.
+ * POR QUE NO TIENE LOGICA PROPIA, QUE ES LO IMPORTANTE: antes SI la tenia, una
+ * copia casi igual de la de restablecer. «Casi» es el problema. Cuando el
+ * borrado se amplio para llevarse tambien los bots, el chatbot, las
+ * notificaciones y el perfil editado de la empresa, una de las dos copias se
+ * habria quedado atras, y entonces «restaurar» y «restablecer» dejarian la
+ * demo en dos estados distintos con el mismo nombre. Hay una implementacion y
+ * esto la llama.
  *
  * Uso:
- *   npm run demo:restaurar
- *
- * No necesita contraseñas: las cuentas no se tocan.
+ *   npm run demo:restaurar     (equivalente a npm run demo:restablecer)
  */
 async function main() {
   const prisma = new PrismaClient();
   try {
-    const empresa = await empresaDemo(prisma);
-    if (!empresa) {
-      throw new Error(
-        `No existe ninguna empresa con slug "${SLUG_DEMO}". ` +
-          `Ejecuta primero: npm run demo:aprovisionar`,
-      );
-    }
+    console.log(
+      'Nota: «demo:restaurar» es ahora un alias de «demo:restablecer».',
+    );
+    const r = await restablecer(prisma);
+    const resumen = await contar(prisma, r.companyId);
 
-    const [admin, asesor] = await Promise.all([
-      prisma.user.findFirst({
-        where: { companyId: empresa.id, role: 'ADMIN' },
-        select: { id: true, email: true },
-      }),
-      prisma.user.findFirst({
-        where: { companyId: empresa.id, role: 'AGENT' },
-        select: { id: true, email: true },
-      }),
-    ]);
-    if (!admin || !asesor) {
-      throw new Error(
-        'La empresa demo no tiene sus dos cuentas (ADMIN y AGENT). ' +
-          'Ejecuta: npm run demo:aprovisionar',
-      );
-    }
+    console.log('Empresa demo restablecida al baseline.');
+    console.log(`  slug      : ${SLUG_DEMO}`);
+    console.log(`  companyId : ${r.companyId}`);
+    console.log('  baseline  :', JSON.stringify(resumen));
+    console.log('  cuentas conservadas: id, correo y contraseña intactos');
 
-    const antes = await contar(prisma, empresa.id);
-
-    await prisma.$transaction(async (tx) => {
-      // Reverificacion dentro de la transaccion, por lo mismo que en el
-      // aprovisionamiento: no se borra sobre una comprobacion de hace un rato.
-      const dentro = await empresaDemo(tx);
-      if (!dentro || dentro.id !== empresa.id) {
-        throw new Error('La empresa demo cambió durante la restauración');
+    if (!r.informe.ok) {
+      console.error('\nEl baseline NO quedó como debe:');
+      for (const f of r.informe.fallos) {
+        console.error(
+          `  FALLA  ${f.nombre}  → esperado ${JSON.stringify(f.esperado)}, ` +
+            `obtenido ${JSON.stringify(f.obtenido)}`,
+        );
       }
-      await borrarDatosOperativos(tx, dentro.id);
-      await sembrarBaseline(tx, dentro.id, admin.id, asesor.id);
-    });
-
-    const despues = await contar(prisma, empresa.id);
-    console.log('Empresa demo restaurada al baseline.');
-    console.log(`  companyId : ${empresa.id}`);
-    console.log('  antes     :', JSON.stringify(antes));
-    console.log('  después   :', JSON.stringify(despues));
-    console.log(`  cuentas conservadas: ${admin.email} · ${asesor.email}`);
+      process.exitCode = 1;
+    }
   } finally {
     await prisma.$disconnect();
   }

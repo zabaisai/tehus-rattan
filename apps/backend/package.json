@@ -25,6 +25,8 @@
     "whatsapp:encrypt-token": "ts-node --transpile-only scripts/encrypt-whatsapp-token.ts",
     "platform:create-super-admin": "ts-node --transpile-only scripts/create-super-admin.ts",
     "demo:aprovisionar": "ts-node --transpile-only scripts/demo-aprovisionar.ts",
+    "demo:restablecer": "ts-node --transpile-only scripts/demo-restablecer.ts",
+    "demo:verificar": "ts-node --transpile-only scripts/demo-verificar.ts",
     "demo:restaurar": "ts-node --transpile-only scripts/demo-restaurar.ts"
   },
   "dependencies": {

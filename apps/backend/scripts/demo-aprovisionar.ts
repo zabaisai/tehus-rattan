@@ -3,10 +3,8 @@ import {
   SLUG_DEMO,
   validarCuentas,
   asegurarEmpresaYCuentas,
-  empresaDemo,
-  borrarDatosOperativos,
 } from './demo-socio';
-import { sembrarBaseline } from './demo-socio-baseline';
+import { restablecer } from './demo-restablecer';
 
 /**
  * APROVISIONA la empresa demo y la deja en el baseline.
@@ -28,30 +26,21 @@ async function main() {
   try {
     const cuentas = validarCuentas(process.env);
 
+    // PRIMER PASO: la empresa y sus dos cuentas, con las claves del entorno.
+    // Es lo unico que aprovisionar hace y restablecer no: aqui SI se fijan las
+    // contraseñas, porque es el momento en que se crean.
     const empresaId = await asegurarEmpresaYCuentas(prisma, cuentas);
 
-    const admin = await prisma.user.findUnique({
-      where: { email: cuentas.adminEmail },
-      select: { id: true },
-    });
-    const asesor = await prisma.user.findUnique({
-      where: { email: cuentas.agentEmail },
-      select: { id: true },
-    });
-    if (!admin || !asesor)
-      throw new Error('No se pudieron resolver las cuentas demo');
-
-    await prisma.$transaction(async (tx) => {
-      // Se vuelve a comprobar DENTRO de la transaccion: entre el `asegurar` y
-      // este punto nadie deberia haber tocado la marca, pero borrar es lo que
-      // no se hace sobre una suposicion.
-      const empresa = await empresaDemo(tx);
-      if (!empresa || empresa.id !== empresaId) {
-        throw new Error('La empresa demo cambió durante el aprovisionamiento');
-      }
-      await borrarDatosOperativos(tx, empresa.id);
-      await sembrarBaseline(tx, empresa.id, admin.id, asesor.id);
-    });
+    // SEGUNDO PASO: exactamente el mismo camino que `demo:restablecer`.
+    //
+    // Antes esto tenia su propia copia del borrado y del sembrado, y una copia
+    // se queda atras: aprovisionar y restablecer podian dejar la demo en dos
+    // estados que se parecen pero no son iguales, y ninguno de los dos seria
+    // «el baseline». Una implementacion, dos puertas de entrada.
+    const r = await restablecer(prisma);
+    if (r.companyId !== empresaId) {
+      throw new Error('La empresa demo cambió durante el aprovisionamiento');
+    }
 
     const resumen = await contar(prisma, empresaId);
     console.log('Empresa demo aprovisionada.');
@@ -60,7 +49,21 @@ async function main() {
     console.log(`  ADMIN       : ${cuentas.adminEmail}`);
     console.log(`  AGENT       : ${cuentas.agentEmail}`);
     console.log('  baseline    :', JSON.stringify(resumen));
+    console.log(
+      `  verificación: ${r.informe.comprobaciones.length - r.informe.fallos.length}/${r.informe.comprobaciones.length}`,
+    );
     console.log('  (las contraseñas no se imprimen: salieron del entorno)');
+
+    if (!r.informe.ok) {
+      console.error('\nEl baseline NO quedó como debe:');
+      for (const f of r.informe.fallos) {
+        console.error(
+          `  FALLA  ${f.nombre}  → esperado ${JSON.stringify(f.esperado)}, ` +
+            `obtenido ${JSON.stringify(f.obtenido)}`,
+        );
+      }
+      process.exitCode = 1;
+    }
   } finally {
     await prisma.$disconnect();
   }
