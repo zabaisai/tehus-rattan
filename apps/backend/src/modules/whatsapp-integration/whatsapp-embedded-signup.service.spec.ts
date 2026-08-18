@@ -1,3 +1,4 @@
+import { dobleModoDemo } from '../../common/demo/modo-demo.doble';
 import {
   BadRequestException,
   ConflictException,
@@ -112,6 +113,7 @@ function build(overrides: any = {}) {
     integrationService,
     management,
     notifications,
+    dobleModoDemo(),
   );
   return {
     service,

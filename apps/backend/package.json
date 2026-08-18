@@ -23,7 +23,11 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "whatsapp:encrypt-token": "ts-node --transpile-only scripts/encrypt-whatsapp-token.ts",
-    "platform:create-super-admin": "ts-node --transpile-only scripts/create-super-admin.ts"
+    "platform:create-super-admin": "ts-node --transpile-only scripts/create-super-admin.ts",
+    "demo:aprovisionar": "ts-node --transpile-only scripts/demo-aprovisionar.ts",
+    "demo:restablecer": "ts-node --transpile-only scripts/demo-restablecer.ts",
+    "demo:verificar": "ts-node --transpile-only scripts/demo-verificar.ts",
+    "demo:restaurar": "ts-node --transpile-only scripts/demo-restaurar.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

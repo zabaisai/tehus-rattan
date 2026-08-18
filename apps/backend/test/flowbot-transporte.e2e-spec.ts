@@ -1,3 +1,4 @@
+import { dobleModoDemo } from '../src/common/demo/modo-demo.doble';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { OutboxService } from '../src/common/outbox/outbox.service';
@@ -219,6 +220,7 @@ describe('transporte y recuperación durable de FlowBot (e2e, base real)', () =>
       new FlowBotSelectorService(servicioPrisma),
       runner,
       handoffService,
+      dobleModoDemo(),
     );
     reconciler = new FlowBotReconcilerService(
       servicioPrisma,

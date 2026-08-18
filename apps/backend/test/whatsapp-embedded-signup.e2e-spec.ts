@@ -5,6 +5,8 @@ import { PassportModule } from '@nestjs/passport';
 import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { ModoDemoService } from '../src/common/demo/modo-demo.service';
+import { dobleModoDemo } from '../src/common/demo/modo-demo.doble';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { WhatsAppIntegrationController } from '../src/modules/whatsapp-integration/whatsapp-integration.controller';
@@ -207,6 +209,10 @@ describe('WhatsApp Embedded Signup (e2e)', () => {
       controllers: [WhatsAppIntegrationController],
       providers: [
         JwtStrategy,
+        // Empresa NO demo: esta suite mide el flujo real de Meta, que es
+        // justo lo que el modo demo bloquea. Con el doble en `false`, el
+        // guardarrail esta presente pero no interfiere.
+        { provide: ModoDemoService, useValue: dobleModoDemo(false) },
         { provide: ConfigService, useValue: config },
         { provide: PrismaService, useValue: store.client },
         { provide: WhatsAppMetaClientService, useValue: metaMock },

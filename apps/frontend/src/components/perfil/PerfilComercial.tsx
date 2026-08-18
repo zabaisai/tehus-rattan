@@ -78,11 +78,22 @@ export function PerfilComercial({
   origen,
   volverA,
   rutaDeRegreso,
+  oportunidadPreferidaId,
   variante = "lateral",
   onCerrar,
 }: {
   contactId: string;
   origen: "pipeline" | "conversacion";
+  /**
+   * Qué oportunidad enseñar cuando el contacto tiene varias abiertas.
+   *
+   * Sin esto, la ficha enseña siempre la ABIERTA MÁS RECIENTE, que es lo
+   * correcto al llegar desde un chat —no se ha señalado ninguna— pero no al
+   * llegar desde el embudo: ahí se ha pulsado una tarjeta concreta, y ver los
+   * datos de otra oportunidad del mismo contacto es peor que no abrir la
+   * ficha. Es un dato que ya viaja en `oportunidades`; no añade consultas.
+   */
+  oportunidadPreferidaId?: string | null;
   /** Ruta de regreso, ya codificada. Conserva embudo, filtros y scroll. */
   volverA?: string | null;
   /**
@@ -114,6 +125,13 @@ export function PerfilComercial({
     queryKey: clavePerfil(contactId),
     queryFn: () => getPerfilComercial(contactId),
   });
+
+  // La preferida si está en la lista; si no, la que resuelve el servidor.
+  const oportunidad =
+    (oportunidadPreferidaId &&
+      perfil?.oportunidades.find((o) => o.id === oportunidadPreferidaId)) ||
+    perfil?.oportunidad ||
+    null;
 
   async function conAviso(accion: () => Promise<unknown>, respaldo: string) {
     setError(null);
@@ -233,11 +251,11 @@ export function PerfilComercial({
               </button>
             )}
 
-            {perfil.oportunidad && (
+            {oportunidad && (
               <button
                 onClick={() =>
                   router.push(
-                    `/dashboard/pipeline?embudo=${perfil.oportunidad!.pipeline.id}&lead=${perfil.oportunidad!.id}`,
+                    `/dashboard/pipeline?embudo=${oportunidad.pipeline.id}&lead=${oportunidad.id}&sel=${oportunidad.id}`,
                   )
                 }
                 className="flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"
@@ -346,27 +364,21 @@ export function PerfilComercial({
 
           {pestana === "resumen" && (
           <Seccion titulo="Oportunidad">
-            {perfil.oportunidad ? (
+            {oportunidad ? (
               <div className="space-y-1 text-sm">
                 <p className="font-medium text-neutral-900">
-                  {perfil.oportunidad.titulo}
+                  {oportunidad.titulo}
                 </p>
-                <Fila
-                  etiqueta="Embudo"
-                  valor={perfil.oportunidad.pipeline.nombre}
-                />
-                <Fila
-                  etiqueta="Etapa"
-                  valor={perfil.oportunidad.etapa.nombre}
-                />
+                <Fila etiqueta="Embudo" valor={oportunidad.pipeline.nombre} />
+                <Fila etiqueta="Etapa" valor={oportunidad.etapa.nombre} />
                 <Fila
                   etiqueta="Valor"
-                  valor={moneda(perfil.oportunidad.valor)}
+                  valor={moneda(oportunidad.valor)}
                   mono
                 />
                 <Fila
                   etiqueta="Asesor"
-                  valor={perfil.oportunidad.asesor?.nombre ?? "Sin asignar"}
+                  valor={oportunidad.asesor?.nombre ?? "Sin asignar"}
                 />
               </div>
             ) : (

@@ -1,3 +1,4 @@
+import { dobleModoDemo } from '../../common/demo/modo-demo.doble';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import axios from 'axios';
@@ -58,6 +59,7 @@ describe('WhatsappService', () => {
       whatsappIntegrationService,
       tokenCryptoService,
       configService as any,
+      dobleModoDemo(),
     );
   });
 
@@ -205,7 +207,12 @@ describe('WhatsappService', () => {
         phoneNumberId: '1234567890',
         accessTokenEncrypted: crypto.encrypt('fake-meta-access-token'),
       });
-      return new WhatsappService(integrationSvc as any, crypto, config as any);
+      return new WhatsappService(
+        integrationSvc as any,
+        crypto,
+        config as any,
+        dobleModoDemo(),
+      );
     }
 
     it('builds the URL from the configured version (a valid v<major>.<minor>)', async () => {

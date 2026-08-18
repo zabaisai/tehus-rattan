@@ -23,20 +23,15 @@ import {
 } from '@/lib/pipeline';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Modal } from '@/components/ui/Modal';
+import {
+  SelectorDeColor,
+  nombreDeColor,
+} from '@/components/ui/SelectorDeColor';
 import { mensajeDeError } from '@/components/ui/ListState';
 import { RetirarEmbudoDialog } from '@/components/pipeline/RetirarEmbudoDialog';
 import type { Pipeline, PipelineStage } from '@/types';
-
-const COLORES = [
-  '#131C4A',
-  '#FF6A00',
-  '#0F766E',
-  '#B45309',
-  '#7C3AED',
-  '#B91C1C',
-  '#64748B',
-];
 
 /**
  * Administrar los embudos.
@@ -316,6 +311,7 @@ function Etapas({
   onAccion: (a: () => Promise<unknown>, r: string) => Promise<boolean>;
 }) {
   const [nueva, setNueva] = useState('');
+  const [aEliminar, setAEliminar] = useState<PipelineStage | null>(null);
 
   async function mover(etapa: PipelineStage, dir: -1 | 1) {
     const ordenadas = [...pipeline.stages].sort((a, b) => a.order - b.order);
@@ -338,14 +334,23 @@ function Etapas({
       {pipeline.stages.map((etapa, i) => (
         <div
           key={etapa.id}
-          className="flex flex-wrap items-center gap-2 rounded-md bg-neutral-50 px-2 py-1.5"
+          className="space-y-2 rounded-md bg-neutral-50 px-2 py-1.5"
         >
+        <div className="flex flex-wrap items-center gap-2">
           <span
             aria-hidden="true"
             className="h-3 w-3 shrink-0 rounded-full border border-black/10"
             style={{ backgroundColor: etapa.color ?? '#94a3b8' }}
           />
-          <span className="flex-1 text-xs text-neutral-800">{etapa.name}</span>
+          <span className="flex-1 text-xs text-neutral-800">
+            {etapa.name}
+            {/* EL COLOR TIENE NOMBRE. Antes solo estaba el punto, y el unico
+                sitio donde se leia cual era el desplegable que ofrecia
+                «#0F766E» como opcion. */}
+            <span className="ml-1.5 text-[10px] text-neutral-500">
+              {nombreDeColor(etapa.color)}
+            </span>
+          </span>
 
           {etapa.isInitial && (
             <Badge tone="success">
@@ -358,26 +363,6 @@ function Etapas({
               {etapa.probability}%
             </span>
           )}
-
-          <select
-            value={etapa.color ?? ''}
-            aria-label={`Color de ${etapa.name}`}
-            onChange={(e) =>
-              void onAccion(
-                () =>
-                  updateStage(pipeline.id, etapa.id, { color: e.target.value }),
-                'No se pudo cambiar el color.',
-              )
-            }
-            className="rounded border border-neutral-300 px-1 py-0.5 text-[10px] outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
-          >
-            <option value="">Color…</option>
-            {COLORES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
 
           <input
             type="number"
@@ -434,21 +419,55 @@ function Etapas({
           >
             <ArrowDown size={12} />
           </Button>
+          {/* BORRAR UNA ETAPA ES DEFINITIVO, y hasta ahora era un icono de
+              12 px sin texto que borraba al primer clic. Es exactamente el
+              defecto que encontró la revisión de 3.z en Contactos. El
+              servidor ya se niega si la etapa tiene oportunidades o es la de
+              entrada; lo que faltaba era decirlo antes, no después. */}
           <Button
             variant="quiet"
             size="sm"
-            aria-label={`Eliminar ${etapa.name}`}
-            onClick={() =>
-              void onAccion(
-                () => deleteStage(pipeline.id, etapa.id),
-                'No se pudo eliminar la etapa.',
-              )
-            }
+            aria-label={`Eliminar la etapa ${etapa.name}`}
+            onClick={() => setAEliminar(etapa)}
           >
-            <Trash2 size={12} />
+            <Trash2 size={12} aria-hidden="true" />
           </Button>
         </div>
+
+        {/* El color, con swatches y nombre. El §3.1 no admite el hexadecimal
+            como interfaz principal, y aquí lo era: las opciones del
+            desplegable anterior eran los propios códigos. */}
+        <SelectorDeColor
+          valor={etapa.color}
+          grupo={`admin-color-${etapa.id}`}
+          etiqueta={`Color de ${etapa.name}`}
+          onChange={(valor) =>
+            void onAccion(
+              () =>
+                updateStage(pipeline.id, etapa.id, { color: valor ?? '' }),
+              'No se pudo cambiar el color.',
+            )
+          }
+        />
+        </div>
       ))}
+
+      {aEliminar && (
+        <ConfirmDialog
+          title={`¿Eliminar la etapa «${aEliminar.name}»?`}
+          message="La etapa desaparece del embudo y no se puede recuperar. Solo se puede eliminar si no tiene ninguna oportunidad y no es la etapa de entrada."
+          confirmLabel="Eliminar la etapa"
+          onClose={() => setAEliminar(null)}
+          onConfirm={async () => {
+            const etapa = aEliminar;
+            setAEliminar(null);
+            await onAccion(
+              () => deleteStage(pipeline.id, etapa.id),
+              'No se pudo eliminar la etapa.',
+            );
+          }}
+        />
+      )}
 
       <div className="flex items-center gap-2">
         <input
