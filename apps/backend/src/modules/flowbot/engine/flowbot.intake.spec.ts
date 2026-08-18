@@ -1,3 +1,4 @@
+import { dobleModoDemo } from '../../../common/demo/modo-demo.doble';
 import { OutboxService } from '../../../common/outbox/outbox.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FlowBotIntakeService } from './flowbot.intake';
@@ -71,6 +72,7 @@ describe('FlowBotIntakeService', () => {
       selector as unknown as FlowBotSelectorService,
       runner as unknown as FlowBotRunnerService,
       handoff as unknown as HandoffService,
+      dobleModoDemo(),
     );
   });
 

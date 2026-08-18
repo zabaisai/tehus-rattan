@@ -92,8 +92,27 @@ export function ListState({
  */
 export function mensajeDeError(e: unknown): string {
   const respuesta = (
-    e as { response?: { status?: number; data?: { message?: unknown } } }
+    e as {
+      response?: {
+        status?: number;
+        data?: { message?: unknown; code?: unknown };
+      };
+    }
   )?.response;
+
+  // MODO DEMO antes que el 403 genérico. Los dos son 403, pero significan
+  // cosas distintas: uno es «tu cuenta no llega», el otro es «esto no se hace
+  // desde la demo». Decir lo primero cuando pasa lo segundo hace que quien
+  // está evaluando el producto crea que su usuario está mal.
+  //
+  // Se distingue por el `code`, no por el texto: reescribir una frase no
+  // puede volver a romper la explicación.
+  if (respuesta?.data?.code === 'MODO_DEMO') {
+    const m = respuesta.data.message;
+    return typeof m === 'string'
+      ? m
+      : 'Modo demo: esta acción no se realiza desde la empresa de demostración.';
+  }
 
   if (respuesta?.status === 403) {
     return 'No tienes permiso para ver esto.';

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { dobleModoDemo } from '../common/demo/modo-demo.doble';
 import { WhatsAppIntegrationService } from './whatsapp-integration/whatsapp-integration.service';
 import { WhatsAppTokenCryptoService } from './whatsapp-integration/whatsapp-token-crypto.service';
 import { WebhookService } from './webhook/webhook.service';
@@ -323,6 +324,7 @@ describe('WhatsApp tenant isolation (Company A vs Company B)', () => {
           get: (key: string) =>
             key === 'WHATSAPP_GRAPH_API_VERSION' ? 'v20.0' : undefined,
         } as any,
+        dobleModoDemo(),
       );
 
       mockedAxios.post.mockResolvedValue({ data: {} });

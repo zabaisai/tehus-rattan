@@ -11,6 +11,7 @@ import { WhatsAppIntegrationService } from '../whatsapp-integration/whatsapp-int
 import { WhatsAppTokenCryptoService } from '../whatsapp-integration/whatsapp-token-crypto.service';
 import { GRAPH_API_VERSION_FORMAT } from '../../common/config/env.validation';
 import { maskPhone } from '../../common/logging/redact';
+import { ModoDemoService } from '../../common/demo/modo-demo.service';
 
 @Injectable()
 export class WhatsappService {
@@ -20,6 +21,7 @@ export class WhatsappService {
     private whatsappIntegrationService: WhatsAppIntegrationService,
     private tokenCryptoService: WhatsAppTokenCryptoService,
     private config: ConfigService,
+    private readonly modoDemo: ModoDemoService,
   ) {}
 
   // `fromPhoneNumberId` permite al asesor elegir desde que numero responde
@@ -57,6 +59,13 @@ export class WhatsappService {
     message: string,
     fromPhoneNumberId?: string,
   ): Promise<string | undefined> {
+    // MODO DEMO: se corta ANTES de resolver la integracion y de descifrar
+    // ningun token. Este es el unico camino de salida del CRM hacia Meta
+    // —respuesta manual del asesor, chatbot y automatizaciones pasan por
+    // aqui—, asi que basta con cerrarlo una vez. No depende de las banderas
+    // de entorno: pregunta por la EMPRESA.
+    await this.modoDemo.bloquearSiDemo(companyId, 'enviar un WhatsApp');
+
     const integration = fromPhoneNumberId
       ? await this.whatsappIntegrationService.findConnectedByCompanyAndPhoneNumberId(
           companyId,

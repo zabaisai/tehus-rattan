@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
+import { ModoDemoService } from '../../common/demo/modo-demo.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
 import { WhatsAppTokenCryptoService } from './whatsapp-token-crypto.service';
@@ -46,6 +47,7 @@ export class WhatsAppEmbeddedSignupService {
     private integrationService: WhatsAppIntegrationService,
     private management: WhatsAppIntegrationManagementService,
     private notifications: NotificationsService,
+    private readonly modoDemo: ModoDemoService,
   ) {}
 
   // Notifies the company's admins about a WhatsApp connection event.
@@ -95,6 +97,8 @@ export class WhatsAppEmbeddedSignupService {
   }
 
   async start(companyId: string, actor: SignupActor) {
+    await this.modoDemo.bloquearSiDemo(companyId, 'conectar WhatsApp con Meta');
+
     this.assertEnabled();
     const config = this.publicConfig();
     const { state, expiresAt } = await this.stateService.issueForCompany(
@@ -117,6 +121,11 @@ export class WhatsAppEmbeddedSignupService {
   }
 
   async reconnect(companyId: string, actor: SignupActor) {
+    await this.modoDemo.bloquearSiDemo(
+      companyId,
+      'reconectar WhatsApp con Meta',
+    );
+
     this.assertEnabled();
     const config = this.publicConfig();
     // Reconnect simply issues a NEW single-use state. The existing integration
@@ -168,6 +177,11 @@ export class WhatsAppEmbeddedSignupService {
   // allowed conversation window (no template) — a closed window yields a
   // generic error. Never returns the raw Meta response.
   async sendTest(companyId: string, actor: SignupActor, to: string) {
+    await this.modoDemo.bloquearSiDemo(
+      companyId,
+      'enviar un mensaje de prueba',
+    );
+
     this.assertEnabled();
     const integration =
       await this.integrationService.findConnectedByCompanyId(companyId);
@@ -210,6 +224,7 @@ export class WhatsAppEmbeddedSignupService {
     actor: SignupActor,
     dto: EmbeddedSignupCompleteDto,
   ) {
+    await this.modoDemo.bloquearSiDemo(companyId, 'conectar WhatsApp con Meta');
     this.assertEnabled();
 
     // 1) Consume the state immediately (outside the persist transaction) so it

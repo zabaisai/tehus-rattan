@@ -21,6 +21,11 @@ export class UsersService {
         isActive: true,
         companyId: true,
         createdAt: true,
+        // La interfaz necesita saber si esta en la empresa de demostracion
+        // para decirlo en pantalla. Viaja aqui —en el arranque de sesion— y no
+        // en un endpoint aparte, porque preguntarlo por separado significaria
+        // que hay un instante en el que la pantalla no lo sabe todavia.
+        company: { select: { isDemo: true } },
       },
     });
   }
