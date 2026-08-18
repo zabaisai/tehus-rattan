@@ -24,6 +24,7 @@ import {
   THROTTLE_LIMITS,
 } from './common/throttle/throttle.config';
 import { PrismaModule } from './prisma/prisma.module';
+import { DemoModule } from './common/demo/demo.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
 import { UsersModule } from './modules/users/users.module';
@@ -50,6 +51,10 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
 
 @Module({
   imports: [
+    // Global: el guardarrail de modo demo se comprueba en modulos que no se
+    // conocen entre si. Que cada uno tuviera que importarlo convertiria un
+    // olvido en un efecto externo desde la empresa de demostracion.
+    DemoModule,
     QueueModule,
     OutboxModule,
     RealtimeModule,

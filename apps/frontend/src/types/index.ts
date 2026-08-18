@@ -10,6 +10,14 @@ export interface User {
   name: string;
   role: Role;
   companyId: string | null;
+  /**
+   * La empresa de la sesión es la de DEMOSTRACIÓN.
+   *
+   * Llega en `/auth/me`. Opcional porque el login inicial devuelve un usuario
+   * más escueto: hasta que `/auth/me` responde, la pantalla no lo sabe, y
+   * `undefined` es «todavía no sé», no «no es demo».
+   */
+  company?: { isDemo: boolean } | null;
 }
 
 export interface AuthResponse {

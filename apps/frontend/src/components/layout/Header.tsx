@@ -9,6 +9,7 @@ import { logout } from '@/lib/auth';
 import { broadcastAuthEvent } from '@/lib/auth-events';
 import { Avatar } from '@/components/ui/Avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { DistintivoDemo } from '@/components/layout/DistintivoDemo';
 import { PaletaDeBusqueda } from '@/components/busqueda/PaletaDeBusqueda';
 import { olvidarRecientes } from '@/lib/creacion-rapida';
 
@@ -85,6 +86,10 @@ export function Header({ onMenuClick }: HeaderProps) {
       </button>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Primero de la zona derecha: se lee antes que las acciones, que es
+            donde tiene que estar un aviso sobre en qué empresa estás. */}
+        <DistintivoDemo />
+
         {/* ACCIÓN GLOBAL «CREAR». Abre la MISMA paleta que Ctrl/⌘+K, que es
             donde ya vive el panel «Crear rápidamente» del mockup 16 con sus
             seis acciones y sus permisos espejados del backend. Un menú propio

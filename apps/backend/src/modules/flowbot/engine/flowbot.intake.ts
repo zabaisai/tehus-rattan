@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { OutboxService } from '../../../common/outbox/outbox.service';
+import { ModoDemoService } from '../../../common/demo/modo-demo.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FlowBotQueueService } from './flowbot.queue';
 import { FlowBotSelectorService } from './flowbot.selector';
@@ -49,6 +50,8 @@ export interface ResultadoIntake {
     | 'handoff-activo'
     | 'contacto-archivado'
     | 'sin-bot'
+    /** La empresa es de demostracion: los bots no se ejecutan de verdad. */
+    | 'modo-demo'
     | 'ya-hay-ejecucion'
     | 'espera-vencida'
     | 'error';
@@ -73,6 +76,7 @@ export class FlowBotIntakeService {
     private readonly selector: FlowBotSelectorService,
     private readonly runner: FlowBotRunnerService,
     private readonly handoff: HandoffService,
+    private readonly modoDemo: ModoDemoService,
   ) {}
 
   /**
@@ -85,6 +89,15 @@ export class FlowBotIntakeService {
    */
   async atenderMensaje(entrada: MensajeParaFlowBot): Promise<ResultadoIntake> {
     try {
+      // MODO DEMO: los bots NO se ejecutan de verdad. Se corta aqui, antes
+      // de seleccionar flujo y de crear ejecucion, para que la empresa de
+      // demostracion no deje ejecuciones, esperas ni efectos a medias.
+      // Se devuelve 'ignorado', no un error: este metodo NUNCA lanza, y un
+      // mensaje entrante debe seguir guardandose igual.
+      if (await this.modoDemo.esDemo(entrada.companyId)) {
+        return { atendido: false, motivo: 'modo-demo' };
+      }
+
       const conversacion = await this.prisma.conversation.findFirst({
         where: { id: entrada.conversationId, companyId: entrada.companyId },
         select: {

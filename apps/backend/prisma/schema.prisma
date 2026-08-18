@@ -47,6 +47,18 @@ model Company {
   // `businessHours` queda nullable a propósito: "sin horario definido" es un
   // estado distinto de "horario vacío", y las reglas de asignación deben
   // poder distinguirlos.
+  /// EMPRESA DE DEMOSTRACION. Marcador estable, no una convencion de nombre.
+  ///
+  /// Existe porque un prefijo en el nombre es texto: alguien lo renombra y la
+  /// empresa deja de estar protegida sin que nadie se entere. Esto es una
+  /// columna, se consulta en CADA efecto externo y no depende de como se
+  /// llame la empresa.
+  ///
+  /// Lo que implica: desde una empresa con `isDemo` no se envia WhatsApp, no
+  /// se conecta Meta, no sale correo y no se ejecutan bots de verdad. El
+  /// bloqueo vive en el servidor (ModoDemoService), nunca en la interfaz.
+  isDemo Boolean @default(false)
+
   timezone String @default("America/Bogota")
   currency String @default("COP")
   locale   String @default("es-CO")
@@ -130,8 +142,8 @@ model Company {
 
   handoffs ConversationHandoff[]
 
-  contactMerges           ContactMerge[]
-  contactMergeDismissals  ContactMergeDismissal[]
+  contactMerges          ContactMerge[]
+  contactMergeDismissals ContactMergeDismissal[]
 
   flowBotCredentials FlowBotCredential[]
   flowBotSettings    FlowBotSettings?

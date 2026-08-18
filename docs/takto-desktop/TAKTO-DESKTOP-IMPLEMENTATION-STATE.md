@@ -1974,6 +1974,36 @@ sin conocerse. Si vuelve a aparecer, conviene mirarlo con el log delante.
 
 ---
 
+## Trabajo en paralelo: `DEMO 1.1 — tenant demo aislado` (EN REVISIÓN HUMANA)
+
+**No es un incremento del plan desktop y no altera su orden.** Es una demo
+autónoma para enseñar el producto a un posible socio, en la rama
+`feature/takto-demo-socio-autonomo`, partiendo de `077faec`.
+
+**Qué añade al producto**, y es lo único que toca fuera de la empresa demo:
+
+- `Company.isDemo` (migración **aditiva** `20260818150000_empresa_demo`), y
+  `ModoDemoService`, que **falla cerrado**: si no puede comprobar si una
+  empresa es demo, la bloquea.
+- Siete puntos de corte: envío de WhatsApp del CRM, los cuatro caminos hacia
+  Meta, la ejecución de bots y los dos caminos de correo.
+- El bloqueo **no depende del entorno**. Hay una prueba que abre a la vez
+  `FLOWBOT_REAL_WHATSAPP_ENABLED=true`, `DRY_RUN=false` y las tres allowlists
+  llenas, y comprueba que la empresa demo sigue sin poder enviar y que **no se
+  llega a llamar a Meta ni a descifrar el token**.
+- La interfaz dice **«Modo demo»** en la cabecera y traduce el 403 por su
+  `code`, no por su texto: antes cualquier 403 se leía «No tienes permiso»,
+  que delante de alguien evaluando el producto parece una cuenta rota.
+
+**Comandos** (idempotentes y transaccionales, contraseñas solo por entorno):
+`npm run demo:aprovisionar` y `npm run demo:restaurar`. La empresa se elige por
+`slug` único **y** `isDemo`, nunca por prefijo de nombre, y todo borrado va
+acotado por ese `companyId`.
+
+**Estado: EN REVISIÓN HUMANA.** No cierra nada del plan desktop.
+
+---
+
 ## Incremento entregado: 4.1 — Pipeline vertical (mockup 04)
 
 **ENTREGADO. PENDIENTE DE REVISIÓN HUMANA.** Sin migraciones. **Sin un solo

@@ -1,3 +1,4 @@
+import { dobleModoDemo } from '../src/common/demo/modo-demo.doble';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { OutboxService } from '../src/common/outbox/outbox.service';
@@ -206,6 +207,7 @@ describe('vertical completa de FlowBot (e2e, base real)', () => {
       new FlowBotSelectorService(servicioPrisma),
       runner,
       handoff,
+      dobleModoDemo(),
     );
     // Reparto, avisos y tiempo real inertes: esta suite mide el recorrido de
     // los datos, no la mensajeria interna.

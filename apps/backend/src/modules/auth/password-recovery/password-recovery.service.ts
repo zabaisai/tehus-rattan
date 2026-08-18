@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { ModoDemoService } from '../../../common/demo/modo-demo.service';
 import { SessionsService } from '../../sessions/sessions.service';
 import { MailService } from '../../mail/mail.service';
 import { PasswordResetTokenService } from './password-reset-token.service';
@@ -43,6 +44,7 @@ export class PasswordRecoveryService {
     private readonly mail: MailService,
     private readonly sessions: SessionsService,
     private readonly config: ConfigService,
+    private readonly modoDemo: ModoDemoService,
   ) {}
 
   // ---- public: forgot password (anti-enumeration) --------------------------
@@ -271,6 +273,18 @@ export class PasswordRecoveryService {
     actorUserId: string;
     actorRole: Role;
   }): Promise<void> {
+    // MODO DEMO: no sale correo. Se corta antes de construir el mensaje y
+    // sin lanzar: la respuesta al usuario ya es generica a proposito —para
+    // no revelar si la cuenta existe— y un error aqui cambiaria ese
+    // comportamiento. El token se revoca igual que si el envio fallara.
+    if (
+      params.user.companyId &&
+      (await this.modoDemo.esDemo(params.user.companyId))
+    ) {
+      await this.tokens.revokeByPlainToken(params.plainToken).catch(() => null);
+      return;
+    }
+
     const resetUrl = this.buildResetUrl(params.plainToken);
     try {
       await this.mail.sendPasswordResetEmail({

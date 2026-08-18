@@ -304,13 +304,18 @@ export class NotificationsService {
           email: true,
           name: true,
           isActive: true,
-          company: { select: { status: true } },
+          // `isDemo` viaja en la MISMA consulta que ya se hacia: comprobar
+          // el modo demo aqui no cuesta un viaje extra a la base.
+          company: { select: { status: true, isDemo: true } },
         },
       });
       if (
         !recipient?.isActive ||
         !recipient.email ||
-        recipient.company?.status !== 'ACTIVE'
+        recipient.company?.status !== 'ACTIVE' ||
+        // MODO DEMO: la notificacion se sigue creando en el producto —se ve en
+        // la campana— pero no sale ningun correo.
+        recipient.company?.isDemo
       ) {
         return;
       }
