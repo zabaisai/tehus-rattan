@@ -2236,6 +2236,50 @@ Entrando con `qa-pipe41-admin@local.invalid` se ve «Configurar etapas» y el
 lápiz de cada etapa; con `qa-pipe41-asesor@local.invalid` **no**, y sí «Nueva
 oportunidad»: mover y crear es trabajo de asesor, configurar el embudo no.
 
+### El CI de `ec51a04`: Frontend verde, Backend rojo en E2E — y qué se sabe
+
+**Es la segunda vez que ocurre en esta rama con el mismo perfil**, así que no se
+despacha como «cosas del CI». Lo que se puede afirmar con evidencia:
+
+- **4.1 no toca el backend.** `git diff --name-only 077faec ec51a04 -- apps/backend`
+  devuelve **0 archivos**.
+- **El árbol de `apps/backend` es el MISMO objeto de git** en los dos SHA:
+  `40991d321811d7709227808ac802e7f43b85a9a9`. No es «parecido»: es idéntico.
+- **`077faec`, con ese mismo árbol, salió verde** en el CI (run
+  [`32054515370`](https://github.com/zabaisai/tehus-rattan/actions/runs/32054515370)),
+  incluido el paso E2E.
+- **En local, la suite E2E completa pasa 904/904 en 62 suites**, con
+  `--runInBand` y `QUEUE_ENABLED=false`, que es exactamente lo que hace el CI,
+  contra PostgreSQL y Redis reales.
+- **El job de Frontend salió `success`**, que es el que sí cubre lo entregado:
+  938 pruebas, lint y build.
+
+Lo que **no** se pudo comprobar, igual que la vez anterior: el log del job.
+Descargarlo por API exige permisos de administración del repositorio
+(`403 Must have admin rights`) y la única anotación pública dice
+`Process completed with exit code 1`, sin nombrar un test.
+
+**Historial del paso E2E en esta rama**, para que se vea el patrón:
+
+| SHA | Toca `apps/backend` | E2E en CI |
+|---|---|---|
+| `cb6f046` | no | ✅ |
+| `1769e0f` | no | ❌ |
+| `9a49bab` | no | ✅ |
+| `910f6b2` | no | ✅ |
+| `077faec` | no | ✅ |
+| `ec51a04` | **no** | ❌ |
+
+Seis ejecuciones del **mismo** código de backend: cuatro verdes y dos rojas.
+Eso es inestabilidad del entorno, no una regresión —una regresión no aparece y
+desaparece con el código congelado—, pero **sigue siendo deuda observacional sin
+resolver**, y ya no es una anécdota: conviene conseguir permiso de lectura de
+logs del CI antes de que vuelva a pasar en un cierre que dependa de él.
+
+**No se ha tocado el backend para «arreglarlo»:** hacerlo sería cambiar código
+que la evidencia dice que está bien, para perseguir un fallo cuya causa no se ha
+leído.
+
 ### Próximo incremento propuesto: `4.2 — Tareas (mockup 07)`
 
 **PROPUESTO. No iniciado.** La fase 4 queda **EN_CURSO**: entregó el mockup 04 y
