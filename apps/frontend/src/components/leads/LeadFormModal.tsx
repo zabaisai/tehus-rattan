@@ -23,16 +23,39 @@ type ApiError = {
 interface LeadFormModalProps {
   pipelineId: string;
   stages: PipelineStage[];
+  /**
+   * Etapa preseleccionada. La pone «Agregar oportunidad» desde una fila del
+   * tablero: quien pulsa el «+» de «Cotizado» está diciendo dónde la quiere, y
+   * obligarle a volver a elegirla en el formulario es pedirle el dato dos
+   * veces —y dejar que se equivoque en la segunda—.
+   */
+  etapaInicialId?: string;
   onClose: () => void;
   onCreated: () => void;
 }
 
-export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFormModalProps) {
+export function LeadFormModal({
+  pipelineId,
+  stages,
+  etapaInicialId,
+  onClose,
+  onCreated,
+}: LeadFormModalProps) {
   const sortedStages = [...stages].sort((a, b) => a.order - b.order);
+
+  // Sin preselección, la de ENTRADA y no «la primera por orden». Es la misma
+  // distinción que hace el servidor con `isInitial`: dónde está dibujada una
+  // etapa y por dónde se entra al embudo son cosas distintas, y en un embudo
+  // reordenado la primera puede ser «Ganado».
+  const etapaPorDefecto =
+    etapaInicialId ??
+    sortedStages.find((s) => s.isInitial)?.id ??
+    sortedStages[0]?.id ??
+    '';
 
   const [title, setTitle] = useState('');
   const [contactId, setContactId] = useState('');
-  const [stageId, setStageId] = useState(sortedStages[0]?.id ?? '');
+  const [stageId, setStageId] = useState(etapaPorDefecto);
   const [value, setValue] = useState('');
   const [expectedCloseDate, setExpectedCloseDate] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
@@ -86,7 +109,7 @@ export function LeadFormModal({ pipelineId, stages, onClose, onCreated }: LeadFo
   }
 
   return (
-    <Modal title="Nuevo lead" onClose={onClose} maxWidth="sm">
+    <Modal title="Nueva oportunidad" onClose={onClose} maxWidth="sm">
         <form onSubmit={handleSubmit}>
           <Field label="Título" required className="mb-3">
             <Input

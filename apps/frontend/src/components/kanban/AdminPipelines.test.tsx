@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Pipeline } from '@/types';
@@ -147,9 +147,47 @@ describe('Administración de embudos', () => {
     pintar();
     await userEvent.click(await screen.findByText(/Ventas/));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Eliminar Cotizado' }));
+    // Ahora pasa por confirmación: borrar una etapa es definitivo y ya no se
+    // ejecuta al primer clic sobre un icono sin texto.
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Eliminar la etapa Cotizado' }),
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Eliminar la etapa' }),
+    );
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/leads activos/);
+  });
+
+  it('borrar una etapa AVISA antes, con su nombre y su consecuencia', async () => {
+    pintar();
+    await userEvent.click(await screen.findByText(/Ventas/));
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Eliminar la etapa Cotizado' }),
+    );
+
+    expect(
+      screen.getByText('¿Eliminar la etapa «Cotizado»?'),
+    ).toBeInTheDocument();
+    expect(deleteStage).not.toHaveBeenCalled();
+  });
+
+  it('el color se elige por su NOMBRE, no escribiendo un hexadecimal', async () => {
+    pintar();
+    await userEvent.click(await screen.findByText(/Ventas/));
+
+    await userEvent.click(
+      screen.getAllByRole('radio', { name: 'Verde' })[0],
+    );
+
+    await waitFor(() =>
+      expect(updateStage).toHaveBeenCalledWith(
+        'p1',
+        expect.any(String),
+        { color: '#0E8A5F' },
+      ),
+    );
   });
 
   it('crea un embudo nuevo', async () => {

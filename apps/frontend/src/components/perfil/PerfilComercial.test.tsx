@@ -264,7 +264,11 @@ describe("Perfil comercial", () => {
       await screen.findByRole("button", { name: /abrir oportunidad/i }),
     );
 
-    expect(push).toHaveBeenCalledWith("/dashboard/pipeline?embudo=p1&lead=l1");
+    // Lleva TAMBIÉN `sel`: al aterrizar en el embudo, la tarjeta de esa
+    // oportunidad queda señalada, no solo abierto su detalle.
+    expect(push).toHaveBeenCalledWith(
+      "/dashboard/pipeline?embudo=p1&lead=l1&sel=l1",
+    );
   });
 
   it("archiva desde el panel y refresca el perfil", async () => {
