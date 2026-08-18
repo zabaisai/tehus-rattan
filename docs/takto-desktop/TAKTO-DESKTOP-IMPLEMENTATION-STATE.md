@@ -7,9 +7,11 @@
 ## Última actualización
 
 - Fecha: **18 de agosto de 2026** · America/Bogota
-- **`4.1 — Pipeline vertical` (mockup 04): ENTREGADO, con pruebas, build y QA de navegador. PENDIENTE DE REVISIÓN HUMANA.**
-- Commits de 4.1: `3485016` (tablero vertical) · `028242a` (cinco defectos del navegador) · `1473b82` (singular del resumen)
+- **`4.1 — Pipeline vertical` (mockup 04): ENTREGADO, con pruebas, build, QA de navegador y CI verde. PENDIENTE DE REVISIÓN HUMANA.**
+- **SHA con CI verde: `28237d7` · run [`32184889102`](https://github.com/zabaisai/tehus-rattan/actions/runs/32184889102) — Backend y Frontend `success`.**
+- Commits de 4.1: `3485016` (tablero vertical) · `028242a` (cinco defectos del navegador) · `1473b82` (singular del resumen) · `ec51a04` (estado) · `28237d7` (el CI rojo, con su evidencia)
 - Rama: `feature/takto-brand-ui-integration`
+- **Sin migraciones. Sin un solo cambio en `apps/backend`.**
 - **`3.z — Contactos: listado, papelera y restauración` (mockup 02): HECHO y APROBADO por revisión humana el 17 de agosto de 2026.**
 - **SHA aprobado de 3.z: `910f6b2baf9af21ab7f9daf7ea90632292ad62e1` · CI verde, run [`32045702872`](https://github.com/zabaisai/tehus-rattan/actions/runs/32045702872)**
 - Commits de 3.z: `cd3c2e1` (modelo de lectura) · `5cc66ed` (primitivas) · `334f3da` (URL) · `77c51d9` (pantalla) · **2ª ronda:** `1769e0f` (retirar el borrado definitivo y explicar los iconos)
@@ -2271,6 +2273,15 @@ Descargarlo por API exige permisos de administración del repositorio
 | `ec51a04` | **no** | ❌ |
 
 Seis ejecuciones del **mismo** código de backend: cuatro verdes y dos rojas.
+
+**Y una séptima, que resuelve este cierre.** El commit siguiente —`28237d7`, solo
+documentación, con el backend otra vez byte a byte idéntico y **el mismo código
+de frontend que entrega 4.1**— salió **Backend y Frontend `success`**, paso E2E
+incluido (run
+[`32184889102`](https://github.com/zabaisai/tehus-rattan/actions/runs/32184889102)).
+Es el mismo desenlace que tuvo el rojo de `1769e0f`, y con el mismo método: no se
+tocó nada, se volvió a ejecutar.
+
 Eso es inestabilidad del entorno, no una regresión —una regresión no aparece y
 desaparece con el código congelado—, pero **sigue siendo deuda observacional sin
 resolver**, y ya no es una anécdota: conviene conseguir permiso de lectura de
@@ -2310,10 +2321,15 @@ git rev-parse origin/feature/takto-brand-ui-integration
 # Con el, la FASE 3 queda HECHA: sus cuatro mockups -02, 03, 18 y 22- estan
 # entregados y aprobados.
 #
-# 4.1 - Pipeline vertical (mockup 04): ENTREGADO el 18-ago-2026 sobre 1473b82.
+# 4.1 - Pipeline vertical (mockup 04): ENTREGADO el 18-ago-2026.
 # PENDIENTE DE REVISION HUMANA. Sin migraciones y SIN TOCAR EL BACKEND.
+# SHA con CI VERDE: 28237d7 (run 32184889102, Backend y Frontend success).
 # Commits: 3485016 (tablero) - 028242a (cinco defectos del navegador) -
-# 1473b82 (singular del resumen).
+# 1473b82 (singular del resumen) - ec51a04 (estado) - 28237d7 (el CI rojo).
+#
+# El CI de ec51a04 salio Backend rojo en E2E con apps/backend byte a byte
+# identico a 077faec, que estaba verde; en local sus 904 E2E pasan. 28237d7,
+# con el mismo codigo, salio verde. Esta caracterizado en el documento.
 #
 # La FASE 4 queda EN_CURSO: entrego el mockup 04 y le faltan el 07, 19, 20 y 21.
 #
