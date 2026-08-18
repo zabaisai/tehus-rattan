@@ -162,7 +162,11 @@ describe("PipelinePage", () => {
     parametros = new URLSearchParams();
     getPipelines.mockResolvedValue([embudo()]);
     getKanban.mockResolvedValue(kanban());
-    getOverview.mockResolvedValue({ conversionRate: 18.4 });
+    getOverview.mockResolvedValue({
+      conversionRate: 18.4,
+      wonCount: 9,
+      lostCount: 40,
+    });
     comoRol("ADMIN");
     vi.spyOn(window.history, "pushState").mockImplementation(pushState);
     vi.spyOn(window.history, "replaceState").mockImplementation(replaceState);
@@ -292,6 +296,33 @@ describe("PipelinePage", () => {
     expect(
       screen.getByRole("option", { name: "Sin responsable" }),
     ).toBeInTheDocument();
+  });
+
+  it("con filtro, las cifras cuentan lo FILTRADO y lo dicen", async () => {
+    parametros = new URLSearchParams("q=comedor");
+    pintar();
+    // Solo «Comedor Roble» pasa el filtro: 1 de 2, y $8.000.000 en curso.
+    expect(await screen.findByText(/8\.000\.000/)).toBeInTheDocument();
+
+    const cifra = (etiqueta: string) =>
+      screen.getByText(etiqueta).closest("div")!.textContent;
+    expect(cifra("oportunidades abiertas")).toContain("1");
+    expect(
+      screen.getByText("Mostrando 1 de 2 oportunidades"),
+    ).toBeInTheDocument();
+  });
+
+  it("sin nada cerrado, la conversión es «—» y no un 0 % que afirma un fracaso", async () => {
+    getOverview.mockResolvedValue({
+      conversionRate: 0,
+      wonCount: 0,
+      lostCount: 0,
+    });
+    pintar();
+    expect(
+      await screen.findByText("todavía no hay oportunidades ganadas ni perdidas"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("0 %")).not.toBeInTheDocument();
   });
 
   it("«Plegar todas» deja las etapas del embudo en la URL", async () => {

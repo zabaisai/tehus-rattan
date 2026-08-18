@@ -124,6 +124,19 @@ describe("TarjetaDeOportunidad", () => {
     ).toBeInTheDocument();
   });
 
+  it("el asa NO es un <button>, o el teclado deja de poder arrastrar", () => {
+    // La biblioteca de arrastre ignora sus sensores cuando el evento nace en
+    // un elemento interactivo. Con `<button>` el asa se ve, se enfoca y la
+    // barra espaciadora no levanta nada: se rompe en silencio. Esta prueba
+    // existe para que el próximo que lo «arregle» a `<button>` se entere.
+    pintar();
+    const asa = screen.getByRole("button", {
+      name: "Mover Sala Toscana para terraza arrastrando",
+    });
+    expect(asa.tagName).toBe("SPAN");
+    expect(asa).toHaveAttribute("tabindex", "0");
+  });
+
   it("la selección se VE, y no solo en el estado de React", () => {
     const { container } = enTablero(
       <TarjetaDeOportunidad

@@ -17,11 +17,12 @@ import type { Lead } from "@/types";
  * tarjeta entera se puede pulsar.
  *
  * EL ARRASTRE TIENE ASA PROPIA. Con la tarjeta entera como asa, empezar a
- * arrastrar desde encima de «Abrir chat» se comía la pulsación. El asa además
- * es enfocable, así que mover una oportunidad con el teclado —espacio para
+ * arrastrar desde encima de «Abrir chat» se comía la pulsación. El asa es
+ * enfocable, así que mover una oportunidad con el teclado —espacio para
  * levantarla, flechas para llevarla, espacio para soltarla— funciona sin
- * ratón. El desplegable «Mover a» hace lo mismo sin arrastrar nada, para
- * quien no puede o no quiere.
+ * ratón; comprobado en navegador, con la etapa de destino a la vista. El
+ * desplegable «Mover a» hace lo mismo sin arrastrar nada y sin depender de
+ * que la etapa de destino esté en pantalla.
  */
 export function TarjetaDeOportunidad({
   lead,
@@ -58,7 +59,11 @@ export function TarjetaDeOportunidad({
           } ${snapshot.isDragging ? "shadow-lg" : ""}`}
         >
           {/* ── Identidad ─────────────────────────────────────────── */}
-          <div className="flex items-start gap-2.5">
+          {/* `flex-1`: las tarjetas de una etapa se estiran a la más alta, y
+              sin esto el bloque de responsable y los botones quedaban a
+              distinta altura en cada una. Con la identidad ocupando el hueco
+              sobrante, los pies se alinean como en el mockup. */}
+          <div className="flex flex-1 items-start gap-2.5">
             <Avatar nombre={contacto} size="md" />
 
             <div className="min-w-0 flex-1">
@@ -80,16 +85,25 @@ export function TarjetaDeOportunidad({
               </p>
             </div>
 
-            <button
-              type="button"
+            {/* UN `<span>` Y NO UN `<button>`, Y NO ES UN DESCUIDO.
+                La biblioteca de arrastre ignora sus sensores cuando el evento
+                nace en un elemento interactivo —`button`, `input`, `select`,
+                `a[href]`—, así que con un `<button>` el asa se veía, se
+                enfocaba… y la barra espaciadora no levantaba nada: mover una
+                oportunidad con el teclado quedaba roto y sin avisar. Medido en
+                navegador: con `<button>`, 0 tarjetas movidas; con `<span>`, la
+                tarjeta cambia de etapa y se persiste.
+                `dragHandleProps` ya aporta `tabIndex` y `role="button"`, así
+                que sigue siendo enfocable y se anuncia como control. */}
+            <span
               {...provided.dragHandleProps}
               // El asa necesita nombre: un icono de seis puntos no dice nada
               // a quien escucha la pantalla.
               aria-label={`Mover ${lead.title} arrastrando`}
-              className="-mr-1 shrink-0 rounded p-1 text-content-disabled outline-none hover:bg-surface-subtle hover:text-content-secondary focus-visible:ring-2 focus-visible:ring-line-focus"
+              className="-mr-1 shrink-0 cursor-grab rounded p-1 text-content-disabled outline-none hover:bg-surface-subtle hover:text-content-secondary focus-visible:ring-2 focus-visible:ring-line-focus"
             >
               <GripVertical size={15} aria-hidden="true" />
-            </button>
+            </span>
           </div>
 
           {/* ── Responsable y última actualización ─────────────────── */}

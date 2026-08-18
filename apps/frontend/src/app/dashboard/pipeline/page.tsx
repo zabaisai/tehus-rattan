@@ -32,6 +32,7 @@ import { useAuthStore } from "@/store/auth.store";
 import {
   aplicarEnPipeline,
   asesoresDelEmbudo,
+  filtrarEtapas,
   leerEstadoDePipeline,
   moneda,
   resumenDelEmbudo,
@@ -115,6 +116,10 @@ function PipelineContenido() {
     queryFn: getOverview,
   });
 
+  const cerradas = general.data
+    ? general.data.wonCount + general.data.lostCount
+    : null;
+
   const [textoBusqueda, setTextoBusqueda] = useState(estado.q);
   const [busquedaAplicada, setBusquedaAplicada] = useState(estado.q);
   if (estado.q !== busquedaAplicada) {
@@ -171,7 +176,17 @@ function PipelineContenido() {
 
   const etapasDelEmbudo = [...activo.stages].sort((a, b) => a.order - b.order);
   const datos = kanban.data as KanbanData | undefined;
-  const resumen = resumenDelEmbudo(datos?.stages ?? []);
+  const filtro = { q: estado.q, asesor: estado.asesor };
+  const hayFiltro = !!estado.q || !!estado.asesor;
+  // EL RESUMEN CUENTA LO QUE SE ESTÁ VIENDO. Con el filtro puesto, las
+  // cabeceras de etapa ya se recalculaban y estas cuatro cifras no: el tablero
+  // enseñaba una oportunidad y arriba seguía diciendo once. Es exactamente la
+  // discrepancia que hace que nadie se fíe del número.
+  const resumen = resumenDelEmbudo(filtrarEtapas(datos?.stages ?? [], filtro));
+  const totalSinFiltro = resumenDelEmbudo(datos?.stages ?? []).oportunidades;
+  // El desplegable de responsables se arma con el tablero SIN filtrar: si se
+  // armara con el filtrado, elegir a alguien vaciaría la lista y ya no habría
+  // forma de volver a otro sin quitar el filtro.
   const asesores = asesoresDelEmbudo(datos?.stages ?? []);
   const cargandoCifras = kanban.isLoading;
   const rutaActual = rutaDePipeline(parametros.toString());
@@ -252,7 +267,15 @@ function PipelineContenido() {
             LLEVA a su listado —`href` obligatorio—, y estas cuatro describen
             el tablero que ya se está mirando. Inventarles un destino para
             poder reutilizar el componente sería peor que no reutilizarlo. */}
-        <dl className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {/* Las columnas dependen de si el panel está abierto, no solo del
+            ancho de la ventana. A 1440 px con la ficha abierta, cuatro
+            columnas dejan ~130 px por cifra y «$ 77.480.000» se partía en dos
+            líneas por la mitad del número. */}
+        <dl
+          className={`grid gap-3 ${
+            estado.perfil ? "grid-cols-2 2xl:grid-cols-4" : "grid-cols-2 xl:grid-cols-4"
+          }`}
+        >
           <Cifra
             icono={Target}
             etiqueta="oportunidades abiertas"
@@ -268,11 +291,23 @@ function PipelineContenido() {
           <Cifra
             icono={Percent}
             etiqueta="conversión de la empresa"
+            // SIN NADA CERRADO NO HAY CONVERSIÓN, Y «0 %» NO ES CERO: es que
+            // todavía no se ha ganado ni perdido ninguna. El contrato devuelve
+            // 0 en ese caso, así que aquí se distingue con `wonCount` y
+            // `lostCount` en vez de afirmar un fracaso que no ha ocurrido.
             valor={
-              general.data ? `${general.data.conversionRate} %`.replace(".", ",") : "—"
+              general.data
+                ? cerradas === 0
+                  ? "—"
+                  : `${general.data.conversionRate} %`.replace(".", ",")
+                : "—"
             }
             cargando={general.isLoading}
-            nota="ganadas frente a cerradas, todos los embudos"
+            nota={
+              general.data && cerradas === 0
+                ? "todavía no hay oportunidades ganadas ni perdidas"
+                : "ganadas frente a cerradas, todos los embudos"
+            }
           />
           <Cifra
             icono={AlertTriangle}
@@ -335,11 +370,30 @@ function PipelineContenido() {
           >
             {todasPlegadas ? "Desplegar todas" : "Plegar todas"}
           </Button>
+
+          {/* Con filtro, las cifras de arriba cuentan lo FILTRADO. Decirlo
+              evita la lectura contraria —«el embudo se ha quedado en una»— y
+              da la salida en el mismo sitio. */}
+          {hayFiltro && (
+            <p className="flex items-center gap-2 text-xs text-content-secondary">
+              <span>
+                Mostrando {resumen.oportunidades} de {totalSinFiltro}{" "}
+                oportunidades
+              </span>
+              <button
+                type="button"
+                onClick={() => navegar({ q: "", asesor: null })}
+                className="font-medium text-brand-primary underline outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
+              >
+                Quitar filtros
+              </button>
+            </p>
+          )}
         </div>
 
         <TableroVertical
           embudo={activo}
-          filtro={{ q: estado.q, asesor: estado.asesor }}
+          filtro={filtro}
           seleccion={estado.seleccion}
           plegadas={estado.plegadas}
           puedeAdministrar={puedeAdministrar}
@@ -435,7 +489,10 @@ function Cifra({
         {cargando ? (
           <Skeleton className="h-7 w-20" />
         ) : (
-          <dd className="break-words font-mono text-xl font-semibold leading-tight tabular-nums text-content-primary">
+          /* `whitespace-nowrap`: una cifra partida en dos líneas deja de
+             leerse como una cifra. Si no cupiera, el problema es el número de
+             columnas, y eso se resuelve arriba. */
+          <dd className="whitespace-nowrap font-mono text-xl font-semibold leading-tight tabular-nums text-content-primary">
             {valor}
           </dd>
         )}

@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { DragDropContext, DropResult } from "@hello-pangea/dnd";
+import type {
+  DragStart,
+  DragUpdate,
+  DropResult,
+  ResponderProvided,
+} from "@hello-pangea/dnd";
+import { DragDropContext } from "@hello-pangea/dnd";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { KanbanSquare } from "lucide-react";
 import { getKanban, changeLeadStage, updateStage } from "@/lib/pipeline";
@@ -109,15 +115,52 @@ export function TableroVertical({
     }
   }
 
-  function alSoltar(resultado: DropResult) {
+  /**
+   * Los anuncios del arrastre, EN ESPAÑOL.
+   *
+   * La biblioteca trae los suyos —«You have lifted an item in position 1»— y
+   * son lo único que oye quien mueve una oportunidad sin ver la pantalla. Un
+   * producto en español que da sus instrucciones de teclado en inglés no es
+   * accesible: es traducido a medias. Además se nombra la etapa y no el
+   * identificador de la lista, que es lo que anuncia por defecto.
+   */
+  function nombreDeEtapa(id: string): string {
+    return data?.stages.find((s) => s.id === id)?.name ?? "otra etapa";
+  }
+
+  function alLevantar(inicio: DragStart, provided: ResponderProvided) {
+    provided.announce(
+      `Has levantado la oportunidad de la etapa ${nombreDeEtapa(inicio.source.droppableId)}. ` +
+        "Usa las flechas para llevarla a otra etapa, espacio para soltarla y Escape para cancelar.",
+    );
+  }
+
+  function alActualizar(cambio: DragUpdate, provided: ResponderProvided) {
+    provided.announce(
+      cambio.destination
+        ? `Sobre la etapa ${nombreDeEtapa(cambio.destination.droppableId)}, posición ${cambio.destination.index + 1}.`
+        : "Fuera de cualquier etapa. Si sueltas aquí, la oportunidad no se mueve.",
+    );
+  }
+
+  function alSoltar(resultado: DropResult, provided: ResponderProvided) {
     const { source, destination, draggableId } = resultado;
-    if (!destination) return;
+
+    if (!destination) {
+      provided.announce("Movimiento cancelado. La oportunidad sigue donde estaba.");
+      return;
+    }
     if (
       source.droppableId === destination.droppableId &&
       source.index === destination.index
     ) {
+      provided.announce("La oportunidad se queda en su sitio.");
       return;
     }
+
+    provided.announce(
+      `Oportunidad movida a la etapa ${nombreDeEtapa(destination.droppableId)}.`,
+    );
     void mover(draggableId, destination.droppableId, destination.index);
   }
 
@@ -232,7 +275,11 @@ export function TableroVertical({
         </p>
       )}
 
-      <DragDropContext onDragEnd={alSoltar}>
+      <DragDropContext
+        onDragStart={alLevantar}
+        onDragUpdate={alActualizar}
+        onDragEnd={alSoltar}
+      >
         <div className="space-y-3">
           {etapas.map((etapa, i) => (
             <EtapaVertical
