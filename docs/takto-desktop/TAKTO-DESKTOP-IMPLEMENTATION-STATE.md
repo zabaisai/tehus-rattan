@@ -6,7 +6,10 @@
 
 ## Última actualización
 
-- Fecha: **17 de agosto de 2026** · America/Bogota
+- Fecha: **18 de agosto de 2026** · America/Bogota
+- **`4.1 — Pipeline vertical` (mockup 04): ENTREGADO, con pruebas, build y QA de navegador. PENDIENTE DE REVISIÓN HUMANA.**
+- Commits de 4.1: `3485016` (tablero vertical) · `028242a` (cinco defectos del navegador) · `1473b82` (singular del resumen)
+- Rama: `feature/takto-brand-ui-integration`
 - **`3.z — Contactos: listado, papelera y restauración` (mockup 02): HECHO y APROBADO por revisión humana el 17 de agosto de 2026.**
 - **SHA aprobado de 3.z: `910f6b2baf9af21ab7f9daf7ea90632292ad62e1` · CI verde, run [`32045702872`](https://github.com/zabaisai/tehus-rattan/actions/runs/32045702872)**
 - Commits de 3.z: `cd3c2e1` (modelo de lectura) · `5cc66ed` (primitivas) · `334f3da` (URL) · `77c51d9` (pantalla) · **2ª ronda:** `1769e0f` (retirar el borrado definitivo y explicar los iconos)
@@ -94,10 +97,10 @@
 | Fase | Estado | Evidencia | Bloqueador |
 |---|---|---|---|
 | 0. Auditoría e inventario | **HECHO** | Este documento, secciones «Inventario real» y «Baseline» | — |
-| 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real, y **tooltip en 3.z** con su demanda demostrada; faltan tabla, drawer, tabs, toast y swatches | — |
+| 1. Fundamentos visuales | **PARCIAL** | Primitivas en `components/ui/`; entraron skeleton, forbidden, avatar, metric-card, panel y sparkline con consumidor real, y **tooltip en 3.z** con su demanda demostrada; entraron además los **swatches** en 4.1; faltan tabla, drawer, tabs y toast | — |
 | 2. Shell, búsqueda y notificaciones | **HECHO** | 2.1 y 2.2 aprobados (mockup 16) y **2.3 aprobado el 13-ago-2026** sobre `1d16fae` (mockup 01) | — |
 | 3. Contactos, conversaciones y perfil 360 | **HECHO** | Sus **cuatro** mockups entregados y aprobados: **22** (3.x, `397dab9`), **03 y 18** (3.y, `7a1e0a1`) y **02** (3.z, `910f6b2`, aprobado el 17-ago-2026) | — |
-| 4. Pipeline vertical y tareas | PARCIAL | Kanban, etapas, sugerencias con aprobación; falta pipeline **vertical** del mockup 04 | — |
+| 4. Pipeline vertical y tareas | **EN_CURSO** | **Mockup 04 entregado en 4.1** (`1473b82`), pendiente de revisión humana. Quedan los mockups 07, 19, 20 y 21 | — |
 | 5. Productos e importación | PARCIAL | Wizard de importación completo en API; falta catálogo visual con imágenes | — |
 | 6. Cotizaciones y documentos | PARCIAL | Desglose y PDF cuadrados; falta repositorio de documentos del mockup 11 | — |
 | 7. TAKTO Pulso y reglas | PARCIAL | 40 endpoints, editor visual, versiones; falta importación JSON del mockup 23 | — |
@@ -115,11 +118,11 @@ Verificado contra el código en este SHA, no copiado de informes anteriores.
 
 | Capacidad | Estado | Evidencia/ruta |
 |---|---|---|
-| Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); primitivas en `components/ui/`, con skeleton, forbidden, avatar de iniciales y **tooltip** ya entregados. Faltan tabla, drawer, tabs, toast y swatches |
+| Design system y tokens | **PARCIAL** | `app/globals.css` (`@theme` completo, 3 tokens derivados documentados); primitivas en `components/ui/`, con skeleton, forbidden, avatar de iniciales y **tooltip** ya entregados. Los **swatches** entraron en 4.1 con su consumidor real. Faltan tabla, drawer, tabs y toast |
 | Dashboard | **HECHO** (mockup 01) | `app/dashboard/page.tsx` + `analytics` (8 endpoints reales: los 6 anteriores más `sales-trend` y `activity`). Hero, cuatro métricas con enlace, embudo, conversaciones sin responder, agenda, tendencia, rendimiento y actividad reciente. Aprobado el 13-ago-2026 (incremento 2.3) |
 | Contactos / papelera / fusión | **HECHO** (mockups 02 y 22) | 11 endpoints previos, 7 de fusión y **`GET /contacts/listado`** (3.z). **Fusión** aprobada el 14-ago sobre `397dab9`; **listado, papelera y restauración** aprobados el 17-ago sobre `910f6b2` — `app/dashboard/contacts/page.tsx`, `components/contacts/ContactosTabla.tsx`, `lib/contactos-url.ts`, `components/ui/Tooltip.tsx` |
 | Conversaciones / perfil lateral | **HECHO** (mockups 03 y 18) | 15 endpoints incluidos `inbox`, `inbox/counters`, `:id/messages`, `handoff`, `pause/resume`, `read/unread`, `bulk`. `PerfilComercial` montado en conversaciones y pipeline |
-| Pipeline y colores | **PARCIAL** | 16 endpoints (`:id/kanban`, etapas, reordenar, archivar, trasladar). Kanban **horizontal**; el mockup 04 pide vertical. Colores por hex, no swatches |
+| Pipeline y colores | **ENTREGADO, sin aprobar** (mockup 04) | Los MISMOS 16 endpoints: 4.1 no añadió ninguno. Tablero **vertical** en `components/kanban/TableroVertical.tsx`, `EtapaVertical.tsx` y `TarjetaDeOportunidad.tsx`; URL en `lib/pipeline-url.ts`. Colores por **swatches con nombre** (`components/ui/SelectorDeColor.tsx`), ya no por hexadecimal |
 | Tareas y sugerencias | **PARCIAL** | 9 endpoints con `:id/aprobar` y `:id/rechazar`; `SugerenciasDeTarea` en frontend. Falta la vista del mockup 07 con pendientes/completadas/sugeridas separadas |
 | Productos / imágenes / importación | **PARCIAL** | 14 endpoints con wizard completo (`import`, `mapping`, `preview`, `start`, `cancel`, `report`, `limits`). Catálogo sin imágenes; falta UI del wizard (mockup 09) |
 | Cotizaciones / PDF / documentos | **PARCIAL** | 11 endpoints, `from-lead/:leadId`, `:id/pdf`, ciclo enviar/aceptar/rechazar. `documents/` con 13 componentes. Falta repositorio filtrable del mockup 11 |
@@ -178,7 +181,7 @@ resuelve consultando lo existente.
 | Gap | Por qué necesita decisión |
 |---|---|
 | ~~Fusión de contactos~~ | **RESUELTO** el 13-ago-2026: gana el campo que elija la persona, uno a uno, con el valor del principal preseleccionado; el absorbido queda como alias interno. Implementado en 3.x |
-| Pipeline vertical | Cambia la interacción de arrastre ya probada; conviene confirmar antes de reescribir |
+| ~~Pipeline vertical~~ | **RESUELTO el 18-ago-2026**: autorización explícita para abrir 4.1 con «arrastre **o** cambio de etapa persistente». Se conservan los dos caminos —arrastre con ratón y con teclado, y un desplegable «Mover a» en cada tarjeta— y se retira el kanban horizontal, que ya no tenía pantalla que lo usara |
 | WhatsApp multi-número | El esquema hoy asume una integración por empresa; ampliarlo es cambio de modelo |
 | Eliminación definitiva | Ya existe `:id/definitivo` con frase de confirmación; falta política de retención visible |
 
@@ -1116,7 +1119,7 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | Fusión de duplicados (mockup 22, 3.x) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
 | Contactos: activos y papelera (mockup 02, 3.z) | ✅ | ✅ | ✅¹ | ✅ | ✅ | ✅ | **HECHO** · aprobado 17-ago-2026 |
 | Inbox de tres paneles (mockups 03 y 18, 3.y) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **HECHO** · aprobado 14-ago-2026 |
-| Pipeline |  |  |  |  |  |  | PENDIENTE |
+| Pipeline vertical (mockup 04, 4.1) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅² | **ENTREGADO** · pendiente de revisión humana |
 | TAKTO Pulso |  |  |  |  |  |  | PENDIENTE |
 | Tareas |  |  |  |  |  |  | PENDIENTE |
 | Productos |  |  |  |  |  |  | PENDIENTE |
@@ -1126,6 +1129,11 @@ NULL y los 5 contactos `PREVIEW_BRANDING_` intactos. Sin `migrate reset`, sin
 | WhatsApp |  |  |  |  |  |  | PENDIENTE |
 | Empresa/Datos/Equipo |  |  |  |  |  |  | PENDIENTE |
 
+> ² **Consola del Pipeline: limpia, y medida así.** 0 respuestas ≥ 400 en
+> `/dashboard/pipeline`, capturando la red con el depurador. Los dos 401 que
+> aparecen si se graba el recorrido entero son del `auth/refresh` **anterior al
+> inicio de sesión**, del shell, no de esta pantalla.
+>
 > ¹ **Contactos a 1280 px, matizado y aprobado tal cual.** La pestaña Papelera
 > se ve completa. La de Activos, con sus nueve columnas, usa **una sola barra
 > horizontal interna de la tabla**: la persona revisora comprobó que todas las
@@ -1964,35 +1972,276 @@ sin conocerse. Si vuelve a aparecer, conviene mirarlo con el log delante.
 
 ---
 
-## Próximo incremento seguro: `4.1 — Pipeline vertical (mockup 04)`
+## Incremento entregado: 4.1 — Pipeline vertical (mockup 04)
 
-**PROPUESTO. No iniciado, no abierto y no EN_CURSO.**
+**ENTREGADO. PENDIENTE DE REVISIÓN HUMANA.** Sin migraciones. **Sin un solo
+cambio en el backend**: ningún endpoint nuevo, ninguna columna nueva, ningún DTO
+tocado. No se rozaron los guiones de demo-socio, su aprovisionamiento ni sus
+pruebas.
 
-Con 3.z aprobado el 17-ago, la **fase 3 queda HECHA** —sus cuatro mockups, 02,
-03, 18 y 22, están entregados y aprobados— y el master pasa a la **fase 4 —
-pipeline vertical, tareas y acciones desde chat** (mockups 04, 07, 19, 20, 21).
-Su primer punto es el pipeline vertical, que el inventario ya señala como el
-hueco: el kanban existe pero es **horizontal**, y el mockup 04 lo pide vertical.
+### Las dos condiciones que el documento exigía antes de abrirlo
 
-Su diseño y su implementación **no se redactan aquí**: se abren cuando se
-arranque el incremento, con su propio preflight §2.
+1. **Autorización explícita.** Recibida el 18-ago-2026, con el alcance escrito.
+2. **El gap «Pipeline vertical».** La autorización lo resuelve al pedir
+   «arrastre **o** cambio de etapa persistente». La decisión implementada es
+   *los dos*: se conserva el arrastre —con ratón y con teclado— y cada tarjeta
+   lleva además un desplegable «Mover a». El kanban horizontal se retira, no se
+   deja conviviendo: dos tableros que mueven las mismas oportunidades con dos
+   reglas de arrastre distintas es el duplicado que el §12 prohíbe.
 
-> **Dos condiciones antes de abrirlo, y ninguna es técnica.**
->
-> 1. Una **autorización explícita** para empezarlo. Este documento lo deja
->    propuesto, no en curso.
-> 2. El gap **«Pipeline vertical»** sigue abierto en «Gaps que requieren
->    decisión de producto»: *«cambia la interacción de arrastre ya probada;
->    conviene confirmar antes de reescribir»*. Es una decisión humana previa,
->    no algo que se resuelva durante la implementación.
+### Preflight §2
 
-> Además, el gap **«Pipeline vertical»** sigue abierto en «Gaps que requieren
-> decisión de producto» —«cambia la interacción de arrastre ya probada; conviene
-> confirmar antes de reescribir»—. Es una decisión humana previa, no algo que se
-> resuelva durante la implementación.
+| # | Comprobación | Resultado |
+|---|---|---|
+| 1 | Master y estado leídos completos | ✅ |
+| 2 | Continuidad relacionada | ✅ mockup 04, `DESIGN-SYSTEM.md`, cierres de 3.y y 3.z |
+| 3 | Raíz, rama, HEAD, remoto, árbol, `index.lock`, CI | ✅ sin lock; árbol limpio al empezar |
+| 4 | Cambios del usuario preservados; `brand/` sin versionar | ✅ |
+| 5 | 26 mockups | ✅ |
+| 6 | Capacidad objetivo auditada | ✅ ver «Auditoría» |
+| 7 | Pruebas base ejecutadas | ✅ 21/21 en las 4 suites de pipeline antes de tocar nada |
+| 8 | Local aislado, sin efectos externos | ✅ `localhost:5432`, API en `:3001`, WhatsApp en transporte falso |
 
-Su diseño y su implementación **no se redactan aquí**: se abren cuando se
-arranque el incremento, con su propio preflight §2.
+> **La sesión empezó en `feature/takto-demo-socio-autonomo`** (`317a7cc`), que es
+> donde vive la demo en revisión. El trabajo desktop se hizo en
+> `feature/takto-brand-ui-integration`, que es la rama que fija el §2 del
+> master, partiendo de `077faec`. La demo no se tocó y sigue publicada en su
+> rama.
+
+### Auditoría acotada, antes de escribir nada
+
+| Pieza | Estado real | Qué se hizo |
+|---|---|---|
+| `GET /pipelines/:id/kanban` | HECHO | Se reutiliza tal cual. Ya filtra por `companyId` y por `status: OPEN` |
+| `PATCH /leads/:id/stage` | HECHO | Se reutiliza tal cual |
+| `PATCH /pipelines/:id/stages/:stageId` | HECHO, solo ADMIN | Se reutiliza para nombre, color y etapa de entrada |
+| `GET /contacts/:id/perfil` | HECHO | Es el panel lateral. **No se creó un segundo contrato** |
+| `GET /analytics/overview` | HECHO | De ahí sale la conversión, con la misma clave de caché que el Inicio |
+| `LeadFormModal`, `LeadDetailModal`, `AdminPipelines`, `PerfilComercial`, `PipelineSelector` | HECHO | Se reutilizan; dos reciben una prop opcional aditiva |
+| `KanbanBoard`, `KanbanColumn`, `LeadCard` | HECHO, pero horizontal | **Retirados**: ninguna pantalla los usaba salvo esta |
+| `probability`, `isInitial` de la etapa | Ya viajaban en `GET /pipelines` | Se enseñan; no hubo que pedirlos |
+
+**Conclusión de la auditoría: el incremento no necesitaba backend, y no lo
+tocó.** El único hueco era la interfaz.
+
+### Qué se entregó
+
+| Capa | Archivos |
+|---|---|
+| URL y cifras (puro, comprobable sin montar nada) | `lib/pipeline-url.ts` |
+| Tablero | `components/kanban/TableroVertical.tsx`, `EtapaVertical.tsx`, `TarjetaDeOportunidad.tsx` |
+| Primitiva de marca | `components/ui/SelectorDeColor.tsx` |
+| Pantalla | `app/dashboard/pipeline/page.tsx` |
+| Reutilizados con una prop aditiva | `components/leads/LeadFormModal.tsx` (`etapaInicialId`), `components/perfil/PerfilComercial.tsx` (`oportunidadPreferidaId`) |
+| Administración de etapas | `components/kanban/AdminPipelines.tsx` |
+| Retirados | `KanbanBoard.tsx`, `KanbanColumn.tsx`, `LeadCard.tsx` y su prueba |
+
+### Lo que cubre, punto por punto
+
+**Tablero.** Embudo seleccionado —selector si hay varios, nombre si hay uno—,
+etapas en su orden con su número, cantidad y valor por etapa, y un total que es
+**exactamente** la suma de lo que hay escrito debajo. Estados vacíos que
+distinguen «no hay nada» de «el filtro no deja ver nada». **El desplazamiento
+horizontal ocurre solo dentro de la fila de tarjetas de cada etapa**; el
+documento no se desplaza de lado en ningún ancho.
+
+**Tarjetas.** Oportunidad, contacto, valor y responsable —«Sin asignar»
+escrito, no un hueco—. Selección visible con borde navy y anillo. El título abre
+la ficha lateral sin sacar al usuario del tablero. El cambio de etapa persiste
+por arrastre y por desplegable. Solo aparecen oportunidades `OPEN` del embudo
+del tenant: lo archivado y lo cerrado no está, y los embudos archivados no
+figuran en el selector.
+
+**Panel lateral.** Es el `PerfilComercial` que ya existía, con resumen del
+contacto, oportunidad y etapa, responsable, último mensaje, tareas pendientes y
+accesos a conversación, contacto y oportunidad. **Novedad de 4.1:** enseña la
+oportunidad de la tarjeta que se pulsó y no «la abierta más reciente», que con
+dos oportunidades abiertas del mismo contacto enseñaba la equivocada.
+
+**Acciones.** Nueva oportunidad —y «Agregar» por etapa, que la preselecciona—,
+cambiar de embudo, asignar responsable (al crear y desde el detalle), mover de
+etapa, abrir la conversación vinculada y abrir la oportunidad. Todo lo que se
+está mirando viaja en la URL y sobrevive a una recarga.
+
+### El defecto de navegación que 4.1 heredaba
+
+La pantalla navegaba con `router.replace`. Es **la misma trampa que ya costó una
+ronda de revisión en la bandeja (3.y) y otra en Contactos (3.z)**: cuando la
+ruta no cambia y solo cambia la query, en el build de producción no llega a
+aplicarse, así que la barra de direcciones se queda igual y recargar devuelve al
+embudo predeterminado y sin panel —justo lo que el comentario de la pantalla
+afirmaba tener resuelto—. Ahora se escribe con la History API, que Next sí
+observa. `push` para lo que es ir a otro sitio y `replace` para teclear.
+
+### Cinco defectos que la suite no vio y el navegador sí
+
+Las pruebas pasaban con los cinco puestos. Salieron levantando el producto.
+
+1. **El resumen del embudo no respetaba el filtro.** Con `?q=hotel` el tablero
+   enseñaba una oportunidad y arriba seguía diciendo once.
+2. **«0 % de conversión» con nada cerrado.** El contrato devuelve 0 tanto si se
+   perdió todo como si no se ha cerrado nada; se distingue con `wonCount` y
+   `lostCount` y se enseña «—» con su explicación.
+3. **`$ 77.480.0` / `00`.** Con la ficha abierta a 1440 px, cuatro columnas
+   dejaban ~130 px por cifra y el importe se partía **por la mitad del número**.
+4. **El asa de arrastre era un `<button>`, y eso rompía el teclado en
+   silencio.** La biblioteca de arrastre ignora sus sensores cuando el evento
+   nace en un elemento interactivo: el asa se veía, se enfocaba y la barra
+   espaciadora no levantaba nada. Medido en navegador: con `<button>`, 0
+   tarjetas movidas; con `<span>`, la tarjeta cambia de etapa y persiste. Hay
+   una prueba que lo fija para que nadie lo «arregle» de vuelta.
+5. **Los anuncios del arrastre salían en inglés** —«You have lifted an item in
+   position 1»—, y son lo único que oye quien mueve una oportunidad sin ver la
+   pantalla. Ahora están en español y nombran la etapa, no el id de la lista.
+
+Y uno más, de lectura: el resumen decía «1 oportunidades abiertas».
+
+### El hexadecimal deja de ser la interfaz
+
+El §3.1 dice que los códigos hexadecimales no son la interfaz principal. En la
+administración de etapas lo eran, literalmente: el desplegable de color ofrecía
+«#0F766E» y «#B45309» como opciones, y tres de los siete colores no pertenecían
+a ninguna escala de TAKTO. `SelectorDeColor` los sustituye por los **seis tonos
+de etapa que el paquete de marca ya define** en `globals.css`, con su nombre, con
+marca de verificación además del borde —el estado no depende solo del color— y
+como radios de verdad, así que las flechas del teclado recorren la paleta.
+
+**Borrar una etapa pasa ahora por confirmación** con su nombre y su
+consecuencia. Antes era un icono de papelera de 12 px sin texto que borraba al
+primer clic: el mismo defecto que la revisión de 3.z encontró en Contactos.
+
+### Diferencias deliberadas con el mockup 04
+
+| Mockup 04 | Entregado | Por qué |
+|---|---|---|
+| «$12,4 M» abreviado | Importe completo | Abreviar redondea, y con un total arriba y cinco importes debajo la suma de lo escrito deja de dar el total escrito |
+| «25% conversión» por etapa | «25% de cierre» | El dato es la **probabilidad configurada** en la etapa, no una conversión medida. Llamarla conversión sería describir mal el dato |
+| «Última actividad · Hoy 10:23» con icono de WhatsApp | «Actualizada · 10:23» sin icono | El dato es el `updatedAt` de la oportunidad, no la hora del último WhatsApp. El icono afirmaría algo que este contrato no sabe |
+| Etiquetas «Cliente VIP», «Medellín» en la tarjeta | No están | Son etiquetas del contacto y el contrato del kanban no las trae. Pedirlas es un cambio de backend que ninguna prueba roja exige |
+| «5 requieren atención» | «3 sin responsable» | Se cuenta algo real y accionable en vez de un criterio inventado |
+| «Editar etapa» como ventana flotante | Se despliega bajo la cabecera | Una ventana flotante anclada a una fila dentro de una zona con `overflow` es la receta conocida de que el panel se recorte o empuje el documento |
+| «Archivar etapa» dentro de ese panel | No está; sigue en «Configurar etapas» | En el producto esa acción es un borrado **definitivo**, y un borrado irreversible no puede descubrirse pulsando (lección de 3.z) |
+| Filtros Etiqueta, Valor y Última actividad | Solo buscador y responsable | Son los dos que el contrato actual puede filtrar de verdad. Un filtro que no filtra es peor que no tenerlo |
+| Carril de navegación de etapas a la derecha | «Plegar todas» / «Desplegar todas» | Resuelve lo mismo —llegar a una etapa lejana— sin un segundo mecanismo de desplazamiento |
+| Fotos en los avatares | Iniciales | Regla del §3.1 |
+
+### Evidencia de pruebas
+
+| Suite | Antes | Después |
+|---|---|---|
+| Frontend completo | 935 en 85 archivos | **938 en 85 archivos, todas en verde** |
+| Solo pipeline (`kanban`, pantalla, `pipeline-url`, `SelectorDeColor`) | 21 en 4 archivos | **81 en 7 archivos** |
+| `tsc --noEmit` | limpio | limpio |
+| `eslint .` | 1 warning heredado | **el mismo 1 warning heredado**, 0 nuevos |
+| `next build` | verde | **verde** |
+
+El único warning de lint es el ya registrado como deuda: `NOMBRE_PULSO` sin usar
+en `EstadoTransporte.test.tsx`. No es de este incremento.
+
+Backend: **no se ejecutó ni una modificación**, así que su suite no cambia.
+
+### QA de navegador (build de producción, Chrome, `deviceScaleFactor: 1`)
+
+Empresa QA propia, recorrido completo por CDP:
+
+| Ancho | Desborde horizontal del documento | Zonas con desplazamiento horizontal | Etapas | Tarjetas |
+|---|---|---|---|---|
+| 1024 | **0** | 2 (filas de tarjetas) | 5 | 11 |
+| 1280 | **0** | 0 | 5 | 11 |
+| 1440 | **0** | 0 | 5 | 11 |
+| 1920 | **0** | 0 | 5 | 11 |
+| 1440 con la ficha abierta | **0** | 2 | 5 | 11 |
+| 1024 con la ficha abierta | **0** | 4 | 5 | 11 |
+
+**El documento no se desplaza de lado en ningún ancho: no hay segunda barra.**
+Las únicas zonas que se desplazan en horizontal son las filas de tarjetas de
+cada etapa, que es exactamente lo que pedía el alcance.
+
+Comprobado además, en navegador real:
+
+- **Las cifras cuadran.** 3+3+2+2+1 = 11 tarjetas y
+  37.900.000 + 11.780.000 + 13.200.000 + 12.900.000 + 1.700.000 = **77.480.000**,
+  que es el total que enseña la cabecera.
+- **Con filtro también cuadran.** `?q=hotel` deja 1 tarjeta, y arriba dice 1.
+- **Estado vacío por filtro** distinto del estado vacío por etapa sin nada.
+- **Mover de etapa persiste** tras recargar, por desplegable y por arrastre.
+- **Arrastre con teclado:** espacio levanta, flechas llevan, espacio suelta, y
+  el cambio se persiste. **Con una salvedad honesta:** la biblioteca solo
+  encuentra la etapa de destino si está en el área visible; con la etapa de
+  destino fuera de pantalla el arrastre por teclado no la alcanza. El
+  desplegable «Mover a» sí, siempre, y por eso está en todas las tarjetas.
+- **URL profunda recargable:** `?perfil=…&sel=…` devuelve la ficha abierta, la
+  tarjeta señalada y la oportunidad correcta; `?plegadas=…` devuelve el tablero
+  plegado como se dejó.
+- **Foco visible** al tabular, con anillo.
+- **Consola limpia en `/dashboard/pipeline`:** 0 respuestas ≥ 400 en esa
+  pantalla, verificado capturando la red. Los dos 401 que aparecen en el
+  recorrido completo son del `auth/refresh` **previo al login**, del shell, y no
+  de esta pantalla.
+- **Textos:** ningún corte dentro del tablero ni de la ficha. Los dos truncados
+  que quedan —el nombre de la empresa en la barra lateral y el del usuario en la
+  cabecera— son del shell y venían de antes; se ven porque los datos QA llevan
+  el prefijo `QA-PIPE41`.
+
+### Datos QA — se conservan para la revisión
+
+Empresa propia con prefijo **`QA-PIPE41`**, aislada de los conjuntos protegidos:
+**`PREVIEW_BRANDING_`, `QA_MERGE_`, `QA_INBOX_` y `DEMO_SOCIO_` quedaron
+intactos.** Teléfonos del rango de pruebas, correos en `example.invalid`, sin
+integración de WhatsApp, sin tokens y sin envíos.
+
+| Objeto | Detalle |
+|---|---|
+| Empresa | `QA-PIPE41 Muebles del Valle` |
+| Usuarios | `qa-pipe41-admin@local.invalid` (ADMIN) · `qa-pipe41-asesor@local.invalid` (AGENT) |
+| Embudos | `Embudo comercial` (5 etapas, predeterminado) y `Posventa y garantías` (1 etapa) |
+| Oportunidades | 11 abiertas, 3 sin responsable, con títulos largos a propósito |
+| Conversación y tarea | La primera oportunidad lleva 3 mensajes y 1 tarea pendiente |
+
+**La contraseña no se escribe aquí.** El guion que los crea vive fuera del
+repositorio —es andamiaje de revisión, no código de producto— y la toma de
+`QA_PIPE41_CLAVE`. **Limpieza:** borrar la empresa entera por su prefijo; no
+hay nada suyo fuera de ella.
+
+### Limitaciones honestas
+
+1. **Sin revisión humana todavía.** El incremento está entregado, no aprobado.
+2. **Solo Chrome.** Edge queda para el gate de la fase 10, que es donde el
+   master lo pide.
+3. **El arrastre por teclado necesita la etapa de destino a la vista.** Es una
+   limitación de la biblioteca, no del tablero. Mitigada, no tapada: el
+   desplegable «Mover a» hace lo mismo sin esa condición.
+4. **La conversión es de la empresa, no del embudo.** Es lo que devuelve el
+   contrato que ya existe, y la tarjeta lo dice en su propia línea. Calcularla
+   por embudo exige backend, y ninguna prueba roja lo exige hoy.
+5. **Las etiquetas del contacto no salen en la tarjeta.** El contrato del kanban
+   no las trae. Es la deuda más visible frente al mockup.
+6. **El filtrado y la búsqueda son en el cliente**, sobre el tablero ya cargado.
+   Con un embudo de miles de oportunidades abiertas habrá que paginar el kanban,
+   y eso sí es un cambio de contrato.
+7. **La vista «Lista»** que el mockup ofrece junto a «Vertical» no está.
+8. **`analytics/overview` se pide también aquí.** Comparte clave de caché con el
+   Inicio, así que no hay una segunda petición mientras se navega entre las dos.
+
+### Rutas exactas para la revisión
+
+```text
+http://localhost:3000/dashboard/pipeline
+http://localhost:3000/dashboard/pipeline?q=hotel
+http://localhost:3000/dashboard/pipeline?q=zzzznoexiste
+http://localhost:3000/dashboard/pipeline?asesor=sin
+```
+
+Entrando con `qa-pipe41-admin@local.invalid` se ve «Configurar etapas» y el
+lápiz de cada etapa; con `qa-pipe41-asesor@local.invalid` **no**, y sí «Nueva
+oportunidad»: mover y crear es trabajo de asesor, configurar el embudo no.
+
+### Próximo incremento propuesto: `4.2 — Tareas (mockup 07)`
+
+**PROPUESTO. No iniciado.** La fase 4 queda **EN_CURSO**: entregó el mockup 04 y
+le faltan el 07, el 19, el 20 y el 21. Abrirlo exige autorización explícita y su
+propio preflight §2, y **4.1 debería estar aprobado antes**, porque las tareas
+del mockup 07 cuelgan de las mismas oportunidades que este tablero mueve.
 
 ---
 
@@ -2017,10 +2266,36 @@ git rev-parse origin/feature/takto-brand-ui-integration
 # Con el, la FASE 3 queda HECHA: sus cuatro mockups -02, 03, 18 y 22- estan
 # entregados y aprobados.
 #
-# Proximo incremento PROPUESTO, no iniciado y no EN_CURSO:
-#   4.1 - Pipeline vertical (mockup 04). Abrirlo exige una autorizacion
-#   explicita, su propio preflight §2 y, antes, la decision humana sobre el
-#   gap "Pipeline vertical" que sigue abierto.
+# 4.1 - Pipeline vertical (mockup 04): ENTREGADO el 18-ago-2026 sobre 1473b82.
+# PENDIENTE DE REVISION HUMANA. Sin migraciones y SIN TOCAR EL BACKEND.
+# Commits: 3485016 (tablero) - 028242a (cinco defectos del navegador) -
+# 1473b82 (singular del resumen).
+#
+# La FASE 4 queda EN_CURSO: entrego el mockup 04 y le faltan el 07, 19, 20 y 21.
+#
+# Proximo incremento PROPUESTO, no iniciado:
+#   4.2 - Tareas (mockup 07). Abrirlo exige autorizacion explicita, su propio
+#   preflight §2 y, antes, la aprobacion humana de 4.1: las tareas del mockup 07
+#   cuelgan de las mismas oportunidades que mueve este tablero.
+#
+# Datos QA de 4.1: empresa propia con prefijo QA-PIPE41, aislada. Los conjuntos
+# PREVIEW_BRANDING_, QA_MERGE_, QA_INBOX_ y DEMO_SOCIO_ quedaron INTACTOS.
+# Se CONSERVA para la revision; se borra por su prefijo cuando se cierre.
+#   Usuarios: qa-pipe41-admin@local.invalid (ADMIN)
+#             qa-pipe41-asesor@local.invalid (AGENT)
+#   La clave NO se escribe aqui: la pone QA_PIPE41_CLAVE.
+#
+# Rutas de QA de 4.1 (mockup 04):
+#   http://localhost:3000/dashboard/pipeline
+#   http://localhost:3000/dashboard/pipeline?q=hotel
+#   http://localhost:3000/dashboard/pipeline?q=zzzznoexiste
+#   http://localhost:3000/dashboard/pipeline?asesor=sin
+#
+# AVISO SOBRE LA VISTA PREVIA LOCAL: el :3000 que estaba levantado servia el
+# build de la rama de la DEMO. Compilar 4.1 reescribio apps/frontend/.next, asi
+# que ahora sirve el build de feature/takto-brand-ui-integration. Para volver a
+# la demo hay que hacer checkout de su rama y reconstruir; nada de la demo se
+# perdio, sigue publicada en feature/takto-demo-socio-autonomo.
 #
 # Los datos QA_INBOX_ se CONSERVAN: son los que hacen revisable el inbox.
 # El contacto QA_CONTACTS_Archivo temporal (id cmsxgiivt0001v2jk4hixewc3,
