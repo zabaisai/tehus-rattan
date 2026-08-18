@@ -306,7 +306,10 @@ describe("PipelinePage", () => {
 
     const cifra = (etiqueta: string) =>
       screen.getByText(etiqueta).closest("div")!.textContent;
-    expect(cifra("oportunidades abiertas")).toContain("1");
+    // Y en singular: «1 oportunidades abiertas» es de las cosas que se leen
+    // como que el producto no está terminado.
+    expect(cifra("oportunidad abierta")).toContain("1");
+    expect(screen.queryByText("oportunidades abiertas")).not.toBeInTheDocument();
     expect(
       screen.getByText("Mostrando 1 de 2 oportunidades"),
     ).toBeInTheDocument();

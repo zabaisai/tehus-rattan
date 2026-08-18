@@ -278,7 +278,11 @@ function PipelineContenido() {
         >
           <Cifra
             icono={Target}
-            etiqueta="oportunidades abiertas"
+            etiqueta={
+              resumen.oportunidades === 1
+                ? "oportunidad abierta"
+                : "oportunidades abiertas"
+            }
             valor={String(resumen.oportunidades)}
             cargando={cargandoCifras}
           />
@@ -378,7 +382,7 @@ function PipelineContenido() {
             <p className="flex items-center gap-2 text-xs text-content-secondary">
               <span>
                 Mostrando {resumen.oportunidades} de {totalSinFiltro}{" "}
-                oportunidades
+                {totalSinFiltro === 1 ? "oportunidad" : "oportunidades"}
               </span>
               <button
                 type="button"
