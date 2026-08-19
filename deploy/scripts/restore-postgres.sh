@@ -87,7 +87,7 @@ fi
 restoring_live=false
 [ "$TARGET_DB" = "$POSTGRES_DB" ] && restoring_live=true
 
-compose() { docker compose -f "$COMPOSE_FILE" "$@"; }
+compose() { docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"; }
 pexec()   { compose exec -T -e PGPASSWORD="$POSTGRES_PASSWORD" postgres "$@"; }
 psql_admin() { pexec psql -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 "$@"; }
 

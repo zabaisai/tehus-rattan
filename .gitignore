@@ -5,6 +5,8 @@ scratchpad/
 # throwaway file while testing docker-compose.staging.yml, never committed.
 .env.staging
 .env.staging.*
+/.env.backup
+/.secrets/
 
 # PostgreSQL dumps produced by deploy/scripts/backup-postgres.sh on the VPS.
 /backups/
