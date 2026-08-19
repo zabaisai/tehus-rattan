@@ -83,6 +83,24 @@ cat >"$tmp/bin/flock" <<'FAKE_FLOCK'
 exit 0
 FAKE_FLOCK
 
+# Git Bash/MSYS on Windows does not model POSIX mode bits on NTFS reliably:
+# `chmod 600` can still be reported by GNU stat as 644. Production runs on the
+# Linux VPS, where the real mode check must remain strict. Only for this local
+# Windows test harness, fake the password-file mode so behavioral tests can run.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*)
+    cat >"$tmp/bin/stat" <<'FAKE_STAT'
+#!/usr/bin/env bash
+if [ "${1:-}" = "-c" ] && [ "${2:-}" = "%a" ] && [ "${3:-}" = "${RESTIC_PASSWORD_FILE:-}" ]; then
+  printf '600\n'
+  exit 0
+fi
+exec /usr/bin/stat "$@"
+FAKE_STAT
+    chmod +x "$tmp/bin/stat"
+    ;;
+esac
+
 cat >"$tmp/fake-backup.sh" <<'FAKE_BACKUP'
 #!/usr/bin/env bash
 set -euo pipefail
