@@ -10,12 +10,14 @@ source "$SCRIPT_DIR/backup-lib.sh"
 
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.staging.yml}"
 ENV_FILE="${ENV_FILE:-.env.staging}"
+BACKUP_DIR="${BACKUP_DIR:-/opt/tehus-crm/backups}"
 BACKUP_RESTIC_TAG="${BACKUP_RESTIC_TAG:-takto-staging}"
 RESTIC_HOST="${RESTIC_HOST:-tehus-crm-staging}"
 RESTORE_DRILL_DB="${RESTORE_DRILL_DB:-tehus_restore_drill}"
-RESTORE_LOCK_FILE="${RESTORE_LOCK_FILE:-/tmp/tehus-restore-drill.lock}"
+RESTORE_LOCK_FILE="${RESTORE_LOCK_FILE:-$BACKUP_DIR/.tehus-restore-drill.lock}"
 # Reuse the shared heartbeat implementation with the drill-specific monitor.
-BACKUP_HEARTBEAT_URL="${BACKUP_DRILL_HEARTBEAT_URL:-${BACKUP_HEARTBEAT_URL:-}}"
+backup_require_value BACKUP_DRILL_HEARTBEAT_URL
+BACKUP_HEARTBEAT_URL="$BACKUP_DRILL_HEARTBEAT_URL"
 
 printf '%s' "$RESTORE_DRILL_DB" \
   | grep -qE '^tehus_restore_drill(_[A-Za-z0-9_]+)?$' \
@@ -31,6 +33,7 @@ backup_enable_heartbeat_trap
 
 cd "$REPO_ROOT"
 [ -f "$ENV_FILE" ] || backup_die "$ENV_FILE does not exist"
+mkdir -p "$BACKUP_DIR"
 
 exec 9>"$RESTORE_LOCK_FILE"
 flock -n 9 || backup_die "another restore drill is already running"

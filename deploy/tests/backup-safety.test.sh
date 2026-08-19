@@ -13,7 +13,7 @@ scripts=(
 )
 
 for script in "${scripts[@]}"; do
-  [ -f "$script" ] || continue
+  [ -f "$script" ] || { echo "required backup script missing: $script" >&2; exit 1; }
   bash -n "$script"
 done
 
@@ -32,14 +32,23 @@ grep -Fq -- 'restic check --read-data' "$drill"
 grep -Fq -- '--target-db "$RESTORE_DRILL_DB"' "$drill"
 grep -Fq "grep -qE '^tehus_restore_drill(_[A-Za-z0-9_]+)?\$'" "$drill"
 grep -Fq 'docker compose --env-file "$ENV_FILE"' "$restore"
-# Installation must not start Persistent timers before the operator has run
-# the first backup and restore drill under observation.
-if grep -Eq 'systemctl enable[[:space:]]+--now' "$installer"; then
-  echo "installer starts a Persistent timer before validation" >&2
+grep -Fq 'backup_require_value BACKUP_HEARTBEAT_URL' "$offsite"
+grep -Fq 'backup_require_value BACKUP_DRILL_HEARTBEAT_URL' "$drill"
+grep -Fxq '/.env.backup' "$ROOT/.gitignore"
+grep -Fxq '/.secrets/' "$ROOT/.gitignore"
+# Installation must not enable or start Persistent timers before the operator
+# has run the first backup and restore drill under observation. Ignore comments
+# and echo text; reject executable systemctl enable/start commands.
+if grep -Eq '^[[:space:]]*systemctl[[:space:]]+(enable|start)([[:space:]]|$)' "$installer"; then
+  echo "installer changes timer activation before validation" >&2
   exit 1
 fi
 grep -Fq 'OnCalendar=*-*-* 03:00:00 America/Bogota' "$timer"
 grep -Fq 'Persistent=true' "$timer"
+if grep -Fq 'RandomizedDelaySec=' "$timer"; then
+  echo "daily timer must remain anchored to 03:00 without randomized delay" >&2
+  exit 1
+fi
 grep -Fq 'OnCalendar=*-*-01 04:30:00 America/Bogota' "$drill_timer"
 grep -Fq 'Persistent=true' "$drill_timer"
 
@@ -64,6 +73,16 @@ printf '%s\n' "$*" >>"$RESTIC_TEST_LOG"
 exit 0
 FAKE_RESTIC
 
+cat >"$tmp/bin/curl" <<'FAKE_CURL'
+#!/usr/bin/env bash
+exit 0
+FAKE_CURL
+
+cat >"$tmp/bin/flock" <<'FAKE_FLOCK'
+#!/usr/bin/env bash
+exit 0
+FAKE_FLOCK
+
 cat >"$tmp/fake-backup.sh" <<'FAKE_BACKUP'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -83,7 +102,7 @@ cat >"$tmp/fake-verify.sh" <<'FAKE_VERIFY'
 exit 0
 FAKE_VERIFY
 
-chmod +x "$tmp/bin/restic" "$tmp/fake-backup.sh" "$tmp/fake-verify.sh"
+chmod +x "$tmp/bin/restic" "$tmp/bin/curl" "$tmp/bin/flock" "$tmp/fake-backup.sh" "$tmp/fake-verify.sh"
 printf 'test-only-password\n' >"$tmp/restic-password"
 chmod 600 "$tmp/restic-password"
 
@@ -93,6 +112,7 @@ RESTIC_REPOSITORY="s3:https://example.invalid/bucket/test" \
 RESTIC_PASSWORD_FILE="$tmp/restic-password" \
 AWS_ACCESS_KEY_ID="test-only" \
 AWS_SECRET_ACCESS_KEY="test-only" \
+BACKUP_HEARTBEAT_URL="https://example.invalid/daily" \
 BACKUP_DIR="$tmp/backups" \
 BACKUP_SCRIPT="$tmp/fake-backup.sh" \
 VERIFY_SCRIPT="$tmp/fake-verify.sh" \
@@ -122,6 +142,7 @@ if RESTIC_TEST_LOG="$tmp/restic-incomplete.log" \
     RESTIC_PASSWORD_FILE="$tmp/restic-password" \
     AWS_ACCESS_KEY_ID="test-only" \
     AWS_SECRET_ACCESS_KEY="test-only" \
+    BACKUP_HEARTBEAT_URL="https://example.invalid/daily" \
     BACKUP_DIR="$tmp/backups-incomplete" \
     BACKUP_SCRIPT="$tmp/fake-db-only.sh" \
     VERIFY_SCRIPT="$tmp/fake-verify.sh" \

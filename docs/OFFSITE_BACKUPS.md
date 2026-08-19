@@ -1,8 +1,10 @@
 # Respaldos cifrados fuera del VPS
 
-Este procedimiento cierra el hallazgo **H-01**: la pérdida del disco o del VPS
-ya no elimina simultáneamente la base de datos y todas sus copias, y un tercero
-con lectura del almacenamiento externo no obtiene volcados en claro.
+Este procedimiento implementa el control técnico necesario para cerrar el
+hallazgo **H-01**: la pérdida del disco o del VPS deja de eliminar
+simultáneamente la base de datos y todas sus copias, y un tercero con acceso al
+almacenamiento externo no obtiene volcados en claro. H-01 solo se considera
+cerrado después de cumplir los criterios auditables del final de este runbook.
 
 ## Diseño
 
@@ -13,6 +15,12 @@ La protección tiene dos niveles:
 2. `backup-offsite.sh` exige el par completo (PostgreSQL y `backend_uploads`),
    verifica SHA-256/gzip/tar y lo sube con **cifrado del lado del cliente** a un
    repositorio Restic externo.
+
+La copia local de recuperación rápida conserva el formato existente
+`.sql.gz`/`.tar.gz` con permisos restrictivos; el cifrado criptográfico de este
+control se aplica al nivel **off-site**. Si una auditoría exige que las copias
+locales sean también criptográficamente ilegibles ante lectura forense del
+disco del VPS, ese endurecimiento debe implementarse y validarse por separado.
 
 Restic cifra contenido y metadatos antes de transmitirlos. El proveedor nunca
 recibe la clave de cifrado. La contraseña de Restic es irrecuperable: debe
@@ -80,18 +88,35 @@ sudo stat -c '%a %U %G %n' \
   /opt/tehus-crm/.secrets/restic-password
 ```
 
-El resultado esperado es `600 deploy deploy` para ambos archivos.
+El resultado esperado es `600 deploy deploy` para ambos archivos. Los dos
+secretos viven dentro del árbol de trabajo del VPS, por lo que `.env.backup` y
+`.secrets/` están ignorados explícitamente por Git. Verificarlo sin mostrar
+ningún valor:
+
+```bash
+git check-ignore -v .env.backup .secrets/restic-password
+git status --short
+```
+
+Ninguno de los dos archivos debe aparecer como rastreable o pendiente de
+commit.
 
 ## Inicialización y primera prueba
 
-Instalar las unidades versionadas. Quedan habilitadas para futuros arranques,
-pero deliberadamente **no se inician todavía**: un temporizador `Persistent`
-puede ejecutar de inmediato una hora omitida.
+Instalar las unidades versionadas. El instalador deliberadamente **no habilita
+ni inicia** los temporizadores: un `Persistent=true` habilitado antes de la
+primera prueba podría ejecutarse tras un reinicio o al activarse después de una
+hora omitida.
 
 ```bash
 cd /opt/tehus-crm
 sudo REPO_ROOT=/opt/tehus-crm deploy/scripts/install-backup-systemd.sh
+systemctl is-enabled tehus-backup.timer tehus-backup-drill.timer || true
+systemctl is-active tehus-backup.timer tehus-backup-drill.timer || true
 ```
+
+En una instalación nueva ambos deben permanecer `disabled` e `inactive` hasta
+terminar las pruebas observadas.
 
 Inicializar una sola vez y ejecutar el primer respaldo observado:
 
@@ -122,7 +147,7 @@ Solo después de esas comprobaciones, iniciar la programación y verificar la
 próxima ejecución calculada:
 
 ```bash
-sudo systemctl start tehus-backup.timer tehus-backup-drill.timer
+sudo systemctl enable --now tehus-backup.timer tehus-backup-drill.timer
 systemctl list-timers --all tehus-backup.timer tehus-backup-drill.timer
 ```
 
@@ -142,6 +167,57 @@ sudo -u deploy bash -lc '
 ```
 
 Nunca registrar el entorno completo ni ejecutar `set -x` en estos comandos.
+
+## Recuperación real desde el almacenamiento externo
+
+Usar este procedimiento únicamente durante una recuperación autorizada. Primero
+restaurar el snapshot cifrado a un directorio temporal sin tocar la base viva:
+
+```bash
+cd /opt/tehus-crm
+sudo -u deploy bash -lc '
+  set -a
+  . /opt/tehus-crm/.env.backup
+  set +a
+  target="$(mktemp -d /tmp/takto-offsite-restore.XXXXXX)"
+  printf "%s\n" "$target" > /tmp/takto-offsite-restore.path
+  restic restore latest \
+    --host tehus-crm-staging \
+    --tag takto-staging \
+    --target "$target"
+'
+```
+
+Leer la ruta temporal y localizar el conjunto exacto DB + uploads del mismo
+timestamp:
+
+```bash
+RECOVERY_ROOT="$(cat /tmp/takto-offsite-restore.path)"
+RECOVERY_BACKUPS="$RECOVERY_ROOT/opt/tehus-crm/backups"
+find "$RECOVERY_BACKUPS" -maxdepth 1 -type f -print | sort
+```
+
+Antes de tocar datos reales, verificar el `.sql.gz`, su sidecar y el tar de
+uploads correspondiente. Después usar los scripts de restauración existentes
+con `BACKUP_DIR` apuntando a ese directorio. El nombre del dump y el del tar
+deben compartir exactamente el mismo timestamp:
+
+```bash
+BACKUP_DIR="$RECOVERY_BACKUPS" \
+  ./deploy/scripts/backup-verify.sh tehus-crm-staging-YYYYMMDD-HHMMSS.sql.gz
+
+BACKUP_DIR="$RECOVERY_BACKUPS" \
+  ./deploy/scripts/restore-postgres.sh \
+    tehus-crm-staging-YYYYMMDD-HHMMSS.sql.gz
+
+BACKUP_DIR="$RECOVERY_BACKUPS" \
+  ./deploy/scripts/restore-uploads.sh \
+    tehus-crm-staging-uploads-YYYYMMDD-HHMMSS.tar.gz
+```
+
+No sustituir `YYYYMMDD-HHMMSS` por un valor adivinado: copiar el timestamp de
+los archivos restaurados. Tras validar aplicación, datos y uploads, eliminar el
+directorio temporal y `/tmp/takto-offsite-restore.path`.
 
 ## Rotación y recuperación de credenciales
 

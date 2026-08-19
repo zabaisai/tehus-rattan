@@ -39,15 +39,14 @@ install -m 0644 "$REPO_ROOT/deploy/systemd/tehus-backup-drill.timer" "$SYSTEMD_D
 install -m 0644 "$REPO_ROOT/deploy/systemd/tehus-backup-init.service" "$SYSTEMD_DIR/"
 
 systemctl daemon-reload
-# Enable for future boots, but deliberately do not start Persistent timers here:
-# starting one after its scheduled time may immediately run the service.
-systemctl enable tehus-backup.timer tehus-backup-drill.timer
-
-echo "Unit files installed and enabled, but timers are not running yet."
+# Deliberately do not enable or start Persistent timers here. On a fresh
+# installation they remain disabled across reboots until the first observed
+# backup and restore drill have both succeeded.
+echo "Unit files installed; this installer did not enable or start the timers."
 echo "Run the one-time repository initialization explicitly:"
 echo "  sudo systemctl start tehus-backup-init.service"
 echo "Then run and inspect the first backup explicitly:"
 echo "  sudo systemctl start tehus-backup.service"
 echo "  journalctl -u tehus-backup.service --since today"
-echo "After the first backup and restore drill pass, start the timers explicitly:"
-echo "  sudo systemctl start tehus-backup.timer tehus-backup-drill.timer"
+echo "After the first backup and restore drill pass, enable and start the timers explicitly:"
+echo "  sudo systemctl enable --now tehus-backup.timer tehus-backup-drill.timer"

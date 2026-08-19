@@ -33,6 +33,8 @@ backup_validate_restic_environment() {
 
   [ -f "$RESTIC_PASSWORD_FILE" ] \
     || backup_die "RESTIC_PASSWORD_FILE does not exist"
+  [ -r "$RESTIC_PASSWORD_FILE" ] \
+    || backup_die "RESTIC_PASSWORD_FILE is not readable by the backup user"
 
   local mode
   mode="$(stat -c '%a' "$RESTIC_PASSWORD_FILE")"

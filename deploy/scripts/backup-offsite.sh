@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/backup-lib.sh"
 BACKUP_DIR="${BACKUP_DIR:-/opt/tehus-crm/backups}"
 BACKUP_SCRIPT="${BACKUP_SCRIPT:-$SCRIPT_DIR/backup-postgres.sh}"
 VERIFY_SCRIPT="${VERIFY_SCRIPT:-$SCRIPT_DIR/backup-verify.sh}"
-BACKUP_LOCK_FILE="${BACKUP_LOCK_FILE:-/tmp/tehus-offsite-backup.lock}"
+BACKUP_LOCK_FILE="${BACKUP_LOCK_FILE:-$BACKUP_DIR/.tehus-offsite-backup.lock}"
 BACKUP_RESTIC_TAG="${BACKUP_RESTIC_TAG:-takto-staging}"
 RESTIC_HOST="${RESTIC_HOST:-tehus-crm-staging}"
 
@@ -21,6 +21,7 @@ backup_require_command gzip
 backup_require_command sha256sum
 backup_require_command tar
 backup_validate_restic_environment
+backup_require_value BACKUP_HEARTBEAT_URL
 backup_enable_heartbeat_trap
 
 mkdir -p "$BACKUP_DIR"
@@ -68,7 +69,7 @@ backup_verify_sidecar "$database_backup"
 backup_verify_sidecar "$uploads_backup"
 gzip -t "$database_backup"
 tar -tzf "$uploads_backup" >/dev/null
-"$VERIFY_SCRIPT" "$(basename "$database_backup")"
+BACKUP_DIR="$BACKUP_DIR" "$VERIFY_SCRIPT" "$(basename "$database_backup")"
 
 backup_log "uploading the verified set with client-side encryption"
 restic backup \
