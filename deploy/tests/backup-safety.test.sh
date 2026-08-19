@@ -30,6 +30,12 @@ grep -Fq -- '--keep-weekly 4' "$offsite"
 grep -Fq -- '--keep-monthly 6' "$offsite"
 grep -Fq -- '--group-by host,tags' "$offsite"
 grep -Fq -- 'restic check --read-data' "$drill"
+grep -Fq 'rclone:*)' "$backup_lib"
+grep -Fq 'backup_require_value RCLONE_CONFIG' "$backup_lib"
+grep -Fq 'RESTIC_REPOSITORY=rclone:takto-drive:TAKTO_BACKUPS/staging' "$ROOT/deploy/env/backup.env.example"
+grep -Fq 'command -v rclone' "$installer"
+grep -Fq 'unsupported RESTIC_REPOSITORY backend; expected s3: or rclone:' "$installer"
+grep -Fq 'Google Drive via rclone' "$ROOT/docs/OFFSITE_BACKUPS.md"
 grep -Fq 'backup_validate_tar_archive "$uploads_backup"' "$drill"
 grep -Fq -- '--target-db "$RESTORE_DRILL_DB"' "$drill"
 grep -Fq "grep -qE '^tehus_restore_drill(_[A-Za-z0-9_]+)?\$'" "$drill"
@@ -75,6 +81,11 @@ printf '%s\n' "$*" >>"$RESTIC_TEST_LOG"
 exit 0
 FAKE_RESTIC
 
+cat >"$tmp/bin/rclone" <<'FAKE_RCLONE'
+#!/usr/bin/env bash
+exit 0
+FAKE_RCLONE
+
 cat >"$tmp/bin/curl" <<'FAKE_CURL'
 #!/usr/bin/env bash
 exit 0
@@ -93,7 +104,9 @@ case "$(uname -s)" in
   MINGW*|MSYS*|CYGWIN*)
     cat >"$tmp/bin/stat" <<'FAKE_STAT'
 #!/usr/bin/env bash
-if [ "${1:-}" = "-c" ] && [ "${2:-}" = "%a" ] && [ "${3:-}" = "${RESTIC_PASSWORD_FILE:-}" ]; then
+if [ "${1:-}" = "-c" ] && [ "${2:-}" = "%a" ] && \
+   { [ "${3:-}" = "${RESTIC_PASSWORD_FILE:-}" ] || \
+     [ "${3:-}" = "${RCLONE_CONFIG:-}" ]; }; then
   printf '600\n'
   exit 0
 fi
@@ -122,9 +135,11 @@ cat >"$tmp/fake-verify.sh" <<'FAKE_VERIFY'
 exit 0
 FAKE_VERIFY
 
-chmod +x "$tmp/bin/restic" "$tmp/bin/curl" "$tmp/bin/flock" "$tmp/fake-backup.sh" "$tmp/fake-verify.sh"
+chmod +x "$tmp/bin/restic" "$tmp/bin/rclone" "$tmp/bin/curl" "$tmp/bin/flock" "$tmp/fake-backup.sh" "$tmp/fake-verify.sh"
 printf 'test-only-password\n' >"$tmp/restic-password"
 chmod 600 "$tmp/restic-password"
+printf '[takto-drive]\ntype = drive\n' >"$tmp/rclone.conf"
+chmod 600 "$tmp/rclone.conf"
 
 RESTIC_TEST_LOG="$tmp/restic.log" \
 PATH="$tmp/bin:$PATH" \
@@ -143,6 +158,26 @@ grep -Fq 'snapshots --host tehus-crm-staging --tag takto-staging' "$tmp/restic.l
 grep -Fq 'backup --host tehus-crm-staging --tag takto-staging' "$tmp/restic.log"
 grep -Fq 'forget --host tehus-crm-staging --tag takto-staging --group-by host,tags --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune' "$tmp/restic.log"
 grep -Fxq 'check' "$tmp/restic.log"
+
+# The rclone backend must work without AWS credentials. Its OAuth/config file
+# remains a protected secret and is validated independently.
+mkdir -p "$tmp/backups-rclone"
+RESTIC_TEST_LOG="$tmp/restic-rclone.log" \
+PATH="$tmp/bin:$PATH" \
+RESTIC_REPOSITORY="rclone:takto-drive:TAKTO_BACKUPS/staging" \
+RESTIC_PASSWORD_FILE="$tmp/restic-password" \
+RCLONE_CONFIG="$tmp/rclone.conf" \
+BACKUP_HEARTBEAT_URL="https://example.invalid/daily" \
+BACKUP_DIR="$tmp/backups-rclone" \
+BACKUP_SCRIPT="$tmp/fake-backup.sh" \
+VERIFY_SCRIPT="$tmp/fake-verify.sh" \
+BACKUP_LOCK_FILE="$tmp/backup-rclone.lock" \
+"$offsite"
+
+grep -Fq 'snapshots --host tehus-crm-staging --tag takto-staging' "$tmp/restic-rclone.log"
+grep -Fq 'backup --host tehus-crm-staging --tag takto-staging' "$tmp/restic-rclone.log"
+grep -Fq 'forget --host tehus-crm-staging --tag takto-staging --group-by host,tags --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune' "$tmp/restic-rclone.log"
+grep -Fxq 'check' "$tmp/restic-rclone.log"
 
 # Missing uploads must fail closed: the DB-only snapshot is not an acceptable
 # disaster-recovery set and must never be uploaded.

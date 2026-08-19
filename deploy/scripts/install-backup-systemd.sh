@@ -27,6 +27,26 @@ command -v restic >/dev/null 2>&1 || {
   echo "ERROR: restic is not installed" >&2
   exit 1
 }
+
+repository="$(grep -m1 '^RESTIC_REPOSITORY=' "$REPO_ROOT/.env.backup" | cut -d= -f2-)"
+[ -n "$repository" ] || {
+  echo "ERROR: RESTIC_REPOSITORY is missing from /opt/tehus-crm/.env.backup" >&2
+  exit 1
+}
+case "$repository" in
+  rclone:*)
+    command -v rclone >/dev/null 2>&1 || {
+      echo "ERROR: rclone is required for a rclone: Restic repository" >&2
+      exit 1
+    }
+    ;;
+  s3:*) ;;
+  *)
+    echo "ERROR: unsupported RESTIC_REPOSITORY backend; expected s3: or rclone:" >&2
+    exit 1
+    ;;
+esac
+
 id deploy >/dev/null 2>&1 || {
   echo "ERROR: deploy user does not exist" >&2
   exit 1
