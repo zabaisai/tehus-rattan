@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily TAKTO encrypted off-site backup at 03:00 Bogota
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 America/Bogota
+Persistent=true
+RandomizedDelaySec=5m
+AccuracySec=1m
+Unit=tehus-backup.service
+
+[Install]
+WantedBy=timers.target

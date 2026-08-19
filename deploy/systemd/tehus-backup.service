@@ -1,0 +1,18 @@
+[Unit]
+Description=TAKTO encrypted off-site backup
+Documentation=file:/opt/tehus-crm/docs/OFFSITE_BACKUPS.md
+Wants=network-online.target docker.service
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+User=deploy
+Group=deploy
+WorkingDirectory=/opt/tehus-crm
+EnvironmentFile=/opt/tehus-crm/.env.backup
+UMask=0077
+ExecStart=/opt/tehus-crm/deploy/scripts/backup-offsite.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+TimeoutStartSec=4h
