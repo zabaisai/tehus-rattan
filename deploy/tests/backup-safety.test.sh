@@ -17,6 +17,7 @@ for script in "${scripts[@]}"; do
   bash -n "$script"
 done
 
+backup_lib="$ROOT/deploy/scripts/backup-lib.sh"
 offsite="$ROOT/deploy/scripts/backup-offsite.sh"
 drill="$ROOT/deploy/scripts/backup-restore-drill.sh"
 installer="$ROOT/deploy/scripts/install-backup-systemd.sh"
@@ -29,6 +30,7 @@ grep -Fq -- '--keep-weekly 4' "$offsite"
 grep -Fq -- '--keep-monthly 6' "$offsite"
 grep -Fq -- '--group-by host,tags' "$offsite"
 grep -Fq -- 'restic check --read-data' "$drill"
+grep -Fq 'backup_validate_tar_archive "$uploads_backup"' "$drill"
 grep -Fq -- '--target-db "$RESTORE_DRILL_DB"' "$drill"
 grep -Fq "grep -qE '^tehus_restore_drill(_[A-Za-z0-9_]+)?\$'" "$drill"
 grep -Fq 'docker compose --env-file "$ENV_FILE"' "$restore"
@@ -173,6 +175,56 @@ fi
 if grep -q '^backup ' "$tmp/restic-incomplete.log"; then
   echo "DB-only backup was uploaded" >&2
   exit 1
+fi
+
+# Generate hostile tar metadata directly so traversal, escaping symlinks and
+# unsafe hard links are regression-tested. CI must never silently skip this
+# behavioral gate; local Git Bash without python3 still gets the static check.
+if [ "${CI:-}" = true ] && ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 is required for the hostile-tar CI regression test" >&2
+  exit 1
+fi
+if command -v python3 >/dev/null 2>&1; then
+  python3 - "$tmp" <<'PY_TAR_FIXTURES'
+import io
+import pathlib
+import sys
+import tarfile
+
+root = pathlib.Path(sys.argv[1])
+
+def write_archive(filename, member_name, kind="file", linkname=None):
+    with tarfile.open(root / filename, "w:gz") as archive:
+        member = tarfile.TarInfo(member_name)
+        member.mode = 0o644
+        if kind == "file":
+            payload = b"safe"
+            member.size = len(payload)
+            archive.addfile(member, io.BytesIO(payload))
+        elif kind == "symlink":
+            member.type = tarfile.SYMTYPE
+            member.linkname = linkname
+            archive.addfile(member)
+        elif kind == "hardlink":
+            member.type = tarfile.LNKTYPE
+            member.linkname = linkname
+            archive.addfile(member)
+
+write_archive("uploads-safe.tar.gz", "safe/file.txt")
+write_archive("uploads-traversal.tar.gz", "../escape.txt")
+write_archive("uploads-symlink.tar.gz", "safe/link", "symlink", "../../escape")
+write_archive("uploads-hardlink.tar.gz", "safe/link", "hardlink", "../../escape")
+PY_TAR_FIXTURES
+
+  # The valid archive must pass. Each hostile archive must fail closed.
+  ( source "$backup_lib"; backup_validate_tar_archive "$tmp/uploads-safe.tar.gz" )
+  for unsafe_tar in uploads-traversal.tar.gz uploads-symlink.tar.gz uploads-hardlink.tar.gz; do
+    if ( source "$backup_lib"; backup_validate_tar_archive "$tmp/$unsafe_tar" ) \
+        >/dev/null 2>&1; then
+      echo "unsafe uploads archive unexpectedly passed validation: $unsafe_tar" >&2
+      exit 1
+    fi
+  done
 fi
 
 echo "Backup safety checks passed."

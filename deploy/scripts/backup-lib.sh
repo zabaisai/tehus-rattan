@@ -88,3 +88,51 @@ backup_verify_sidecar() {
   [ -f "$file.sha256" ] || backup_die "checksum sidecar is missing: $file.sha256"
   (cd "$directory" && sha256sum -c "$(basename "$file").sha256")
 }
+
+# Validate an uploads tarball as hostile input before any extraction. GNU tar
+# normalizes unsafe hard-link targets while listing them and emits a warning;
+# failing closed on every tar warning preserves the original unsafe condition.
+backup_validate_tar_archive() {
+  local archive="$1"
+  local names listing member target
+
+  [ -f "$archive" ] || backup_die "uploads archive does not exist: $archive"
+
+  if ! names="$(tar --force-local --quoting-style=escape -tzf "$archive" 2>&1)"; then
+    backup_die "uploads archive is not a valid tar.gz"
+  fi
+  if printf '%s\n' "$names" | grep -q '^tar:'; then
+    backup_die "uploads archive contains unsafe member or hard-link metadata"
+  fi
+
+  while IFS= read -r member; do
+    [ -n "$member" ] || continue
+    case "$member" in
+      /*) backup_die "uploads archive contains an absolute path" ;;
+    esac
+    if printf '%s\n' "$member" | grep -qE '(^|/)\.\.($|/)'; then
+      backup_die "uploads archive contains '..' path traversal"
+    fi
+  done <<<"$names"
+
+  if ! listing="$(tar --force-local --quoting-style=escape -tzvf "$archive" 2>&1)"; then
+    backup_die "uploads archive cannot be listed safely"
+  fi
+  if printf '%s\n' "$listing" | grep -q '^tar:'; then
+    backup_die "uploads archive contains unsafe link metadata"
+  fi
+
+  while IFS= read -r member; do
+    case "$member" in
+      l*" -> "*)
+        target="${member##* -> }"
+        case "$target" in
+          /*) backup_die "uploads archive contains an absolute symlink target" ;;
+        esac
+        if printf '%s\n' "$target" | grep -qE '(^|/)\.\.($|/)'; then
+          backup_die "uploads archive contains a symlink escaping the restore root"
+        fi
+        ;;
+    esac
+  done <<<"$listing"
+}

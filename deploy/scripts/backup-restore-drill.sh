@@ -108,9 +108,10 @@ uploads_backup="$(find "$restore_root" -type f \
 backup_verify_sidecar "$database_backup"
 backup_verify_sidecar "$uploads_backup"
 gzip -t "$database_backup"
-tar -tzf "$uploads_backup" >/dev/null
+backup_log "validating uploads archive paths and links before extraction"
+backup_validate_tar_archive "$uploads_backup"
 mkdir -p "$restore_root/uploads-extracted"
-tar -xzf "$uploads_backup" -C "$restore_root/uploads-extracted"
+tar --force-local -xzf "$uploads_backup" -C "$restore_root/uploads-extracted"
 
 backup_log "restoring PostgreSQL into isolated database $RESTORE_DRILL_DB"
 # A prior interrupted drill may have left only this reserved, disposable DB.
