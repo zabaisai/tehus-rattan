@@ -37,21 +37,39 @@ Una URL de latido externa recibe `/start`, éxito o `/fail`. El monitor diario
 se configura con periodo de 24 horas y gracia de 2 horas; así alerta si no hay
 un respaldo confirmado en **26 horas**, incluso si el VPS entero desaparece.
 
-## Proveedor recomendado: Cloudflare R2
+## Almacenamiento externo
 
-La implementación usa el protocolo S3 y no queda atada a un proveedor. Para
-R2:
+La implementación admite dos familias de backend:
 
-1. Crear un bucket exclusivo para staging, sin acceso público.
-2. Crear un token exclusivo limitado a lectura/escritura de objetos en ese
-   bucket. No reutilizar una clave global de la cuenta.
-3. Usar un prefijo separado (`takto-staging`) y, cuando exista producción, otro
-   bucket y otras credenciales.
-4. Mantener desactivadas las reglas de borrado del proveedor que contradigan la
-   retención de Restic.
+- **Google Drive mediante rclone**, que es la opción elegida para staging.
+- **S3 compatible** (por ejemplo Cloudflare R2) como alternativa.
 
-R2 cifra en reposo y usa TLS; Restic añade el cifrado independiente que permite
-tratar al proveedor como almacenamiento no confiable.
+En ambos casos Restic mantiene el cifrado del lado del cliente, por lo que el
+almacenamiento remoto recibe únicamente datos cifrados por Restic.
+
+### Google Drive via rclone
+
+Para staging se usa un remote de rclone llamado `takto-drive` y la ruta
+`TAKTO_BACKUPS/staging`.
+
+Requisitos operativos:
+
+1. Usar una cuenta de Google controlada por la organización y protegida con MFA.
+2. No compartir públicamente `TAKTO_BACKUPS` ni su contenido.
+3. Guardar el OAuth/config de rclone solamente en
+   `/opt/tehus-crm/.secrets/rclone.conf`.
+4. Mantener `rclone.conf` con propietario `deploy:deploy` y permisos `600`.
+5. Guardar fuera del VPS la contraseña de Restic. El token OAuth de rclone no
+   sustituye esa contraseña de cifrado.
+
+Cuando exista producción debe usar un destino lógico separado y secretos
+distintos; no se debe reutilizar el mismo repositorio Restic de staging.
+
+### Alternativa S3 compatible
+
+S3 continúa soportado. En ese caso usar un bucket privado exclusivo,
+credenciales de mínimo privilegio limitadas al destino de backups y reglas del
+proveedor que no contradigan la retención administrada por Restic.
 
 ## Preparación en staging
 
@@ -60,46 +78,71 @@ el respaldo ni toca datos.
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y restic
+sudo apt-get install -y restic rclone
 
 cd /opt/tehus-crm
 sudo install -d -m 0700 -o deploy -g deploy /opt/tehus-crm/.secrets
 sudo -u deploy sh -c 'umask 077; openssl rand -base64 48 > /opt/tehus-crm/.secrets/restic-password'
+
+sudo -u deploy rclone config --config /opt/tehus-crm/.secrets/rclone.conf
+sudo chown deploy:deploy /opt/tehus-crm/.secrets/rclone.conf
+sudo chmod 600 /opt/tehus-crm/.secrets/rclone.conf
 
 sudo install -m 0600 -o deploy -g deploy \
   deploy/env/backup.env.example /opt/tehus-crm/.env.backup
 sudoedit /opt/tehus-crm/.env.backup
 ```
 
-Completar únicamente en el VPS:
+Durante `rclone config`, crear o autorizar el remote con el nombre exacto
+`takto-drive`. Si el VPS no puede abrir un navegador, seguir el flujo de
+autorización que rclone muestre y completar el OAuth desde una estación de
+trabajo confiable.
 
-- `RESTIC_REPOSITORY`
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
+Para Google Drive, confirmar en `.env.backup` únicamente:
+
+- `RESTIC_REPOSITORY=rclone:takto-drive:TAKTO_BACKUPS/staging`
+- `RCLONE_CONFIG=/opt/tehus-crm/.secrets/rclone.conf`
 - `BACKUP_HEARTBEAT_URL`
 - `BACKUP_DRILL_HEARTBEAT_URL`
 
-No pegar esos valores en GitHub, tickets, chats, capturas ni logs. Confirmar sin
-imprimir secretos:
+`AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY` solo son necesarios si se elige
+un backend `s3:`.
+
+No pegar secretos, tokens OAuth, contraseñas ni el contenido de `rclone.conf`
+en GitHub, tickets, chats, capturas o logs.
+
+Confirmar permisos sin imprimir secretos:
 
 ```bash
 sudo stat -c '%a %U %G %n' \
   /opt/tehus-crm/.env.backup \
-  /opt/tehus-crm/.secrets/restic-password
+  /opt/tehus-crm/.secrets/restic-password \
+  /opt/tehus-crm/.secrets/rclone.conf
 ```
 
-El resultado esperado es `600 deploy deploy` para ambos archivos. Los dos
-secretos viven dentro del árbol de trabajo del VPS, por lo que `.env.backup` y
-`.secrets/` están ignorados explícitamente por Git. Verificarlo sin mostrar
-ningún valor:
+El resultado esperado es `600 deploy deploy` para los tres archivos.
+
+Los secretos viven dentro del árbol de trabajo del VPS y están excluidos por
+Git:
 
 ```bash
-git check-ignore -v .env.backup .secrets/restic-password
+git check-ignore -v \
+  .env.backup \
+  .secrets/restic-password \
+  .secrets/rclone.conf
+
 git status --short
 ```
 
-Ninguno de los dos archivos debe aparecer como rastreable o pendiente de
-commit.
+Ninguno de esos archivos debe aparecer como rastreable o pendiente de commit.
+
+Comprobar el remote sin mostrar contenido sensible:
+
+```bash
+sudo -u deploy rclone lsd \
+  --config /opt/tehus-crm/.secrets/rclone.conf \
+  takto-drive:
+```
 
 ## Inicialización y primera prueba
 
@@ -129,9 +172,17 @@ sudo systemctl status tehus-backup.service --no-pager
 sudo journalctl -u tehus-backup.service --since today --no-pager
 ```
 
-Verificar desde una máquina distinta o desde la consola de R2 que existen
-objetos. No basta con que el comando local diga éxito. Luego ejecutar el primer
-ejercicio de recuperación:
+Verificar desde una máquina distinta o desde Google Drive que el destino remoto
+contiene objetos del repositorio. También puede comprobarse con rclone:
+
+```bash
+sudo -u deploy rclone lsf \
+  --config /opt/tehus-crm/.secrets/rclone.conf \
+  takto-drive:TAKTO_BACKUPS/staging
+```
+
+No basta con que el comando local de backup diga éxito. Luego ejecutar el
+primer ejercicio de recuperación:
 
 ```bash
 sudo systemctl start tehus-backup-drill.service
@@ -221,11 +272,14 @@ directorio temporal y `/tmp/takto-offsite-restore.path`.
 
 ## Rotación y recuperación de credenciales
 
-- Rotar el token S3/R2 sin cambiar la contraseña de Restic: crear token nuevo,
-  probar `restic snapshots`, actualizar `.env.backup` y revocar el anterior.
+- Para Google Drive/rclone, reautorizar o rotar el acceso de `takto-drive`,
+  probar `restic snapshots` y conservar `rclone.conf` con modo `600`.
+- Para S3, rotar la credencial sin cambiar la contraseña de Restic, probar
+  `restic snapshots`, actualizar `.env.backup` y revocar la anterior.
 - Si se sospecha exposición de la contraseña de Restic, crear un repositorio
   nuevo con contraseña nueva y copiar mediante una estación confiable. Cambiar
-  únicamente el token del bucket no vuelve a cifrar snapshots anteriores.
+  únicamente la credencial del proveedor no vuelve a cifrar snapshots
+  anteriores.
 - La contraseña Restic no tiene recuperación. Verificar trimestralmente que dos
   custodios autorizados pueden localizarla sin revelarla.
 
@@ -237,17 +291,17 @@ Detener programación sin borrar copias:
 sudo systemctl disable --now tehus-backup.timer tehus-backup-drill.timer
 ```
 
-Esto no elimina datos locales, snapshots de Restic, el bucket ni credenciales.
-La eliminación de respaldos es una acción destructiva separada y requiere una
-autorización explícita.
+Esto no elimina datos locales, snapshots de Restic, el destino externo ni
+credenciales. La eliminación de respaldos es una acción destructiva separada y
+requiere una autorización explícita.
 
 ## Criterios auditables de cierre
 
-- [ ] Bucket externo privado y credencial limitada al bucket.
+- [ ] Almacenamiento externo independiente, privado y con acceso de mínimo privilegio.
 - [ ] Contraseña Restic almacenada fuera del VPS y recuperable por dos custodios.
 - [ ] Primera copia DB + uploads verificada fuera del VPS.
 - [ ] Retención 7/4/6 visible en `restic snapshots` tras ciclos suficientes.
 - [ ] Temporizadores `systemd` habilitados desde archivos versionados.
 - [ ] Monitor diario con 24 h + 2 h de gracia y alertas probadas.
 - [ ] Restauración mensual exitosa y documentada.
-- [ ] Procedimiento repetido para producción con bucket y secretos distintos.
+- [ ] Procedimiento repetido para producción con destino externo y secretos distintos.

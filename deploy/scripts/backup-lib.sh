@@ -24,23 +24,42 @@ backup_require_value() {
   [ -n "${!name:-}" ] || backup_die "$name is required"
 }
 
+backup_require_secure_file() {
+  local file="$1"
+  local label="$2"
+  local mode
+
+  [ -f "$file" ] || backup_die "$label does not exist"
+  [ -r "$file" ] || backup_die "$label is not readable by the backup user"
+
+  mode="$(stat -c '%a' "$file")"
+  case "$mode" in
+    400|600) ;;
+    *) backup_die "$label must have mode 400 or 600 (current: $mode)" ;;
+  esac
+}
+
 backup_validate_restic_environment() {
   backup_require_command restic
   backup_require_value RESTIC_REPOSITORY
   backup_require_value RESTIC_PASSWORD_FILE
-  backup_require_value AWS_ACCESS_KEY_ID
-  backup_require_value AWS_SECRET_ACCESS_KEY
+  backup_require_secure_file "$RESTIC_PASSWORD_FILE" "RESTIC_PASSWORD_FILE"
 
-  [ -f "$RESTIC_PASSWORD_FILE" ] \
-    || backup_die "RESTIC_PASSWORD_FILE does not exist"
-  [ -r "$RESTIC_PASSWORD_FILE" ] \
-    || backup_die "RESTIC_PASSWORD_FILE is not readable by the backup user"
-
-  local mode
-  mode="$(stat -c '%a' "$RESTIC_PASSWORD_FILE")"
-  case "$mode" in
-    400|600) ;;
-    *) backup_die "RESTIC_PASSWORD_FILE must have mode 400 or 600 (current: $mode)" ;;
+  # Backend-specific credentials are mutually exclusive. S3 needs AWS keys;
+  # rclone needs only its own protected config/OAuth token.
+  case "$RESTIC_REPOSITORY" in
+    s3:*)
+      backup_require_value AWS_ACCESS_KEY_ID
+      backup_require_value AWS_SECRET_ACCESS_KEY
+      ;;
+    rclone:*)
+      backup_require_command rclone
+      backup_require_value RCLONE_CONFIG
+      backup_require_secure_file "$RCLONE_CONFIG" "RCLONE_CONFIG"
+      ;;
+    *)
+      backup_die "unsupported RESTIC_REPOSITORY backend; expected s3: or rclone:"
+      ;;
   esac
 }
 
