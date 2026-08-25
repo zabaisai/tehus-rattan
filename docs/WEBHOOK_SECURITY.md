@@ -73,7 +73,7 @@ límite con `@Throttle` / `@SkipThrottle`.
 | --- | --- |
 | `POST /api/auth/login` | 10 / 60s (estricto: fuerza bruta) |
 | `POST /api/auth/refresh` | 30 / 60s |
-| `POST /api/onboarding/company`, `POST /api/auth/register` | 15 / 60s (fuerza bruta de códigos de invitación) |
+| `POST /api/onboarding/company` | 15 / 60s (fuerza bruta de códigos de invitación) |
 | `POST /api/webhook` | 600 / 60s (alto: ráfagas legítimas de Meta) |
 | `GET /api/webhook` (verify) | 30 / 60s |
 | `GET /api/health`, `GET /api/` | exentos (`@SkipThrottle`) |

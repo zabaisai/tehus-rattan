@@ -22,7 +22,6 @@ Controllers use two patterns:
 
 | Module | Endpoint Group | Authentication | Role Restriction | Tenant Source |
 | --- | --- | --- | --- | --- |
-| Auth | `POST /auth/register` | Public | None | Request body creates company |
 | Auth | `POST /auth/login` | Public | None | User lookup by email |
 | Auth | `GET /auth/me` | JWT | Any authenticated role | JWT `sub` |
 | Companies | `/companies/*` | JWT | `ADMIN`, `SUPER_ADMIN` for updates | JWT `companyId` |

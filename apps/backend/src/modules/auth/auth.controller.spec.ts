@@ -26,7 +26,6 @@ describe('AuthController', () => {
 
   beforeEach(() => {
     authService = {
-      register: jest.fn(),
       login: jest.fn(),
       me: jest.fn(),
       refresh: jest.fn(),
@@ -35,28 +34,9 @@ describe('AuthController', () => {
     controller = new AuthController(authService);
   });
 
-  it('applies OnboardingInviteGuard to POST /auth/register', () => {
-    const guards = Reflect.getMetadata(GUARDS_METADATA, controller.register);
-    expect(guards).toContain(OnboardingInviteGuard);
-  });
-
   it('does not gate /auth/login with the onboarding invite guard', () => {
     const guards = Reflect.getMetadata(GUARDS_METADATA, controller.login) ?? [];
     expect(guards).not.toContain(OnboardingInviteGuard);
-  });
-
-  it('delegates register to authService.register', async () => {
-    authService.register.mockResolvedValue({ token: 't', user: {} });
-    const body = {
-      companyName: 'Co',
-      name: 'Admin',
-      email: 'a@co.test',
-      password: 'password123',
-    };
-
-    await controller.register(body);
-
-    expect(authService.register).toHaveBeenCalledWith(body);
   });
 
   describe('login', () => {
