@@ -26,7 +26,7 @@ Ver `docs/WHATSAPP_MULTI_TENANT.md` para el detalle de cada flujo.
 - [ ] `npm test -- --runInBand`, `npm run test:e2e` y `npm run build` pasan sin errores.
 - [ ] Tienes una base Postgres real de prueba/staging disponible (no la de desarrollo local sin datos, y **nunca** producción para la primera prueba).
 - [ ] Confirmas que **no** vas a pegar tokens reales en este chat, en commits, en mensajes de Slack/correo, ni en capturas de pantalla.
-- [ ] Tienes un usuario `ADMIN` de una empresa de prueba ya creado en esa base (o puedes crearlo vía `POST /auth/register`).
+- [ ] Tienes un usuario `ADMIN` de una empresa de prueba ya creado en esa base (o puedes crearlo vía `POST /api/onboarding/company` con un código de invitación válido).
 
 ## 4. Variables de entorno necesarias
 
