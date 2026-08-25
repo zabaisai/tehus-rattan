@@ -27,10 +27,13 @@ Es la condición que distingue a un SUPER_ADMIN de plataforma de cualquier
 otro usuario. El script de este documento la garantiza siempre, tanto al
 crear como al actualizar.
 
-## No usar `register` para crear un SUPER_ADMIN
+## No existe endpoint HTTP para crear un SUPER_ADMIN
 
-`POST /api/auth/register` es un endpoint público que solo crea `Company` +
-`ADMIN` — nunca crea ni puede crear un `SUPER_ADMIN`, y así debe seguir. La
+El aprovisionamiento de empresas se hace únicamente vía
+`POST /api/onboarding/company`, que crea `Company` + `ADMIN` tras validar un
+código de invitación real — nunca crea ni puede crear un `SUPER_ADMIN`, y así
+debe seguir. (El antiguo `POST /api/auth/register` fue eliminado porque creaba
+`Company` + `ADMIN` sin validar la invitación contra la base de datos.) La
 única forma soportada de crear o actualizar un SUPER_ADMIN global es el
 script de este documento, ejecutado desde terminal con acceso directo a la
 base de datos. No existe (ni debe existir) un endpoint HTTP para esto.

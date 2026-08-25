@@ -11,7 +11,6 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import type { Request as ExpressRequest, Response } from 'express';
-import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
 import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 import {
   THROTTLE_TTL_MS,
@@ -19,7 +18,6 @@ import {
 } from '../../common/throttle/throttle.config';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 import { buildSessionRequestContext } from '../sessions/utils/request-context.util';
 import { REFRESH_TOKEN_COOKIE } from '../sessions/sessions.constants';
 import {
@@ -31,23 +29,12 @@ import {
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  // Deprecated in favor of POST /onboarding/company, which also creates the
-  // pipeline/stages/agents this endpoint never did. Kept for backward
-  // compatibility, but gated the same way so it can no longer create a
-  // Company + ADMIN for free.
-  //
-  // Deliberately NOT wired into session tracking: this path issues a
-  // sid-less access token via AuthService.issueSession(user) with no
-  // second argument, and JwtStrategy now rejects any token with no `sid`
-  // outright (see jwt.strategy.ts) — so the token this endpoint returns
-  // authenticates nothing against any guarded route. It is fully inert,
-  // not merely "legacy"; this is intentional rather than an oversight.
-  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding } })
-  @UseGuards(OnboardingInviteGuard)
-  @Post('register')
-  register(@Body() body: RegisterDto) {
-    return this.authService.register(body);
-  }
+  // Company + ADMIN provisioning is done exclusively through
+  // POST /onboarding/company, which performs the real database-backed
+  // invitation validation and atomic claim. The former POST /auth/register
+  // endpoint was removed: it created a Company + ADMIN without validating the
+  // invitation code against the database, so any non-empty string passed its
+  // guard.
 
   @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.auth } })
   @UseGuards(CookieOriginGuard)
@@ -71,7 +58,9 @@ export class AuthController {
   // never be reachable from JS given it's httpOnly), rotates it, and mints
   // a fresh access JWT. A missing/invalid/revoked/expired session all fail
   // the same generic way (see AuthService.refresh).
-  @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.refresh } })
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.refresh },
+  })
   @UseGuards(CookieOriginGuard)
   @Post('refresh')
   async refresh(
