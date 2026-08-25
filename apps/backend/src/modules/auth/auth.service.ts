@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -21,30 +17,6 @@ export class AuthService {
     private prisma: PrismaService,
     private sessionsService: SessionsService,
   ) {}
-
-  async register(data: {
-    companyName: string;
-    name: string;
-    email: string;
-    password: string;
-  }) {
-    const exists = await this.usersService.findByEmail(data.email);
-    if (exists) throw new ConflictException('El email ya está registrado');
-
-    const company = await this.prisma.company.create({
-      data: { name: data.companyName },
-    });
-
-    const user = await this.usersService.create({
-      email: data.email,
-      password: data.password,
-      name: data.name,
-      companyId: company.id,
-      role: 'ADMIN',
-    });
-
-    return this.issueSession(user);
-  }
 
   // Overloaded so the return type is precise at each call site: passing a
   // `context` (the only thing AuthController.login does) statically

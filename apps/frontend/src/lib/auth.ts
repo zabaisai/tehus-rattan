@@ -12,16 +12,6 @@ export async function login(
   return data;
 }
 
-export async function register(payload: {
-  companyName: string;
-  name: string;
-  email: string;
-  password: string;
-}): Promise<AuthResponse> {
-  const { data } = await api.post<AuthResponse>("/auth/register", payload);
-  return data;
-}
-
 export async function getMe(): Promise<User> {
   const { data } = await api.get<User>("/auth/me");
   return data;

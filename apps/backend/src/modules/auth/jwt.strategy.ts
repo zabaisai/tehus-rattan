@@ -24,10 +24,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   // refresh, onboarding — see AuthService) carries a `sid` (UserSession
   // id); a token with no `sid` at all is rejected outright, with no
   // legacy/back-compat exception. That deliberately includes every access
-  // token issued before this shipped (7-day tokens with no sid) and
-  // anything from the deprecated POST /auth/register, which still mints a
-  // sid-less token — both simply stop working the moment this deploys, and
-  // every user must log in again. One extra indexed UserSession lookup per
+  // token issued before this shipped (7-day tokens with no sid) — they
+  // simply stop working the moment this deploys, and every user must log in
+  // again. One extra indexed UserSession lookup per
   // request is an accepted cost at this app's current scale; no caching
   // layer (Redis or otherwise) was introduced for it.
   async validate(payload: {
