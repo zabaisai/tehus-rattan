@@ -1,6 +1,21 @@
 # Local scratchpad / reference files
 scratchpad/
 
+# Env files — real values must never be committed anywhere in the tree.
+# Only the *.example templates (fictitious values) are tracked.
+.env
+.env.*
+**/.env
+**/.env.*
+!.env.example
+!**/.env.example
+!deploy/env/staging.env.example
+
+# Private keys / certificates
+*.pem
+*.p12
+*.pfx
+
 # Deployment secrets — real values only ever exist on the VPS or in a local
 # throwaway file while testing docker-compose.staging.yml, never committed.
 .env.staging
