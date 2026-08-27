@@ -1,0 +1,44 @@
+version: 2
+updates:
+  # Backend (NestJS) npm dependencies.
+  - package-ecosystem: npm
+    directory: /apps/backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # Batch low-risk updates so review stays manageable; majors still come
+      # as individual PRs.
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # Frontend (Next.js) npm dependencies.
+  - package-ecosystem: npm
+    directory: /apps/frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      frontend-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions — keep the pinned action SHAs current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  # Base images referenced by the Dockerfiles.
+  - package-ecosystem: docker
+    directory: /apps/backend
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /apps/frontend
+    schedule:
+      interval: weekly
