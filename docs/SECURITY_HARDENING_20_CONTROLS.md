@@ -60,9 +60,9 @@ arreglado con prueba) · `PARCIAL` (parte hecha, resto documentado) · `BLOQUEAD
 
 - **Riesgo original:** posibles secretos en commits antiguos de cualquier rama.
 - **Evidencia:** gitleaks 8.24 sobre `--log-opts=--all` (456 commits, todas las
-  ramas): 2 hallazgos, ambos falsos positivos verificados a mano —
-  el badge boilerplate de NestJS (`token=abc123def456` en
-  `apps/backend/README.md`) y un JWT ficticio en un test que precisamente
+  ramas): 2 hallazgos, ambos falsos positivos verificados a mano — el token
+  placeholder del badge CircleCI del starter de NestJS en
+  `apps/backend/README.md` y un JWT ficticio en un test que precisamente
   comprueba que el logger NO escribe tokens (`realtime.auth.spec.ts`), más
   fixtures ficticios del validador de flowbot.
 - **Corrección:** `.gitleaks.toml` con allowlist justificada de esos 3

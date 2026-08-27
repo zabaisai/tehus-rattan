@@ -26,8 +26,11 @@ paths = [
 ]
 
 regexes = [
-  # Boilerplate CircleCI badge token from the NestJS starter.
+  # Boilerplate CircleCI badge token from the NestJS starter. Allowlisted both
+  # with and without the `token=` prefix, because the generic-api-key rule
+  # captures the bare value as the secret.
   '''token=abc123def456''',
+  '''abc123def456''',
   # Deliberately fake JWT used by realtime.auth.spec.ts to assert that the
   # realtime auth logger NEVER writes a token to the logs.
   '''eyJhbGciOiJIUzI1NiJ9\.secreto''',
