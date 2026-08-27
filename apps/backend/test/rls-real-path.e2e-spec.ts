@@ -7,6 +7,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
 import { AppModule } from '../src/app.module';
+import { AccountThrottleGuard } from '../src/common/throttle/account-throttle.guard';
 
 // Verificación HONESTA de si RLS protege el CAMINO REST REAL (AppModule +
 // controller + service + Prisma), con el rol runtime SIN BYPASSRLS y RLS ACTIVO.
@@ -126,8 +127,6 @@ describe('RLS — camino REST REAL con rol runtime (e2e)', () => {
     process.env.WHATSAPP_TOKEN_ENCRYPTION_KEY =
       process.env.WHATSAPP_TOKEN_ENCRYPTION_KEY || 'rls-rp-enc-key';
 
-    const { AccountThrottleGuard } =
-      await import('../src/common/throttle/account-throttle.guard');
     const moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     })
