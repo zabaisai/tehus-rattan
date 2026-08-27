@@ -56,17 +56,20 @@ async function bootstrap() {
   applySecurityHeaders(app);
 
   app.setGlobalPrefix('api');
-  // Static company assets (branding logos). Hardened serving:
-  //  - index:false     — no directory listing, so /uploads/branding/ cannot
-  //                      enumerate company ids.
-  //  - dotfiles:deny   — never serve a dotfile that lands here.
-  //  - Content-Disposition + a safe Content-Type: files are downloaded/rendered
-  //    as their real type, never sniffed or run inline as HTML in this origin.
-  // Note: these files are intentionally public (the frontend <img> loads them
-  // without an Authorization header). Cross-tenant confidentiality of logos is
-  // NOT provided here — see SECURITY_HARDENING_20_CONTROLS.md (control 16).
-  app.useStaticAssets(join(process.cwd(), 'uploads'), {
-    prefix: '/uploads',
+  // ÚNICA categoría pública explícita: los logos de marca (branding). Se sirve
+  // SOLO el subdirectorio uploads/branding, nunca todo uploads/, de modo que
+  // cualquier otro subdirectorio (p. ej. archivos privados futuros) NO queda
+  // expuesto por conocer su URL. Los logos son públicos a propósito: aparecen en
+  // cotizaciones/PDF que se comparten; llevan nombre generado por servidor (no
+  // adivinable) y no contienen datos sensibles.
+  //  - index:false     — sin listado de directorio (no enumera empresas).
+  //  - dotfiles:deny   — nunca sirve un dotfile.
+  //  - nosniff + Content-Disposition — se sirve como su tipo real, jamás como
+  //    HTML ejecutable en este origen.
+  // Archivos PRIVADOS deben ir por un controller autenticado y con
+  // autorización por empresa — ver SECURITY_HARDENING_20_CONTROLS.md (control 16).
+  app.useStaticAssets(join(process.cwd(), 'uploads', 'branding'), {
+    prefix: '/uploads/branding',
     index: false,
     dotfiles: 'deny',
     setHeaders: (res) => {

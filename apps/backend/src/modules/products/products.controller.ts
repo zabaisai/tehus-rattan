@@ -28,7 +28,7 @@ import {
   MAX_PRODUCT_IMPORT_ROWS,
 } from './products-import.constants';
 import type { Response } from 'express';
-import { unlink } from 'fs/promises';
+import { unlink, readFile } from 'fs/promises';
 import { ImportacionDeProductosService } from './import/importacion.service';
 import { ImportacionQueue } from './import/importacion.queue';
 import {
@@ -40,6 +40,7 @@ import {
   EXTENSIONES_PERMITIDAS,
   validarArchivoDeImportacion,
 } from './import/validacion-archivo';
+import { validarContenidoDeImportacion } from './import/validacion-contenido';
 import { FijarMapeoDto, SubirImportacionDto } from './import/dto';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
@@ -101,6 +102,11 @@ export class ProductsController {
 
     try {
       validarArchivoDeImportacion(file.originalname, file.size);
+      // Validación de CONTENIDO además de la extensión: firma + estructura ZIP
+      // del .xlsx (anti-bomba, anti-traversal) o texto real del .csv. Se lee del
+      // disco (el archivo ya está guardado; el tamaño está acotado por multer).
+      const contenido = await readFile(file.path);
+      validarContenidoDeImportacion(contenido, file.originalname);
       await comprobarEspacio(file.size);
     } catch (error) {
       // El archivo ya esta en disco: si se rechaza, hay que borrarlo o queda
