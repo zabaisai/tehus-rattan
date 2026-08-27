@@ -13,24 +13,53 @@ datos (ver abajo). Nada de esto se aplica automáticamente ni toca la base real.
 | `proof.mjs` | Prueba EJECUTABLE: crea su propia base temporal aislada y un rol runtime real, aplica RLS y demuestra el aislamiento. `node prisma/rls/proof.mjs`. |
 | `../../src/prisma/tenant-context.ts` | Helper `runWithTenant()` que fija `app.company_id` **transaction-scoped** (`set_config(..., true)`), imprescindible para no filtrar la empresa entre conexiones del pool. |
 
-## Prueba local (ya ejecutada)
+## Integración en la aplicación (código presente y probado localmente)
 
-`node prisma/rls/proof.mjs` demuestra, con un rol runtime **sin BYPASSRLS**:
+- `src/prisma/tenant-context.storage.ts` — `TenantContext` (AsyncLocalStorage)
+  con la empresa de la petición/operación.
+- `src/prisma/tenant-context.interceptor.ts` — `TenantContextInterceptor`
+  (APP_INTERCEPTOR) que fija el contexto desde `req.user.companyId` en cada
+  request. Los caminos de sistema (jobs BullMQ, worker, WebSocket, tareas
+  programadas) fijan el contexto explícitamente alrededor de su trabajo con
+  `TenantContext.ejecutarCon(...)` / `ejecutarComoSistema(...)`.
+- `runWithTenant(prisma, companyId, fn)` y `runInTenantContext(prisma, fn)`
+  (lee del ALS) ejecutan el acceso a datos dentro de una transacción con
+  `set_config('app.company_id', ..., true)` — **transaction-scoped**, sin fuga
+  entre conexiones del pool.
 
-- contexto empresa A ⇒ solo ve/inserta filas de A;
-- contexto empresa B ⇒ solo las de B;
-- **sin contexto ⇒ 0 filas** (deny-by-default / fail-closed);
-- `WITH CHECK` ⇒ no se puede insertar una fila de otra empresa;
-- el contexto es transaction-scoped ⇒ no se filtra entre peticiones del pool.
+## Pruebas locales (ya ejecutadas, en verde)
 
-## El ÚNICO bloqueo real para activarlo
+- `node prisma/rls/proof.mjs` — prueba a nivel SQL con un rol runtime sin
+  BYPASSRLS.
+- `test/rls-integration.e2e-spec.ts` — prueba de INTEGRACIÓN con el **cliente
+  Prisma real** y el rol runtime, contra una base temporal propia con RLS
+  activo. Demuestra:
+  - `runWithTenant(A)` solo ve/escribe A; `(B)` solo B;
+  - **sin contexto ⇒ 0 filas** (deny-by-default);
+  - una modificación cross-tenant NO afecta a la otra empresa;
+  - `runInTenantContext` usa el contexto del AsyncLocalStorage;
+  - contextos **concurrentes** intercalados no se filtran entre conexiones del
+    pool (20×A y 20×B a la vez, cada uno ve solo lo suyo);
+  - el rol runtime NO es superuser ni bypassrls.
 
-Hoy `DATABASE_URL` usa **un solo rol** que es a la vez propietario de las tablas,
-usuario de migración y usuario runtime. El propietario **omite** RLS (por eso
-usamos `FORCE`, que lo somete), pero para que el modelo sea correcto el runtime
-debe ser un rol **separado, sin BYPASSRLS y sin propiedad de tablas**. Crear ese
-rol y repuntar `DATABASE_URL` es un cambio de infraestructura sobre la base real,
-fuera del alcance de esta sesión (no se ejecutan cambios contra bases reales).
+## El ÚNICO bloqueo real para activarlo en un entorno real
+
+El código de integración y las pruebas están; lo que falta es de infraestructura
+y no puede hacerse contra bases reales en esta sesión:
+
+1. Crear el rol runtime separado (`deploy/rls/init-runtime-role.sql.example`) y
+   repuntar el `DATABASE_URL` del backend/worker a él, dejando las migraciones
+   con el rol propietario.
+2. Aplicar `001-enable-rls.sql`.
+3. Adoptar el contexto de empresa en el acceso a datos de negocio (usar
+   `runInTenantContext`/`runWithTenant` en los servicios, o un `$extends` de
+   Prisma que envuelva las operaciones). El interceptor ya fija el contexto por
+   petición; los servicios aún consultan con el cliente Prisma directo, así que
+   la ADOPCIÓN en cada servicio es el último paso.
+
+Hoy `DATABASE_URL` usa **un solo rol** (propietario = migración = runtime). El
+propietario omite RLS salvo `FORCE`; el runtime debe ser un rol separado sin
+BYPASSRLS ni propiedad de tablas.
 
 ## Pasos para activarlo (en tu infraestructura)
 

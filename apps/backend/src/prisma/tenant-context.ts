@@ -1,4 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
+import { TenantContext } from './tenant-context.storage';
 
 /**
  * Contexto de empresa TRANSACTION-SCOPED para Row-Level Security.
@@ -33,6 +34,26 @@ export async function runWithTenant<T>(
     await tx.$executeRaw`SELECT set_config('app.company_id', ${companyId}, true)`;
     return fn(tx);
   });
+}
+
+/**
+ * Igual que `runWithTenant` pero toma la empresa del CONTEXTO actual
+ * (AsyncLocalStorage), fijado por TenantContextInterceptor en cada request o por
+ * los caminos de sistema alrededor de su trabajo. Falla si no hay contexto: con
+ * RLS activo, ejecutar sin empresa devolvería 0 filas, así que es mejor un error
+ * claro que un silencio.
+ */
+export async function runInTenantContext<T>(
+  prisma: PrismaClient,
+  fn: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  const companyId = TenantContext.empresaActual();
+  if (!companyId) {
+    throw new Error(
+      'No hay contexto de empresa: usa runWithTenant o fija el contexto (interceptor/job).',
+    );
+  }
+  return runWithTenant(prisma, companyId, fn);
 }
 
 /**

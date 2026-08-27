@@ -17,6 +17,7 @@ import { GlobalJwtAuthGuard } from './common/auth/global-jwt-auth.guard';
 import { AccountThrottleGuard } from './common/throttle/account-throttle.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggerInterceptor } from './common/logging/http-logger.interceptor';
+import { TenantContextInterceptor } from './prisma/tenant-context.interceptor';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -138,6 +139,10 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     // One safe access-log line per request (no headers/cookies/body logged).
     { provide: APP_INTERCEPTOR, useClass: HttpLoggerInterceptor },
+    // Fija el contexto de empresa (AsyncLocalStorage) desde req.user por
+    // petición: punto de integración de RLS. No-op hasta activar RLS con el rol
+    // runtime separado; deja el contexto listo para runWithTenant/runInTenantContext.
+    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
   ],
 })
 export class AppModule implements NestModule {
