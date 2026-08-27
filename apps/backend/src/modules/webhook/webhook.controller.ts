@@ -13,11 +13,15 @@ import { timingSafeEqual } from 'crypto';
 import type { Response } from 'express';
 import { WebhookService } from './webhook.service';
 import { WhatsAppSignatureGuard } from './whatsapp-signature.guard';
+import { Public } from '../../common/auth/public.decorator';
 import {
   THROTTLE_TTL_MS,
   THROTTLE_LIMITS,
 } from '../../common/throttle/throttle.config';
 
+// Webhook de Meta: público (Meta no manda JWT). El GET valida el verify token
+// (fail-closed) y el POST el HMAC X-Hub-Signature-256 (WhatsAppSignatureGuard).
+@Public()
 @Controller('webhook')
 export class WebhookController {
   private readonly logger = new Logger(WebhookController.name);

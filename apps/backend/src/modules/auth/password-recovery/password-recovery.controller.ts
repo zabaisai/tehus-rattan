@@ -9,6 +9,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { CookieOriginGuard } from '../../../common/guards/cookie-origin.guard';
+import { Public } from '../../../common/auth/public.decorator';
 import {
   THROTTLE_LIMITS,
   THROTTLE_TTL_MS,
@@ -25,6 +26,9 @@ import {
 // Public, unauthenticated recovery endpoints. Origin/CSRF is enforced by
 // CookieOriginGuard (same as login), and both are per-IP throttled. Neither
 // returns anything that could confirm an account exists.
+// Recuperación de contraseña: pública por necesidad (el usuario no tiene sesión).
+// La CSRF la cubre CookieOriginGuard y el anti-enumeración vive en el servicio.
+@Public()
 @Controller('auth')
 export class PasswordRecoveryController {
   constructor(private readonly recovery: PasswordRecoveryService) {}

@@ -1,6 +1,7 @@
 import { Controller, Get, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from './common/auth/public.decorator';
 import { AppService } from './app.service';
 import { QueueHealthService } from './common/queue/queue.health';
 import { QueuePingService } from './common/queue/queue.ping';
@@ -9,6 +10,8 @@ import { SystemHealthService } from './common/health/system-health.service';
 // Liveness/readiness/version endpoints. Exempt from rate limiting so uptime
 // probes and load balancers can poll them freely without ever being throttled.
 @SkipThrottle()
+// Health, readiness y raíz son públicos por diseño (probes de la infra).
+@Public()
 @Controller()
 export class AppController {
   constructor(

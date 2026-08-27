@@ -13,6 +13,7 @@ import { WhatsAppHistoryModule } from './modules/whatsapp-history/whatsapp-histo
 import { HealthModule } from './common/health/health.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
+import { GlobalJwtAuthGuard } from './common/auth/global-jwt-auth.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggerInterceptor } from './common/logging/http-logger.interceptor';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
@@ -119,6 +120,11 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     // `trust proxy = 1` set in main.ts, the single Caddy hop) EXCEPT
     // POST /auth/refresh, which is bucketed per device — see AppThrottlerGuard.
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
+    // Deny-by-default: autenticación GLOBAL. Toda ruta HTTP exige un JWT válido
+    // salvo las marcadas con @Public(). Es la red de seguridad para que un
+    // controlador nuevo no nazca abierto por olvidar el guard. Los guards por
+    // controlador (jwt/tenant/rol) se mantienen como capa primaria.
+    { provide: APP_GUARD, useClass: GlobalJwtAuthGuard },
     // Consistent error shaping + never leaking a stack trace in a 500 body.
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     // One safe access-log line per request (no headers/cookies/body logged).

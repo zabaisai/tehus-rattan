@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import type { Request as ExpressRequest, Response } from 'express';
 import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
 import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
+import { Public } from '../../common/auth/public.decorator';
 import {
   THROTTLE_TTL_MS,
   THROTTLE_LIMITS,
@@ -28,6 +29,9 @@ interface OnboardingUploadedFiles {
   secondaryLogo?: Express.Multer.File[];
 }
 
+// Onboarding es público (crea la empresa + ADMIN); la autoriza el código de
+// invitación (OnboardingInviteGuard + validación en base) y CookieOriginGuard.
+@Public()
 @Controller('onboarding')
 export class OnboardingController {
   constructor(private onboardingService: OnboardingService) {}
