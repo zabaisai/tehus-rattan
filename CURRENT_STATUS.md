@@ -68,11 +68,17 @@ _Actualizado: 2026-08-27._
 
 ## Los 20 controles (resumen)
 
-Ver `docs/SECURITY_HARDENING_20_CONTROLS.md` (tabla única con vocabulario de
-estados). Resumen: 16 **CORREGIDO Y VERIFICADO**; 1 **CÓDIGO COMPLETO — PENDIENTE
-CONFIGURACIÓN** (12 antibot); 2 con parte **PREPARADO Y PROBADO LOCALMENTE —
-PENDIENTE ACTIVACIÓN** (4 RLS, 19 TLS de BD); riesgos aceptados justificados en
-16 (logos públicos) y 20 (altas de tooling).
+Ver `docs/SECURITY_HARDENING_20_CONTROLS.md` (tabla única, 20 filas, vocabulario
+de estados). Resumen honesto tras la verificación de fase 3:
+- 16 **CORREGIDO Y VERIFICADO**.
+- 12 (antibot): **CÓDIGO COMPLETO — PENDIENTE CONFIGURACIÓN**.
+- 4 (RLS): **PREPARADO Y PROBADO DE FORMA AISLADA — ADOPCIÓN EN SERVICIOS
+  PENDIENTE** (los 67 servicios usan `this.prisma` directo; probado por
+  `rls-real-path.e2e`).
+- 19 (TLS de BD): **PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX** (el script no
+  corre en verde en Windows).
+- Riesgos aceptados y justificados: 16 (logos públicos), 20 (CLI de Prisma =
+  devDependency; exceljs→uuid no alcanzable por archivo del usuario).
 
 ## Qué falta (acción humana) — ver `USER_ACTIONS_REQUIRED.md`
 

@@ -36,16 +36,17 @@ verificado por configuración/escaneo, no por test unit/e2e · `⬜` = no cubier
 | Cifrado: KDF versionado + compatibilidad legacy + rotación | ➕ | `src/modules/whatsapp-token-crypto.compat.spec.ts` |
 | Rate limiting distribuido (Redis, atómico, fail-open) | ➕ | `test/redis-throttler.e2e-spec.ts` (Redis real) |
 | Antibot: fail-closed y verificación server-side | ➕ | `src/common/captcha/captcha.spec.ts` |
-| RLS con el usuario runtime real (aislamiento + WITH CHECK) | ➕ | `prisma/rls/proof.mjs` + `test/rls-integration.e2e-spec.ts` (cliente Prisma real, rol sin BYPASSRLS) — verde |
-| Contexto de empresa sin fugas entre conexiones | ➕ | `test/rls-integration.e2e-spec.ts` (40 contextos A/B concurrentes, transaction-scoped) |
+| RLS — mecanismo con rol runtime real (aislamiento + WITH CHECK + pool) | ➕ | `prisma/rls/proof.mjs` + `rls-integration.e2e-spec.ts` (cliente Prisma real, rol sin BYPASSRLS, 40 contextos concurrentes) — verde |
+| RLS — camino REST REAL: los servicios directos NO quedan protegidos | ➕ | `rls-real-path.e2e-spec.ts` (AppModule+controller+service, rol runtime, RLS activo → `GET /contacts` vacío = adopción pendiente) — verde |
 | Rate limiting fail-safe ante caída de Redis (nunca ilimitado) | ➕ | `redis-throttler.storage.spec.ts` (degradación→local→recuperación) |
-| Límite por cuenta normalizada (login/recuperación) | ➕ | `account-throttle.guard.spec.ts` |
+| Límite por cuenta ACTIVO (429, normalización, genérico) | ➕ | `account-throttle.guard.spec.ts` (unit) + `account-throttle.e2e-spec.ts` (AppModule real, guard **activo**) |
 | Antibot frontend (widget, verify, expiración) | ➕ | `TurnstileWidget.test.tsx`, `turnstile.test.ts`, `csp.test.ts` |
+| Antibot: configuración incoherente falla el build | ➕ | `build-guard.test.ts` (`verificarCaptcha`) |
 | Rehash progresivo de contraseñas (coste 10→12) | ➕ | `password-hash.service.spec.ts` |
 | DTOs de inputs (campos desconocidos, tipos, longitudes) | ➕ | `dto-inline-converted.spec.ts` |
 | Uploads: firma ZIP, zip-bomb, traversal, MIME/extensión falsa | ➕ | `validacion-contenido.spec.ts` (incl. xlsx real y CSV binario/HTML) |
 | Tope máximo por listado (anti-runaway) | ➕ | `contacts.service.spec` + `automations.service.spec` |
-| TLS de Postgres (verify-full conecta, no-TLS rechazado) | ➕ | `deploy/scripts/test-postgres-tls.sh` (Linux/CI; certificados ficticios) |
+| TLS de Postgres (verify-full conecta, no-TLS rechazado) | 📄 | `deploy/scripts/test-postgres-tls.sh` — **pendiente ejecución en Linux/CI** (no verde en Windows) |
 
 ## Comandos de verificación ejecutados (local, sobre `main`)
 

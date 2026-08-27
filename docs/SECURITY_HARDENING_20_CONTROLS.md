@@ -22,7 +22,7 @@ secreto nuevo, ningún cambio destructivo, ningún servicio real activado.**
 | 1 | Ocultar API keys y secretos | CORREGIDO Y VERIFICADO | `.gitignore`, `.env.example`, `.gitleaks.toml`; token legacy fuera del `.env` local | gitleaks limpio; validación de entorno al arranque | Rotar credenciales mostradas (P0, humana) |
 | 2 | Purga de secretos del historial Git | CORREGIDO Y VERIFICADO | `.gitleaks.toml`; CI `security.yml` | gitleaks `--all` (todas las ramas): *no leaks* | — |
 | 3 | “Key pública de BD” (adaptación PG) | CORREGIDO Y VERIFICADO | sin `NEXT_PUBLIC_DATABASE_URL`; PG no expuesto | grep frontend; topología compose | Separar rol de BD → control 4 |
-| 4 | Row-Level Security de PostgreSQL | PREPARADO Y PROBADO LOCALMENTE — PENDIENTE ACTIVACIÓN | `prisma/rls/*`, `src/prisma/tenant-context.*`, `deploy/rls/init-runtime-role.sql.example` | `proof.mjs` + `test/rls-integration.e2e-spec.ts` (rol runtime real, deny-by-default, cross-tenant, sin fuga de pool) | Separar rol migración/runtime en infra + adoptar contexto en servicios (P1) |
+| 4 | Row-Level Security de PostgreSQL | PREPARADO Y PROBADO DE FORMA AISLADA — ADOPCIÓN EN SERVICIOS PENDIENTE | `prisma/rls/*`, `src/prisma/tenant-context.*`, `deploy/rls/init-runtime-role.sql.example` | `proof.mjs` + `rls-integration.e2e` (mecanismo OK) **y** `rls-real-path.e2e` (evidencia: los servicios con `this.prisma` directo NO quedan protegidos) | **Los 67 servicios usan `this.prisma` directo, sin `runWithTenant`.** Adoptar el contexto en servicios/jobs/worker/WS + separar rol de BD (P1) |
 | 5 | Cifrado | CORREGIDO Y VERIFICADO | `whatsapp-token-crypto.service.ts` (AES-256-GCM + KDF scrypt versionado `v2:`) | `whatsapp-token-crypto.compat.spec.ts` (16) | TLS a Postgres → control 19 |
 | 6 | Autenticación obligatoria por defecto | CORREGIDO Y VERIFICADO | guard global `GlobalJwtAuthGuard` + `@Public()`; realtime valida sesión en el handshake | `deny-by-default.e2e`, `realtime.*`, `jwt.strategy` | Revalidación de socket vivo (deuda menor) |
 | 7 | IDOR / acceso entre empresas | CORREGIDO Y VERIFICADO | `analytics.service.ts`, `task-suggestions.service.ts` | `analytics.service.spec`, `test/task-suggestions.e2e`, `multitenant-ownership.spec` | RLS como 2ª barrera → control 4 |
@@ -37,8 +37,8 @@ secreto nuevo, ningún cambio destructivo, ningún servicio real activado.**
 | 16 | Subida de archivos | CORREGIDO Y VERIFICADO | validación de contenido `validacion-contenido.ts` (firma ZIP, anti-bomba, traversal, CSV); servido SOLO de `uploads/branding` | `validacion-contenido.spec` (firma falsa, bomba×2, traversal, xlsx real, csv binario/HTML) | Logos públicos = RIESGO ACEPTADO Y JUSTIFICADO (categoría pública explícita) |
 | 17 | Recorte de respuestas de API | CORREGIDO Y VERIFICADO | `select` explícitos (sin passwordHash); `MAX_LIST_ROWS` en todo listado | specs de servicios + caps | — |
 | 18 | Headers de seguridad | CORREGIDO Y VERIFICADO | Helmet + CSP (`csp.ts`) + Caddy | `security-headers.e2e`, `csp.test`, `smoke-test.sh` | `script-src 'unsafe-inline'` (deuda Next, doc) |
-| 19 | Forzar HTTPS | CORREGIDO Y VERIFICADO (edge); TLS de BD: PREPARADO Y PROBADO LOCALMENTE — PENDIENTE ACTIVACIÓN | Caddy TLS/HSTS; `docs/POSTGRES_TLS.md`, `deploy/scripts/test-postgres-tls.sh` | Habilitar TLS a Postgres al salir del host (P2) |
-| 20 | Escaneo de dependencias y cadena de suministro | CORREGIDO Y VERIFICADO | `security.yml` (gitleaks/npm-audit/CodeQL) + `dependabot.yml`; **frontend 0 vulns** (next 16.3.3) | `npm audit` back/front | Altas del CLI de Prisma/exceljs = RIESGO ACEPTADO Y JUSTIFICADO (tooling, sin fix compatible) |
+| 19 | Forzar HTTPS | CORREGIDO Y VERIFICADO (edge); TLS de BD: PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX | Caddy TLS/HSTS; `docs/POSTGRES_TLS.md`, `deploy/scripts/test-postgres-tls.sh` | `security-headers.e2e`, `csp.test`, `smoke-test.sh`; script TLS NO ejecutado en verde (host Windows, MSYS) | Ejecutar el script TLS en Linux/CI; habilitar TLS a Postgres al salir del host (P2) |
+| 20 | Escaneo de dependencias y cadena de suministro | CORREGIDO Y VERIFICADO | `security.yml` (gitleaks/npm-audit/CodeQL) + `dependabot.yml`; **frontend 0 vulns** (next 16.3.3) | `npm audit` back/front; `validacion-contenido.spec` (gate previo a exceljs) | Backend: altas del **CLI de Prisma** (devDependency, no runtime) + moderada de **exceljs→uuid** NO alcanzable por archivo del usuario → RIESGO ACEPTADO Y JUSTIFICADO (ver tabla de vulnerabilidades) |
 
 ## Detalle por control
 
@@ -59,15 +59,29 @@ PostgreSQL + Prisma, no Supabase. El navegador nunca se conecta a PG; no existe
 `NEXT_PUBLIC_DATABASE_URL`; `DATABASE_URL` solo en backend/worker/migraciones;
 PG sin puerto publicado (red `internal`). La separación de roles se cubre en 4.
 
-### 4. RLS — PREPARADO Y PROBADO LOCALMENTE — PENDIENTE ACTIVACIÓN
-SQL idempotente para las 37 tablas multiempresa (`001-enable-rls.sql`), rol
-runtime separado (`init-runtime-role.sql.example`), contexto transaccional
+### 4. RLS — PREPARADO Y PROBADO DE FORMA AISLADA — ADOPCIÓN EN SERVICIOS PENDIENTE
+El **mecanismo** está y probado: SQL idempotente para las 37 tablas multiempresa
+(`001-enable-rls.sql`), rol runtime separado, contexto transaccional
 (`runWithTenant`/`runInTenantContext` + `TenantContext` con AsyncLocalStorage) e
-interceptor por petición. `test/rls-integration.e2e-spec.ts` lo prueba con el
-**cliente Prisma real** y un **rol runtime sin BYPASSRLS**: A ve solo A,
-deny-by-default sin contexto, escrituras cross-tenant bloqueadas, y 40 contextos
-concurrentes A/B sin fuga entre conexiones del pool. **Único bloqueo:** separar
-el rol de BD en infraestructura y adoptar el contexto en los servicios.
+interceptor por petición. `rls-integration.e2e-spec.ts` lo prueba con el cliente
+Prisma real y un rol runtime sin BYPASSRLS: A ve solo A, deny-by-default sin
+contexto, escrituras cross-tenant bloqueadas, 40 contextos concurrentes sin fuga.
+
+**PERO NO está adoptado en los servicios.** Los 67 servicios (más jobs, worker,
+WebSocket, analytics y tareas programadas) consultan con **`this.prisma` DIRECTO,
+sin `runWithTenant`**, así que la consulta no corre dentro de la transacción con
+`set_config`. Con RLS activo eso devuelve 0 filas. `rls-real-path.e2e-spec.ts` lo
+demuestra por el **camino REST real** (AppModule + controller + service + Prisma,
+rol runtime, RLS activo): con contactos sembrados para A, `GET /api/contacts`
+devuelve **vacío** — el service omite el contexto y RLS lo bloquea.
+
+**Por qué no se adoptó de forma global ahora:** requeriría reescribir el acceso a
+datos de todos los servicios o un `$extends` de Prisma que envuelva cada
+operación en una transacción, lo que choca con las transacciones explícitas
+(`$transaction`) ya existentes y no puede garantizarse seguro sin revisión
+servicio a servicio. Hacerlo mal dejaría la app entera sin datos o permitiría
+consultas que omiten las políticas. **Acción pendiente (P1):** separar el rol de
+BD y adoptar `runInTenantContext` en el acceso a datos, servicio por servicio.
 
 ### 5. Cifrado — CORREGIDO Y VERIFICADO
 AES-256-GCM con IV único; derivación de clave **scrypt + sal por ciphertext** en
@@ -148,28 +162,53 @@ policy, sin X-Powered-By), CSP del frontend (sin unsafe-eval en prod; wss y
 Meta/Turnstile solo cuando aplican), HSTS en Caddy. `'unsafe-inline'` en script-src
 es deuda de Next documentada.
 
-### 19. Forzar HTTPS — CORREGIDO Y VERIFICADO (edge) + TLS BD PREPARADO
+### 19. Forzar HTTPS — CORREGIDO Y VERIFICADO (edge); TLS de BD: PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX
 Caddy termina TLS con HSTS, cookies `secure` en prod, `X-Forwarded-Proto` con
-trust proxy 1, WebSockets `wss`. TLS a Postgres: `docs/POSTGRES_TLS.md`
+trust proxy 1, WebSockets `wss` (verificado). TLS a Postgres: `docs/POSTGRES_TLS.md`
 (verify-full + CA, activación y rollback) y `deploy/scripts/test-postgres-tls.sh`
-(prueba local con certificados ficticios). No se afirma que la BD real use TLS.
+(certificados ficticios en volumen Docker; comprueba que verify-full+CA conecta,
+sin-TLS se rechaza y verify-full sin CA falla). **El script NO se ejecutó en verde
+en este equipo:** Git Bash sobre Windows mangla los argumentos `/certs/...` de
+`docker run` (MSYS) y `--network host` no funciona en Docker Desktop, así que la
+verificación debe correrse en Linux/CI. No se afirma que la BD real use TLS.
 
 ### 20. Dependencias y cadena de suministro — CORREGIDO Y VERIFICADO
 `security.yml` (gitleaks + npm audit + CodeQL) con permisos mínimos y acciones
 fijadas por SHA; `dependabot.yml` (npm ×2, actions, docker). **Frontend: 0
 vulnerabilidades** tras subir Next a 16.3.3 (arreglos compatibles de
-next/postcss/sharp/nanoid). Backend: los altos son la cadena del CLI de Prisma
-(`deepmerge-ts`, DoS de config) y `exceljs→uuid` — tooling, no explotables con
-input de usuario y sin fix compatible → **RIESGO ACEPTADO Y JUSTIFICADO**,
-seguidos por Dependabot. CI bloquea ante secreto confirmado y vulnerabilidad
-crítica.
+next/postcss/sharp/nanoid). CI bloquea ante secreto confirmado y crítica.
+
+**Vulnerabilidades del backend (alcance correcto, evaluadas una a una):**
+
+| Advisory | Paquete | Instalada | Severidad | Cadena | ¿Runtime? | ¿Alcanzable por archivo del usuario? | Fix | Por qué no se aplica |
+|----------|---------|-----------|-----------|--------|-----------|--------------------------------------|-----|----------------------|
+| DoS por recursión de `deepmerge-ts` | `deepmerge-ts` | <8 | HIGH | `prisma`(CLI)→`@prisma/config`→`deepmerge-ts` | **No** — `prisma` es **devDependency**; el runtime usa `@prisma/client` | No — solo al cargar config en `prisma generate/migrate` | `prisma@6.12.0` (major/downgrade) | Rompe la compat con `@prisma/client 6.19.3`; es tooling de build, no runtime |
+| `@prisma/config` (misma cadena) | `@prisma/config` | ≥6.13-dev | HIGH | idem | No (dev) | No | idem | idem |
+| `prisma` (CLI) | `prisma` | 6.19.3 | HIGH | devDependency | No (dev) | No | idem | idem |
+| GHSA-w5hq-g745-h8pq (bounds-check de `buf` en `uuid` v3/v5/v6) | `uuid` | 8.3.2 | MODERATE | `exceljs`→`uuid` | Sí (exceljs procesa XLSX del usuario) | **No** | `exceljs@3.4.0` (major/downgrade) | Ver abajo |
+| `exceljs` (efecto de `uuid`) | `exceljs` | 4.4.0 | MODERATE | directo | Sí | **No** | idem | idem |
+
+**exceljs / uuid — por qué NO es alcanzable por un XLSX del atacante:** el
+advisory solo dispara al llamar `uuid.v3/v5/v6` **con un argumento `buf`**.
+`exceljs` usa **`uuid.v4()` (sin `buf`)** y únicamente en el camino de
+**ESCRITURA** (`cf-rule-ext-xform.js`, generación de `x14Id`). TAKTO solo **LEE**
+XLSX subidos (`workbook.xlsx.load`), nunca escribe con datos del atacante, así que
+el código vulnerable no se ejecuta. Además, la subida pasa antes por
+`validacion-contenido.ts` (firma ZIP + estructura OOXML + anti-bomba + traversal,
+`validacion-contenido.spec`), que rechaza el archivo hostil antes de exceljs.
+**Riesgo residual real: nulo para este advisory.** No es “tooling” —exceljs sí
+procesa archivos de usuario— pero esta vulnerabilidad concreta no es alcanzable.
+
+**prisma-CLI:** genuinamente de desarrollo (`prisma` es devDependency; el
+servidor en runtime carga `@prisma/client`, no el CLI). Seguidos por Dependabot.
 
 ## Acciones humanas restantes (mínimas, ordenadas)
 
 1. **P0** — Rotar las credenciales mostradas en la fase 1 (nombres en
    `USER_ACTIONS_REQUIRED.md`); ninguna está en Git.
-2. **P1** — Separar el rol de PostgreSQL (migración/runtime) para **activar** el
-   RLS ya integrado y probado (control 4).
+2. **P1** — RLS (control 4): **adoptar** el contexto (`runInTenantContext`) en el
+   acceso a datos de los servicios/jobs/worker/WS **y** separar el rol de BD. El
+   mecanismo está probado; los servicios aún consultan con `this.prisma` directo.
 3. **P2** — Crear las claves reales de Turnstile y `CAPTCHA_ENABLED=true`
    (control 12).
 4. **P2** — Habilitar TLS en Postgres al sacarlo del host (control 19).

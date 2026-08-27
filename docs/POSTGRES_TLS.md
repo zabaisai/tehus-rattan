@@ -1,7 +1,10 @@
 # TLS de PostgreSQL — estado, activación y rollback
 
-Estado: **HTTPS CORREGIDO — TLS DE BD PREPARADO**. No se afirma que la base real
-use TLS: no se ha activado en ningún entorno real en esta sesión.
+Estado: **TLS DE BD PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX**. La
+configuración y el script de prueba están; el script **no se ejecutó en verde en
+el equipo de esta sesión** (Git Bash sobre Windows mangla los argumentos
+`/certs/...` de `docker run` por MSYS, y `--network host` no funciona en Docker
+Desktop). Debe ejecutarse en Linux/CI. No se afirma que la base real use TLS.
 
 ## Caso actual (aceptado y justificado)
 
