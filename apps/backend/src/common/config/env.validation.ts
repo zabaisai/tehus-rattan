@@ -144,6 +144,30 @@ export function validateEnv(config: Env): Env {
     errors.push('PASSWORD_RESET_TOKEN_TTL_MINUTES must be a positive integer');
   }
 
+  // Antibot (Cloudflare Turnstile). Opt-in vía CAPTCHA_ENABLED. Cuando el
+  // control es obligatorio (enabled) con el proveedor real, el secret es
+  // imprescindible: sin él no se puede verificar y el guard bloquearía todo.
+  // Fail-closed: en producción con captcha activo y Turnstile, exige el secret.
+  const captchaEnabled = config.CAPTCHA_ENABLED?.trim() === 'true';
+  const captchaProvider = config.CAPTCHA_PROVIDER?.trim();
+  const usaTurnstile = captchaProvider === 'turnstile' || isProduction;
+  if (captchaEnabled && usaTurnstile && !config.TURNSTILE_SECRET_KEY?.trim()) {
+    errors.push(
+      'TURNSTILE_SECRET_KEY is required when CAPTCHA_ENABLED=true with the turnstile provider',
+    );
+  }
+  if (
+    captchaEnabled &&
+    isProduction &&
+    captchaProvider &&
+    captchaProvider !== 'turnstile'
+  ) {
+    // El adaptador falso jamás debe ser el control real en producción.
+    errors.push(
+      'CAPTCHA_PROVIDER must be "turnstile" in production when CAPTCHA_ENABLED=true',
+    );
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `Invalid environment configuration:\n- ${errors.join('\n- ')}`,

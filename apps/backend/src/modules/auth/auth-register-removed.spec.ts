@@ -4,6 +4,7 @@ import request from 'supertest';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
+import { CaptchaGuard } from '../../common/captcha/captcha.guard';
 
 // Regression guard for the removed legacy endpoint POST /api/auth/register
 // (security fix N-1/N-2). This asserts Nest's real HTTP routing — not a text
@@ -35,6 +36,8 @@ describe('POST /api/auth/register (removed legacy endpoint)', () => {
       // Bypass the Origin allowlist guard so the positive-control login route
       // is reachable without a ConfigService; irrelevant to the 404 assertion.
       .overrideGuard(CookieOriginGuard)
+      .useValue({ canActivate: () => true })
+      .overrideGuard(CaptchaGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

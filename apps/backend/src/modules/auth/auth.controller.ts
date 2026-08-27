@@ -12,6 +12,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { Throttle } from '@nestjs/throttler';
 import type { Request as ExpressRequest, Response } from 'express';
 import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
+import { CaptchaGuard } from '../../common/captcha/captcha.guard';
 import {
   THROTTLE_TTL_MS,
   THROTTLE_LIMITS,
@@ -36,8 +37,11 @@ export class AuthController {
   // invitation code against the database, so any non-empty string passed its
   // guard.
 
+  // CaptchaGuard es no-op salvo que CAPTCHA_ENABLED=true; entonces exige un
+  // token antibot verificado server-side antes de intentar el login (defensa
+  // contra fuerza bruta/credential stuffing además del rate limiting).
   @Throttle({ default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.auth } })
-  @UseGuards(CookieOriginGuard)
+  @UseGuards(CookieOriginGuard, CaptchaGuard)
   @Post('login')
   async login(
     @Body() body: LoginDto,

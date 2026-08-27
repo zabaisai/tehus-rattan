@@ -81,6 +81,45 @@ describe('validateEnv', () => {
     ).toThrow(/DATABASE_URL must be a postgres/);
   });
 
+  it('requires TURNSTILE_SECRET_KEY when captcha is enabled with turnstile', () => {
+    // Provider explícito turnstile, captcha activo, sin secret → error.
+    expect(() =>
+      validateEnv({
+        ...base,
+        CAPTCHA_ENABLED: 'true',
+        CAPTCHA_PROVIDER: 'turnstile',
+      }),
+    ).toThrow(/TURNSTILE_SECRET_KEY is required/);
+
+    // Con secret → ok.
+    expect(() =>
+      validateEnv({
+        ...base,
+        CAPTCHA_ENABLED: 'true',
+        CAPTCHA_PROVIDER: 'turnstile',
+        TURNSTILE_SECRET_KEY: 'fake-secret',
+      }),
+    ).not.toThrow();
+
+    // Desactivado → no exige nada.
+    expect(() =>
+      validateEnv({ ...base, CAPTCHA_ENABLED: 'false' }),
+    ).not.toThrow();
+
+    // En producción el proveedor debe ser turnstile cuando está activo.
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'x'.repeat(32),
+        DATABASE_URL: 'postgresql://u:p@db:5432/app',
+        WHATSAPP_TOKEN_ENCRYPTION_KEY: 'y'.repeat(32),
+        CAPTCHA_ENABLED: 'true',
+        CAPTCHA_PROVIDER: 'fake',
+        TURNSTILE_SECRET_KEY: 'fake-secret',
+      }),
+    ).toThrow(/CAPTCHA_PROVIDER must be "turnstile" in production/);
+  });
+
   it('validates the Graph API version format when present', () => {
     expect(() =>
       validateEnv({ ...base, WHATSAPP_GRAPH_API_VERSION: 'v22.0' }),
