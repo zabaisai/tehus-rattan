@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PasswordHashService } from '../../common/password/password-hash.service';
 
@@ -39,6 +40,7 @@ export class UsersService {
 
   async findAllByCompany(companyId: string) {
     return this.prisma.user.findMany({
+      take: MAX_LIST_ROWS,
       where: { companyId },
       select: {
         id: true,

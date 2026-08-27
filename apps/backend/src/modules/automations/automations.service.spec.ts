@@ -110,6 +110,7 @@ describe('AutomationsService (disparadores, acciones y etapa real)', () => {
       await service.findAll(COMPANY_A);
 
       expect(prisma.automation.findMany).toHaveBeenCalledWith({
+        take: 1000,
         where: { companyId: COMPANY_A },
         orderBy: { order: 'asc' },
       });

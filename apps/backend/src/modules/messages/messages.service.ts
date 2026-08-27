@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 
@@ -10,13 +11,18 @@ export class MessagesService {
   ) {}
 
   async findByConversation(conversationId: string, companyId: string) {
-    return this.prisma.message.findMany({
+    // Guardia anti-runaway: los MÁS RECIENTES hasta el tope (desc + take) y se
+    // devuelven en orden cronológico (reverse). Un hilo enorme no trunca los
+    // mensajes recientes, que son los que importan.
+    const recientes = await this.prisma.message.findMany({
+      take: MAX_LIST_ROWS,
       where: {
         conversationId,
         conversation: { companyId },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: 'desc' },
     });
+    return recientes.reverse();
   }
 
   async create(

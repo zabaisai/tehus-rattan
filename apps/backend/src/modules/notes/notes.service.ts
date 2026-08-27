@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 
 @Injectable()
 export class NotesService {
@@ -11,6 +12,7 @@ export class NotesService {
 
   async findByLead(leadId: string, companyId: string) {
     return this.prisma.note.findMany({
+      take: MAX_LIST_ROWS,
       where: { leadId, companyId },
       include: { user: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
@@ -19,6 +21,7 @@ export class NotesService {
 
   async findByConversation(conversationId: string, companyId: string) {
     return this.prisma.note.findMany({
+      take: MAX_LIST_ROWS,
       where: { conversationId, companyId },
       include: { user: { select: { id: true, name: true } } },
       orderBy: { createdAt: 'desc' },
