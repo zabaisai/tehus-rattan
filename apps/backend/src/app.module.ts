@@ -23,6 +23,7 @@ import {
   THROTTLE_TTL_MS,
   THROTTLE_LIMITS,
 } from './common/throttle/throttle.config';
+import { buildThrottlerStorage } from './common/throttle/throttler-storage.factory';
 import { PrismaModule } from './prisma/prisma.module';
 import { CaptchaModule } from './common/captcha/captcha.module';
 import { DemoModule } from './common/demo/demo.module';
@@ -72,13 +73,19 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
       isGlobal: true,
       validate: validateEnv,
     }),
-    ThrottlerModule.forRoot([
-      {
-        name: 'default',
-        ttl: THROTTLE_TTL_MS,
-        limit: THROTTLE_LIMITS.default,
-      },
-    ]),
+    // Rate limiting. El store es Redis compartido en producción/dev (así N
+    // réplicas comparten el cupo); en pruebas y con la cola apagada cae al store
+    // en memoria por defecto. Ver throttler-storage.factory.ts.
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'default',
+          ttl: THROTTLE_TTL_MS,
+          limit: THROTTLE_LIMITS.default,
+        },
+      ],
+      storage: buildThrottlerStorage(process.env),
+    }),
     ScheduleModule.forRoot(),
     PrismaModule,
     SessionsModule,
