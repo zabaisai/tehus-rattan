@@ -1,0 +1,30 @@
+-- Rol runtime separado para RLS — EJEMPLO. Lo ejecuta un DBA/superusuario una
+-- sola vez en la base real. NO se versiona con valores reales: la contraseña se
+-- pone fuera (o se usa autenticación por certificado/IAM).
+--
+-- Por qué un rol aparte: el propietario de las tablas OMITE las políticas RLS a
+-- menos que se use FORCE (que sí usamos), y un rol con BYPASSRLS también las
+-- omite. El runtime debe ser un rol SIN propiedad de tablas, SIN BYPASSRLS y SIN
+-- superusuario, para que las políticas apliquen de verdad. Las migraciones
+-- (DDL) las sigue ejecutando el rol propietario, distinto de éste.
+
+-- 1) Rol runtime (DML), sin privilegios de administración.
+CREATE ROLE takto_app LOGIN PASSWORD 'CAMBIAR_FUERA_DE_AQUI'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+
+-- 2) Permisos mínimos: conectar + usar el esquema + DML en las tablas.
+GRANT CONNECT ON DATABASE tehus_rattan TO takto_app;
+GRANT USAGE ON SCHEMA public TO takto_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO takto_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO takto_app;
+
+-- 3) Que las tablas/secuencias futuras hereden esos permisos.
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO takto_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO takto_app;
+
+-- 4) Después: apuntar DATABASE_URL (runtime del backend y del worker) a takto_app,
+--    dejar las migraciones con el rol propietario, y aplicar prisma/rls/001-enable-rls.sql.
+--    La app DEBE fijar app.company_id por transacción (src/prisma/tenant-context.ts)
+--    antes de cualquier consulta de datos, o RLS devolverá 0 filas.
