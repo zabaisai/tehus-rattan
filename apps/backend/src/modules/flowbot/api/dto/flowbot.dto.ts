@@ -75,6 +75,44 @@ export class PublicarDto {
   nota?: string;
 }
 
+// DTOs para los endpoints que antes recibían objetos inline (sin validación de
+// whitelist). El handler mantiene sus comprobaciones de mensaje específico; el
+// DTO añade tipado, whitelist y rechazo de campos desconocidos.
+export class ReiniciarBreakerDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  motivo?: string;
+}
+
+export class KillSwitchDto {
+  @IsBoolean()
+  activo!: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(300)
+  motivo?: string;
+}
+
+export class UsarPlantillaDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  nombre?: string;
+}
+
+export class CambiarEstadoDto {
+  @IsString()
+  @MaxLength(40)
+  estado!: string;
+}
+
+export class ValidarGrafoDto {
+  @IsObject()
+  graph!: unknown;
+}
+
 export class CrearDisparadorDto {
   @IsString()
   tipo!: string;

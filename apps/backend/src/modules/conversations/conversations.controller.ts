@@ -15,6 +15,7 @@ import { ConversationsService } from './conversations.service';
 import { MessagesService } from '../messages/messages.service';
 import { WhatsappService } from '../whatsapp/whatsapp.service';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
+import { ResolverHandoffDto } from './dto/resolver-handoff.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { BulkConversationsDto } from './dto/bulk-conversations.dto';
@@ -152,7 +153,7 @@ export class ConversationsController {
   resolverHandoff(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body: { resumeBot?: boolean },
+    @Body() body: ResolverHandoffDto,
   ) {
     return this.handoff.resolver({
       companyId: req.user.companyId,

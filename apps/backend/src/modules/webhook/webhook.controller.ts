@@ -84,6 +84,11 @@ export class WebhookController {
   })
   @UseGuards(WhatsAppSignatureGuard)
   @Post()
+  // `body: any` DELIBERADO: el payload lo define Meta, no un DTO nuestro, y ya
+  // viene autenticado por el HMAC X-Hub-Signature-256 (WhatsAppSignatureGuard)
+  // sobre el cuerpo crudo antes de llegar aquí. Validarlo con class-validator
+  // rechazaría formatos nuevos legítimos de Meta; el parser interno lo navega
+  // defensivamente campo a campo.
   receive(@Body() body: any, @Res() res: Response) {
     res.status(200).send('OK');
     // `void` deliberado: el ack a Meta ya salió y el procesamiento continúa
