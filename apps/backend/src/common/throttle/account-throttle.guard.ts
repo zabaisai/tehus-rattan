@@ -52,9 +52,10 @@ export class AccountThrottleGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     if (context.getType() !== 'http') return true;
-    // En pruebas se desactiva para que las e2e sean deterministas; el límite se
-    // valida por unit test dedicado. En dev/prod está activo.
-    if (process.env.NODE_ENV === 'test') return true;
+    // ACTIVO en todos los entornos (incl. producción y pruebas): el control no
+    // se apaga por NODE_ENV. Las e2e que NO ejercitan rate limiting y hacen
+    // muchos logins con la misma cuenta lo desactivan con un override EXPLÍCITO
+    // (.overrideGuard(AccountThrottleGuard)); la e2e dedicada lo deja activo.
     const req = context.switchToHttp().getRequest<Request>();
     const path: string = req.originalUrl ?? req.url ?? '';
     if (!AccountThrottleGuard.RUTAS_SENSIBLES.some((r) => path.includes(r))) {

@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 import { buildContentSecurityPolicy, resolveApiOrigin } from "./src/lib/csp";
-import { verificarUrlDeApi } from "./src/lib/build-guard";
+import { verificarUrlDeApi, verificarCaptcha } from "./src/lib/build-guard";
 
 // Security headers set on every response. HSTS is intentionally NOT set here —
 // the Caddy TLS edge owns it, so it is never duplicated or sent over plain HTTP.
@@ -12,6 +12,13 @@ const isDev = process.env.NODE_ENV !== "production";
 // frontend: 404 en cada pantalla, con la imagen construida, el contenedor
 // healthy, el health en `ok` y el smoke test en verde. Ver src/lib/build-guard.ts.
 verificarUrlDeApi(process.env.NEXT_PUBLIC_API_URL, !isDev);
+// Coherencia del antibot: si el despliegue lo declara obligatorio, la site key
+// pública tiene que estar presente o la construcción de producción se niega.
+verificarCaptcha(
+  process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
+  process.env.NEXT_PUBLIC_TURNSTILE_REQUIRED === "true",
+  !isDev,
+);
 const contentSecurityPolicy = buildContentSecurityPolicy({
   apiOrigin: resolveApiOrigin(process.env.NEXT_PUBLIC_API_URL),
   isDev,

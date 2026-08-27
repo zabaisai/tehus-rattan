@@ -10,6 +10,7 @@ import request from 'supertest';
 import * as bcrypt from 'bcryptjs';
 import { createHash } from 'crypto';
 import { AppModule } from '../src/app.module';
+import { AccountThrottleGuard } from '../src/common/throttle/account-throttle.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
 import {
   MailService,
@@ -57,6 +58,11 @@ describe('Password recovery (e2e)', () => {
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
       .overrideProvider(MailService)
       .useValue(mail)
+      // Este e2e hace varios logins con las mismas cuentas y NO prueba el límite
+      // por cuenta; se desactiva ese guard de forma explícita (su e2e dedicada
+      // lo deja activo). El límite por IP y el resto de guards siguen vigentes.
+      .overrideGuard(AccountThrottleGuard)
+      .useValue({ canActivate: () => true })
       .compile();
 
     app = moduleRef.createNestApplication();

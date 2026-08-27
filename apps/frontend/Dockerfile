@@ -29,6 +29,10 @@ ENV NEXT_PUBLIC_WHATSAPP_CONFIG_ID=${NEXT_PUBLIC_WHATSAPP_CONFIG_ID}
 # stays backend-only as TURNSTILE_SECRET_KEY).
 ARG NEXT_PUBLIC_TURNSTILE_SITE_KEY
 ENV NEXT_PUBLIC_TURNSTILE_SITE_KEY=${NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+# Espejo de CAPTCHA_ENABLED del backend: si es "true" y falta la site key, el
+# build falla (build-guard) para no bloquear todos los logins.
+ARG NEXT_PUBLIC_TURNSTILE_REQUIRED
+ENV NEXT_PUBLIC_TURNSTILE_REQUIRED=${NEXT_PUBLIC_TURNSTILE_REQUIRED}
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npm run build
