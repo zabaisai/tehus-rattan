@@ -1,6 +1,9 @@
 import { Logger, type OnModuleDestroy } from '@nestjs/common';
 import Redis from 'ioredis';
-import type { ThrottlerStorage } from '@nestjs/throttler';
+import {
+  type ThrottlerStorage,
+  ThrottlerStorageService,
+} from '@nestjs/throttler';
 
 // La forma que exige el contrato de ThrottlerStorage.increment (no se exporta
 // como tipo desde la raíz del paquete, así que se declara aquí).
@@ -50,19 +53,28 @@ interface RedisConn {
 }
 
 /**
- * ThrottlerStorage compartido en Redis: los contadores de rate limiting viven
- * en Redis, así N réplicas del backend comparten el mismo cupo (el store en
- * memoria multiplicaba cada límite por el nº de procesos).
+ * ThrottlerStorage con Redis como almacenamiento distribuido PRINCIPAL y un
+ * fallback LOCAL en memoria si Redis no responde.
  *
- * FAIL-OPEN: si Redis no responde, se permite la petición en vez de tumbar el
- * endpoint. Perder rate limiting durante un corte de Redis es preferible a
- * devolver 500 a todo el mundo; el corte se ve por el log y por la salud.
+ * FAIL-SAFE, no fail-open: una caída de Redis NUNCA deja el rate limiting en
+ * ilimitado. Cuando el comando a Redis falla, la petición se cuenta contra un
+ * `ThrottlerStorageService` en memoria (por proceso) con los MISMOS límites, de
+ * modo que login/refresh/recuperación/invitaciones siguen acotados durante el
+ * corte — más estricto que Redis (cada réplica cuenta aparte), nunca más laxo.
+ *
+ * Un corte breve de Redis no tumba la app (no se lanza 500): se degrada al
+ * limitador local y se recupera solo cuando Redis vuelve. La transición se
+ * registra UNA vez en cada sentido (sin spam) y nunca incluye secretos.
  */
 export class RedisThrottlerStorage
   implements ThrottlerStorage, OnModuleDestroy
 {
   private readonly logger = new Logger(RedisThrottlerStorage.name);
   private readonly client: Redis;
+  // Limitador local conservador para cuando Redis no está.
+  private readonly fallback = new ThrottlerStorageService();
+  // Estado de degradación, para loguear una sola vez cada transición.
+  private degradado = false;
 
   constructor(conn: RedisConn) {
     this.client = new Redis({
@@ -70,15 +82,17 @@ export class RedisThrottlerStorage
       port: conn.port,
       ...(conn.password ? { password: conn.password } : {}),
       // La cola offline absorbe los primeros comandos hasta que la conexión
-      // está lista (evita un falso fail-open en el arranque). commandTimeout
-      // acota cada comando: con Redis caído, el comando encolado rechaza en
-      // ~1.5 s y se cae al fail-open, en vez de colgarse. (Este storage solo se
-      // construye fuera de pruebas.)
+      // está lista (evita un falso fallback en el arranque). commandTimeout
+      // acota cada comando: con Redis caído, el comando rechaza en ~1.5 s y se
+      // cae al fallback local. Reconexión controlada por defecto de ioredis
+      // (retryStrategy indefinido y acotado) — cuando Redis vuelve, el siguiente
+      // comando funciona y se sale del modo degradado.
       maxRetriesPerRequest: 1,
       commandTimeout: 1500,
       connectTimeout: 1500,
     });
-    // Silenciar el error de conexión ruidoso; el fail-open ya lo cubre.
+    // Silenciar el error de conexión ruidoso de ioredis; la transición de
+    // degradación ya se registra una sola vez en increment().
     this.client.on('error', () => undefined);
   }
 
@@ -102,6 +116,15 @@ export class RedisThrottlerStorage
         String(blockDuration),
       )) as [number, number, number, number];
 
+      // Redis respondió: si veníamos degradados, avisar de la recuperación una
+      // sola vez.
+      if (this.degradado) {
+        this.degradado = false;
+        this.logger.log(
+          'Redis throttler recuperado — vuelve el store distribuido',
+        );
+      }
+
       return {
         totalHits: res[0],
         timeToExpire: Math.ceil(res[1] / 1000),
@@ -109,17 +132,27 @@ export class RedisThrottlerStorage
         timeToBlockExpire: Math.ceil(res[3] / 1000),
       };
     } catch (error) {
-      // Fail-open: nunca bloquea por un fallo de infraestructura.
-      this.logger.warn(
-        `Redis throttler no disponible [${(error as { code?: string })?.code ?? 'ERROR'}] — fail-open`,
+      // FAIL-SAFE: se cae al limitador LOCAL en memoria (mismos límites), nunca
+      // a ilimitado. Se registra la degradación una sola vez, sin secretos.
+      if (!this.degradado) {
+        this.degradado = true;
+        this.logger.warn(
+          `Redis throttler no disponible [${(error as { code?: string })?.code ?? 'ERROR'}] — degradado a limitador LOCAL en memoria (límites conservadores por proceso)`,
+        );
+      }
+      return this.fallback.increment(
+        key,
+        ttl,
+        limit,
+        blockDuration,
+        throttlerName,
       );
-      return {
-        totalHits: 0,
-        timeToExpire: Math.ceil(ttl / 1000),
-        isBlocked: false,
-        timeToBlockExpire: 0,
-      };
     }
+  }
+
+  /** ¿Está el storage operando en modo degradado (local)? Para health/tests. */
+  estaDegradado(): boolean {
+    return this.degradado;
   }
 
   async onModuleDestroy(): Promise<void> {

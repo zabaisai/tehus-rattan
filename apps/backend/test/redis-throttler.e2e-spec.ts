@@ -65,12 +65,21 @@ describe('RedisThrottlerStorage (Redis real)', () => {
     expect(b.totalHits).toBe(1);
   });
 
-  it('fail-open: con Redis inalcanzable devuelve permitido, no lanza', async () => {
-    // Puerto cerrado a propósito.
+  it('FAIL-SAFE: con Redis caído cae al limitador LOCAL, NO a ilimitado', async () => {
+    // Puerto cerrado a propósito: Redis inalcanzable.
     const caido = new RedisThrottlerStorage({ host: '127.0.0.1', port: 1 });
-    const r = await caido.increment('x', 60_000, 5, 60_000, 'default');
-    expect(r.isBlocked).toBe(false);
-    expect(r.totalHits).toBe(0);
+    // El primer intento cuenta 1 (no 0): sigue habiendo límite.
+    const r1 = await caido.increment('x', 60_000, 2, 60_000, 'auth');
+    expect(r1.totalHits).toBe(1);
+    expect(r1.isBlocked).toBe(false);
+    const r2 = await caido.increment('x', 60_000, 2, 60_000, 'auth');
+    expect(r2.totalHits).toBe(2);
+    // Al tercer intento, el limitador LOCAL bloquea (límite 2): NUNCA ilimitado.
+    const r3 = await caido.increment('x', 60_000, 2, 60_000, 'auth');
+    expect(r3.isBlocked).toBe(true);
+    expect(
+      (caido as unknown as { estaDegradado: () => boolean }).estaDegradado(),
+    ).toBe(true);
     await (
       caido as unknown as { onModuleDestroy: () => Promise<void> }
     ).onModuleDestroy();

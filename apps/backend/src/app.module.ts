@@ -14,6 +14,7 @@ import { HealthModule } from './common/health/health.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
 import { GlobalJwtAuthGuard } from './common/auth/global-jwt-auth.guard';
+import { AccountThrottleGuard } from './common/throttle/account-throttle.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggerInterceptor } from './common/logging/http-logger.interceptor';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
@@ -125,6 +126,11 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     // controlador nuevo no nazca abierto por olvidar el guard. Los guards por
     // controlador (jwt/tenant/rol) se mantienen como capa primaria.
     { provide: APP_GUARD, useClass: GlobalJwtAuthGuard },
+    // Límite por CUENTA normalizada (complementa el límite por IP) en
+    // login/recuperación: frena ataques distribuidos contra una sola cuenta.
+    // Reutiliza el ThrottlerStorage (Redis + fallback local). No-op salvo en las
+    // rutas sensibles. Respuesta 429 genérica (sin enumeración).
+    { provide: APP_GUARD, useClass: AccountThrottleGuard },
     // Consistent error shaping + never leaking a stack trace in a 500 body.
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     // One safe access-log line per request (no headers/cookies/body logged).
