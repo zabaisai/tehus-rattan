@@ -14,13 +14,15 @@ describe('WhatsAppTokenCryptoService', () => {
     service = new WhatsAppTokenCryptoService(configService);
   });
 
-  it('encrypt returns a value with 3 parts separated by ":"', () => {
+  it('encrypt returns the v2 format (prefix + salt + iv + tag + ciphertext)', () => {
     const encrypted = service.encrypt('fake-token-123');
     const parts = encrypted.split(':');
 
-    expect(parts).toHaveLength(3);
-    expect(Buffer.from(parts[0], 'hex').length).toBe(12); // IV
-    expect(Buffer.from(parts[1], 'hex').length).toBe(16); // GCM auth tag
+    expect(parts[0]).toBe('v2');
+    expect(parts).toHaveLength(5);
+    expect(Buffer.from(parts[1], 'hex').length).toBe(16); // scrypt salt
+    expect(Buffer.from(parts[2], 'hex').length).toBe(12); // IV
+    expect(Buffer.from(parts[3], 'hex').length).toBe(16); // GCM auth tag
   });
 
   it('decrypt(encrypt(token)) returns the original token', () => {

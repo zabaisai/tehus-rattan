@@ -5,33 +5,56 @@ import {
   createDecipheriv,
   createHash,
   randomBytes,
+  scryptSync,
 } from 'node:crypto';
 
-// accessTokenEncrypted format: "<ivHex>:<authTagHex>:<cipherTextHex>",
-// AES-256-GCM with a 12-byte IV, key = sha256(WHATSAPP_TOKEN_ENCRYPTION_KEY).
+// accessTokenEncrypted — AES-256-GCM, dos formatos:
+//
+//   v2 (nuevo, por defecto al cifrar):
+//     "v2:<saltHex>:<ivHex>:<authTagHex>:<cipherTextHex>"
+//     clave = scrypt(RAW_KEY, salt)  — KDF con sal única por ciphertext.
+//
+//   legacy (los ya guardados antes de v2):
+//     "<ivHex>:<authTagHex>:<cipherTextHex>"
+//     clave = sha256(RAW_KEY)  — sin sal.
+//
+// COMPATIBILIDAD: descifrar detecta el formato y usa la derivación correcta, así
+// que los tokens legacy siguen leyéndose sin migración. Cifrar produce SIEMPRE
+// v2; un proceso de recifrado (o el paso natural al reconectar) va moviendo los
+// legacy a v2. El prefijo "v2" ES el versionado de clave/derivación: una v3
+// futura se añade sin romper nada.
 //
 // ROTACION DE CLAVE
 // Cifrar usa SIEMPRE la clave actual; descifrar prueba primero la actual y
-// despues `WHATSAPP_TOKEN_ENCRYPTION_KEY_PREVIOUS` si esta definida.
-//
-// Esa asimetria es lo que hace posible rotar sin parar el servicio: se pone la
-// clave nueva como actual y la vieja como anterior, el sistema sigue leyendo
-// todo lo cifrado con la vieja, y un proceso aparte va recifrando. Sin la
-// clave anterior, cambiar la variable dejaria ilegibles todos los tokens ya
-// guardados en el mismo instante — y el sintoma seria que WhatsApp deja de
-// enviar, sin ninguna pista de por que.
-//
-// La clave anterior se retira DESPUES de verificar el recifrado, no antes.
+// despues `WHATSAPP_TOKEN_ENCRYPTION_KEY_PREVIOUS` si esta definida. Esa
+// asimetria permite rotar sin parar el servicio: clave nueva como actual, vieja
+// como anterior, el sistema sigue leyendo lo cifrado con la vieja, y un proceso
+// aparte recifra. La clave anterior se retira DESPUES de verificar el recifrado.
+const V2_PREFIX = 'v2';
+// Parámetros de scrypt: coste moderado (~decenas de ms) — suficiente contra
+// fuerza bruta de una passphrase sin penalizar el envío, más la caché de abajo.
+const SCRYPT_N = 16384; // 2^14
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+const KEY_LEN = 32; // AES-256
+const SALT_LEN = 16;
+
 @Injectable()
 export class WhatsAppTokenCryptoService {
   constructor(private configService: ConfigService) {}
+
+  // scrypt es caro a propósito; derivar en cada envío sería costoso. Un token
+  // guardado tiene UNA sal, así que su clave se deriva una vez por proceso y se
+  // cachea. La cardinalidad está acotada por el nº de integraciones.
+  private readonly claveCache = new Map<string, Buffer>();
 
   encrypt(plainToken: string): string {
     if (!plainToken?.trim()) {
       throw new Error('El token de WhatsApp no puede estar vacio');
     }
 
-    const key = this.deriveKey();
+    const salt = randomBytes(SALT_LEN);
+    const key = this.deriveScrypt(this.rawKeyActual(), salt);
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', key, iv);
     const encrypted = Buffer.concat([
@@ -40,7 +63,13 @@ export class WhatsAppTokenCryptoService {
     ]);
     const authTag = cipher.getAuthTag();
 
-    return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+    return [
+      V2_PREFIX,
+      salt.toString('hex'),
+      iv.toString('hex'),
+      authTag.toString('hex'),
+      encrypted.toString('hex'),
+    ].join(':');
   }
 
   decrypt(accessTokenEncrypted: string): string {
@@ -62,7 +91,22 @@ export class WhatsAppTokenCryptoService {
       throw new Error('accessTokenEncrypted no puede estar vacio');
     }
 
-    const [ivHex, authTagHex, cipherTextHex] = accessTokenEncrypted.split(':');
+    const partes = accessTokenEncrypted.split(':');
+    const esV2 = partes[0] === V2_PREFIX;
+
+    // Deriva la clave según el formato: v2 → scrypt(raw, salt); legacy → sha256.
+    const derivar = (rawKey: string): Buffer => {
+      if (esV2) {
+        const saltHex = partes[1];
+        if (!saltHex) throw new Error('Formato v2 inválido: falta la sal');
+        return this.deriveScrypt(rawKey, Buffer.from(saltHex, 'hex'));
+      }
+      return createHash('sha256').update(rawKey).digest();
+    };
+
+    const [ivHex, authTagHex, cipherTextHex] = esV2
+      ? [partes[2], partes[3], partes[4]]
+      : [partes[0], partes[1], partes[2]];
 
     if (!ivHex || !authTagHex || !cipherTextHex) {
       throw new Error('Formato de accessTokenEncrypted inválido');
@@ -71,7 +115,7 @@ export class WhatsAppTokenCryptoService {
     try {
       return {
         token: this.descifrarCon(
-          this.deriveKey(),
+          derivar(this.rawKeyActual()),
           ivHex,
           authTagHex,
           cipherTextHex,
@@ -79,16 +123,21 @@ export class WhatsAppTokenCryptoService {
         conClaveAnterior: false,
       };
     } catch (errorConActual) {
-      const anterior = this.deriveKeyAnterior();
+      const rawAnterior = this.rawKeyAnterior();
       // Sin clave anterior configurada, el fallo es el fallo: no hay nada mas
       // que probar y ocultarlo confundiria el diagnostico.
-      if (!anterior) throw errorConActual;
+      if (!rawAnterior) throw errorConActual;
 
       // GCM autentica: si la clave no es la correcta, `final()` lanza. Por eso
       // probar la segunda clave no es adivinar — o descifra bien, o no
       // descifra.
       return {
-        token: this.descifrarCon(anterior, ivHex, authTagHex, cipherTextHex),
+        token: this.descifrarCon(
+          derivar(rawAnterior),
+          ivHex,
+          authTagHex,
+          cipherTextHex,
+        ),
         conClaveAnterior: true,
       };
     }
@@ -115,29 +164,43 @@ export class WhatsAppTokenCryptoService {
     return decrypted.toString('utf8');
   }
 
+  /** Deriva (y cachea) la clave scrypt para una (rawKey, salt) dada. */
+  private deriveScrypt(rawKey: string, salt: Buffer): Buffer {
+    const cacheKey = `${createHash('sha256')
+      .update(rawKey)
+      .digest('hex')}:${salt.toString('hex')}`;
+    const cacheado = this.claveCache.get(cacheKey);
+    if (cacheado) return cacheado;
+
+    const key = scryptSync(rawKey, salt, KEY_LEN, {
+      N: SCRYPT_N,
+      r: SCRYPT_R,
+      p: SCRYPT_P,
+    });
+    this.claveCache.set(cacheKey, key);
+    return key;
+  }
+
+  private rawKeyActual(): string {
+    const rawKey = this.configService.get<string>(
+      'WHATSAPP_TOKEN_ENCRYPTION_KEY',
+    );
+    if (!rawKey?.trim()) {
+      throw new Error('WHATSAPP_TOKEN_ENCRYPTION_KEY no está configurada');
+    }
+    return rawKey.trim();
+  }
+
   /** `null` si no hay rotacion en curso. */
-  private deriveKeyAnterior(): Buffer | null {
+  private rawKeyAnterior(): string | null {
     const rawKey = this.configService.get<string>(
       'WHATSAPP_TOKEN_ENCRYPTION_KEY_PREVIOUS',
     );
-    if (!rawKey?.trim()) return null;
-    return createHash('sha256').update(rawKey).digest();
+    return rawKey?.trim() ? rawKey.trim() : null;
   }
 
   /** ¿Hay una rotacion en curso? Lo consulta el recifrado y el health. */
   rotacionEnCurso(): boolean {
-    return this.deriveKeyAnterior() !== null;
-  }
-
-  private deriveKey(): Buffer {
-    const rawKey = this.configService.get<string>(
-      'WHATSAPP_TOKEN_ENCRYPTION_KEY',
-    );
-
-    if (!rawKey?.trim()) {
-      throw new Error('WHATSAPP_TOKEN_ENCRYPTION_KEY no está configurada');
-    }
-
-    return createHash('sha256').update(rawKey).digest();
+    return this.rawKeyAnterior() !== null;
   }
 }
