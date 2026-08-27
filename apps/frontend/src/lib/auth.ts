@@ -4,11 +4,15 @@ import { AuthResponse, User } from "@/types";
 export async function login(
   email: string,
   password: string,
+  captchaToken?: string,
 ): Promise<AuthResponse> {
-  const { data } = await api.post<AuthResponse>("/auth/login", {
-    email,
-    password,
-  });
+  // El token antibot (si el reto está activo) viaja en el cuerpo y en la
+  // cabecera; el backend lo verifica server-side. Sin reto activo se omite.
+  const { data } = await api.post<AuthResponse>(
+    "/auth/login",
+    captchaToken ? { email, password, captchaToken } : { email, password },
+    captchaToken ? { headers: { "x-captcha-token": captchaToken } } : undefined,
+  );
   return data;
 }
 

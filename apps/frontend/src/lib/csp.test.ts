@@ -36,6 +36,32 @@ describe("buildContentSecurityPolicy (Meta Embedded Signup)", () => {
   });
 });
 
+describe("buildContentSecurityPolicy (Turnstile)", () => {
+  const base = buildContentSecurityPolicy({ apiOrigin: api, isDev: false });
+  const withTs = buildContentSecurityPolicy({
+    apiOrigin: api,
+    isDev: false,
+    turnstile: true,
+  });
+
+  it("no incluye challenges.cloudflare.com cuando está apagado", () => {
+    expect(base).not.toContain("challenges.cloudflare.com");
+    expect(base).toContain("frame-src 'none'");
+  });
+
+  it("permite el script/frame/connect de Turnstile solo cuando está activo", () => {
+    expect(withTs).toContain(
+      "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
+    );
+    expect(withTs).toContain("frame-src https://challenges.cloudflare.com");
+    expect(withTs).toContain(
+      "connect-src 'self' " + api + " " + api.replace(/^http/, "ws") +
+        " https://challenges.cloudflare.com",
+    );
+    expect(withTs).not.toContain("'unsafe-eval'");
+  });
+});
+
 describe("buildContentSecurityPolicy (production)", () => {
   const csp = buildContentSecurityPolicy({ apiOrigin: api, isDev: false });
 

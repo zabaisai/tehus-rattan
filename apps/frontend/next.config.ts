@@ -18,6 +18,9 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
   // Only relax the CSP for Meta's SDK when the Embedded Signup app id is present
   // at build time; otherwise the policy stays fully locked down.
   metaSdk: Boolean(process.env.NEXT_PUBLIC_WHATSAPP_APP_ID),
+  // Relaja la CSP para Turnstile solo si la site key pública está presente en
+  // build; si no, la política sigue cerrada.
+  turnstile: Boolean(process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY),
 });
 
 const securityHeaders = [
