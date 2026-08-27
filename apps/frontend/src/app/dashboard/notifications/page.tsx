@@ -15,6 +15,7 @@ import {
   type AppNotification,
   type NotificationCategory,
 } from '@/lib/notifications';
+import { isSafeInternalPath } from '@/lib/safe-url';
 import { CategoryIcon, relativeTime } from '@/components/notifications/notification-ui';
 import { useRealtime } from '@/lib/use-realtime';
 
@@ -51,7 +52,7 @@ export default function NotificationsPage() {
       await markNotificationRead(n.id).catch(() => undefined);
       invalidate();
     }
-    if (n.actionUrl && n.actionUrl.startsWith('/')) router.push(n.actionUrl);
+    if (isSafeInternalPath(n.actionUrl)) router.push(n.actionUrl);
   };
 
   const markAll = async () => {

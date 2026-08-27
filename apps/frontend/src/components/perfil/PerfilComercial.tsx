@@ -24,6 +24,7 @@ import { TextoLargo } from "@/components/ui/TextoLargo";
 import { SugerenciasDeTarea } from "@/components/tasks/SugerenciasDeTarea";
 import { mensajeDeError } from "@/components/ui/ListState";
 import { NOMBRE_PULSO } from "@/lib/producto";
+import { isSafeInternalPath } from "@/lib/safe-url";
 
 const PRIORIDAD: Record<string, string> = {
   LOW: "Baja",
@@ -241,7 +242,7 @@ export function PerfilComercial({
               </button>
             )}
 
-            {volverA && origen === "conversacion" && (
+            {isSafeInternalPath(volverA) && origen === "conversacion" && (
               <button
                 onClick={() => router.push(volverA)}
                 className="flex items-center gap-1.5 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50"

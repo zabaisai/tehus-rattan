@@ -12,6 +12,7 @@ import {
   markNotificationRead,
   type AppNotification,
 } from '@/lib/notifications';
+import { isSafeInternalPath } from '@/lib/safe-url';
 import { CategoryIcon, relativeTime } from './notification-ui';
 
 const UNREAD_POLL_MS = 30_000;
@@ -61,7 +62,7 @@ export function NotificationBell() {
       invalidate();
     }
     setOpen(false);
-    if (n.actionUrl && n.actionUrl.startsWith('/')) router.push(n.actionUrl);
+    if (isSafeInternalPath(n.actionUrl)) router.push(n.actionUrl);
   };
 
   const markAll = async () => {

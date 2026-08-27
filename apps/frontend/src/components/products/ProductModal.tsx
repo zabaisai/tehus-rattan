@@ -9,6 +9,7 @@ import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import { isSafeHttpUrl } from "@/lib/safe-url";
 
 type ApiError = {
   response?: {
@@ -52,6 +53,10 @@ export function ProductModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (imageUrl.trim() && !isSafeHttpUrl(imageUrl.trim())) {
+      setError("La URL de la imagen debe empezar con https:// (o http://)");
+      return;
+    }
     setSaving(true);
     try {
       await onSubmit({
