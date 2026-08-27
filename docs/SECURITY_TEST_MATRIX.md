@@ -30,26 +30,35 @@ verificado por configuración/escaneo, no por test unit/e2e · `⬜` = no cubier
 | Ausencia de campos sensibles en respuestas | ➕/✅ | `POST /users` ya no devuelve el hash (`users.service`); selects explícitos; `analytics` sin metadata sensible |
 | Headers de seguridad | ✅ | `test/security-headers.e2e-spec.ts`, `apps/frontend/src/lib/csp.test.ts`, `smoke-test.sh` |
 | Webhook GET verify fail-closed / no reflexión | ➕ | `test/webhook-verify.e2e-spec.ts` (sin token → 403; challenge como `text/plain`) |
-| RLS con el usuario runtime real | ⬜ | BLOQUEADO (control 4 — precondición: separar roles de BD) |
-| Contexto de empresa sin fugas entre conexiones | ⬜ | Aplica al implementar RLS transaction-scoped (control 4) |
-| Validación de variables de entorno | ➕ | `src/common/config/env.validation.spec.ts` (JWT/DATABASE_URL/clave cifrado, gating por producción) |
+| Validación de variables de entorno | ➕ | `src/common/config/env.validation.spec.ts` (JWT/DATABASE_URL/clave cifrado/Turnstile, gating por producción) |
 | Escaneo de secretos | ➕ | `.github/workflows/security.yml` (gitleaks) + `.gitleaks.toml`; escaneo local limpio |
+| Deny-by-default (ruta privada sin token) | ➕ | `test/deny-by-default.e2e-spec.ts` (AppModule real: públicas 200, privadas 401) |
+| Cifrado: KDF versionado + compatibilidad legacy + rotación | ➕ | `src/modules/whatsapp-token-crypto.compat.spec.ts` |
+| Rate limiting distribuido (Redis, atómico, fail-open) | ➕ | `test/redis-throttler.e2e-spec.ts` (Redis real) |
+| Antibot: fail-closed y verificación server-side | ➕ | `src/common/captcha/captcha.spec.ts` |
+| RLS con el usuario runtime real (aislamiento + WITH CHECK) | ➕ | `prisma/rls/proof.mjs` (base temporal aislada, rol sin BYPASSRLS) — ejecutado en verde |
+| Contexto de empresa sin fugas entre conexiones | ➕ | `src/prisma/tenant-context.ts` (`set_config(..., true)` transaction-scoped) + proof.mjs |
 
 ## Comandos de verificación ejecutados (local, sobre `main`)
 
 | Comando | Resultado |
 |---------|-----------|
-| Backend — unit (`npm test -- --runInBand`) | 134 suites / **2166** ✅ |
-| Backend — e2e (`npm run test:e2e`, base temporal) | 65 suites / **957** ✅ |
+| Backend — unit (`npm test -- --runInBand`) | 136 suites / **2186** ✅ |
+| Backend — e2e (`npm run test:e2e`, base temporal) | 67 suites / **966** ✅ |
 | Backend — typecheck (`npm run typecheck`) | ✅ |
+| Backend — lint (`eslint --no-fix`, como CI) | ✅ |
+| Backend — build (`nest build`) | ✅ |
 | Frontend — tests (`npm test`, vitest) | 87 archivos / **948** ✅ |
-| Frontend — build (`npm run build`) | ✅ compila |
+| Frontend — lint / build | ✅ (1 warning preexistente ajeno) |
 | `prisma migrate deploy` (base temporal vacía) | 58 migraciones aplicadas ✅ |
-| `prisma validate` | ✅ (en CI) |
-| gitleaks (HEAD y `--all`) | *no leaks found* ✅ |
-| `npm audit --omit=dev` (backend/frontend) | 0 críticas; altas documentadas (control 20) |
+| `prisma validate` | ✅ |
+| RLS proof (`node prisma/rls/proof.mjs`, base aislada) | ✅ aislamiento con rol runtime real |
+| gitleaks (HEAD, `--all`, y commits de la rama) | *no leaks found* ✅ |
+| `npm audit --omit=dev --audit-level=critical` (back/front) | 0 críticas (gate PASS); altas documentadas |
 | `git diff --check` | sin errores de espacios |
 
-Línea base (antes de tocar nada, sobre `main`): backend 134/2159 unit,
-frontend 25/120 (subset) → tras los cambios 134/2166 unit + 87/948 frontend, sin
-regresiones. Ningún fallo ocultado ni test debilitado para pasar.
+Línea base (sobre `main`, antes de tocar nada): backend 134/2159 unit. Tras las
+dos fases: **136/2186 unit + 67/966 e2e + 948 frontend**, sin regresiones.
+Ningún fallo ocultado ni test debilitado para pasar (los tests que cambiaron de
+aserción lo hicieron porque el comportamiento nuevo es MÁS seguro — mensajes
+anti-enumeración genéricos, formato de cifrado v2).

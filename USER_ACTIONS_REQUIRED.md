@@ -69,37 +69,42 @@ rotación, se listan por transparencia): `WHATSAPP_BUSINESS_ACCOUNT_ID`,
 - Los filtros de aplicación por `companyId` NO se retiran: RLS es una segunda
   barrera.
 
-## P2 — Antibot (control 12)
+## P2 — Antibot: conectar las claves reales (control 12)
 
-- **Qué:** no hay proveedor antibot. Decisión de producto + claves externas.
-- **Acción:** elegir proveedor (Cloudflare Turnstile recomendado), crear la
-  cuenta y las claves (site key pública en frontend, secret solo en backend),
-  y activar el reto en login/registro tras señales de abuso. La integración debe
-  ser fail-closed con adaptador falso explícito en local/tests. No conectes
-  claves reales al repositorio; guárdalas como variables de entorno.
+- **Ya implementado:** el adaptador antibot está completo y probado
+  (`common/captcha`): `FakeCaptchaProvider` para local/tests, `TurnstileCaptchaProvider`
+  con verificación server-side fail-closed, guard opt-in en login, validación de
+  entorno fail-closed en producción.
+- **Acción humana restante:** crear la cuenta de **Cloudflare Turnstile** y sus
+  claves — site key pública para el frontend (`NEXT_PUBLIC_TURNSTILE_SITE_KEY`),
+  secret solo en el backend (`TURNSTILE_SECRET_KEY`) — y poner
+  `CAPTCHA_ENABLED=true` + `CAPTCHA_PROVIDER=turnstile`. Guárdalas como variables
+  de entorno, nunca en el repositorio. (El widget del frontend que envía el token
+  en `x-captcha-token`/`captchaToken` se conecta al activar el control.)
 
-## P2 — Rate limiting distribuido con Redis (control 11)
+## Rate limiting distribuido con Redis (control 11) — HECHO
 
-- **Qué:** el throttler es en memoria por proceso; con varias réplicas los
-  límites se multiplican. Redis ya está en el stack.
-- **Acción:** configurar el store Redis de `@nestjs/throttler`
-  (`@nest-lab/throttler-storage-redis` o equivalente) reutilizando la conexión
-  existente. Es un cambio contenido pero toca el arranque; se dejó fuera para no
-  arriesgar el comportamiento de arranque sin poder probarlo contra el stack real
-  multi-réplica.
+Ya no requiere acción: implementado en la fase 2 (`RedisThrottlerStorage`,
+seleccionado fuera de pruebas con la cola habilitada, fail-open). Solo asegúrate
+de que `REDIS_HOST`/`REDIS_PORT` (y `REDIS_PASSWORD` si expones Redis) están
+configurados en producción.
 
 ---
 
 ## Deudas menores documentadas (no bloquean; mejoras futuras)
 
-- Guard global de auth con `@Public()` (control 6): hoy la auth es opt-in por
-  controlador; un controlador nuevo nace público.
 - Detección de reutilización de refresh token (control 9).
-- KDF con sal + versión de clave para el cifrado de tokens (control 5).
+- Revalidación periódica del socket WebSocket ya conectado tras revocar la sesión
+  (hoy se cierra el canal nuevo; el existente vive hasta expirar el token, 15 min).
 - Firma ZIP/OOXML en el import de productos y servido autenticado de `/uploads`
   por empresa (control 16).
-- Tope `take` por defecto en listados sin paginar (control 17).
-- TLS PostgreSQL (`sslmode=require`) al mover Postgres fuera del host (control 19).
+- Tope `take` por defecto en listados sin paginar (control 17): el máximo por
+  petición ya está en ≤100; añadir un default que trunque en silencio requiere
+  coordinar la paginación del frontend para no ocultar filas.
 - Subir coste bcrypt a 12 con rehash progresivo (control 10).
 - Altas de dependencias (sharp/libvips, cadena del CLI de Prisma) — se resuelven
   vía Dependabot cuando haya versión compatible (control 20).
+
+Resueltas en fase 2 (ya NO son deuda): guard global deny-by-default (6), KDF con
+sal + versión (5), rate limiting distribuido en Redis (11), adaptador antibot (12),
+preparación ejecutable de RLS (4).

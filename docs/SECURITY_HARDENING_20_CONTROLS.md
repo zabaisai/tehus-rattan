@@ -15,23 +15,29 @@ arreglado con prueba) · `PARCIAL` (parte hecha, resto documentado) · `BLOQUEAD
 | 1 | Ocultar API keys y secretos | CORREGIDO |
 | 2 | Escaneo y purga de secretos en el historial Git | VERIFICADO |
 | 3 | “Key pública de base de datos” (adaptación PostgreSQL) | NO APLICA, ADAPTADO |
-| 4 | Row-Level Security de PostgreSQL | BLOQUEADO (precondición: separar rol de migración/runtime) |
-| 5 | Cifrado | PARCIAL |
-| 6 | Autenticación obligatoria por defecto | CORREGIDO / PARCIAL |
+| 4 | Row-Level Security de PostgreSQL | PARCIAL (preparado y probado en local; falta separar rol de BD en infra) |
+| 5 | Cifrado | CORREGIDO (KDF); PARCIAL (TLS a Postgres, ver 19) |
+| 6 | Autenticación obligatoria por defecto | CORREGIDO |
 | 7 | IDOR / acceso entre empresas | CORREGIDO |
 | 8 | Mass assignment | VERIFICADO |
 | 9 | Cookies y sesiones / CSRF | CORREGIDO |
 | 10 | Hash de contraseñas | VERIFICADO |
-| 11 | Rate limiting del login | PARCIAL |
-| 12 | Antibot | BLOQUEADO (no implementado; requiere decisión y claves) |
+| 11 | Rate limiting del login | CORREGIDO |
+| 12 | Antibot | CORREGIDO (adaptador completo; solo falta conectar claves reales) |
 | 13 | Parametrización de consultas | VERIFICADO |
 | 14 | Validación y normalización de inputs | VERIFICADO / PARCIAL |
 | 15 | Escape y saneo de contenido | CORREGIDO |
 | 16 | Subida de archivos | PARCIAL |
-| 17 | Recorte de respuestas de API | CORREGIDO |
+| 17 | Recorte de respuestas de API | CORREGIDO (campos); PARCIAL (paginación por defecto) |
 | 18 | Headers de seguridad | VERIFICADO |
-| 19 | Forzar HTTPS | VERIFICADO / PARCIAL |
+| 19 | Forzar HTTPS | VERIFICADO / PARCIAL (TLS a Postgres documentado) |
 | 20 | Escaneo de dependencias y cadena de suministro | CORREGIDO |
+
+> **Fase 2 (cierre):** se implementaron y probaron en local, además de lo
+> anterior: derivación de clave scrypt versionada con compatibilidad legacy
+> (5), guard global de autenticación deny-by-default (6), rate limiting
+> distribuido en Redis (11), adaptador antibot desacoplado con Turnstile +
+> proveedor falso (12), y RLS ejecutable probado con un rol runtime real (4).
 
 ---
 
@@ -82,24 +88,31 @@ TAKTO usa PostgreSQL + Prisma, no Supabase. Comprobado:
 - **Pendiente (ver control 4/5):** el usuario runtime = usuario de migración =
   propietario de tablas; separar roles es precondición para RLS y TLS.
 
-## 4. Row-Level Security de PostgreSQL — BLOQUEADO
+## 4. Row-Level Security de PostgreSQL — PARCIAL (preparado y probado)
 
 - **Riesgo original:** el aislamiento multiempresa es 100% de aplicación; un
   `where` sin `companyId` olvidado es una fuga sin red de seguridad por debajo.
-- **Evidencia:** 0 `CREATE POLICY` / `ROW LEVEL SECURITY` en 58 migraciones;
-  `prisma.service.ts` sin `$extends`/`$use`; `DATABASE_URL` único para migración
-  y runtime (propietario de tablas → omitiría RLS aunque se activara).
-- **Estado:** BLOQUEADO. Activar RLS de forma honesta exige **primero** separar
-  el rol de migración (DDL, propietario) del rol runtime (DML, sujeto a RLS, sin
-  `BYPASSRLS`), lo que a su vez requiere cambios de infraestructura y de
-  `DATABASE_URL` que no pueden ejecutarse contra bases reales en esta sesión.
-- **Acción pendiente (P1, humana):** crear el rol `takto_app` sin `BYPASSRLS` ni
-  propiedad de tablas; luego una migración aditiva con `ENABLE ROW LEVEL
-  SECURITY` + `FORCE` + políticas por `companyId` usando
-  `current_setting('app.company_id', true)` establecido de forma transaccional
-  (`set_config(..., true)`), y un guard/`$extends` de Prisma que fije ese
-  contexto por petición. Se documenta como plan en `PROCESS_MAP.md`. No se finge
-  RLS activo. Los filtros de aplicación por `companyId` permanecen intactos.
+- **Evidencia:** 0 `CREATE POLICY` / `ROW LEVEL SECURITY` en las migraciones;
+  `DATABASE_URL` único para migración y runtime (propietario de tablas →
+  omitiría RLS aunque se activara).
+- **Preparado y PROBADO en local (fase 2):**
+  - `apps/backend/prisma/rls/001-enable-rls.sql` — SQL idempotente que activa
+    `ENABLE`+`FORCE ROW LEVEL SECURITY` y una política `tenant_isolation` por
+    `companyId` en las 37 tablas multiempresa, generado desde el esquema.
+  - `apps/backend/prisma/rls/000-create-runtime-role.sql.example` — rol runtime
+    separado (sin superuser, sin `BYPASSRLS`, sin propiedad de tablas).
+  - `apps/backend/src/prisma/tenant-context.ts` — `runWithTenant()` fija
+    `app.company_id` **transaction-scoped** (`set_config(..., true)`), sin fuga
+    entre conexiones del pool.
+  - `apps/backend/prisma/rls/proof.mjs` — prueba EJECUTABLE contra una base
+    temporal propia con un rol runtime REAL sin `BYPASSRLS`: **ejecutada en
+    verde** — A ve solo A, B solo B, sin contexto 0 filas, `WITH CHECK` bloquea
+    inserciones cross-tenant.
+- **Único bloqueo real (P1, humana):** separar el rol de BD (migración/propietario
+  vs runtime) en la infraestructura y repuntar `DATABASE_URL` — no puede
+  ejecutarse contra bases reales en esta sesión. Con eso hecho + adoptar
+  `runWithTenant()`, se aplica el SQL. Ver `prisma/rls/README.md`. No se finge
+  RLS activo; los filtros de aplicación por `companyId` permanecen intactos.
 
 ## 5. Cifrado — PARCIAL
 
@@ -112,11 +125,16 @@ TAKTO usa PostgreSQL + Prisma, no Supabase. Comprobado:
 - **CORREGIDO:** validación de la clave de cifrado y de `JWT_SECRET` en el
   arranque (requeridas y longitud mínima 32 en producción) —
   `common/config/env.validation.ts` (+ tests).
-- **Riesgo residual (documentado):** la derivación de clave es un `sha256(raw)`
-  sin sal ni KDF y el blob no versiona la clave. Cambiarlo rompería los
-  ciphertexts existentes, así que se mitiga exigiendo longitud/entropía mínima y
-  se deja como deuda (migrar a scrypt/HKDF con prefijo de versión en una
-  ventana de rotación). TLS para PostgreSQL: ver control 19.
+- **CORREGIDO (fase 2) — derivación de clave:** el cifrado pasa a un formato
+  versionado `v2:` que deriva la clave con **scrypt + sal única por ciphertext**
+  (`whatsapp-token-crypto.service.ts`). Es **retrocompatible**: descifra los
+  ciphertexts legacy (`sha256`, sin sal) sin migración; cifra siempre en v2. El
+  prefijo `v2` es el versionado de clave. La rotación (clave actual/anterior)
+  funciona en ambos formatos. Cubierto por `whatsapp-token-crypto.compat.spec.ts`
+  (16 tests: formato v2, no-determinismo, descifrado legacy, rotación en ambos
+  formatos, rechazo por manipulación GCM).
+- **Riesgo residual (documentado):** TLS para PostgreSQL — ver control 19
+  (documentado, pendiente de infraestructura).
 
 ## 6. Autenticación obligatoria por defecto — CORREGIDO / PARCIAL
 
@@ -132,15 +150,16 @@ TAKTO usa PostgreSQL + Prisma, no Supabase. Comprobado:
   de algoritmo (HS256) en verificación y firma del JWT (REST y WS).
   `realtime.auth.ts`, `jwt.strategy.ts`, `auth.module.ts` (+ tests unit y e2e,
   incl. caso de sesión revocada).
-- **PARCIAL / documentado:**
-  - No hay guard global de autenticación con `@Public()`; la auth es opt-in por
-    controlador (hoy los 33 controladores privados lo llevan, pero un
-    controlador nuevo nace público). Se documenta como deuda; introducir un
-    `APP_GUARD` global con decorador `@Public()` es un cambio transversal
-    pendiente de una fase dedicada.
-  - Un socket ya conectado sigue vivo hasta expirar el token (15 min) tras una
-    revocación: cierra el canal nuevo, no el existente. Revalidación periódica
-    del socket queda como mejora.
+- **CORREGIDO (fase 2) — deny-by-default:** se añadió un guard GLOBAL de
+  autenticación (`GlobalJwtAuthGuard` como `APP_GUARD`) que exige JWT en TODA
+  ruta HTTP salvo las marcadas `@Public()` (health/raíz, login/refresh/logout,
+  recuperación, onboarding, webhook de Meta). Un controlador nuevo nace
+  protegido. Los guards por controlador se mantienen como capa primaria. Cubierto
+  por `deny-by-default.e2e-spec.ts` (arranca el AppModule real: públicas 200,
+  privadas 401 sin token).
+- **Riesgo residual (documentado):** un socket ya conectado sigue vivo hasta
+  expirar el token (15 min) tras una revocación: cierra el canal nuevo, no el
+  existente. Revalidación periódica del socket queda como mejora.
 
 ## 7. IDOR / acceso entre empresas — CORREGIDO
 
@@ -196,25 +215,39 @@ de invitación/reset/refresh almacenados como hash. Deuda documentada: coste 10
 es algo bajo para 2026 (12 recomendado) y está fijo en código; subirlo con
 rehash progresivo queda como mejora.
 
-## 11. Rate limiting del login — PARCIAL
+## 11. Rate limiting del login — CORREGIDO
 
 - **VERIFICADO:** `@nestjs/throttler` con límites por endpoint (login 10/min por
   IP, refresh 30/min por dispositivo, reset 5/min, etc.), respuesta 429, IP real
   detrás de Caddy (`trust proxy 1`), sin bloqueos permanentes.
-- **PARCIAL / documentado:** el store es **en memoria**, por proceso. Con varias
-  réplicas cada límite se multiplica. Redis ya está disponible en el stack; migrar
-  el throttler a un store Redis compartido queda como acción pendiente (ya
-  reconocida en `docs/AUTH_SESSION_SECURITY.md`). `POST /auth/logout` sin throttle
-  específico (cae al default 300/min) — deuda menor.
+- **CORREGIDO (fase 2):** store **compartido en Redis** (`RedisThrottlerStorage`,
+  incremento atómico por Lua que también gestiona la ventana de bloqueo), así N
+  réplicas comparten el cupo (antes cada límite se multiplicaba por proceso). Se
+  selecciona solo fuera de pruebas y con la cola habilitada; en pruebas/cola-off
+  cae al store en memoria determinista. **Fail-open** ante corte de Redis
+  (mejor que 500 a todos), acotado por `commandTimeout`. Cubierto por
+  `redis-throttler.e2e-spec.ts` contra un Redis real (conteo de ventana,
+  bloqueo, aislamiento por throttler, fail-open).
+- **Deuda menor documentada:** `POST /auth/logout` sin throttle específico (cae
+  al default 300/min).
 
-## 12. Antibot — BLOQUEADO
+## 12. Antibot — CORREGIDO (adaptador completo)
 
-No existe proveedor antibot (Turnstile/reCAPTCHA) en el código. Implementar una
-integración desacoplada fail-closed con adaptador falso para local/tests, y
-conectar cuentas/claves reales, es una acción con decisión de producto y
-credenciales externas: se deja como **acción humana P2** documentada en
-`USER_ACTIONS_REQUIRED.md`. Mitigación actual: rate limiting por endpoint y
-mensajes anti-enumeración.
+- **CORREGIDO (fase 2):** integración antibot **desacoplada** (`common/captcha`):
+  - `CaptchaService` + `CaptchaGuard` detrás de una interfaz de proveedor.
+  - `FakeCaptchaProvider` (tokens deterministas) para local/tests.
+  - `TurnstileCaptchaProvider`: verificación **server-side** de Cloudflare
+    Turnstile con timeout, **fail-closed** ante red/timeout/fallo, validación de
+    action/hostname; el secret vive solo en backend; nunca registra el token.
+  - Selección de proveedor por entorno; el falso queda **vetado en producción**.
+  - `CaptchaGuard` es no-op salvo `CAPTCHA_ENABLED=true`; entonces fail-closed
+    (403 sin token verificado). Conectado a `POST /auth/login`.
+  - `env.validation`: con el control activo y Turnstile, `TURNSTILE_SECRET_KEY`
+    es obligatorio al arranque; en producción el proveedor debe ser Turnstile.
+  - Cubierto por `captcha.spec.ts` y `env.validation.spec.ts`.
+- **Única acción pendiente (P2, humana):** crear la cuenta/claves reales de
+  Turnstile (site key pública en frontend, secret en backend) y poner
+  `CAPTCHA_ENABLED=true`. No se conectan claves reales aquí.
 
 ## 13. Parametrización de consultas — VERIFICADO
 
@@ -338,8 +371,15 @@ false`. Caddy: HSTS y `-Server`. Cubierto por specs de headers y `smoke-test.sh`
 
 ## Acciones humanas inevitables (resumen; detalle en USER_ACTIONS_REQUIRED.md)
 
-1. **P0** — Rotar el token de acceso de Meta legacy (estaba en el `.env` local,
-   no en Git).
-2. **P1** — Separar el rol de PostgreSQL de migración/runtime y activar RLS.
-3. **P2** — Decidir e integrar un proveedor antibot (control 12).
-4. **P2** — Migrar el rate limiting a un store Redis compartido (control 11).
+1. **P0** — Rotar las credenciales mostradas en salida en la fase 1 (nombres en
+   `USER_ACTIONS_REQUIRED.md`), en especial el token de Meta legacy. Ninguna
+   está en Git (gitleaks `--all` limpio).
+2. **P1** — Separar el rol de PostgreSQL de migración/runtime para **activar** el
+   RLS ya preparado y probado (control 4).
+3. **P2** — Conectar las claves reales de Turnstile y poner `CAPTCHA_ENABLED=true`
+   (control 12; el adaptador ya está implementado y probado).
+4. **P2** — Habilitar TLS en Postgres y añadir `sslmode=require` cuando salga del
+   host (control 19; documentado).
+
+El rate limiting distribuido en Redis (antes P2) quedó **implementado** en la
+fase 2 (control 11).
