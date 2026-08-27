@@ -23,6 +23,10 @@ paths = [
   # Realtime auth spec: asserts the logger never writes a token; the fixture
   # JWT below is fake.
   '''apps/backend/src/common/realtime/realtime.auth.spec.ts''',
+  # RLS e2e specs: use fictitious runtime-role passwords and a fake JWT secret to
+  # boot an isolated throwaway DB; no real credentials.
+  '''apps/backend/test/rls-real-path.e2e-spec.ts''',
+  '''apps/backend/test/rls-integration.e2e-spec.ts''',
 ]
 
 regexes = [
