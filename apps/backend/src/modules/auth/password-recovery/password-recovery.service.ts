@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma, Role } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import { PasswordHashService } from '../../../common/password/password-hash.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ModoDemoService } from '../../../common/demo/modo-demo.service';
 import { SessionsService } from '../../sessions/sessions.service';
@@ -26,8 +26,6 @@ export const RESET_PASSWORD_INVALID_MESSAGE =
 export const ADMIN_SEND_RESET_MESSAGE =
   'Solicitud registrada. Si la cuenta puede recibirlo, se enviaron las instrucciones.';
 
-const BCRYPT_SALT_ROUNDS = 10;
-
 export interface RecoveryActor {
   userId: string;
   role: Role;
@@ -45,6 +43,7 @@ export class PasswordRecoveryService {
     private readonly sessions: SessionsService,
     private readonly config: ConfigService,
     private readonly modoDemo: ModoDemoService,
+    private readonly passwordHash: PasswordHashService,
   ) {}
 
   // ---- public: forgot password (anti-enumeration) --------------------------
@@ -137,14 +136,17 @@ export class PasswordRecoveryService {
       throw new BadRequestException(RESET_PASSWORD_INVALID_MESSAGE);
     }
 
-    const sameAsCurrent = await bcrypt.compare(newPassword, user.password);
+    const sameAsCurrent = await this.passwordHash.compare(
+      newPassword,
+      user.password,
+    );
     if (sameAsCurrent) {
       throw new BadRequestException(
         'La nueva contraseña no puede ser igual a la actual.',
       );
     }
 
-    const newHash = await bcrypt.hash(newPassword, BCRYPT_SALT_ROUNDS);
+    const newHash = await this.passwordHash.hash(newPassword);
 
     // Atomic: consume the token (CAS), change the password, revoke every
     // session, and write both audit rows — all or nothing.

@@ -75,6 +75,22 @@ describe('validateEnv', () => {
     ).toThrow(/WHATSAPP_TOKEN_ENCRYPTION_KEY is required in production/);
   });
 
+  it('valida BCRYPT_COST (rango y mínimo 12 en producción)', () => {
+    expect(() => validateEnv({ ...base, BCRYPT_COST: '10' })).not.toThrow();
+    expect(() => validateEnv({ ...base, BCRYPT_COST: '3' })).toThrow(
+      /BCRYPT_COST must be an integer between/,
+    );
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'x'.repeat(32),
+        DATABASE_URL: 'postgresql://u:p@db:5432/app',
+        WHATSAPP_TOKEN_ENCRYPTION_KEY: 'y'.repeat(32),
+        BCRYPT_COST: '10',
+      }),
+    ).toThrow(/BCRYPT_COST must be at least 12 in production/);
+  });
+
   it('rejects a malformed DATABASE_URL whenever present', () => {
     expect(() =>
       validateEnv({ ...base, DATABASE_URL: 'mysql://u:p@db/app' }),

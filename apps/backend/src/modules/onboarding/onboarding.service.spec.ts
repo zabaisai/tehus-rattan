@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 import { OnboardingService } from './onboarding.service';
 import { CreateOnboardingCompanyDto } from './dto/create-onboarding-company.dto';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
@@ -165,6 +166,7 @@ describe('OnboardingService', () => {
       authService,
       auditLogService,
       sessionsService,
+      new PasswordHashService(),
     );
   });
 

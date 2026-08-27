@@ -144,6 +144,19 @@ export function validateEnv(config: Env): Env {
     errors.push('PASSWORD_RESET_TOKEN_TTL_MINUTES must be a positive integer');
   }
 
+  // Coste bcrypt. Por defecto 12 (el mínimo razonable para 2026). En producción
+  // se exige >= 12 para no dejar contraseñas con un coste débil. Fuera de
+  // producción se permite un coste menor para que la suite sea rápida.
+  const bcryptCostRaw = config.BCRYPT_COST?.trim();
+  if (bcryptCostRaw) {
+    const cost = Number(bcryptCostRaw);
+    if (!Number.isInteger(cost) || cost < 4 || cost > 20) {
+      errors.push('BCRYPT_COST must be an integer between 4 and 20');
+    } else if (isProduction && cost < 12) {
+      errors.push('BCRYPT_COST must be at least 12 in production');
+    }
+  }
+
   // Antibot (Cloudflare Turnstile). Opt-in vía CAPTCHA_ENABLED. Cuando el
   // control es obligatorio (enabled) con el proveedor real, el secret es
   // imprescindible: sin él no se puede verificar y el guard bloquearía todo.

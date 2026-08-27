@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
-import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -23,6 +22,7 @@ import {
 } from '../invitation-codes/invitation-code.util';
 import { SessionsService } from '../sessions/sessions.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 
 export interface OnboardingLogoFiles {
   logo?: UploadedLogoFile;
@@ -60,6 +60,7 @@ export class OnboardingService {
     private authService: AuthService,
     private auditLogService: PlatformAuditLogService,
     private sessionsService: SessionsService,
+    private passwordHash: PasswordHashService,
   ) {}
 
   // Accepts either a plain JSON body (existing behavior, unchanged) or a
@@ -184,9 +185,9 @@ export class OnboardingService {
     const companyName = dto.company.name.trim();
     const slug = await this.generateUniqueSlug(companyName);
 
-    const adminPasswordHash = await bcrypt.hash(dto.admin.password, 10);
+    const adminPasswordHash = await this.passwordHash.hash(dto.admin.password);
     const agentPasswordHashes = await Promise.all(
-      agents.map((agent) => bcrypt.hash(agent.password, 10)),
+      agents.map((agent) => this.passwordHash.hash(agent.password)),
     );
 
     const settings = {

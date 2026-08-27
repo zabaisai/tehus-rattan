@@ -28,6 +28,7 @@ import {
 import { buildThrottlerStorage } from './common/throttle/throttler-storage.factory';
 import { PrismaModule } from './prisma/prisma.module';
 import { CaptchaModule } from './common/captcha/captcha.module';
+import { PasswordModule } from './common/password/password.module';
 import { DemoModule } from './common/demo/demo.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
@@ -59,6 +60,8 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     // conocen entre si. Que cada uno tuviera que importarlo convertiria un
     // olvido en un efecto externo desde la empresa de demostracion.
     DemoModule,
+    // Hashing de contraseñas global (coste objetivo + rehash progresivo).
+    PasswordModule,
     // Antibot global (desacoplado): proveedor falso en local/tests, Turnstile
     // en producción. Opt-in vía CAPTCHA_ENABLED; guard fail-closed cuando activo.
     CaptchaModule,

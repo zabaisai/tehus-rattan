@@ -1,6 +1,7 @@
 import { UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
 const fakeContext: SessionRequestContext = {
@@ -25,7 +26,9 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     prisma = {
-      user: { findUnique: jest.fn() },
+      // `update` cubre el rehash progresivo tras un login válido (el hash de
+      // prueba es coste 10 < objetivo, así que se recifra).
+      user: { findUnique: jest.fn(), update: jest.fn().mockResolvedValue({}) },
       company: { create: jest.fn() },
     };
     usersService = {
@@ -49,6 +52,7 @@ describe('AuthService', () => {
       jwtService,
       prisma,
       sessionsService,
+      new PasswordHashService(),
     );
   });
 
