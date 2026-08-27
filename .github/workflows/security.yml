@@ -34,6 +34,11 @@ jobs:
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITLEAKS_CONFIG: .gitleaks.toml
+          # gitleaks-action exige GITHUB_TOKEN para escanear pull requests (lo
+          # usa para leer el diff del PR); es el token automático de solo lectura
+          # que ya concede `permissions: contents: read`. Sin él el job aborta
+          # ANTES de escanear (no es un secreto detectado).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   npm-audit:
     name: Dependency audit (npm)
