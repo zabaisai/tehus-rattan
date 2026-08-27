@@ -87,3 +87,19 @@ jobs:
           queries: security-extended
       - name: Analyze
         uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+
+  postgres-tls:
+    name: PostgreSQL TLS (verify-full) proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Levanta un Postgres TLS efímero con certificados FICTICIOS generados en
+      # un volumen Docker (no hay certificados en el repo, no hay secretos
+      # reales) y comprueba que verify-full+CA conecta, que sin TLS se rechaza y
+      # que verify-full sin la CA correcta falla. El script limpia con `trap`
+      # incluso si falla. No relaja verify-full ni acepta CA/hostname inválidos.
+      - name: Run ephemeral PostgreSQL TLS test
+        run: bash deploy/scripts/test-postgres-tls.sh
