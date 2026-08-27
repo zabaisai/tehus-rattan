@@ -5,6 +5,34 @@ local. Ordenadas por prioridad. Nada de lo de abajo se ejecutó.
 
 ---
 
+## P0 — Rotar TODAS las credenciales locales que se mostraron en salida
+
+Durante la primera fase, el contenido de `apps/backend/.env` (archivo **local**,
+no versionado, no en el historial Git) se imprimió en la salida. Aunque no está
+en el repositorio (gitleaks sobre `--all` lo confirma: *no leaks found*), sus
+valores deben **tratarse como potencialmente comprometidos** y rotarse. Se
+identifican **solo por nombre de variable**; los valores NO se reproducen aquí y
+los secretos locales NO se han modificado ni borrado en esta fase.
+
+Variables a rotar / regenerar (todas en `apps/backend/.env`, entorno local):
+
+| Variable | Tipo | Acción |
+|----------|------|--------|
+| `WHATSAPP_TOKEN` | Token de acceso de Meta (legacy, estaba comentado) | Revocar/rotar en Meta App Dashboard |
+| `WHATSAPP_VERIFY_TOKEN` | Verify token del webhook de Meta | Regenerar y actualizar en la config del webhook de Meta |
+| `WHATSAPP_TOKEN_ENCRYPTION_KEY` | Clave AES-256-GCM de tokens de WhatsApp | Rotar con la ventana de doble clave (ver control 5 / `docs/ROTACION-CLAVE-WHATSAPP.md`) |
+| `JWT_SECRET` | Secreto de firma de JWT | Regenerar (`openssl rand -base64 48`); invalida todas las sesiones activas |
+| `DATABASE_URL` | Cadena de conexión (incluye la contraseña de Postgres) | Cambiar la contraseña del rol de Postgres y actualizar la URL |
+
+Identificadores que también aparecieron pero NO son secretos (no requieren
+rotación, se listan por transparencia): `WHATSAPP_BUSINESS_ACCOUNT_ID`,
+`WHATSAPP_PHONE_NUMBER_ID`.
+
+> Nota: la rotación de `WHATSAPP_TOKEN` (Meta legacy) sigue siendo la más urgente;
+> el resto son claves/valores locales de desarrollo, pero se rotan por haberse
+> mostrado en salida. No es necesario reescribir el historial Git: ninguno de
+> estos valores está en Git.
+
 ## P0 — Rotar el token de acceso de Meta (WhatsApp) legacy
 
 - **Qué:** en `apps/backend/.env` (archivo LOCAL, **no** versionado y **no** en
