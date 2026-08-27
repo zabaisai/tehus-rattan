@@ -96,15 +96,14 @@ configurados en producción.
 - Detección de reutilización de refresh token (control 9).
 - Revalidación periódica del socket WebSocket ya conectado tras revocar la sesión
   (hoy se cierra el canal nuevo; el existente vive hasta expirar el token, 15 min).
-- Firma ZIP/OOXML en el import de productos y servido autenticado de `/uploads`
-  por empresa (control 16).
-- Tope `take` por defecto en listados sin paginar (control 17): el máximo por
-  petición ya está en ≤100; añadir un default que trunque en silencio requiere
-  coordinar la paginación del frontend para no ocultar filas.
-- Subir coste bcrypt a 12 con rehash progresivo (control 10).
-- Altas de dependencias (sharp/libvips, cadena del CLI de Prisma) — se resuelven
-  vía Dependabot cuando haya versión compatible (control 20).
+- Servido autenticado de archivos PRIVADOS por empresa cuando existan (hoy solo
+  hay logos, que son públicos por diseño — control 16).
+- Altas de dependencias del CLI de Prisma / exceljs — se resuelven vía Dependabot
+  cuando haya versión compatible (control 20).
 
-Resueltas en fase 2 (ya NO son deuda): guard global deny-by-default (6), KDF con
-sal + versión (5), rate limiting distribuido en Redis (11), adaptador antibot (12),
-preparación ejecutable de RLS (4).
+Resueltas en fases 2–3 (ya NO son deuda): guard global deny-by-default (6), KDF
+scrypt versionado (5), rate limiting distribuido fail-safe + límite por cuenta
+(11), antibot frontend+backend (12), RLS integrado y probado (4), coste bcrypt 12
++ rehash progresivo (10), validación de inputs con DTOs (14), firma/estructura ZIP
+del import + servido restringido a branding (16), tope máximo en listados (17),
+TLS de Postgres preparado y probado (19), frontend a 0 vulnerabilidades (20).

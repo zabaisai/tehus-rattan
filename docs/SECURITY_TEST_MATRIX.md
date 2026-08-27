@@ -36,8 +36,16 @@ verificado por configuración/escaneo, no por test unit/e2e · `⬜` = no cubier
 | Cifrado: KDF versionado + compatibilidad legacy + rotación | ➕ | `src/modules/whatsapp-token-crypto.compat.spec.ts` |
 | Rate limiting distribuido (Redis, atómico, fail-open) | ➕ | `test/redis-throttler.e2e-spec.ts` (Redis real) |
 | Antibot: fail-closed y verificación server-side | ➕ | `src/common/captcha/captcha.spec.ts` |
-| RLS con el usuario runtime real (aislamiento + WITH CHECK) | ➕ | `prisma/rls/proof.mjs` (base temporal aislada, rol sin BYPASSRLS) — ejecutado en verde |
-| Contexto de empresa sin fugas entre conexiones | ➕ | `src/prisma/tenant-context.ts` (`set_config(..., true)` transaction-scoped) + proof.mjs |
+| RLS con el usuario runtime real (aislamiento + WITH CHECK) | ➕ | `prisma/rls/proof.mjs` + `test/rls-integration.e2e-spec.ts` (cliente Prisma real, rol sin BYPASSRLS) — verde |
+| Contexto de empresa sin fugas entre conexiones | ➕ | `test/rls-integration.e2e-spec.ts` (40 contextos A/B concurrentes, transaction-scoped) |
+| Rate limiting fail-safe ante caída de Redis (nunca ilimitado) | ➕ | `redis-throttler.storage.spec.ts` (degradación→local→recuperación) |
+| Límite por cuenta normalizada (login/recuperación) | ➕ | `account-throttle.guard.spec.ts` |
+| Antibot frontend (widget, verify, expiración) | ➕ | `TurnstileWidget.test.tsx`, `turnstile.test.ts`, `csp.test.ts` |
+| Rehash progresivo de contraseñas (coste 10→12) | ➕ | `password-hash.service.spec.ts` |
+| DTOs de inputs (campos desconocidos, tipos, longitudes) | ➕ | `dto-inline-converted.spec.ts` |
+| Uploads: firma ZIP, zip-bomb, traversal, MIME/extensión falsa | ➕ | `validacion-contenido.spec.ts` (incl. xlsx real y CSV binario/HTML) |
+| Tope máximo por listado (anti-runaway) | ➕ | `contacts.service.spec` + `automations.service.spec` |
+| TLS de Postgres (verify-full conecta, no-TLS rechazado) | ➕ | `deploy/scripts/test-postgres-tls.sh` (Linux/CI; certificados ficticios) |
 
 ## Comandos de verificación ejecutados (local, sobre `main`)
 

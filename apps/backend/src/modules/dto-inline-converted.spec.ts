@@ -56,7 +56,11 @@ describe('DTOs convertidos desde @Body() inline — validación', () => {
       { motivo: 'ok', companyId: 'x' },
       /companyId should not exist/,
     );
-    await rejects(KillSwitchDto, { activo: true, extra: 1 }, /should not exist/);
+    await rejects(
+      KillSwitchDto,
+      { activo: true, extra: 1 },
+      /should not exist/,
+    );
   });
 
   it('rechaza tipos incorrectos', async () => {

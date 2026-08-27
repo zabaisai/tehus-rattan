@@ -112,13 +112,19 @@ describe('RLS — integración con Prisma y rol runtime (e2e, base propia)', () 
     companyB = b.id;
     // Los contactos SÍ están bajo RLS/FORCE: se insertan con contexto.
     await runWithTenant(ownerPrisma, companyA, (tx) =>
-      tx.contact.create({ data: { companyId: companyA, name: 'Ana A', phone: '+100000001' } }),
+      tx.contact.create({
+        data: { companyId: companyA, name: 'Ana A', phone: '+100000001' },
+      }),
     );
     await runWithTenant(ownerPrisma, companyA, (tx) =>
-      tx.contact.create({ data: { companyId: companyA, name: 'Alba A', phone: '+100000002' } }),
+      tx.contact.create({
+        data: { companyId: companyA, name: 'Alba A', phone: '+100000002' },
+      }),
     );
     await runWithTenant(ownerPrisma, companyB, (tx) =>
-      tx.contact.create({ data: { companyId: companyB, name: 'Ber B', phone: '+100000003' } }),
+      tx.contact.create({
+        data: { companyId: companyB, name: 'Ber B', phone: '+100000003' },
+      }),
     );
   });
 
@@ -172,7 +178,9 @@ describe('RLS — integración con Prisma y rol runtime (e2e, base propia)', () 
   it('crear con contexto A queda en A; B no lo ve', async () => {
     if (saltaSiNoHay()) return;
     await runWithTenant(prisma, companyA, (tx) =>
-      tx.contact.create({ data: { companyId: companyA, name: 'Nuevo A', phone: '+100000004' } }),
+      tx.contact.create({
+        data: { companyId: companyA, name: 'Nuevo A', phone: '+100000004' },
+      }),
     );
     const vistosPorB = await runWithTenant(prisma, companyB, (tx) =>
       tx.contact.findMany({ where: { name: 'Nuevo A' } }),

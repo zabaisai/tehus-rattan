@@ -38,30 +38,48 @@ _Actualizado: 2026-08-27._
 | `1d1ed41` | documenta habilitación de TLS a Postgres |
 | `8457634` | limpieza de línea en blanco en el SQL de RLS |
 
+**Fase 3 — cierre de PARCIALes**
+
+| SHA | Qué |
+|-----|-----|
+| `02d2199` | rate limiting fail-SAFE (fallback local) + límite por cuenta |
+| `8a51ef5` | CI: pasar GITHUB_TOKEN a gitleaks (el job ya escanea) |
+| `d358a69` | validación de inputs: 7 `@Body()` inline → DTOs |
+| `e6552f2` | contraseñas: coste 12 + rehash progresivo |
+| `c30eb39` | antibot frontend (widget Turnstile en login) |
+| `b36ccf3` | uploads: validación de contenido ZIP/CSV + servido solo branding |
+| `09165fa` | tope máximo por listado (anti-runaway) |
+| `1e03756` | RLS: contexto por petición + integración probada con rol runtime |
+| `095d239` | TLS de Postgres: config verify-full + prueba local + runbook |
+| `71fc6f1` | dependencias: frontend a 0 vulnerabilidades (next 16.3.3) |
+
 ## Verificación (local, sobre `main`)
 
-- Backend unit: **136 suites / 2186** ✅
-- Backend e2e (base temporal): **67 suites / 966** ✅
+- Backend unit: **141 suites / 2216** ✅
+- Backend e2e (base temporal, incl. RLS integración): ✅ (ver informe)
 - Backend typecheck ✅ · lint (`--no-fix`) ✅ · build ✅
-- Frontend tests: **948** ✅ · lint (1 warning ajeno) ✅ · build ✅
+- Frontend tests: **956** ✅ · typecheck ✅ · lint ✅ · build ✅
 - `prisma migrate deploy` (base vacía): 58 migraciones ✅ · `prisma validate` ✅
-- RLS proof (`node prisma/rls/proof.mjs`, base aislada): ✅
+- RLS: `proof.mjs` + `rls-integration.e2e` (rol runtime real) ✅
+- TLS Postgres: `test-postgres-tls.sh` (Linux/CI; en Windows limitado por MSYS)
 - gitleaks (HEAD, `--all`, commits de la rama): *no leaks found* ✅
-- `npm audit --omit=dev --audit-level=critical`: 0 críticas ✅ (altas documentadas)
+- `npm audit`: **frontend 0 vulns**; backend 0 críticas (altas de tooling documentadas)
 - `git diff --check`: limpio
 
 ## Los 20 controles (resumen)
 
-Ver `docs/SECURITY_HARDENING_20_CONTROLS.md`. Corregidos: 1, 5 (KDF), 6, 7, 9,
-11, 12, 15, 16 (parcial), 17 (campos), 20. Verificados: 2, 3, 8, 10, 13, 14, 18.
-Parciales: 4 (RLS preparado+probado, falta separar rol de BD), 19 (TLS Postgres).
+Ver `docs/SECURITY_HARDENING_20_CONTROLS.md` (tabla única con vocabulario de
+estados). Resumen: 16 **CORREGIDO Y VERIFICADO**; 1 **CÓDIGO COMPLETO — PENDIENTE
+CONFIGURACIÓN** (12 antibot); 2 con parte **PREPARADO Y PROBADO LOCALMENTE —
+PENDIENTE ACTIVACIÓN** (4 RLS, 19 TLS de BD); riesgos aceptados justificados en
+16 (logos públicos) y 20 (altas de tooling).
 
 ## Qué falta (acción humana) — ver `USER_ACTIONS_REQUIRED.md`
 
 1. **P0** rotar las credenciales mostradas en salida (nombres en el doc); ninguna
    está en Git.
-2. **P1** separar rol de BD migración/runtime y **activar** el RLS ya preparado.
-3. **P2** conectar claves reales de Turnstile; **P2** TLS a Postgres.
+2. **P1** separar rol de BD migración/runtime y **activar** el RLS ya integrado.
+3. **P2** crear claves reales de Turnstile; **P2** TLS a Postgres al salir del host.
 
 ## Autorización pendiente
 
