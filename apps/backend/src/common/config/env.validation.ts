@@ -12,9 +12,42 @@ export const GRAPH_API_VERSION_FORMAT = /^v\d+\.\d+$/;
 
 export function validateEnv(config: Env): Env {
   const errors: string[] = [];
+  const isProduction = config.NODE_ENV?.trim() === 'production';
 
-  if (!config.JWT_SECRET?.trim()) {
+  const jwtSecret = config.JWT_SECRET?.trim();
+  if (!jwtSecret) {
     errors.push('JWT_SECRET is required');
+  } else if (isProduction && jwtSecret.length < 32) {
+    // In production a short symmetric secret is brute-forceable; require at
+    // least 32 chars (e.g. `openssl rand -base64 32`). Dev/test keep short
+    // fixtures working.
+    errors.push('JWT_SECRET must be at least 32 characters in production');
+  }
+
+  // DATABASE_URL is consumed only by the generated Prisma client, so a missing
+  // or malformed value otherwise fails lazily at first query. It is required in
+  // production; its shape is validated whenever present (dev/test may inject it
+  // through other means). Never print the value.
+  const databaseUrl = config.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    if (isProduction) errors.push('DATABASE_URL is required in production');
+  } else if (!/^postgres(ql)?:\/\/.+/i.test(databaseUrl)) {
+    errors.push('DATABASE_URL must be a postgres(ql):// connection string');
+  }
+
+  // The WhatsApp access-token encryption key decrypts per-company tokens.
+  // Without it the crypto service throws lazily on first encrypt/decrypt.
+  // Required in production, with a minimum length so a trivially short key
+  // never protects real tokens; dev/test keep short fixtures working.
+  const encryptionKey = config.WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim();
+  if (!encryptionKey) {
+    if (isProduction) {
+      errors.push('WHATSAPP_TOKEN_ENCRYPTION_KEY is required in production');
+    }
+  } else if (isProduction && encryptionKey.length < 32) {
+    errors.push(
+      'WHATSAPP_TOKEN_ENCRYPTION_KEY must be at least 32 characters in production',
+    );
   }
 
   // Opt-in flag: only when the webhook is explicitly enabled do we demand the

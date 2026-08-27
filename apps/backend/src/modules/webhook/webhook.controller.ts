@@ -9,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { timingSafeEqual } from 'crypto';
 import type { Response } from 'express';
 import { WebhookService } from './webhook.service';
 import { WhatsAppSignatureGuard } from './whatsapp-signature.guard';
@@ -39,12 +40,35 @@ export class WebhookController {
     @Query('hub.challenge') challenge: string,
     @Res() res: Response,
   ): void {
-    if (mode === 'subscribe' && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    // text/plain, never text/html: res.send(string) would otherwise default to
+    // HTML and reflect the attacker-supplied hub.challenge as a document.
+    res.type('text/plain');
+
+    const expected = process.env.WHATSAPP_VERIFY_TOKEN;
+    // Fail closed: with no configured verify token there is no handshake to
+    // pass. Without this an unset token turns `undefined === undefined` into a
+    // 200 that reflects arbitrary hub.challenge input.
+    if (
+      mode === 'subscribe' &&
+      expected &&
+      this.tokenMatches(token, expected)
+    ) {
       this.logger.log('Webhook verificado correctamente');
-      res.status(200).send(challenge);
+      res.status(200).send(challenge ?? '');
       return;
     }
     res.status(403).send('Forbidden');
+  }
+
+  // Constant-time comparison of the verify token, mirroring the HMAC path's
+  // timingSafeEqual. Length is checked first so the compare never throws and a
+  // length mismatch is not itself a timing side channel.
+  private tokenMatches(received: unknown, expected: string): boolean {
+    if (typeof received !== 'string') return false;
+    const a = Buffer.from(received);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
   }
 
   // WhatsAppSignatureGuard verifies the X-Hub-Signature-256 HMAC against the

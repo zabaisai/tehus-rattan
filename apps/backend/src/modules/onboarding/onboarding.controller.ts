@@ -12,6 +12,7 @@ import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import type { Request as ExpressRequest, Response } from 'express';
 import { OnboardingInviteGuard } from '../../common/guards/onboarding-invite.guard';
+import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 import {
   THROTTLE_TTL_MS,
   THROTTLE_LIMITS,
@@ -44,7 +45,9 @@ export class OnboardingController {
   @Throttle({
     default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding },
   })
-  @UseGuards(OnboardingInviteGuard)
+  // CookieOriginGuard: this endpoint mints the ADMIN refresh cookie (auto
+  // login), so it needs the same CSRF Origin allowlist as login/refresh/logout.
+  @UseGuards(CookieOriginGuard, OnboardingInviteGuard)
   @Post('company')
   @UseInterceptors(
     FileFieldsInterceptor(

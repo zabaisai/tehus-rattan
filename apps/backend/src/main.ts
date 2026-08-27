@@ -56,7 +56,24 @@ async function bootstrap() {
   applySecurityHeaders(app);
 
   app.setGlobalPrefix('api');
-  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
+  // Static company assets (branding logos). Hardened serving:
+  //  - index:false     — no directory listing, so /uploads/branding/ cannot
+  //                      enumerate company ids.
+  //  - dotfiles:deny   — never serve a dotfile that lands here.
+  //  - Content-Disposition + a safe Content-Type: files are downloaded/rendered
+  //    as their real type, never sniffed or run inline as HTML in this origin.
+  // Note: these files are intentionally public (the frontend <img> loads them
+  // without an Authorization header). Cross-tenant confidentiality of logos is
+  // NOT provided here — see SECURITY_HARDENING_20_CONTROLS.md (control 16).
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
+    prefix: '/uploads',
+    index: false,
+    dotfiles: 'deny',
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('Content-Disposition', 'inline');
+    },
+  });
 
   app.enableCors(buildCorsOptions(process.env));
 

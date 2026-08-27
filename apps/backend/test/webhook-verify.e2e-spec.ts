@@ -141,6 +141,38 @@ describe('WhatsApp webhook GET verify handshake, with main.ts globals (e2e)', ()
     await expectServerStillAlive();
   });
 
+  it('fails closed when no verify token is configured (no reflection)', async () => {
+    // With WHATSAPP_VERIFY_TOKEN unset, a bare `?hub.mode=subscribe` used to
+    // reflect hub.challenge as text/html with 200 (undefined === undefined).
+    // It must now be a flat 403 regardless of what the client sends.
+    delete process.env.WHATSAPP_VERIFY_TOKEN;
+    try {
+      await request(app.getHttpServer())
+        .get('/api/webhook')
+        .query({
+          'hub.mode': 'subscribe',
+          'hub.challenge': '<script>x</script>',
+        })
+        .expect(403)
+        .expect('Forbidden');
+    } finally {
+      process.env.WHATSAPP_VERIFY_TOKEN = VERIFY_TOKEN;
+    }
+  });
+
+  it('serves the challenge as text/plain, never text/html', async () => {
+    await request(app.getHttpServer())
+      .get('/api/webhook')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': VERIFY_TOKEN,
+        'hub.challenge': 'challenge-abc',
+      })
+      .expect(200)
+      .expect('Content-Type', /text\/plain/)
+      .expect('challenge-abc');
+  });
+
   it('valid token but no challenge: answers 200 with an empty body, no crash', async () => {
     // Documents today's behavior for a partial query (Meta always sends
     // hub.challenge). The point of the case is the absence of a 500, not the
@@ -163,6 +195,7 @@ describe('WhatsApp webhook GET verify handshake, with main.ts globals (e2e)', ()
     const res = {
       status: jest.fn().mockReturnThis(),
       send: jest.fn().mockReturnThis(),
+      type: jest.fn().mockReturnThis(),
     };
 
     const returned = controller.verify(

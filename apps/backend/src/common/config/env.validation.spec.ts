@@ -43,6 +43,44 @@ describe('validateEnv', () => {
     ).not.toThrow();
   });
 
+  it('enforces production-only requirements (JWT length, DATABASE_URL, encryption key)', () => {
+    const prod = { NODE_ENV: 'production' };
+
+    // Short JWT secret is fine outside production, rejected in production.
+    expect(() => validateEnv({ JWT_SECRET: 'short' })).not.toThrow();
+    expect(() => validateEnv({ ...prod, JWT_SECRET: 'short' })).toThrow(
+      /JWT_SECRET must be at least 32 characters/,
+    );
+
+    // A fully valid production config passes.
+    expect(() =>
+      validateEnv({
+        ...prod,
+        JWT_SECRET: 'x'.repeat(32),
+        DATABASE_URL: 'postgresql://u:p@db:5432/app',
+        WHATSAPP_TOKEN_ENCRYPTION_KEY: 'y'.repeat(32),
+      }),
+    ).not.toThrow();
+
+    // Missing DATABASE_URL / encryption key in production are reported.
+    expect(() => validateEnv({ ...prod, JWT_SECRET: 'x'.repeat(32) })).toThrow(
+      /DATABASE_URL is required in production/,
+    );
+    expect(() =>
+      validateEnv({
+        ...prod,
+        JWT_SECRET: 'x'.repeat(32),
+        DATABASE_URL: 'postgresql://u:p@db:5432/app',
+      }),
+    ).toThrow(/WHATSAPP_TOKEN_ENCRYPTION_KEY is required in production/);
+  });
+
+  it('rejects a malformed DATABASE_URL whenever present', () => {
+    expect(() =>
+      validateEnv({ ...base, DATABASE_URL: 'mysql://u:p@db/app' }),
+    ).toThrow(/DATABASE_URL must be a postgres/);
+  });
+
   it('validates the Graph API version format when present', () => {
     expect(() =>
       validateEnv({ ...base, WHATSAPP_GRAPH_API_VERSION: 'v22.0' }),

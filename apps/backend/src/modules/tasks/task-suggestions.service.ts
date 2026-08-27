@@ -200,6 +200,24 @@ export class TaskSuggestionsService {
         );
       }
 
+      // El asesor puede corregir el asignado antes de aceptar. Ese `assignedTo`
+      // llega del cliente y DEBE pertenecer a la misma empresa y estar activo:
+      // sin esta comprobación se podría crear una tarea asignada a un usuario de
+      // otra empresa (escritura cross-tenant). Misma regla que TasksService.
+      const asignado =
+        ajustes.assignedTo !== undefined
+          ? ajustes.assignedTo
+          : propuesta.suggestedAssignee;
+      if (asignado) {
+        const usuario = await tx.user.findFirst({
+          where: { id: asignado, companyId, isActive: true },
+          select: { id: true },
+        });
+        if (!usuario) {
+          throw new NotFoundException('Usuario asignado no encontrado');
+        }
+      }
+
       const tarea = await tx.task.create({
         data: {
           companyId,
@@ -210,10 +228,7 @@ export class TaskSuggestionsService {
           priority: ajustes.priority ?? propuesta.priority,
           dueDate:
             ajustes.dueAt !== undefined ? ajustes.dueAt : propuesta.dueAt,
-          assignedTo:
-            ajustes.assignedTo !== undefined
-              ? ajustes.assignedTo
-              : propuesta.suggestedAssignee,
+          assignedTo: asignado,
           contactId: propuesta.contactId,
           conversationId: propuesta.conversationId,
           leadId: propuesta.leadId,

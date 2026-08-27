@@ -68,6 +68,24 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getLeadsByStage — aislamiento por embudo', () => {
+    it('exige que el embudo pertenezca a la empresa del token', async () => {
+      prisma.pipelineStage.findMany.mockResolvedValue([]);
+
+      await service.getLeadsByStage('empresa-1', 'pipeline-de-otra');
+
+      // La comprobación de pertenencia viaja DENTRO del where, vía la relación
+      // pipeline: un pipelineId ajeno no encuentra fila y no filtra etapas.
+      const where = prisma.pipelineStage.findMany.mock.calls[0][0].where;
+      expect(where).toEqual(
+        expect.objectContaining({
+          pipelineId: 'pipeline-de-otra',
+          pipeline: { companyId: 'empresa-1' },
+        }),
+      );
+    });
+  });
+
   describe('getSalesTrend — ventana', () => {
     it('recorta days a 7–90 y devuelve un punto por día', async () => {
       expect((await service.getSalesTrend('e1', 1)).days).toBe(7);
