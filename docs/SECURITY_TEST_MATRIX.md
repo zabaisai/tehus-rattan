@@ -46,7 +46,9 @@ verificado por configuración/escaneo, no por test unit/e2e · `⬜` = no cubier
 | DTOs de inputs (campos desconocidos, tipos, longitudes) | ➕ | `dto-inline-converted.spec.ts` |
 | Uploads: firma ZIP, zip-bomb, traversal, MIME/extensión falsa | ➕ | `validacion-contenido.spec.ts` (incl. xlsx real y CSV binario/HTML) |
 | Tope máximo por listado (anti-runaway) | ➕ | `contacts.service.spec` + `automations.service.spec` |
-| TLS de Postgres (verify-full conecta, no-TLS rechazado) | 📄 | `deploy/scripts/test-postgres-tls.sh` — **pendiente ejecución en Linux/CI** (no verde en Windows) |
+| Webhook GET: challenge hostil no se refleja (reflected XSS) | ➕ | `test/webhook-verify.e2e-spec.ts` (token válido + `<script>`, saltos de línea, valor larguísimo, otros metacaracteres → 400 sin reflejar; challenge legítimo numérico intacto). Allowlist estricta antes de `res.send` |
+| Import upload: la ruta se construye del server-dir + clave del servidor (path injection) | ➕ | `products.controller.import-path.spec.ts` (flujo CSV/XLSX real registra con `file.filename`; clave manipulada → 400 sin tocar `file.path`) + `almacenamiento-importaciones.spec.ts` (`resolverRutaDeClave`: traversal/absoluta/separador/nulo → 400; contención en raíz) |
+| TLS de Postgres (verify-full conecta, no-TLS rechazado, sin-CA falla) | ✅ | `deploy/scripts/test-postgres-tls.sh` — **ejecutado en verde en GitHub Actions Linux** (job `postgres-tls`, `ubuntu-latest`, certificados efímeros ficticios). No implica que la BD real use TLS |
 
 ## Comandos de verificación ejecutados (local, sobre `main`)
 

@@ -1,10 +1,19 @@
 # TLS de PostgreSQL — estado, activación y rollback
 
-Estado: **TLS DE BD PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX**. La
-configuración y el script de prueba están; el script **no se ejecutó en verde en
-el equipo de esta sesión** (Git Bash sobre Windows mangla los argumentos
-`/certs/...` de `docker run` por MSYS, y `--network host` no funciona en Docker
-Desktop). Debe ejecutarse en Linux/CI. No se afirma que la base real use TLS.
+Estado: **TLS DE BD PREPARADO — PRUEBA EJECUTADA EN VERDE EN CI LINUX**. La
+prueba `deploy/scripts/test-postgres-tls.sh` se ejecuta en GitHub Actions sobre
+`ubuntu-latest` (job `postgres-tls` de `.github/workflows/security.yml`) y pasó,
+verificando sobre un PostgreSQL TLS efímero con certificados ficticios:
+
+- `verify-full` con la CA correcta **conecta**;
+- una conexión **sin TLS** (`sslmode=disable`) es **rechazada**;
+- `verify-full` **sin** la CA correcta **falla**.
+
+En Git Bash sobre Windows el script no corre en verde (MSYS mangla los
+argumentos `/certs/...` de `docker run` y `--network host` no funciona en Docker
+Desktop); por eso la prueba vive en CI Linux. **Esto NO significa que la base de
+datos real use TLS**: es la prueba de la configuración objetivo, no su
+activación en un entorno real (ver «Cuándo pasa a ser obligatorio»).
 
 ## Caso actual (aceptado y justificado)
 
@@ -43,7 +52,7 @@ cifrada y con verificación de servidor.
 - **Certificados y claves privadas NUNCA en Git.** Se generan/gestionan fuera
   del repositorio (o con un emisor/ACME interno) y se montan como secretos.
 
-## Prueba local (certificados ficticios, fuera del repo)
+## Prueba (certificados ficticios, fuera del repo)
 
 `deploy/scripts/test-postgres-tls.sh` levanta un PostgreSQL TLS **efímero** con
 certificados ficticios generados en un volumen de Docker (no toca ninguna base
@@ -53,9 +62,11 @@ real ni deja certificados en Git) y comprueba, con `psql`:
 2. `sslmode=disable` es **rechazado** (pg_hba exige `hostssl`);
 3. `verify-full` **sin** la CA correcta **falla** la verificación.
 
-Ejecutar en un shell POSIX (Linux/macOS/CI). En Git Bash sobre Windows la
-conversión de rutas de MSYS mangla los argumentos `/certs/...` de `docker run`,
-por lo que la comprobación debe correrse en Linux/CI (ver la nota en el script).
+Se ejecuta automáticamente en CI Linux (job `postgres-tls`, `ubuntu-latest`, sin
+secretos reales, con limpieza por `trap`) y **pasó en verde**. Para correrla en
+local hace falta un shell POSIX (Linux/macOS): en Git Bash sobre Windows la
+conversión de rutas de MSYS mangla los argumentos `/certs/...` de `docker run`
+(ver la nota en el script).
 
 ## Procedimiento de ACTIVACIÓN en staging
 

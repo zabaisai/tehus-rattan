@@ -61,7 +61,13 @@ _Actualizado: 2026-08-27._
 - Frontend tests: **956** ✅ · typecheck ✅ · lint ✅ · build ✅
 - `prisma migrate deploy` (base vacía): 58 migraciones ✅ · `prisma validate` ✅
 - RLS: `proof.mjs` + `rls-integration.e2e` (rol runtime real) ✅
-- TLS Postgres: `test-postgres-tls.sh` (Linux/CI; en Windows limitado por MSYS)
+- TLS Postgres: `test-postgres-tls.sh` **ejecutado en verde en CI Linux**
+  (`ubuntu-latest`, job `postgres-tls`): verify-full+CA conecta, no-TLS
+  rechazado, verify-full sin CA falla. NO implica que la BD real use TLS.
+- CodeQL: cerradas las dos observaciones abiertas — reflected XSS en el GET del
+  webhook (validación estricta del challenge antes de reflejarlo) y ruta no
+  controlada en la subida de import (ruta reconstruida del server-dir + clave del
+  servidor, resuelta canónicamente y confinada). Con pruebas dedicadas.
 - gitleaks (HEAD, `--all`, commits de la rama): *no leaks found* ✅
 - `npm audit`: **frontend 0 vulns**; backend 0 críticas (altas de tooling documentadas)
 - `git diff --check`: limpio
@@ -75,8 +81,9 @@ de estados). Resumen honesto tras la verificación de fase 3:
 - 4 (RLS): **PREPARADO Y PROBADO DE FORMA AISLADA — ADOPCIÓN EN SERVICIOS
   PENDIENTE** (los 67 servicios usan `this.prisma` directo; probado por
   `rls-real-path.e2e`).
-- 19 (TLS de BD): **PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX** (el script no
-  corre en verde en Windows).
+- 19 (TLS de BD): **PREPARADO — PRUEBA EJECUTADA EN VERDE EN CI LINUX** (job
+  `postgres-tls`; el script no corre en verde en Windows por MSYS). Sigue sin
+  activarse en ninguna base real.
 - Riesgos aceptados y justificados: 16 (logos públicos), 20 (CLI de Prisma =
   devDependency; exceljs→uuid no alcanzable por archivo del usuario).
 
