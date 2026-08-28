@@ -11,6 +11,9 @@ secreto nuevo, ningún cambio destructivo, ningún servicio real activado.**
   falta poner claves/valores reales.
 - **PREPARADO Y PROBADO LOCALMENTE — PENDIENTE ACTIVACIÓN** — código y pruebas
   hechos; falta un paso de infraestructura para activarlo en un entorno real.
+- **PREPARADO Y PROBADO EN CI — PENDIENTE ACTIVACIÓN REAL** — la configuración
+  objetivo pasó una prueba automatizada aislada, pero todavía no está activa en
+  la infraestructura real.
 - **BLOQUEADO POR ACCIÓN HUMANA** — requiere una decisión/acción humana antes de
   poder hacerse.
 - **RIESGO ACEPTADO Y JUSTIFICADO** — se decide no cambiarlo, con motivo.
@@ -37,7 +40,7 @@ secreto nuevo, ningún cambio destructivo, ningún servicio real activado.**
 | 16 | Subida de archivos | CORREGIDO Y VERIFICADO | validación de contenido `validacion-contenido.ts` (firma ZIP, anti-bomba, traversal, CSV); servido SOLO de `uploads/branding` | `validacion-contenido.spec` (firma falsa, bomba×2, traversal, xlsx real, csv binario/HTML) | Logos públicos = RIESGO ACEPTADO Y JUSTIFICADO (categoría pública explícita) |
 | 17 | Recorte de respuestas de API | CORREGIDO Y VERIFICADO | `select` explícitos (sin passwordHash); `MAX_LIST_ROWS` en todo listado | specs de servicios + caps | — |
 | 18 | Headers de seguridad | CORREGIDO Y VERIFICADO | Helmet + CSP (`csp.ts`) + Caddy | `security-headers.e2e`, `csp.test`, `smoke-test.sh` | `script-src 'unsafe-inline'` (deuda Next, doc) |
-| 19 | Forzar HTTPS | CORREGIDO Y VERIFICADO (edge); TLS de BD: PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX | Caddy TLS/HSTS; `docs/POSTGRES_TLS.md`, `deploy/scripts/test-postgres-tls.sh` | `security-headers.e2e`, `csp.test`, `smoke-test.sh`; script TLS NO ejecutado en verde (host Windows, MSYS) | Ejecutar el script TLS en Linux/CI; habilitar TLS a Postgres al salir del host (P2) |
+| 19 | Forzar HTTPS | CORREGIDO Y VERIFICADO (edge); TLS de BD: PREPARADO Y PROBADO EN CI — PENDIENTE ACTIVACIÓN REAL | Caddy TLS/HSTS; `docs/POSTGRES_TLS.md`, `deploy/scripts/test-postgres-tls.sh`, job `postgres-tls` | `security-headers.e2e`, `csp.test`, `smoke-test.sh`; CI Linux: verify-full+CA conecta, no-TLS rechazado y verify-full sin CA falla | La BD real sigue sin TLS mientras PostgreSQL permanezca en la red Docker privada del mismo host; activarlo al salir del host (P2) |
 | 20 | Escaneo de dependencias y cadena de suministro | CORREGIDO Y VERIFICADO | `security.yml` (gitleaks/npm-audit/CodeQL) + `dependabot.yml`; **frontend 0 vulns** (next 16.3.3) | `npm audit` back/front; `validacion-contenido.spec` (gate previo a exceljs) | Backend: altas del **CLI de Prisma** (devDependency, no runtime) + moderada de **exceljs→uuid** NO alcanzable por archivo del usuario → RIESGO ACEPTADO Y JUSTIFICADO (ver tabla de vulnerabilidades) |
 
 ## Detalle por control
@@ -162,15 +165,19 @@ policy, sin X-Powered-By), CSP del frontend (sin unsafe-eval en prod; wss y
 Meta/Turnstile solo cuando aplican), HSTS en Caddy. `'unsafe-inline'` en script-src
 es deuda de Next documentada.
 
-### 19. Forzar HTTPS — CORREGIDO Y VERIFICADO (edge); TLS de BD: PREPARADO — PENDIENTE EJECUCIÓN EN CI LINUX
-Caddy termina TLS con HSTS, cookies `secure` en prod, `X-Forwarded-Proto` con
-trust proxy 1, WebSockets `wss` (verificado). TLS a Postgres: `docs/POSTGRES_TLS.md`
-(verify-full + CA, activación y rollback) y `deploy/scripts/test-postgres-tls.sh`
-(certificados ficticios en volumen Docker; comprueba que verify-full+CA conecta,
-sin-TLS se rechaza y verify-full sin CA falla). **El script NO se ejecutó en verde
-en este equipo:** Git Bash sobre Windows mangla los argumentos `/certs/...` de
-`docker run` (MSYS) y `--network host` no funciona en Docker Desktop, así que la
-verificación debe correrse en Linux/CI. No se afirma que la BD real use TLS.
+### 19. Forzar HTTPS — CORREGIDO Y VERIFICADO (edge); TLS DE BD PREPARADO Y PROBADO EN CI — PENDIENTE ACTIVACIÓN REAL
+Caddy termina TLS con HSTS, cookies `secure` en producción, `X-Forwarded-Proto`
+con trust proxy 1 y WebSockets `wss` (verificado). Para PostgreSQL,
+`deploy/scripts/test-postgres-tls.sh` se ejecuta en GitHub Actions sobre
+`ubuntu-latest` y pasó con certificados ficticios efímeros: `verify-full` con la
+CA correcta conecta, `sslmode=disable` es rechazado y `verify-full` sin la CA
+correcta falla. Ninguna alerta se silenció y no se usaron secretos reales.
+
+Esta prueba valida la configuración objetivo; **no significa que la base real ya
+use TLS**. Actualmente backend, worker y PostgreSQL permanecen en la red Docker
+privada del mismo VPS, sin puerto publicado. TLS deberá activarse con
+`verify-full` y una CA válida cuando PostgreSQL salga del host. El procedimiento
+y rollback están en `docs/POSTGRES_TLS.md`.
 
 ### 20. Dependencias y cadena de suministro — CORREGIDO Y VERIFICADO
 `security.yml` (gitleaks + npm audit + CodeQL) con permisos mínimos y acciones
