@@ -110,9 +110,7 @@ export class WhatsAppMetaClientService {
         verifiedName: n?.verified_name || undefined,
         platformType: n?.platform_type || undefined,
         isOnBizApp:
-          typeof n?.is_on_biz_app === 'boolean'
-            ? n.is_on_biz_app
-            : undefined,
+          typeof n?.is_on_biz_app === 'boolean' ? n.is_on_biz_app : undefined,
       }));
     } catch (error) {
       throw this.normalize(error, 'WABA_LOOKUP_FAILED');
