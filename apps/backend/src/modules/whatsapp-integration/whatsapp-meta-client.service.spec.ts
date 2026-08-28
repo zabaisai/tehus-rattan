@@ -66,7 +66,7 @@ describe('WhatsAppMetaClientService', () => {
   });
 
   describe('listPhoneNumbers', () => {
-    it('parses id / display / verified name / platform type', async () => {
+    it('parses phone metadata including the official coexistence flag', async () => {
       mockedAxios.get.mockResolvedValue({
         data: {
           data: [
@@ -74,17 +74,21 @@ describe('WhatsAppMetaClientService', () => {
               id: '123',
               display_phone_number: '+57 300 555 4521',
               verified_name: 'Tehus QA',
-              platform_type: 'COEXISTENCE',
+              platform_type: 'CLOUD_API',
+              is_on_biz_app: true,
             },
           ],
         },
       });
       const numbers = await service.listPhoneNumbers('waba-1', 'token');
+      const [, opts] = mockedAxios.get.mock.calls[0];
+      expect((opts as any).params.fields).toContain('is_on_biz_app');
       expect(numbers[0]).toEqual({
         id: '123',
         displayPhoneNumber: '+57 300 555 4521',
         verifiedName: 'Tehus QA',
-        platformType: 'COEXISTENCE',
+        platformType: 'CLOUD_API',
+        isOnBizApp: true,
       });
     });
 
