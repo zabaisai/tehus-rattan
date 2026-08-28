@@ -57,8 +57,24 @@ export class WebhookController {
       expected &&
       this.tokenMatches(token, expected)
     ) {
+      // hub.challenge es un token OPACO que genera Meta y que solo devolvemos
+      // tal cual. Antes de reflejarlo se valida contra una allowlist estricta:
+      // caracteres de token URL-safe ([A-Za-z0-9_-]) y longitud acotada. Ese
+      // conjunto es un superconjunto de cualquier challenge real de Meta (un
+      // token alfanumérico aleatorio) y EXCLUYE todos los metacaracteres de
+      // HTML/JS (`<`, `>`, `&`, `"`, `'`, `/`, espacios y saltos de línea), de
+      // modo que el valor reflejado nunca puede formar marcado ni salir del
+      // cuerpo text/plain. Un challenge presente pero inválido se RECHAZA (400)
+      // en lugar de reflejarse. Esta guarda es además la barrera-sanitizador de
+      // la ruta reflected-XSS hacia `res.send` (validada por CodeQL). No cambia
+      // el handshake oficial: un challenge legítimo pasa intacto.
+      const challengeStr = challenge ?? '';
+      if (challengeStr !== '' && !/^[A-Za-z0-9_-]{1,256}$/.test(challengeStr)) {
+        res.status(400).send('Bad Request');
+        return;
+      }
       this.logger.log('Webhook verificado correctamente');
-      res.status(200).send(challenge ?? '');
+      res.status(200).send(challengeStr);
       return;
     }
     res.status(403).send('Forbidden');
