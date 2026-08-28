@@ -11,16 +11,21 @@ bypass Meta authentication.
 
 ## Flow
 
-1. An ADMIN/SUPER_ADMIN opens *Configuración → WhatsApp* and clicks **"Conectar
-   con Meta"**.
+1. An ADMIN/SUPER_ADMIN opens *Configuración → WhatsApp* and chooses:
+   **"Conectar mi WhatsApp actual"** (the primary, Coexistence path) or
+   **"Usar un número nuevo"** (standard Cloud API onboarding).
 2. Frontend calls `POST /api/whatsapp-integrations/me/embedded-signup/start`.
    The backend mints a **single-use state** (32 random bytes; only its SHA-256
    hash is stored; short TTL) and returns **public** config only:
    `{ appId, configId, graphVersion, state, expiresAt }` — never the app secret.
 3. Frontend loads Meta's official JS SDK (`connect.facebook.net/en_US/sdk.js`),
    calls `FB.login` with `config_id`, `response_type: 'code'`,
-   `override_default_response_type: true`, and listens for the `WA_EMBEDDED_SIGNUP`
-   window message.
+   `override_default_response_type: true` and `sessionInfoVersion: '3'`, and
+   listens for the `WA_EMBEDDED_SIGNUP` window message. For the existing-number
+   path it also sends Meta's official
+   `featureType: 'whatsapp_business_app_onboarding'`. The login callback and
+   session message are awaited independently because Meta does not guarantee
+   their order.
 4. On **FINISH**, the message yields `phone_number_id`, `waba_id`, `business_id`
    and `FB.login` returns a **30-second exchangeable code**.
 5. Frontend posts `{ state, code, phoneNumberId, wabaId, businessId }` to
@@ -77,7 +82,9 @@ docs, or screenshots.
 
 1. Create/choose a **Meta app** (type: Business). Add the **WhatsApp** and
    **Facebook Login for Business** products.
-2. Configure an **Embedded Signup** configuration and note its **configuration id**.
+2. Create a **Facebook Login for Business / Embedded Signup v4**
+   configuration, select only the WhatsApp products TAKTO needs, and note its
+   **configuration id**. Do not reuse an obsolete v2/v3 configuration.
 3. Request the permissions **`whatsapp_business_management`** and
    **`whatsapp_business_messaging`** on the app (App Review as required).
 4. Copy the **App ID** and **App Secret** (Settings → Basic).
@@ -111,8 +118,9 @@ fully locked down. No app secret is ever exposed to the browser.
   `whatsapp_business_messaging`) via the Embedded Signup configuration.
 - **Multi-tenant isolation**: `companyId` from JWT only; `phoneNumberId` is
   globally unique and a second company connecting the same number gets **409**.
-- **Idempotency**: state is single-use; the integration upsert is keyed on
-  `companyId`; subscribing the WABA is idempotent on Meta's side.
+- **Idempotency**: state is single-use; the integration upsert is keyed on the
+  globally unique `phoneNumberId`; subscribing the WABA is idempotent on
+  Meta's side.
 - **Timeouts** on every Meta call; **redacted logs** (never the code, token, or
   Meta payload — only a non-secret error classifier); **generic** user-facing
   errors.
@@ -127,17 +135,60 @@ fully locked down. No app secret is ever exposed to the browser.
   explicitly-confirmed step — the automatic flow does **not** register.
 - **Migrated number**: moving from another BSP/on-prem. Requires the migration
   flow and registration; **always warn the user first**.
-- **Coexistence** (number already live in the WhatsApp Business app): detected
-  from the phone's platform type. The flow **only** subscribes the WABA and
-  stores the token — it **never registers, migrates or deregisters** the number,
-  so it keeps working in the Business app. Prefer Coexistence when Meta offers
-  it. Do not promise Coexistence when the account/country is not eligible.
+- **Coexistence** (number already live in the WhatsApp Business app): requested
+  explicitly through Meta's `whatsapp_business_app_onboarding` flow and
+  confirmed server-side with Meta's official `is_on_biz_app` phone-number
+  field (with `platform_type` only as a compatibility fallback). The flow
+  **only** subscribes the WABA and stores the token — it **never registers,
+  migrates or deregisters** the number, so an eligible number keeps working in
+  the Business app. Do not promise Coexistence when Meta does not offer it for
+  the customer's account, number or country.
 
-  **Coexistence limitations (per Meta):** requires the latest WhatsApp Business
-  app, a linked Facebook Page, and a QR-code scan during signup. Messages sync
-  across app and API; Meta syncs roughly the last 6 months of chats/contacts and
-  ~180 days of message history (no media). Exact eligibility and sync windows
-  follow Meta's current documentation.
+  **Coexistence limitations:** verification and any QR/code confirmation are
+  rendered and controlled by Meta, not by TAKTO. Eligibility, history sync,
+  supported message types and the exact wording shown inside WhatsApp can
+  change by account, app version, country and Meta policy. TAKTO must show
+  only conditional language until a real-number test confirms the behavior.
+
+## Customer experience (Kommo-style)
+
+The customer never pastes an access token, WABA id, app secret or system-user
+credential into TAKTO. The intended flow is:
+
+1. Click **Conectar mi WhatsApp actual**.
+2. Complete Meta's own authentication.
+3. Enter/select the existing WhatsApp Business number.
+4. Confirm the connection using the method Meta presents (for example a
+   confirmation in the Business app, QR, SMS or voice code depending on the
+   flow and eligibility).
+5. Return automatically to TAKTO with the number connected and the webhook
+   subscribed.
+
+TAKTO must not implement or send its own phone-verification OTP. The notice a
+person may see in WhatsApp saying that a number is associated with a Meta
+business/platform service is also rendered by Meta/WhatsApp; TAKTO cannot force
+its exact text.
+
+The TAKTO operator configures one provider app globally. Each customer then
+authorizes their own WABA and customer-scoped token. Tokens are encrypted per
+tenant, incoming webhooks are routed by the globally unique `phone_number_id`,
+and no customer needs operator assistance for routine onboarding.
+
+## Meta production gate (human/external)
+
+Code readiness alone does not make this available to arbitrary customer
+companies. Before enabling the feature in production, the TAKTO operator must:
+
+- complete Meta business verification and Tech Provider onboarding;
+- obtain Advanced Access/App Review approval for
+  `whatsapp_business_management` and `whatsapp_business_messaging`;
+- create the current Embedded Signup v4 configuration with WhatsApp Business
+  app onboarding/Coexistence enabled;
+- configure the production HTTPS domain and webhook callback in Meta;
+- place the App ID, configuration ID and App Secret in the deployment secret
+  store (never Git), then rebuild the frontend with the matching public ids;
+- validate one eligible existing Business app number and one new test number
+  end to end before making the feature generally available.
 
 ## Disconnect semantics
 

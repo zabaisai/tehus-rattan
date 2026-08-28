@@ -73,11 +73,16 @@ describe('WhatsAppConnect', () => {
     });
   });
 
-  it('renders the disconnected view with the "Conectar con Meta" button', async () => {
+  it('offers existing-number coexistence first and a new-number fallback', async () => {
     wa.getWhatsAppConnectionStatus.mockResolvedValue(DISCONNECTED);
     renderConnect();
     expect(await screen.findByText('Conecta tu WhatsApp Business')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Conectar con Meta/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Conectar mi WhatsApp actual/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /Usar un número nuevo/i }),
+    ).toBeInTheDocument();
   });
 
   it('runs the full connect flow and posts the code + ids to the backend', async () => {
@@ -92,12 +97,39 @@ describe('WhatsAppConnect', () => {
     wa.completeEmbeddedSignup.mockResolvedValue(CONNECTED);
 
     renderConnect();
-    await userEvent.click(await screen.findByRole('button', { name: /Conectar con Meta/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /Conectar mi WhatsApp actual/i }));
 
+    expect(sdk.launchEmbeddedSignup).toHaveBeenCalledWith(
+      {},
+      'cfg',
+      'COEXISTENCE',
+    );
     await waitFor(() =>
       expect(wa.completeEmbeddedSignup).toHaveBeenCalledWith({
         state: 'st', code: 'the-code', phoneNumberId: '123', wabaId: '456', businessId: '789',
       }),
+    );
+  });
+
+  it('uses standard Embedded Signup when the company selects a new number', async () => {
+    wa.getWhatsAppConnectionStatus.mockResolvedValue(DISCONNECTED);
+    wa.startEmbeddedSignup.mockResolvedValue({
+      appId: 'app', configId: 'cfg', graphVersion: 'v25.0', state: 'st', expiresAt: 'x',
+    });
+    sdk.loadFacebookSdk.mockResolvedValue({});
+    sdk.launchEmbeddedSignup.mockRejectedValue(new Error('stop after mode check'));
+
+    renderConnect();
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Usar un número nuevo/i }),
+    );
+
+    await waitFor(() =>
+      expect(sdk.launchEmbeddedSignup).toHaveBeenCalledWith(
+        {},
+        'cfg',
+        'STANDARD',
+      ),
     );
   });
 
@@ -111,7 +143,7 @@ describe('WhatsAppConnect', () => {
     sdk.launchEmbeddedSignup.mockRejectedValue(new EmbeddedSignupError('CANCELLED'));
 
     renderConnect();
-    await userEvent.click(await screen.findByRole('button', { name: /Conectar con Meta/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /Conectar mi WhatsApp actual/i }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/Cancelaste/i);
     expect(wa.completeEmbeddedSignup).not.toHaveBeenCalled();
   });

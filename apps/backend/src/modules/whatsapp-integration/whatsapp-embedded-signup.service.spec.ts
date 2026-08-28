@@ -202,14 +202,15 @@ describe('WhatsAppEmbeddedSignupService', () => {
       expect(res.maskedPhoneNumber).not.toContain('300');
     });
 
-    it('detects Coexistence from the phone platform type and never registers the number', async () => {
+    it('detects Coexistence from Meta is_on_biz_app and never registers the number', async () => {
       const { service, metaClient, tx } = build({
         metaClient: {
           listPhoneNumbers: jest.fn().mockResolvedValue([
             {
               id: dto.phoneNumberId,
               displayPhoneNumber: '+57 300 555 4521',
-              platformType: 'COEXISTENCE',
+              platformType: 'CLOUD_API',
+              isOnBizApp: true,
             },
           ]),
         },
