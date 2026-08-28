@@ -146,8 +146,14 @@ export function resolverRutaDeClave(
   raiz: string = carpetaDeAlmacenamiento(),
 ): string {
   exigirClave(clave);
+  // `basename` descarta cualquier componente de directorio: sobre una clave que
+  // `claveSegura` ya validó (sin separadores) es una identidad, pero deja la
+  // ruta construida A PARTIR de un nombre plano. Es a la vez defensa en
+  // profundidad y la barrera que CodeQL reconoce para el path-injection: el
+  // valor que llega a `fs` pasa por `basename`, no por la entrada cruda.
+  const base = path.basename(clave);
   const raizResuelta = path.resolve(raiz);
-  const completa = path.resolve(raizResuelta, clave);
+  const completa = path.resolve(raizResuelta, base);
   if (
     completa !== raizResuelta &&
     !completa.startsWith(raizResuelta + path.sep)

@@ -8,10 +8,7 @@ import { ProductsService } from './products.service';
 import { ImportacionDeProductosService } from './import/importacion.service';
 import { ImportacionQueue } from './import/importacion.queue';
 import { SubirImportacionDto } from './import/dto';
-import {
-  generarClave,
-  resolverRutaDeClave,
-} from './import/almacenamiento-importaciones';
+import { generarClave } from './import/almacenamiento-importaciones';
 
 /**
  * PATH-INJECTION EN LA SUBIDA (CodeQL: uncontrolled data used in path).
@@ -81,7 +78,7 @@ describe('ProductsController · subida de importación · ruta segura', () => {
 
   it('flujo legítimo CSV: lee por la ruta segura y registra con file.filename', async () => {
     const clave = generarClave('catalogo.csv'); // clave válida del servidor
-    const rutaReal = resolverRutaDeClave(clave);
+    const rutaReal = path.join(carpeta, clave); // = ruta que resuelve el controlador
     await fs.promises.writeFile(
       rutaReal,
       'Nombre,SKU,Precio\nSilla,SKU-1,1000\n',
@@ -109,7 +106,7 @@ describe('ProductsController · subida de importación · ruta segura', () => {
     ws.addRow(['Mesa', 'SKU-2', '2000']);
 
     const clave = generarClave('catalogo.xlsx');
-    const rutaReal = resolverRutaDeClave(clave);
+    const rutaReal = path.join(carpeta, clave); // = ruta que resuelve el controlador
     await wb.xlsx.writeFile(rutaReal);
     const { size } = await fs.promises.stat(rutaReal);
 
@@ -158,7 +155,7 @@ describe('ProductsController · subida de importación · ruta segura', () => {
     // validación de contenido lo rechaza y el temporal se limpia usando la
     // MISMA ruta segura (no file.path).
     const clave = generarClave('trampa.csv');
-    const rutaReal = resolverRutaDeClave(clave);
+    const rutaReal = path.join(carpeta, clave); // = ruta que resuelve el controlador
     // Bytes binarios que no son texto CSV ni un ZIP OOXML.
     await fs.promises.writeFile(
       rutaReal,
