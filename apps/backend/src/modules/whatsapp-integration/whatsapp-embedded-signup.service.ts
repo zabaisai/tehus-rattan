@@ -255,7 +255,11 @@ export class WhatsAppEmbeddedSignupService {
         throw new MetaSignupError('PHONE_NOT_IN_WABA');
       }
 
-      const isCoexistence = this.looksLikeCoexistence(match.platformType);
+      // is_on_biz_app is Meta's authoritative coexistence flag. Keep the
+      // platform-type fallback for older Graph responses that omit the field.
+      const isCoexistence =
+        match.isOnBizApp === true ||
+        this.looksLikeCoexistence(match.platformType);
 
       // 5) Subscribe the app to the WABA so inbound webhooks flow (idempotent).
       await this.metaClient.subscribeAppToWaba(dto.wabaId, token);

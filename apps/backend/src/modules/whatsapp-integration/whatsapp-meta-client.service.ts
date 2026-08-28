@@ -33,6 +33,10 @@ export interface MetaPhoneNumber {
   // Meta reports 'CLOUD_API' for numbers fully on Cloud API and a coexistence
   // marker for numbers still running in the WhatsApp Business app.
   platformType?: string;
+  // Official coexistence indicator: true when the number remains connected to
+  // the WhatsApp Business app as well as Cloud API. Optional so older Graph
+  // responses that omit the field keep parsing unchanged.
+  isOnBizApp?: boolean;
 }
 
 // Thin, injectable wrapper over the Meta Graph API used by the Embedded Signup
@@ -93,7 +97,8 @@ export class WhatsAppMetaClientService {
     try {
       const res = await axios.get(url, {
         params: {
-          fields: 'id,display_phone_number,verified_name,platform_type',
+          fields:
+            'id,display_phone_number,verified_name,platform_type,is_on_biz_app',
         },
         headers: { Authorization: `Bearer ${token}` },
         timeout: META_TIMEOUT_MS,
@@ -105,6 +110,8 @@ export class WhatsAppMetaClientService {
         displayPhoneNumber: n?.display_phone_number || undefined,
         verifiedName: n?.verified_name || undefined,
         platformType: n?.platform_type || undefined,
+        isOnBizApp:
+          typeof n?.is_on_biz_app === 'boolean' ? n.is_on_biz_app : undefined,
       }));
     } catch (error) {
       throw this.normalize(error, 'WABA_LOOKUP_FAILED');

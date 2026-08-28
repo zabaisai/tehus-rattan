@@ -222,6 +222,47 @@ describe('WhatsAppEmbeddedSignupService', () => {
       expect(metaClient.registerPhoneNumber).toBeUndefined();
     });
 
+    it('detects Coexistence from is_on_biz_app even when platform type says CLOUD_API', async () => {
+      const { service, metaClient, tx } = build({
+        metaClient: {
+          listPhoneNumbers: jest.fn().mockResolvedValue([
+            {
+              id: dto.phoneNumberId,
+              displayPhoneNumber: '+57 300 555 4521',
+              platformType: 'CLOUD_API',
+              isOnBizApp: true,
+            },
+          ]),
+        },
+      });
+      await service.complete('company-a', actor, dto);
+      expect(
+        tx.whatsAppIntegration.upsert.mock.calls[0][0].create.connectionMethod,
+      ).toBe('COEXISTENCE');
+      // Coexistence must never register the number: registering would pull it
+      // out of the WhatsApp Business app.
+      expect(metaClient.registerPhoneNumber).toBeUndefined();
+    });
+
+    it('keeps a plain Cloud API number as EMBEDDED_SIGNUP when is_on_biz_app is false', async () => {
+      const { service, tx } = build({
+        metaClient: {
+          listPhoneNumbers: jest.fn().mockResolvedValue([
+            {
+              id: dto.phoneNumberId,
+              displayPhoneNumber: '+57 300 555 4521',
+              platformType: 'CLOUD_API',
+              isOnBizApp: false,
+            },
+          ]),
+        },
+      });
+      await service.complete('company-a', actor, dto);
+      expect(
+        tx.whatsAppIntegration.upsert.mock.calls[0][0].create.connectionMethod,
+      ).toBe('EMBEDDED_SIGNUP');
+    });
+
     it('rejects with a generic error when the code exchange fails (no Meta detail leaked)', async () => {
       const { service, prisma, auditLog } = build({
         metaClient: {
