@@ -66,6 +66,8 @@ function mapError(err: unknown): string {
         return 'No se recibió la autorización de Meta. Inténtalo de nuevo.';
       case 'INCOMPLETE_SESSION':
         return 'No se pudo leer el número desde Meta. Verifica que seleccionaste un número elegible e inténtalo de nuevo.';
+      case 'META_ERROR':
+        return 'Meta informó un error durante la conexión. Revisa que el número sea elegible e inténtalo de nuevo.';
     }
   }
   const status = (err as { response?: { status?: number } })?.response?.status;
@@ -91,7 +93,10 @@ export function WhatsAppConnect() {
   const [flowError, setFlowError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const runFlow = async (start: typeof startEmbeddedSignup) => {
+  const runFlow = async (
+    start: typeof startEmbeddedSignup,
+    mode: 'COEXISTENCE' | 'STANDARD',
+  ) => {
     setFlowError(null);
     setBusy(true);
     setStep(0);
@@ -99,7 +104,7 @@ export function WhatsAppConnect() {
       const cfg = await start();
       const fb = await loadFacebookSdk(cfg.appId, cfg.graphVersion);
       setStep(1);
-      const result = await launchEmbeddedSignup(fb, cfg.configId);
+      const result = await launchEmbeddedSignup(fb, cfg.configId, mode);
       setStep(2);
       await completeEmbeddedSignup({
         state: cfg.state,
@@ -172,7 +177,12 @@ export function WhatsAppConnect() {
       {connected ? (
         <ConnectedView
           status={status}
-          onReconnect={() => runFlow(reconnectWhatsApp)}
+          onReconnect={() =>
+            runFlow(
+              reconnectWhatsApp,
+              status.coexistence ? 'COEXISTENCE' : 'STANDARD',
+            )
+          }
           onDisconnect={handleDisconnect}
           onTest={handleTest}
           busy={busy}
@@ -182,7 +192,10 @@ export function WhatsAppConnect() {
       ) : (
         <DisconnectedView
           status={status}
-          onConnect={() => runFlow(startEmbeddedSignup)}
+          onConnectExisting={() =>
+            runFlow(startEmbeddedSignup, 'COEXISTENCE')
+          }
+          onConnectNew={() => runFlow(startEmbeddedSignup, 'STANDARD')}
           busy={busy}
           inProgress={inProgress}
           step={step}
@@ -214,14 +227,16 @@ function StatusPill({ status }: { status: string }) {
 
 function DisconnectedView({
   status,
-  onConnect,
+  onConnectExisting,
+  onConnectNew,
   busy,
   inProgress,
   step,
   error,
 }: {
   status: WhatsAppConnectionStatus;
-  onConnect: () => void;
+  onConnectExisting: () => void;
+  onConnectNew: () => void;
   busy: boolean;
   inProgress: boolean;
   step: number;
@@ -238,8 +253,8 @@ function DisconnectedView({
             Conecta tu WhatsApp Business
           </h3>
           <p className="mt-1 text-sm text-neutral-500">
-            Conserva tu número de WhatsApp Business y administra las
-            conversaciones desde el CRM.
+            Vincula el número que ya usa tu empresa, sin copiar tokens ni
+            depender de un administrador de TAKTO.
           </p>
         </div>
         <div className="ml-auto">
@@ -270,19 +285,32 @@ function DisconnectedView({
         </ol>
       ) : (
         <div className="mt-6">
-          <button
-            type="button"
-            onClick={onConnect}
-            disabled={busy}
-            className="inline-flex items-center gap-2 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-900 disabled:opacity-50"
-          >
-            <MessageCircle className="h-4 w-4" aria-hidden />
-            Conectar con Meta
-          </button>
-          <p className="mt-3 flex items-center gap-1.5 text-xs text-neutral-400">
-            <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
-            La autenticación se realiza de forma segura con Meta. No necesitas
-            copiar tokens ni identificadores.
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onConnectExisting}
+              disabled={busy}
+              className="inline-flex items-center gap-2 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-900 disabled:opacity-50"
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden />
+              Conectar mi WhatsApp actual
+            </button>
+            <button
+              type="button"
+              onClick={onConnectNew}
+              disabled={busy}
+              className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            >
+              Usar un número nuevo
+            </button>
+          </div>
+          <p className="mt-3 flex items-start gap-1.5 text-xs text-neutral-500">
+            <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>
+              Meta te pedirá el número y la confirmación oficial. Si tu cuenta
+              es elegible para coexistencia, el número seguirá funcionando en
+              WhatsApp Business y también quedará conectado a TAKTO.
+            </span>
           </p>
         </div>
       )}
