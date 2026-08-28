@@ -1,16 +1,15 @@
-// Loads Meta's official Facebook JS SDK and drives the WhatsApp Embedded Signup
-// flow. The SDK returns a 30-second exchangeable `code` (never a token) plus,
-// via a window `message` event, the phone_number_id / waba_id / business_id.
-// Everything sensitive (code -> token exchange) happens server-side.
+// Loads Meta's official Facebook JS SDK and drives WhatsApp Embedded Signup.
+// The browser receives only a short-lived exchangeable code plus the selected
+// WhatsApp asset ids. The code-to-token exchange always happens server-side.
 //
-// Requires the app's CSP to allow https://connect.facebook.net (script) and
-// https://www.facebook.com (frame) — see docs/WHATSAPP_EMBEDDED_SIGNUP.md.
-
+// Coexistence is requested explicitly for businesses that want to keep using
+// their existing WhatsApp Business app number while also using TAKTO.
 export type EmbeddedSignupErrorCode =
   | 'SDK_LOAD_FAILED'
   | 'CANCELLED'
   | 'NO_CODE'
-  | 'INCOMPLETE_SESSION';
+  | 'INCOMPLETE_SESSION'
+  | 'META_ERROR';
 
 export class EmbeddedSignupError extends Error {
   constructor(readonly code: EmbeddedSignupErrorCode) {
@@ -18,6 +17,8 @@ export class EmbeddedSignupError extends Error {
     this.name = 'EmbeddedSignupError';
   }
 }
+
+export type EmbeddedSignupMode = 'COEXISTENCE' | 'STANDARD';
 
 export interface EmbeddedSignupResult {
   code: string;
@@ -44,10 +45,9 @@ declare global {
 }
 
 const SDK_SRC = 'https://connect.facebook.net/en_US/sdk.js';
+const SESSION_CALLBACK_TIMEOUT_MS = 15_000;
 let sdkPromise: Promise<FbInstance> | null = null;
 
-// Loads + initializes the SDK once (idempotent). Rejects with SDK_LOAD_FAILED
-// if the script cannot load (e.g. blocked by CSP / network).
 export function loadFacebookSdk(
   appId: string,
   graphVersion: string,
@@ -65,11 +65,12 @@ export function loadFacebookSdk(
     const timeout = window.setTimeout(() => {
       sdkPromise = null;
       reject(new EmbeddedSignupError('SDK_LOAD_FAILED'));
-    }, 15000);
+    }, 15_000);
 
     window.fbAsyncInit = () => {
       window.clearTimeout(timeout);
       if (!window.FB) {
+        sdkPromise = null;
         reject(new EmbeddedSignupError('SDK_LOAD_FAILED'));
         return;
       }
@@ -92,59 +93,101 @@ export function loadFacebookSdk(
   return sdkPromise;
 }
 
-// Launches Embedded Signup and resolves with the code + session info, or
-// rejects with a typed EmbeddedSignupError (cancelled / no code / incomplete).
-// The `state` is our own single-use anti-CSRF value; it is not consumed here —
-// the browser simply forwards it to the backend `complete` call.
+interface SessionInfo {
+  phoneNumberId: string;
+  wabaId: string;
+  businessId?: string;
+}
+
+// Meta returns the authorization code through FB.login and the WhatsApp asset
+// ids through a window message. Their order is not guaranteed, so wait for both
+// independently instead of assuming the message arrived before the callback.
 export async function launchEmbeddedSignup(
   fb: FbInstance,
   configId: string,
+  mode: EmbeddedSignupMode = 'COEXISTENCE',
 ): Promise<EmbeddedSignupResult> {
-  const session: { phoneNumberId?: string; wabaId?: string; businessId?: string; cancelled?: boolean } = {};
+  let resolveSession!: (value: SessionInfo) => void;
+  let rejectSession!: (reason: EmbeddedSignupError) => void;
+  const sessionPromise = new Promise<SessionInfo>((resolve, reject) => {
+    resolveSession = resolve;
+    rejectSession = reject;
+  });
 
   const onMessage = (event: MessageEvent) => {
-    if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') {
+    if (
+      event.origin !== 'https://www.facebook.com' &&
+      event.origin !== 'https://web.facebook.com'
+    ) {
       return;
     }
     try {
-      const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      const data =
+        typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
       if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
+
       if (data.event === 'FINISH') {
-        session.phoneNumberId = data.data?.phone_number_id;
-        session.wabaId = data.data?.waba_id;
-        session.businessId = data.data?.business_id;
+        const phoneNumberId = data.data?.phone_number_id;
+        const wabaId = data.data?.waba_id;
+        if (!phoneNumberId || !wabaId) {
+          rejectSession(new EmbeddedSignupError('INCOMPLETE_SESSION'));
+          return;
+        }
+        resolveSession({
+          phoneNumberId,
+          wabaId,
+          businessId: data.data?.business_id,
+        });
       } else if (data.event === 'CANCEL') {
-        session.cancelled = true;
+        rejectSession(new EmbeddedSignupError('CANCELLED'));
+      } else if (data.event === 'ERROR') {
+        rejectSession(new EmbeddedSignupError('META_ERROR'));
       }
     } catch {
-      // Ignore malformed / unrelated messages.
+      // Ignore malformed or unrelated browser messages.
     }
   };
 
   window.addEventListener('message', onMessage);
   try {
+    const extras: Record<string, unknown> = {
+      setup: {},
+      // Meta requires a session-info version for the WhatsApp callback.
+      sessionInfoVersion: '3',
+    };
+    if (mode === 'COEXISTENCE') {
+      extras.featureType = 'whatsapp_business_app_onboarding';
+    }
+
     const loginResponse = await new Promise<FbLoginResponse>((resolve) => {
       fb.login(resolve, {
         config_id: configId,
         response_type: 'code',
         override_default_response_type: true,
-        extras: { setup: {} },
+        extras,
       });
     });
 
-    const code: string | undefined = loginResponse?.authResponse?.code;
-    if (session.cancelled || !code) {
-      throw new EmbeddedSignupError(code ? 'CANCELLED' : 'NO_CODE');
+    const code = loginResponse?.authResponse?.code;
+    if (!code) {
+      throw new EmbeddedSignupError('NO_CODE');
     }
-    if (!session.phoneNumberId || !session.wabaId) {
-      throw new EmbeddedSignupError('INCOMPLETE_SESSION');
-    }
-    return {
-      code,
-      phoneNumberId: session.phoneNumberId,
-      wabaId: session.wabaId,
-      businessId: session.businessId,
-    };
+
+    let timeoutId: number | undefined;
+    const sessionTimeout = new Promise<never>((_, reject) => {
+      timeoutId = window.setTimeout(
+        () => reject(new EmbeddedSignupError('INCOMPLETE_SESSION')),
+        SESSION_CALLBACK_TIMEOUT_MS,
+      );
+    });
+
+    const session = await Promise.race([sessionPromise, sessionTimeout]).finally(
+      () => {
+        if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      },
+    );
+
+    return { code, ...session };
   } finally {
     window.removeEventListener('message', onMessage);
   }
