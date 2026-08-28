@@ -86,6 +86,35 @@ describe('WhatsAppMetaClientService', () => {
         verifiedName: 'Tehus QA',
         platformType: 'COEXISTENCE',
       });
+      // Sin `is_on_biz_app` en la respuesta (Graph antiguo) el campo queda
+      // simplemente indefinido: nada se rompe.
+      expect(numbers[0].isOnBizApp).toBeUndefined();
+    });
+
+    it('requests and parses the official coexistence flag is_on_biz_app', async () => {
+      mockedAxios.get.mockResolvedValue({
+        data: {
+          data: [
+            {
+              id: '123',
+              display_phone_number: '+57 300 555 4521',
+              verified_name: 'Tehus QA',
+              platform_type: 'CLOUD_API',
+              is_on_biz_app: true,
+            },
+          ],
+        },
+      });
+      const numbers = await service.listPhoneNumbers('waba-1', 'token');
+      const [, opts] = mockedAxios.get.mock.calls[0];
+      expect((opts as any).params.fields).toContain('is_on_biz_app');
+      expect(numbers[0]).toEqual({
+        id: '123',
+        displayPhoneNumber: '+57 300 555 4521',
+        verifiedName: 'Tehus QA',
+        platformType: 'CLOUD_API',
+        isOnBizApp: true,
+      });
     });
 
     it('throws WABA_LOOKUP_FAILED on error', async () => {
