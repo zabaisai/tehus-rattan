@@ -116,6 +116,10 @@ export function claveSegura(clave: string): boolean {
   }
   if (clave.includes('..')) return false;
   if (path.isAbsolute(clave)) return false;
+  // `basename` no puede diferir de la clave si esta no lleva separadores; se
+  // exige igualdad de forma explícita para que un separador de plataforma que
+  // se nos escapara no pueda convertir la clave en una ruta con directorios.
+  if (path.basename(clave) !== clave) return false;
   return CLAVE_VALIDA.test(clave);
 }
 
@@ -123,6 +127,34 @@ function exigirClave(clave: string): void {
   if (!claveSegura(clave)) {
     throw new BadRequestException('La referencia del archivo no es válida.');
   }
+}
+
+/**
+ * Convierte una CLAVE en su ruta física dentro de `raiz`, canónicamente y de
+ * forma segura. Es la ÚNICA manera admitida de obtener una ruta a partir de una
+ * clave: NUNCA se construye una ruta con datos del cliente (`originalname`, la
+ * `file.path` absoluta del contenedor, etc.).
+ *
+ * Rechaza claves con separadores, `..`, nulos, absolutas o que no casen el
+ * patrón (`claveSegura` → `exigirClave`), y además verifica que la ruta ya
+ * resuelta cae DENTRO de la raíz resuelta. Esa comprobación de contención sobre
+ * `path.resolve` es la barrera que neutraliza el path-injection: aunque la clave
+ * llegara manipulada, no puede apuntar fuera del directorio permitido.
+ */
+export function resolverRutaDeClave(
+  clave: string,
+  raiz: string = carpetaDeAlmacenamiento(),
+): string {
+  exigirClave(clave);
+  const raizResuelta = path.resolve(raiz);
+  const completa = path.resolve(raizResuelta, clave);
+  if (
+    completa !== raizResuelta &&
+    !completa.startsWith(raizResuelta + path.sep)
+  ) {
+    throw new BadRequestException('La referencia del archivo no es válida.');
+  }
+  return completa;
 }
 
 export function extensionSegura(nombre: string): string {
@@ -147,19 +179,9 @@ export class AlmacenamientoEnDirectorioCompartido implements AlmacenamientoDeImp
   constructor(private readonly raiz: string = carpetaDeAlmacenamiento()) {}
 
   rutaFisica(clave: string): string {
-    exigirClave(clave);
-    const completa = path.resolve(this.raiz, clave);
-    // Cinturon y tirantes: aunque la clave ya paso el patron, se comprueba que
-    // la ruta resuelta cae DENTRO de la raiz. Un enlace simbolico o una raiz
-    // rara no pueden sacarnos de ahi sin que se note.
-    const raizResuelta = path.resolve(this.raiz);
-    if (
-      completa !== raizResuelta &&
-      !completa.startsWith(raizResuelta + path.sep)
-    ) {
-      throw new BadRequestException('La referencia del archivo no es válida.');
-    }
-    return completa;
+    // Fuente única: la misma resolución canónica + contención que usa el
+    // controlador al leer/borrar la subida (ver `resolverRutaDeClave`).
+    return resolverRutaDeClave(clave, this.raiz);
   }
 
   private async asegurarRaiz(): Promise<void> {

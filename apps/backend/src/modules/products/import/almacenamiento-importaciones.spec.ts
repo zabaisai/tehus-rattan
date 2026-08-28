@@ -7,6 +7,7 @@ import {
   avisoDeAlmacenamiento,
   claveSegura,
   generarClave,
+  resolverRutaDeClave,
 } from './almacenamiento-importaciones';
 
 /**
@@ -136,6 +137,50 @@ describe('Almacenamiento de importaciones', () => {
       expect(await alm.existe('../fuera.csv')).toBe(false);
       await expect(alm.eliminar('../fuera.csv')).resolves.toBeUndefined();
       expect(await alm.metadatos('../fuera.csv')).toBeNull();
+    });
+  });
+
+  // El controlador de subida usa este helper (no `file.path`) para leer y borrar
+  // el archivo. Es la barrera de path-injection que cierra la alerta de CodeQL:
+  // la ruta se construye desde una raíz controlada por el servidor + la clave
+  // generada por el servidor, resuelta canónicamente y confinada a la raíz.
+  describe('resolverRutaDeClave (path-injection)', () => {
+    it('una clave legítima (CSV/XLSX) resuelve DENTRO de la raíz', () => {
+      for (const ext of ['.csv', '.xlsx']) {
+        const clave = generarClave(`catalogo${ext}`);
+        const ruta = resolverRutaDeClave(clave, raizCompartida);
+        expect(path.isAbsolute(ruta)).toBe(true);
+        expect(ruta.startsWith(path.resolve(raizCompartida) + path.sep)).toBe(
+          true,
+        );
+        expect(path.dirname(ruta)).toBe(path.resolve(raizCompartida));
+        expect(path.basename(ruta)).toBe(clave);
+      }
+    });
+
+    it.each([
+      ['../fuera.csv', 'salto de directorio'],
+      ['../../etc/passwd', 'traversal profundo'],
+      ['/etc/passwd', 'ruta absoluta POSIX'],
+      ['C:\\Windows\\win.ini', 'ruta absoluta Windows'],
+      ['sub/otro.csv', 'con separador'],
+      ['sub\\otro.csv', 'separador de Windows'],
+      ['con\0nulo.csv', 'byte nulo'],
+      ['catalogo.csv', 'nombre del cliente, no generado por el servidor'],
+      ['', 'vacía'],
+    ])('rechaza %s (%s) con 400 y no escapa de la raíz', (clave) => {
+      expect(() => resolverRutaDeClave(clave, raizCompartida)).toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('ni siquiera una clave con separador que "empieza por" la raíz escapa', () => {
+      // Defensa en profundidad: aunque el prefijo textual coincidiera, la clave
+      // lleva separadores y `claveSegura` la rechaza antes de resolver.
+      const clave = `${path.basename(raizCompartida)}-hermana/x.csv`;
+      expect(() => resolverRutaDeClave(clave, raizCompartida)).toThrow(
+        BadRequestException,
+      );
     });
   });
 

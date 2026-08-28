@@ -35,6 +35,7 @@ import {
   almacenamientoEnDisco,
   comprobarEspacio,
 } from './import/almacenamiento-temporal';
+import { resolverRutaDeClave } from './import/almacenamiento-importaciones';
 import { validarMapeo } from './import/mapeo-columnas';
 import {
   EXTENSIONES_PERMITIDAS,
@@ -100,18 +101,26 @@ export class ProductsController {
   ) {
     if (!file) throw new BadRequestException('El archivo es requerido');
 
+    // NUNCA se usa `file.path` (ruta absoluta que multer deriva del entorno) ni
+    // `file.originalname` para tocar el disco. La ruta se reconstruye desde el
+    // directorio de almacenamiento controlado por el servidor y la CLAVE que el
+    // propio servidor generó (`file.filename`), resuelta canónicamente y
+    // verificada dentro del directorio permitido. El MISMO helper sirve para
+    // leer y para borrar, así lectura y borrado no pueden divergir.
+    const rutaSegura = resolverRutaDeClave(file.filename);
+
     try {
       validarArchivoDeImportacion(file.originalname, file.size);
       // Validación de CONTENIDO además de la extensión: firma + estructura ZIP
       // del .xlsx (anti-bomba, anti-traversal) o texto real del .csv. Se lee del
       // disco (el archivo ya está guardado; el tamaño está acotado por multer).
-      const contenido = await readFile(file.path);
+      const contenido = await readFile(rutaSegura);
       validarContenidoDeImportacion(contenido, file.originalname);
       await comprobarEspacio(file.size);
     } catch (error) {
       // El archivo ya esta en disco: si se rechaza, hay que borrarlo o queda
       // ocupando sitio para siempre.
-      await unlink(file.path).catch(() => undefined);
+      await unlink(rutaSegura).catch(() => undefined);
       throw error;
     }
 
