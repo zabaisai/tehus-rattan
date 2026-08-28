@@ -89,8 +89,8 @@ describe('launchEmbeddedSignup', () => {
 
     await launchEmbeddedSignup(fb, 'config-id', 'STANDARD');
 
-    expect(loginOptions?.extras.sessionInfoVersion).toBe('3');
-    expect(loginOptions?.extras.featureType).toBeUndefined();
+    expect(loginOptions?.extras).toMatchObject({ sessionInfoVersion: '3' });
+    expect(loginOptions?.extras).not.toHaveProperty('featureType');
   });
 
   it('maps an official Meta ERROR event without exposing its payload', async () => {
