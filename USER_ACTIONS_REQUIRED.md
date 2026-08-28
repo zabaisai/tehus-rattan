@@ -42,8 +42,8 @@ rotación, se listan por transparencia): `WHATSAPP_BUSINESS_ACCOUNT_ID`,
   quedar en copias locales, backups de disco o historiales de shell.
 - **Acción:** en Meta App Dashboard, **revocar/rotar** ese token de acceso. No es
   necesario reescribir el historial Git (el token no está ahí; gitleaks sobre
-  `--all` lo confirma). No publiques la rama hasta rotarlo si consideras que
-  sigue vigente.
+  `--all` lo confirma). No despliegues ni lleves esta integración a producción
+  hasta rotarlo si consideras que sigue vigente.
 - **Identificación (sin valor):** tipo = User/System access token de Meta;
   archivo = `apps/backend/.env` (local); estaba en una línea comentada
   `# WHATSAPP_TOKEN=EAAW...` que ya no existe.
@@ -58,14 +58,17 @@ rotación, se listan por transparencia): `WHATSAPP_BUSINESS_ACCOUNT_ID`,
      sin propiedad de tablas, con solo `SELECT/INSERT/UPDATE/DELETE`.
   2. Mantener un rol separado (propietario) para `prisma migrate deploy`.
   3. Apuntar el `DATABASE_URL` del backend/worker a `takto_app`.
-  4. Migración aditiva (revisable) que active `ENABLE ROW LEVEL SECURITY` +
-     `FORCE ROW LEVEL SECURITY` y políticas por empresa usando
-     `current_setting('app.company_id', true)`, fijado por petición de forma
-     transaction-scoped (`set_config('app.company_id', $id, true)`), más un
-     `$extends` de Prisma que establezca ese contexto en cada transacción.
-     Incluir backend, worker, jobs, analytics y exportaciones.
-  5. Pruebas con el rol runtime real demostrando que empresa A no lee/escribe
-     datos de B y que el contexto no se filtra entre conexiones del pool.
+  4. Adoptar `runInTenantContext`/`runWithTenant` servicio por servicio en el
+     backend, worker, jobs, WebSocket, analytics, tareas programadas y
+     exportaciones. No activar RLS mientras existan consultas runtime con
+     `this.prisma` directo fuera del contexto transaccional.
+  5. Ejecutar pruebas por caminos reales (REST, jobs, worker y realtime) con el
+     rol runtime demostrando que empresa A no lee/escribe datos de B, que sin
+     contexto se deniega por defecto y que el contexto no se filtra entre
+     conexiones del pool.
+  6. Solo cuando toda la adopción anterior esté verde, activar de forma aditiva
+     `ENABLE ROW LEVEL SECURITY` + `FORCE ROW LEVEL SECURITY` y las políticas
+     basadas en `current_setting('app.company_id', true)`.
 - Los filtros de aplicación por `companyId` NO se retiran: RLS es una segunda
   barrera.
 
@@ -85,7 +88,8 @@ rotación, se listan por transparencia): `WHATSAPP_BUSINESS_ACCOUNT_ID`,
 ## Rate limiting distribuido con Redis (control 11) — HECHO
 
 Ya no requiere acción: implementado en la fase 2 (`RedisThrottlerStorage`,
-seleccionado fuera de pruebas con la cola habilitada, fail-open). Solo asegúrate
+seleccionado fuera de pruebas con la cola habilitada, fail-safe mediante
+fallback local en memoria). Solo asegúrate
 de que `REDIS_HOST`/`REDIS_PORT` (y `REDIS_PASSWORD` si expones Redis) están
 configurados en producción.
 
@@ -103,7 +107,7 @@ configurados en producción.
 
 Resueltas en fases 2–3 (ya NO son deuda): guard global deny-by-default (6), KDF
 scrypt versionado (5), rate limiting distribuido fail-safe + límite por cuenta
-(11), antibot frontend+backend (12), RLS integrado y probado (4), coste bcrypt 12
+(11), antibot frontend+backend (12), mecanismo RLS probado de forma aislada (4; su adopción real sigue siendo P1), coste bcrypt 12
 + rehash progresivo (10), validación de inputs con DTOs (14), firma/estructura ZIP
 del import + servido restringido a branding (16), tope máximo en listados (17),
 TLS de Postgres preparado y probado (19), frontend a 0 vulnerabilidades (20).
