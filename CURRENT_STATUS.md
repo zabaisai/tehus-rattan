@@ -1,17 +1,17 @@
 # CURRENT_STATUS — Endurecimiento de seguridad (20 controles)
 
-_Actualizado: 2026-08-27._
+_Actualizado: 2026-08-28._
 
 ## Dónde está el trabajo
 
 - **Rama:** `fix/security-hardening-20-controls`, tomada de `origin/main`
   (`f04ab44`). `main` es el producto real; `develop` está ~269 commits por
   detrás y NO se usó como base.
-- **Estado Git:** commits locales, **sin push, sin PR, sin merge, sin deploy**.
+- **Estado Git:** rama publicada en GitHub; Draft PR [#7](https://github.com/zabaisai/tehus-rattan/pull/7) abierto contra `main`, **sin merge y sin deploy**.
 - **Base de datos:** ninguna base real tocada. Migraciones probadas en una base
   temporal vacía (`tehus_sec_tmp`), creada y **eliminada** al terminar.
 
-## Commits creados (15)
+## Commits principales (resumen; 37 commits en el PR)
 
 **Fase 1 — auditoría + correcciones base**
 
@@ -91,10 +91,9 @@ de estados). Resumen honesto tras la verificación de fase 3:
 
 1. **P0** rotar las credenciales mostradas en salida (nombres en el doc); ninguna
    está en Git.
-2. **P1** separar rol de BD migración/runtime y **activar** el RLS ya integrado.
+2. **P1** adoptar `runInTenantContext`/`runWithTenant` en servicios, jobs, worker, WebSocket, analytics y tareas programadas; después separar el rol runtime `NOBYPASSRLS` del rol de migraciones y solo entonces activar RLS.
 3. **P2** crear claves reales de Turnstile; **P2** TLS a Postgres al salir del host.
 
-## Autorización pendiente
+## Estado de publicación
 
-Una sola frase del usuario autoriza el push de la rama y la creación del PR
-(ver el informe final). Hasta entonces, nada sale de local.
+La rama ya está publicada en el Draft PR #7. El PR debe permanecer en Draft y sin merge hasta completar la revisión y recibir autorización explícita. No se ha desplegado nada ni se ha tocado una base real.
