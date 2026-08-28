@@ -34,7 +34,7 @@ verificado por configuración/escaneo, no por test unit/e2e · `⬜` = no cubier
 | Escaneo de secretos | ➕ | `.github/workflows/security.yml` (gitleaks) + `.gitleaks.toml`; escaneo local limpio |
 | Deny-by-default (ruta privada sin token) | ➕ | `test/deny-by-default.e2e-spec.ts` (AppModule real: públicas 200, privadas 401) |
 | Cifrado: KDF versionado + compatibilidad legacy + rotación | ➕ | `src/modules/whatsapp-token-crypto.compat.spec.ts` |
-| Rate limiting distribuido (Redis, atómico, fail-open) | ➕ | `test/redis-throttler.e2e-spec.ts` (Redis real) |
+| Rate limiting distribuido (Redis compartido y operaciones atómicas) | ➕ | `test/redis-throttler.e2e-spec.ts` (Redis real); la caída degrada a fallback local fail-safe |
 | Antibot: fail-closed y verificación server-side | ➕ | `src/common/captcha/captcha.spec.ts` |
 | RLS — mecanismo con rol runtime real (aislamiento + WITH CHECK + pool) | ➕ | `prisma/rls/proof.mjs` + `rls-integration.e2e-spec.ts` (cliente Prisma real, rol sin BYPASSRLS, 40 contextos concurrentes) — verde |
 | RLS — camino REST REAL: los servicios directos NO quedan protegidos | ➕ | `rls-real-path.e2e-spec.ts` (AppModule+controller+service, rol runtime, RLS activo → `GET /contacts` vacío = adopción pendiente) — verde |
@@ -50,16 +50,16 @@ verificado por configuración/escaneo, no por test unit/e2e · `⬜` = no cubier
 | Import upload: la ruta se construye del server-dir + clave del servidor (path injection) | ➕ | `products.controller.import-path.spec.ts` (flujo CSV/XLSX real registra con `file.filename`; clave manipulada → 400 sin tocar `file.path`) + `almacenamiento-importaciones.spec.ts` (`resolverRutaDeClave`: traversal/absoluta/separador/nulo → 400; contención en raíz) |
 | TLS de Postgres (verify-full conecta, no-TLS rechazado, sin-CA falla) | ✅ | `deploy/scripts/test-postgres-tls.sh` — **ejecutado en verde en GitHub Actions Linux** (job `postgres-tls`, `ubuntu-latest`, certificados efímeros ficticios). No implica que la BD real use TLS |
 
-## Comandos de verificación ejecutados (local, sobre `main`)
+## Comandos de verificación ejecutados (rama del PR, basada en `main`)
 
 | Comando | Resultado |
 |---------|-----------|
-| Backend — unit (`npm test -- --runInBand`) | 136 suites / **2186** ✅ |
+| Backend — unit (`npm test -- --runInBand`) | 141 suites / **2216** ✅ |
 | Backend — e2e (`npm run test:e2e`, base temporal) | 67 suites / **966** ✅ |
 | Backend — typecheck (`npm run typecheck`) | ✅ |
 | Backend — lint (`eslint --no-fix`, como CI) | ✅ |
 | Backend — build (`nest build`) | ✅ |
-| Frontend — tests (`npm test`, vitest) | 87 archivos / **948** ✅ |
+| Frontend — tests (`npm test`, vitest) | **956** pruebas ✅ |
 | Frontend — lint / build | ✅ (1 warning preexistente ajeno) |
 | `prisma migrate deploy` (base temporal vacía) | 58 migraciones aplicadas ✅ |
 | `prisma validate` | ✅ |
@@ -68,8 +68,7 @@ verificado por configuración/escaneo, no por test unit/e2e · `⬜` = no cubier
 | `npm audit --omit=dev --audit-level=critical` (back/front) | 0 críticas (gate PASS); altas documentadas |
 | `git diff --check` | sin errores de espacios |
 
-Línea base (sobre `main`, antes de tocar nada): backend 134/2159 unit. Tras las
-dos fases: **136/2186 unit + 67/966 e2e + 948 frontend**, sin regresiones.
-Ningún fallo ocultado ni test debilitado para pasar (los tests que cambiaron de
-aserción lo hicieron porque el comportamiento nuevo es MÁS seguro — mensajes
-anti-enumeración genéricos, formato de cifrado v2).
+La ejecución más reciente de la rama terminó en verde en GitHub Actions para
+backend, frontend, pruebas e2e, gitleaks, auditoría de dependencias, CodeQL,
+backup safety y la prueba TLS de PostgreSQL. Ningún fallo fue ocultado ni se
+debilitaron tests para obtener verde.
