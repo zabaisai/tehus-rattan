@@ -64,17 +64,24 @@ export class WebhookController {
       // token alfanumérico aleatorio) y EXCLUYE todos los metacaracteres de
       // HTML/JS (`<`, `>`, `&`, `"`, `'`, `/`, espacios y saltos de línea), de
       // modo que el valor reflejado nunca puede formar marcado ni salir del
-      // cuerpo text/plain. Un challenge presente pero inválido se RECHAZA (400)
-      // en lugar de reflejarse. Esta guarda es además la barrera-sanitizador de
-      // la ruta reflected-XSS hacia `res.send` (validada por CodeQL). No cambia
-      // el handshake oficial: un challenge legítimo pasa intacto.
-      const challengeStr = challenge ?? '';
-      if (challengeStr !== '' && !/^[A-Za-z0-9_-]{1,256}$/.test(challengeStr)) {
+      // cuerpo text/plain. No cambia el handshake oficial: un challenge legítimo
+      // pasa intacto.
+      this.logger.log('Webhook verificado correctamente');
+      // Caso sin challenge: se responde con cuerpo vacío (Meta siempre lo
+      // envía; esto solo preserva el comportamiento previo sin reflejar nada).
+      if (challenge === undefined || challenge === '') {
+        res.status(200).send('');
+        return;
+      }
+      // Guarda-sanitizador AISLADA: la única salida hacia `res.send` del valor
+      // reflejado está dominada por este test de allowlist. Al no ir combinada
+      // con otra condición, CodeQL la reconoce como barrera de la ruta
+      // reflected-XSS y un challenge presente pero inválido se rechaza (400).
+      if (!/^[A-Za-z0-9_-]{1,256}$/.test(challenge)) {
         res.status(400).send('Bad Request');
         return;
       }
-      this.logger.log('Webhook verificado correctamente');
-      res.status(200).send(challengeStr);
+      res.status(200).send(challenge);
       return;
     }
     res.status(403).send('Forbidden');
