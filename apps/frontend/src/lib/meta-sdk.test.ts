@@ -66,13 +66,19 @@ describe('launchEmbeddedSignup', () => {
   });
 
   it('keeps standard onboarding available for a new Cloud API number', async () => {
-    let loginOptions: Record<string, any> | undefined;
+    let loginOptions:
+      | (Record<string, unknown> & {
+          extras?: Record<string, unknown>;
+        })
+      | undefined;
     const fb = {
       init: vi.fn(),
       login: vi.fn(
         (
           callback: (response: { authResponse: { code: string } }) => void,
-          options: Record<string, any>,
+          options: Record<string, unknown> & {
+            extras?: Record<string, unknown>;
+          },
         ) => {
           loginOptions = options;
           callback({ authResponse: { code: 'exchange-code' } });
