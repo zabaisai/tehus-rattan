@@ -12,7 +12,7 @@ contradictory across layers:
 | Concern | Owner | Where |
 | --- | --- | --- |
 | HSTS (`Strict-Transport-Security`) | **Caddy** (TLS edge — only layer that knows the request is HTTPS) | `deploy/Caddyfile` |
-| Frontend CSP + security headers | **Next.js** | `apps/frontend/next.config.ts`, `src/lib/csp.ts` |
+| Frontend CSP + security headers | **Next.js** | `apps/frontend/next.config.ts`, `src/lib/csp.ts`, `src/lib/security-headers.ts` |
 | API/uploads security headers + CSP | **Helmet (NestJS)** | `apps/backend/src/common/security/security.setup.ts` |
 | CORS | **NestJS** | `apps/backend/src/common/security/cors.options.ts` |
 | Server-header removal | Caddy (`-Server`) + Helmet (`hidePoweredBy`) | both |
@@ -69,9 +69,17 @@ Dev uses a looser policy (`'unsafe-eval'` + `ws:` for HMR). Staging must run wit
 `NODE_ENV=production` to get the strict policy. Verified with a real Chrome smoke
 (hydration, login, navigation, modals, images → **zero CSP violations**).
 
-Other Next headers (`next.config.ts`): `X-Content-Type-Options`,
-`Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`,
-`Permissions-Policy`, `Cross-Origin-Opener-Policy`, and `poweredByHeader:false`.
+Other Next headers (built by `src/lib/security-headers.ts`, unit-tested):
+`X-Content-Type-Options`, `Referrer-Policy: strict-origin-when-cross-origin`,
+`X-Frame-Options: DENY`, `Permissions-Policy`,
+`Cross-Origin-Opener-Policy: same-origin-allow-popups`, and
+`poweredByHeader:false`. The COOP value is load-bearing: `same-origin` severs
+`window.opener` for the cross-origin popups the page itself opens and breaks
+the Meta Embedded Signup return channel (popup completes but no code and no
+`WA_EMBEDDED_SIGNUP` message can ever arrive) — see
+WHATSAPP_EMBEDDED_SIGNUP.md, "COOP note". The frontend uses no
+SharedArrayBuffer / cross-origin isolation, so nothing needs the stricter
+value. The API keeps `same-origin` (it never opens popups).
 
 ## 4. CORS
 
