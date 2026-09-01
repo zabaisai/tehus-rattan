@@ -70,6 +70,26 @@ describe('CORS (e2e)', () => {
       expect(res.headers['access-control-allow-methods']).toContain('POST');
     });
 
+    // Onboarding: the invite code travels in this header (the guard runs
+    // before Multer parses the multipart body), so the preflight must allow
+    // it or POST /onboarding/company never leaves the browser.
+    it('allows the X-Onboarding-Invite-Code header in the preflight', async () => {
+      const res = await request(app.getHttpServer())
+        .options('/ping')
+        .set('Origin', ALLOWED)
+        .set('Access-Control-Request-Method', 'POST')
+        .set(
+          'Access-Control-Request-Headers',
+          'content-type,x-onboarding-invite-code',
+        )
+        .expect(204);
+      expect(res.headers['access-control-allow-origin']).toBe(ALLOWED);
+      expect(
+        res.headers['access-control-allow-headers']?.toLowerCase(),
+      ).toContain('x-onboarding-invite-code');
+      expect(res.headers['access-control-allow-headers']).not.toContain('*');
+    });
+
     it('does not authorize a preflight from a foreign Origin', async () => {
       const res = await request(app.getHttpServer())
         .options('/ping')

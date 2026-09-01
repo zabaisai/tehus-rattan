@@ -25,7 +25,16 @@ export function buildCorsOptions(env: {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // Explicit allowlist — never '*'. X-Onboarding-Invite-Code is the only
+    // custom header the frontend sends: the invite code travels there (not in
+    // the body) because OnboardingInviteGuard runs before Multer parses the
+    // multipart body. Without it the browser kills the preflight and
+    // POST /onboarding/company never reaches the API.
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Onboarding-Invite-Code',
+    ],
     maxAge: 86400,
   };
 }
