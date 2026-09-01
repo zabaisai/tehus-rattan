@@ -209,16 +209,63 @@ describe('launchEmbeddedSignup', () => {
     await expect(promesa).rejects.toBeInstanceOf(EmbeddedSignupError);
   });
 
-  it('callback sin code rechaza NO_CODE tras la gracia', async () => {
+  // Bug observado en staging (coexistencia): el SDK dispara el callback de
+  // FB.login con authResponse nulo (status 'unknown') a los pocos segundos de
+  // abrir el popup, con el usuario todavía DENTRO del flujo de Meta. Ese
+  // callback prematuro no debe iniciar ninguna cuenta regresiva de fallo.
+  it('un callback prematuro sin code NO es terminal: el flujo resuelve si code y sesión llegan minutos después', async () => {
+    const { fb, completeLogin } = fakeFb();
+    // Tiempos reales de producción.
+    const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE');
+
+    completeLogin(undefined); // callback prematuro (handshake del diálogo)
+    // El usuario sigue completando el popup durante 2 minutos.
+    await vi.advanceTimersByTimeAsync(120_000);
+    postSignupMessage(FINISH_COEXISTENCE);
+    completeLogin('codigo-oauth'); // segundo callback, ya con el code real
+
+    await expect(promesa).resolves.toMatchObject({
+      code: 'codigo-oauth',
+      phoneNumberId: '111',
+      wabaId: '222',
+    });
+  });
+
+  it('tras un callback sin code, un FINISH posterior sí arma la gracia y sin code rechaza NO_CODE', async () => {
     const { fb, completeLogin } = fakeFb();
     const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
     const expectativa = expect(promesa).rejects.toMatchObject({
       code: 'NO_CODE',
     });
 
-    completeLogin(undefined); // ventana cerrada / OAuth sin concesión
-    await vi.advanceTimersByTimeAsync(TIMING.graceMs);
+    completeLogin(undefined);
+    await vi.advanceTimersByTimeAsync(TIMING.graceMs * 3); // no falla aún
+    postSignupMessage(FINISH_COEXISTENCE); // el flujo terminó en Meta
+    await vi.advanceTimersByTimeAsync(TIMING.graceMs); // gracia agotada sin code
     await expectativa;
+  });
+
+  it('callback sin code y sin ningún evento de Meta rechaza TIMEOUT al límite global (no NO_CODE a los 15 s)', async () => {
+    const { fb, completeLogin } = fakeFb();
+    const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
+    const expectativa = expect(promesa).rejects.toMatchObject({
+      code: 'TIMEOUT',
+    });
+
+    completeLogin(undefined);
+    await vi.advanceTimersByTimeAsync(TIMING.timeoutMs);
+    await expectativa;
+  });
+
+  it('un segundo callback vacío no borra un code ya concedido', async () => {
+    const { fb, completeLogin } = fakeFb();
+    const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
+
+    completeLogin('codigo-oauth');
+    completeLogin(undefined); // eco tardío del SDK
+    postSignupMessage(FINISH_COEXISTENCE);
+
+    await expect(promesa).resolves.toMatchObject({ code: 'codigo-oauth' });
   });
 
   it('FINISH sin phone_number_id rechaza INCOMPLETE_SESSION', async () => {
@@ -263,15 +310,17 @@ describe('launchEmbeddedSignup', () => {
     expect(serializado).not.toContain('id-interno-999');
   });
 
-  it('un CANCEL tardío dentro de la gracia prevalece sobre NO_CODE', async () => {
+  it('un CANCEL muy posterior al callback sin code se clasifica CANCELLED (no NO_CODE)', async () => {
     const { fb, completeLogin } = fakeFb();
     const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
     const expectativa = expect(promesa).rejects.toMatchObject({
       code: 'CANCELLED',
     });
 
-    completeLogin(undefined); // login terminó sin code
-    await vi.advanceTimersByTimeAsync(TIMING.graceMs / 2);
+    completeLogin(undefined); // callback prematuro
+    // Mucho después de la vieja gracia de 15 s el flujo sigue vivo y un
+    // CANCEL real del usuario aún se clasifica correctamente.
+    await vi.advanceTimersByTimeAsync(TIMING.graceMs * 4);
     postSignupMessage({ type: 'WA_EMBEDDED_SIGNUP', event: 'CANCEL' });
     await expectativa;
   });
@@ -362,5 +411,103 @@ describe('launchEmbeddedSignup', () => {
     expect(serializado).not.toContain('codigo-super-secreto');
     expect(serializado).not.toContain('222');
     expect(capturado?.message).toBe('INCOMPLETE_SESSION');
+  });
+
+  it('los logs [wa-signup] serializan el detalle como JSON legible (no "Object")', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+    const { fb, completeLogin } = fakeFb();
+    const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
+    promesa.catch(() => undefined);
+
+    completeLogin(undefined);
+
+    const llamada = info.mock.calls.find(
+      ([msg]) => msg === '[wa-signup] callback de FB.login',
+    );
+    expect(llamada).toBeDefined();
+    expect(typeof llamada?.[1]).toBe('string');
+    expect(llamada?.[1]).toContain('"hasCode":false');
+    expect(llamada?.[1]).toContain('"status":"unknown"');
+
+    postSignupMessage({ type: 'WA_EMBEDDED_SIGNUP', event: 'CANCEL' });
+    await expect(promesa).rejects.toMatchObject({ code: 'CANCELLED' });
+  });
+
+  describe('listener de diagnóstico (flag wa-signup-debug)', () => {
+    afterEach(() => {
+      window.localStorage.removeItem('wa-signup-debug');
+    });
+
+    it('con el flag activo loguea origin y clasificadores de TODO message, sin el payload', async () => {
+      window.localStorage.setItem('wa-signup-debug', '1');
+      const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+      const { fb } = fakeFb();
+      const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
+      promesa.catch(() => undefined);
+
+      postSignupMessage(
+        {
+          type: 'ALGO_INESPERADO',
+          event: 'FINISH',
+          data: { phone_number_id: 'id-sensible-999' },
+        },
+        'https://business.facebook.com',
+      );
+
+      const debugLogs = info.mock.calls.filter(
+        ([msg]) => msg === '[wa-signup] debug: message recibido',
+      );
+      expect(debugLogs.length).toBeGreaterThan(0);
+      const detalle = String(debugLogs[0]?.[1]);
+      expect(detalle).toContain('https://business.facebook.com');
+      expect(detalle).toContain('ALGO_INESPERADO');
+      expect(detalle).toContain('FINISH');
+      // El contenido del payload jamás se loguea.
+      expect(detalle).not.toContain('id-sensible-999');
+      const todoLoImpreso = JSON.stringify(info.mock.calls);
+      expect(todoLoImpreso).not.toContain('id-sensible-999');
+
+      // Cierra el flujo para que su listener no contamine otros tests.
+      postSignupMessage({ type: 'WA_EMBEDDED_SIGNUP', event: 'CANCEL' });
+      await expect(promesa).rejects.toMatchObject({ code: 'CANCELLED' });
+    });
+
+    it('sin el flag no se instala el listener de diagnóstico', async () => {
+      const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+      const { fb } = fakeFb();
+      const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
+      promesa.catch(() => undefined);
+
+      postSignupMessage({ type: 'CUALQUIERA' }, 'https://other.example.com');
+
+      expect(
+        info.mock.calls.some(
+          ([msg]) => msg === '[wa-signup] debug: message recibido',
+        ),
+      ).toBe(false);
+
+      postSignupMessage({ type: 'WA_EMBEDDED_SIGNUP', event: 'CANCEL' });
+      await expect(promesa).rejects.toMatchObject({ code: 'CANCELLED' });
+    });
+
+    it('el listener de diagnóstico se retira al terminar el flujo', async () => {
+      window.localStorage.setItem('wa-signup-debug', '1');
+      const info = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+      const { fb } = fakeFb();
+      const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
+      const expectativa = expect(promesa).rejects.toMatchObject({
+        code: 'CANCELLED',
+      });
+      postSignupMessage({ type: 'WA_EMBEDDED_SIGNUP', event: 'CANCEL' });
+      await expectativa;
+
+      info.mockClear();
+      postSignupMessage({ type: 'CUALQUIERA' });
+      expect(
+        info.mock.calls.some(
+          ([msg]) => msg === '[wa-signup] debug: message recibido',
+        ),
+      ).toBe(false);
+    });
   });
 });

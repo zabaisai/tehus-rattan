@@ -117,16 +117,24 @@ export function WhatsAppConnect() {
         wabaId: result.wabaId,
         businessId: result.businessId,
       });
-      console.info('[wa-signup] canje completado', { status: final.status });
+      console.info(
+        '[wa-signup] canje completado',
+        JSON.stringify({ status: final.status }),
+      );
       setStep(STEPS.length); // all done
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-connection-status'] });
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-integration'] });
     } catch (err) {
       // Classifier / HTTP status only — never the code or Meta payloads.
-      console.error('[wa-signup] flujo falló', {
-        code: err instanceof EmbeddedSignupError ? err.code : undefined,
-        httpStatus: (err as { response?: { status?: number } })?.response?.status,
-      });
+      // Stringified so captures/copies of the console show the detail instead
+      // of a collapsed "Object".
+      console.error(
+        '[wa-signup] flujo falló',
+        JSON.stringify({
+          code: err instanceof EmbeddedSignupError ? err.code : undefined,
+          httpStatus: (err as { response?: { status?: number } })?.response?.status,
+        }),
+      );
       setFlowError(mapError(err));
       setStep(-1);
     } finally {
