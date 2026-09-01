@@ -11,16 +11,28 @@ bypass Meta authentication.
 
 ## Flow
 
-1. An ADMIN/SUPER_ADMIN opens *Configuración → WhatsApp* and clicks **"Conectar
-   con Meta"**.
-2. Frontend calls `POST /api/whatsapp-integrations/me/embedded-signup/start`.
-   The backend mints a **single-use state** (32 random bytes; only its SHA-256
-   hash is stored; short TTL) and returns **public** config only:
-   `{ appId, configId, graphVersion, state, expiresAt }` — never the app secret.
-3. Frontend loads Meta's official JS SDK (`connect.facebook.net/en_US/sdk.js`),
-   calls `FB.login` with `config_id`, `response_type: 'code'`,
-   `override_default_response_type: true`, and listens for the `WA_EMBEDDED_SIGNUP`
+1. An ADMIN/SUPER_ADMIN opens *Configuración → WhatsApp*. **On mount** the
+   frontend calls `POST /api/whatsapp-integrations/me/embedded-signup/start`
+   (or `/reconnect` when already connected) and loads Meta's official JS SDK
+   (`connect.facebook.net/en_US/sdk.js`); the connect buttons stay disabled
+   until both are ready. The backend mints a **single-use state** (32 random
+   bytes; only its SHA-256 hash is stored; short TTL) and returns **public**
+   config only: `{ appId, configId, graphVersion, state, expiresAt }` — never
+   the app secret.
+2. The user clicks **"Conectar con Meta"**. `FB.login` (with `config_id`,
+   `response_type: 'code'`, `override_default_response_type: true`) runs
+   **synchronously inside the click handler** — no await in between — so the
+   SDK's popup opens within the click's user-activation context. If the
+   gesture is lost, Chrome blocks/detaches the popup: `FB.login` calls back
+   within seconds with status `unknown` and no `WA_EMBEDDED_SIGNUP`
+   postMessage ever arrives, even if a popup is visible (root cause of the
+   staging failures). The frontend listens for the `WA_EMBEDDED_SIGNUP`
    window message.
+3. In parallel with the popup (never before `FB.login`), the frontend mints a
+   **fresh state** via the same start/reconnect endpoint — `FB.login` does not
+   need the state; only the final exchange does, and the mount-time state may
+   be near its TTL by the time the user finishes. The mount-time state is the
+   fallback if the fresh mint fails.
 4. On **FINISH**, the message yields `phone_number_id`, `waba_id`, `business_id`
    and `FB.login` returns a **30-second exchangeable code**.
 5. Frontend posts `{ state, code, phoneNumberId, wabaId, businessId }` to
@@ -110,6 +122,11 @@ for Meta's `WA_EMBEDDED_SIGNUP` events (or a second callback) until the
 global 5-minute timeout. A bounded grace period (60 s) starts only once the
 flow demonstrably ended — a code was granted, or a FINISH message arrived
 after a code-less callback.
+
+An immediate (~2 s) callback with status `unknown` **plus zero postMessages
+for the whole flow** is the signature of `FB.login` running outside the
+click's user-activation context (an await between the click and `FB.login`)
+— fix the call site per step 2 of the flow, don't tune timeouts.
 
 ### Signup diagnostics
 To debug missing `WA_EMBEDDED_SIGNUP` messages, set the build arg

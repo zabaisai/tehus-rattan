@@ -40,7 +40,7 @@ interface FbLoginResponse {
   status?: string;
 }
 
-interface FbInstance {
+export interface FbInstance {
   init(opts: { appId: string; cookie?: boolean; xfbml?: boolean; version: string }): void;
   login(cb: (resp: FbLoginResponse) => void, opts: Record<string, unknown>): void;
 }
@@ -179,6 +179,15 @@ const debugDescribeMessage = (event: MessageEvent) => {
 // Launches Embedded Signup (Cloud API or WhatsApp Business App coexistence)
 // and resolves with the code + session info, or rejects with a typed
 // EmbeddedSignupError (cancelled / no code / incomplete / timeout).
+//
+// GESTURE CONTRACT: call this SYNCHRONOUSLY inside the user's click handler,
+// with no await between the click and this call. FB.login runs in the same
+// tick (the Promise executor is synchronous), and its window.open must happen
+// within the click's user-activation context: with the gesture lost, Chrome
+// blocks or detaches the SDK's popup — FB.login then calls back within
+// seconds with status 'unknown' and no postMessage ever arrives, even if a
+// popup is visible. Anything async the flow needs (backend /start, loading
+// the SDK) must be done BEFORE the click or fired in parallel after it.
 // The `state` is our own single-use anti-CSRF value; it is not consumed here —
 // the browser simply forwards it to the backend `complete` call.
 //
@@ -340,6 +349,9 @@ export function launchEmbeddedSignup(
     }
     overallTimer = setTimeout(() => fail('TIMEOUT'), timeoutMs);
 
+    // Runs synchronously here — see the GESTURE CONTRACT above. The log lets
+    // a staging trace verify the click-to-login gap is zero.
+    logSignup('lanzando FB.login (mismo tick del gesto de usuario)');
     fb.login(
       (response: FbLoginResponse) => {
         loginDone = true;

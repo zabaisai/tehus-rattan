@@ -89,6 +89,17 @@ describe('launchEmbeddedSignup', () => {
     expect(loginCalls[0].extras).toEqual({ setup: {} });
   });
 
+  it('invoca fb.login de forma síncrona, en el mismo tick de la llamada (contrato de gesto de usuario)', () => {
+    const { fb, loginCalls } = fakeFb();
+    const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
+    promesa.catch(() => undefined);
+
+    // Sin microtasks de por medio: si el caller invoca launchEmbeddedSignup
+    // dentro del handler del clic, el window.open del SDK conserva el gesto
+    // de usuario y el popup queda conectado al canal xd_arbiter.
+    expect(loginCalls).toHaveLength(1);
+  });
+
   it('resuelve cuando el code llega primero y FINISH después', async () => {
     const { fb, completeLogin } = fakeFb();
     const promesa = launchEmbeddedSignup(fb, 'cfg', 'COEXISTENCE', TIMING);
