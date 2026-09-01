@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { buildContentSecurityPolicy, resolveApiOrigin } from "./src/lib/csp";
+import { buildSecurityHeaders } from "./src/lib/security-headers";
 import { verificarUrlDeApi } from "./src/lib/build-guard";
 
 // Security headers set on every response. HSTS is intentionally NOT set here —
@@ -20,19 +21,10 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
   metaSdk: Boolean(process.env.NEXT_PUBLIC_WHATSAPP_APP_ID),
 });
 
-const securityHeaders = [
-  { key: "Content-Security-Policy", value: contentSecurityPolicy },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Redundant with CSP frame-ancestors 'none' but covers older browsers.
-  { key: "X-Frame-Options", value: "DENY" },
-  {
-    key: "Permissions-Policy",
-    value:
-      "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()",
-  },
-  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-];
+// Built in src/lib/security-headers.ts (unit-tested there). COOP must stay
+// 'same-origin-allow-popups' or the Meta Embedded Signup popup loses its
+// opener link and can never report back — see that file for the full story.
+const securityHeaders = buildSecurityHeaders(contentSecurityPolicy);
 
 const nextConfig: NextConfig = {
   // Produces a self-contained `.next/standalone` server (only the traced

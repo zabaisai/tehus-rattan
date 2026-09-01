@@ -113,6 +113,22 @@ and the UI reports `NO_CODE`. This is added **only** when
 `NEXT_PUBLIC_WHATSAPP_APP_ID` is set at build time; otherwise the CSP stays
 fully locked down. No app secret is ever exposed to the browser.
 
+### COOP note (required: `same-origin-allow-popups`)
+The frontend's `Cross-Origin-Opener-Policy` MUST be
+**`same-origin-allow-popups`** (set in `apps/frontend/src/lib/security-headers.ts`,
+pinned by its unit test). With `same-origin`, the browser puts the cross-origin
+popup the page opens (Meta's dialog on facebook.com) into a **separate
+browsing-context group**: `window.opener` is `null` inside the popup and the
+postMessage / xd_arbiter channel dies **by design**. Symptoms (observed in
+staging): `FB.login` calls back with status `unknown` within seconds,
+**zero** `WA_EMBEDDED_SIGNUP` (or any) message events for the whole flow, and
+the user completes a popup that can never report back — no CSP, gesture, or
+timeout change can fix it. Note this is a **response header**, so a reverse
+proxy could also inject a stricter COOP; if the symptoms above appear with the
+code correct, check the live header (e.g.
+`fetch(location.href).then(r => r.headers.get('cross-origin-opener-policy'))`).
+The backend keeps COOP `same-origin` — the API never opens popups.
+
 ### Timing note (premature FB.login callback)
 The SDK can fire the `FB.login` callback with a **null `authResponse`**
 (status `unknown`) seconds after the popup opens, while the user is still
