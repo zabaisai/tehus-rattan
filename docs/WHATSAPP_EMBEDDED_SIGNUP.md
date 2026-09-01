@@ -101,6 +101,24 @@ and the UI reports `NO_CODE`. This is added **only** when
 `NEXT_PUBLIC_WHATSAPP_APP_ID` is set at build time; otherwise the CSP stays
 fully locked down. No app secret is ever exposed to the browser.
 
+### Timing note (premature FB.login callback)
+The SDK can fire the `FB.login` callback with a **null `authResponse`**
+(status `unknown`) seconds after the popup opens, while the user is still
+driving Meta's screens (observed in staging with coexistence). The frontend
+therefore treats a code-less callback as **non-terminal**: it keeps waiting
+for Meta's `WA_EMBEDDED_SIGNUP` events (or a second callback) until the
+global 5-minute timeout. A bounded grace period (60 s) starts only once the
+flow demonstrably ended — a code was granted, or a FINISH message arrived
+after a code-less callback.
+
+### Signup diagnostics
+To debug missing `WA_EMBEDDED_SIGNUP` messages, set the build arg
+`NEXT_PUBLIC_WA_SIGNUP_DEBUG=true` or, without a rebuild, run
+`localStorage.setItem('wa-signup-debug', '1')` in the browser console before
+starting the flow. While the flow runs, every window `message` event is logged
+with its **origin and type/event classifiers only** — never the payload, code
+or ids. Staging-only; do not enable in production builds.
+
 ## Security
 
 - **State**: high-entropy (`crypto.randomBytes(32)`), stored only as a SHA-256
