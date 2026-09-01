@@ -113,6 +113,32 @@ echo "$acao_ok" | grep -qi "$ALLOWED_ORIGIN" && ok "CORS reflects allowed origin
 acao_bad=$(headers -H "Origin: https://evil.example.com" "$API_URL/health/live" | grep -ci '^access-control-allow-origin')
 [ "$acao_bad" = 0 ] && ok "CORS rejects a foreign origin" || bad "CORS reflected a foreign origin"
 
+# 6b. Preflight del onboarding. El navegador manda el codigo de invitacion en
+#     el encabezado X-Onboarding-Invite-Code (el guard corre antes de que
+#     Multer procese el multipart, no puede ir en el body), asi que el OPTIONS
+#     debe permitir ese encabezado explicitamente. Cuando no estaba en
+#     allowedHeaders, la creacion de empresa moria en el navegador con "CORS
+#     error / 0.0 kB" sin llegar nunca a la API (bug 2026-09-01). Es solo un
+#     OPTIONS: no crea empresas, no consume invitaciones, no usa codigo alguno.
+pf=$(headers -X OPTIONS "$API_URL/onboarding/company" \
+  -H "Origin: $ALLOWED_ORIGIN" \
+  -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: content-type,x-onboarding-invite-code')
+pfc=$(printf '%s' "$pf" | head -1 | grep -oE ' [0-9]{3}' | head -1 | tr -d ' ')
+case "$pfc" in
+  2*) ok "onboarding preflight → $pfc" ;;
+  *)  bad "onboarding preflight → ${pfc:-000} (want 2xx)" ;;
+esac
+printf '%s' "$pf" | grep -i '^access-control-allow-origin' | grep -qi "$ALLOWED_ORIGIN" \
+  && ok "onboarding preflight reflects allowed origin" \
+  || bad "onboarding preflight did not reflect allowed origin"
+printf '%s' "$pf" | grep -i '^access-control-allow-methods' | grep -q 'POST' \
+  && ok "onboarding preflight allows POST" \
+  || bad "onboarding preflight does not allow POST"
+printf '%s' "$pf" | grep -i '^access-control-allow-headers' | grep -qi 'x-onboarding-invite-code' \
+  && ok "onboarding preflight allows X-Onboarding-Invite-Code" \
+  || bad "onboarding preflight does NOT allow X-Onboarding-Invite-Code"
+
 # 7. Invalid login → generic 401 (never reveals which field, never 500)
 c=$(code -X POST -H 'Content-Type: application/json' -H "Origin: $ALLOWED_ORIGIN" \
   --data '{"email":"nobody@example.com","password":"wrong-password"}' "$API_URL/auth/login")
