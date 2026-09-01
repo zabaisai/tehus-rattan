@@ -15,6 +15,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: configService.getOrThrow<string>('JWT_SECRET'),
+      // Pin the accepted algorithm (HS256, symmetric): without an allowlist,
+      // jsonwebtoken accepts the whole HMAC family and leaves the door open to
+      // algorithm-confusion. The token is minted HS256 in auth.module.ts.
+      algorithms: ['HS256'],
     });
   }
 

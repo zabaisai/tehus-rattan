@@ -1,0 +1,27 @@
+-- Rol runtime separado para RLS — EJEMPLO para entornos LOCAL/staging.
+-- Lo ejecuta un superusuario UNA vez sobre la base ya migrada. La contraseña se
+-- pone fuera del repositorio (o autenticación por certificado). No se versiona
+-- con un valor real.
+--
+-- Modelo de dos roles:
+--   * OWNER (el actual de DATABASE_URL): propietario de tablas, ejecuta las
+--     migraciones (DDL). Puede omitir RLS, por eso las políticas usan FORCE.
+--   * RUNTIME (takto_app): lo usan el backend y el worker. SIN superuser, SIN
+--     BYPASSRLS, SIN propiedad de tablas. Solo DML. Sujeto a las políticas.
+--
+-- Tras crearlo: apuntar el DATABASE_URL del backend/worker a takto_app, dejar
+-- las migraciones con el OWNER, aplicar apps/backend/prisma/rls/001-enable-rls.sql
+-- y adoptar el contexto de empresa (runInTenantContext / interceptor) en el
+-- acceso a datos. Ver apps/backend/prisma/rls/README.md.
+
+CREATE ROLE takto_app LOGIN PASSWORD 'CAMBIAR_FUERA_DE_AQUI'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS;
+
+GRANT USAGE ON SCHEMA public TO takto_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO takto_app;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO takto_app;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO takto_app;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  GRANT USAGE, SELECT ON SEQUENCES TO takto_app;

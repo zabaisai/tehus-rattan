@@ -276,11 +276,12 @@ describe('ContactsService (normalización E.164 y aislamiento)', () => {
       expect(args.skip).toBe(10);
     });
 
-    it('sin paginación no fija take ni skip', async () => {
+    it('sin paginación aplica el tope máximo (guardia anti-runaway) y no fija skip', async () => {
       await service.findAll(COMPANY_A);
 
       const args = prisma.contact.findMany.mock.calls[0][0];
-      expect(args.take).toBeUndefined();
+      // Ya no es ilimitado: sin limit explícito se aplica MAX_LIST_ROWS.
+      expect(args.take).toBe(1000);
       expect(args.skip).toBeUndefined();
     });
 

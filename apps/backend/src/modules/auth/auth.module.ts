@@ -24,7 +24,9 @@ import { ACCESS_TOKEN_EXPIRES_IN } from '../sessions/sessions.constants';
         // enforces revocation via `sid` on every request (see
         // jwt.strategy.ts). This shorter window is a defense-in-depth
         // measure for token leakage, not the revocation mechanism itself.
-        signOptions: { expiresIn: ACCESS_TOKEN_EXPIRES_IN },
+        // Pin the algorithm on both ends (HS256, symmetric secret): an
+        // explicit allowlist forecloses any algorithm-confusion attack.
+        signOptions: { expiresIn: ACCESS_TOKEN_EXPIRES_IN, algorithm: 'HS256' },
       }),
     }),
   ],

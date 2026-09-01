@@ -1,4 +1,5 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 import { PrismaService } from '../../prisma/prisma.service';
 import { MessagesService } from '../messages/messages.service';
 import { ConversationsService } from '../conversations/conversations.service';
@@ -23,6 +24,7 @@ export class AutomationsService {
 
   async findAll(companyId: string) {
     return this.prisma.automation.findMany({
+      take: MAX_LIST_ROWS,
       where: { companyId },
       orderBy: { order: 'asc' },
     });

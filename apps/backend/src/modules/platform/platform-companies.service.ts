@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CompanyStatus, Role } from '@prisma/client';
-import * as bcrypt from 'bcryptjs';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreatePlatformCompanyDto } from './dto/create-platform-company.dto';
 import { PlatformAuditLogService } from './platform-audit-log.service';
@@ -29,6 +29,7 @@ export class PlatformCompaniesService {
   constructor(
     private prisma: PrismaService,
     private auditLogService: PlatformAuditLogService,
+    private passwordHash: PasswordHashService,
   ) {}
 
   async listCompanies(filters: ListCompaniesFilters = {}) {
@@ -186,7 +187,7 @@ export class PlatformCompaniesService {
       }
     }
 
-    const passwordHash = await bcrypt.hash(dto.adminPassword, 10);
+    const passwordHash = await this.passwordHash.hash(dto.adminPassword);
 
     const company = await this.prisma.$transaction(async (tx) => {
       const created = await tx.company.create({

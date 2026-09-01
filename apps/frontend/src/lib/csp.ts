@@ -20,8 +20,12 @@ export function buildContentSecurityPolicy(opts: {
   // flow. This is the ONLY relaxation for Meta; the app secret is never in the
   // browser and no other third-party origin is allowed.
   metaSdk?: boolean;
+  // When true (only when NEXT_PUBLIC_TURNSTILE_SITE_KEY is configured at build
+  // time), allow Cloudflare Turnstile's script + widget frame. The secret is
+  // never in the browser; only the public site key + the challenge frame.
+  turnstile?: boolean;
 }): string {
-  const { apiOrigin, isDev, metaSdk } = opts;
+  const { apiOrigin, isDev, metaSdk, turnstile } = opts;
 
   const META_SCRIPT = 'https://connect.facebook.net';
   // staticxx.facebook.com hosts the SDK's hidden xd_arbiter relay iframe — the
@@ -31,12 +35,14 @@ export function buildContentSecurityPolicy(opts: {
   const META_FRAME =
     'https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com';
   const META_CONNECT = 'https://graph.facebook.com https://www.facebook.com';
+  const TURNSTILE = 'https://challenges.cloudflare.com';
 
   // Dev additionally needs 'unsafe-eval' for React Fast Refresh; prod never does.
   let scriptSrc = isDev
     ? `'self' 'unsafe-inline' 'unsafe-eval'`
     : `'self' 'unsafe-inline'`;
   if (metaSdk) scriptSrc += ` ${META_SCRIPT}`;
+  if (turnstile) scriptSrc += ` ${TURNSTILE}`;
 
   // El canal de tiempo real va al MISMO host que la API, en wss. La
   // especificacion dice que un origen https cubre tambien wss, pero se declara
@@ -48,8 +54,12 @@ export function buildContentSecurityPolicy(opts: {
     ? `'self' ${apiOrigin} ws: wss:`
     : `'self' ${apiOrigin} ${wsOrigin}`;
   if (metaSdk) connectSrc += ` ${META_CONNECT}`;
+  if (turnstile) connectSrc += ` ${TURNSTILE}`;
 
-  const frameSrc = metaSdk ? META_FRAME : `'none'`;
+  const frameParts: string[] = [];
+  if (metaSdk) frameParts.push(META_FRAME);
+  if (turnstile) frameParts.push(TURNSTILE);
+  const frameSrc = frameParts.length ? frameParts.join(' ') : `'none'`;
 
   const directives = [
     `default-src 'self'`,

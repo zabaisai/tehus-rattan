@@ -5,10 +5,11 @@ import { PlatformModule } from '../platform/platform.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { OnboardingService } from './onboarding.service';
 import { OnboardingController } from './onboarding.controller';
+import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 
 @Module({
   imports: [CompaniesModule, AuthModule, PlatformModule, SessionsModule],
   controllers: [OnboardingController],
-  providers: [OnboardingService],
+  providers: [OnboardingService, CookieOriginGuard],
 })
 export class OnboardingModule {}

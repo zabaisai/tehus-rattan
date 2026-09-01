@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, QuoteStatus } from '@prisma/client';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 import { resta, suma } from '../../common/dinero/dinero';
 import { PrismaService } from '../../prisma/prisma.service';
 import { calcularCotizacion } from './quote-calculo';
@@ -40,6 +41,7 @@ export class QuotesService {
     filters: { leadId?: string; status?: string },
   ) {
     return this.prisma.quote.findMany({
+      take: MAX_LIST_ROWS,
       where: {
         companyId,
         ...(filters.leadId && { leadId: filters.leadId }),

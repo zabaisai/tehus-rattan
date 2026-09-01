@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 import {
   normalizePhone,
   phoneLookupVariants,
@@ -399,6 +400,9 @@ export class ContactsService {
       }
       pagination.skip = skip;
     }
+
+    // Guardia anti-runaway: sin limit explícito se aplica el tope máximo.
+    if (pagination.take === undefined) pagination.take = MAX_LIST_ROWS;
 
     return pagination;
   }

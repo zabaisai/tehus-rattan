@@ -90,13 +90,19 @@ export class RealtimeGateway
    */
   afterInit(server: Server): void {
     server.use((socket, next) => {
-      const identity = this.auth.authenticate(socket.handshake);
-      if (!identity) {
-        next(new Error('unauthorized'));
-        return;
-      }
-      (socket as SocketConIdentidad).data.identity = identity;
-      next();
+      // authenticate ahora valida también la sesión contra la base (async),
+      // así que un token cuya sesión fue revocada no abre canal nuevo.
+      this.auth
+        .authenticate(socket.handshake)
+        .then((identity) => {
+          if (!identity) {
+            next(new Error('unauthorized'));
+            return;
+          }
+          (socket as SocketConIdentidad).data.identity = identity;
+          next();
+        })
+        .catch(() => next(new Error('unauthorized')));
     });
   }
 

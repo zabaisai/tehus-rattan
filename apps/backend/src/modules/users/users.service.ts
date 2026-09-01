@@ -1,11 +1,19 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as bcrypt from 'bcryptjs';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private passwordHash: PasswordHashService,
+  ) {}
 
+  // Returns the FULL row including `password` — this is the login path
+  // (AuthService.validateUser needs the hash for bcrypt.compare). Never surface
+  // this result in an HTTP response; every controller-facing read below uses an
+  // explicit `select` that omits `password`.
   async findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email } });
   }
@@ -32,6 +40,7 @@ export class UsersService {
 
   async findAllByCompany(companyId: string) {
     return this.prisma.user.findMany({
+      take: MAX_LIST_ROWS,
       where: { companyId },
       select: {
         id: true,
@@ -51,9 +60,20 @@ export class UsersService {
     companyId: string;
     role?: any;
   }) {
-    const hashed = await bcrypt.hash(data.password, 10);
+    const hashed = await this.passwordHash.hash(data.password);
+    // Explicit select: the created row carries the bcrypt hash and must never
+    // reach the HTTP response (POST /users returned it before this fix).
     return this.prisma.user.create({
       data: { ...data, password: hashed },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        isActive: true,
+        companyId: true,
+        createdAt: true,
+      },
     });
   }
 

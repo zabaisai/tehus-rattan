@@ -1,4 +1,5 @@
 import type { FiltrosBandeja } from './conversations';
+import { isSafeInternalPath } from './safe-url';
 
 /**
  * La URL de la bandeja: qué se está mirando, no solo qué se abrió.
@@ -108,7 +109,12 @@ export function leerEstadoDeBandeja(params: URLSearchParams): EstadoDeBandeja {
     filtros,
     conversacionId: params.get('c'),
     perfilAbierto: leerPerfil(params.get('perfil')),
-    volverA: params.get('volverA'),
+    // Se sanea en el parseo: `volverA` termina en router.push. Una ruta que no
+    // sea interna absoluta (p. ej. `//evil.tld`) se descarta aquí, de modo que
+    // ningún consumidor navegue fuera del sitio.
+    volverA: isSafeInternalPath(params.get('volverA'))
+      ? params.get('volverA')
+      : null,
   };
 }
 

@@ -20,7 +20,9 @@ describe('RealtimeGateway', () => {
   let gateway: RealtimeGateway;
 
   beforeEach(() => {
-    auth = { authenticate: jest.fn().mockReturnValue(idA) };
+    // authenticate es async (valida la sesión contra la base): los mocks
+    // resuelven la promesa y las pruebas del middleware esperan un microtask.
+    auth = { authenticate: jest.fn().mockResolvedValue(idA) };
     prisma = {
       conversation: {
         findFirst: jest.fn().mockResolvedValue({ id: 'conv-1' }),
@@ -36,29 +38,35 @@ describe('RealtimeGateway', () => {
     return use.mock.calls[0][0] as (s: unknown, next: jest.Mock) => void;
   };
 
+  // El middleware resuelve la identidad de forma asíncrona; dejar correr los
+  // microtasks pendientes antes de comprobar el resultado.
+  const flush = () => new Promise((r) => setImmediate(r));
+
   describe('handshake (middleware)', () => {
-    it('acepta un token válido y deja la identidad en el socket', () => {
+    it('acepta un token válido y deja la identidad en el socket', async () => {
       const s = socket();
       const next = jest.fn();
 
       middleware()(s, next);
+      await flush();
 
       expect(next).toHaveBeenCalledWith();
       expect(s.data.identity).toEqual(idA);
     });
 
-    it('RECHAZA antes de conectar si el token no vale', () => {
+    it('RECHAZA antes de conectar si el token no vale', async () => {
       // Rechazar aquí y no en handleConnection es lo que hace que el cliente
       // reciba connect_error y no se crea en vivo ni un milisegundo.
-      auth.authenticate.mockReturnValue(null);
+      auth.authenticate.mockResolvedValue(null);
       const next = jest.fn();
 
       middleware()(socket(), next);
+      await flush();
 
       expect(next).toHaveBeenCalledWith(expect.any(Error));
     });
 
-    it('la identidad se resuelve del TOKEN, no de lo que envíe el cliente', () => {
+    it('la identidad se resuelve del TOKEN, no de lo que envíe el cliente', async () => {
       const s = socket();
       s.handshake.auth = {
         token: 'tok',
@@ -66,6 +74,7 @@ describe('RealtimeGateway', () => {
       } as never;
 
       middleware()(s, jest.fn());
+      await flush();
 
       expect(s.data.identity).toEqual(idA);
     });

@@ -13,8 +13,11 @@ import { WhatsAppHistoryModule } from './modules/whatsapp-history/whatsapp-histo
 import { HealthModule } from './common/health/health.module';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AppThrottlerGuard } from './common/throttle/app-throttler.guard';
+import { GlobalJwtAuthGuard } from './common/auth/global-jwt-auth.guard';
+import { AccountThrottleGuard } from './common/throttle/account-throttle.guard';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { HttpLoggerInterceptor } from './common/logging/http-logger.interceptor';
+import { TenantContextInterceptor } from './prisma/tenant-context.interceptor';
 import { RequestIdMiddleware } from './common/logging/request-id.middleware';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -23,7 +26,10 @@ import {
   THROTTLE_TTL_MS,
   THROTTLE_LIMITS,
 } from './common/throttle/throttle.config';
+import { buildThrottlerStorage } from './common/throttle/throttler-storage.factory';
 import { PrismaModule } from './prisma/prisma.module';
+import { CaptchaModule } from './common/captcha/captcha.module';
+import { PasswordModule } from './common/password/password.module';
 import { DemoModule } from './common/demo/demo.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CompaniesModule } from './modules/companies/companies.module';
@@ -55,6 +61,11 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     // conocen entre si. Que cada uno tuviera que importarlo convertiria un
     // olvido en un efecto externo desde la empresa de demostracion.
     DemoModule,
+    // Hashing de contraseñas global (coste objetivo + rehash progresivo).
+    PasswordModule,
+    // Antibot global (desacoplado): proveedor falso en local/tests, Turnstile
+    // en producción. Opt-in vía CAPTCHA_ENABLED; guard fail-closed cuando activo.
+    CaptchaModule,
     QueueModule,
     OutboxModule,
     RealtimeModule,
@@ -68,13 +79,19 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
       isGlobal: true,
       validate: validateEnv,
     }),
-    ThrottlerModule.forRoot([
-      {
-        name: 'default',
-        ttl: THROTTLE_TTL_MS,
-        limit: THROTTLE_LIMITS.default,
-      },
-    ]),
+    // Rate limiting. El store es Redis compartido en producción/dev (así N
+    // réplicas comparten el cupo); en pruebas y con la cola apagada cae al store
+    // en memoria por defecto. Ver throttler-storage.factory.ts.
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          name: 'default',
+          ttl: THROTTLE_TTL_MS,
+          limit: THROTTLE_LIMITS.default,
+        },
+      ],
+      storage: buildThrottlerStorage(process.env),
+    }),
     ScheduleModule.forRoot(),
     PrismaModule,
     SessionsModule,
@@ -108,10 +125,24 @@ import { DeviceIdMiddleware } from './modules/sessions/device-id.middleware';
     // `trust proxy = 1` set in main.ts, the single Caddy hop) EXCEPT
     // POST /auth/refresh, which is bucketed per device — see AppThrottlerGuard.
     { provide: APP_GUARD, useClass: AppThrottlerGuard },
+    // Deny-by-default: autenticación GLOBAL. Toda ruta HTTP exige un JWT válido
+    // salvo las marcadas con @Public(). Es la red de seguridad para que un
+    // controlador nuevo no nazca abierto por olvidar el guard. Los guards por
+    // controlador (jwt/tenant/rol) se mantienen como capa primaria.
+    { provide: APP_GUARD, useClass: GlobalJwtAuthGuard },
+    // Límite por CUENTA normalizada (complementa el límite por IP) en
+    // login/recuperación: frena ataques distribuidos contra una sola cuenta.
+    // Reutiliza el ThrottlerStorage (Redis + fallback local). No-op salvo en las
+    // rutas sensibles. Respuesta 429 genérica (sin enumeración).
+    { provide: APP_GUARD, useClass: AccountThrottleGuard },
     // Consistent error shaping + never leaking a stack trace in a 500 body.
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     // One safe access-log line per request (no headers/cookies/body logged).
     { provide: APP_INTERCEPTOR, useClass: HttpLoggerInterceptor },
+    // Fija el contexto de empresa (AsyncLocalStorage) desde req.user por
+    // petición: punto de integración de RLS. No-op hasta activar RLS con el rol
+    // runtime separado; deja el contexto listo para runWithTenant/runInTenantContext.
+    { provide: APP_INTERCEPTOR, useClass: TenantContextInterceptor },
   ],
 })
 export class AppModule implements NestModule {

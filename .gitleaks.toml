@@ -1,0 +1,41 @@
+# Gitleaks configuration for TAKTO / Tehus Rattan.
+# Extends the default ruleset and allowlists a small set of VERIFIED false
+# positives. Every entry below was manually reviewed on 2026-08-27; none is a
+# real credential. Do NOT add allowlist entries for real secrets — rotate and
+# purge those instead (see USER_ACTIONS_REQUIRED.md).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Verified non-secret placeholders and test fixtures"
+
+# Paths that only ever contain fictitious values.
+paths = [
+  # NestJS starter README: the CircleCI badge ships the upstream placeholder
+  # token "abc123def456" — not a Tehus credential.
+  '''apps/backend/README.md''',
+  # *.example templates carry documented placeholder values only.
+  '''.*\.example$''',
+  # Test fixtures: this spec asserts the flowbot validator FLAGS embedded
+  # secrets, so it necessarily contains fake "sk-..." / "EAA..." strings.
+  '''apps/backend/src/modules/flowbot/graph/flowbot.validator.spec.ts''',
+  # Realtime auth spec: asserts the logger never writes a token; the fixture
+  # JWT below is fake.
+  '''apps/backend/src/common/realtime/realtime.auth.spec.ts''',
+  # RLS e2e specs: use fictitious runtime-role passwords and a fake JWT secret to
+  # boot an isolated throwaway DB; no real credentials.
+  '''apps/backend/test/rls-real-path.e2e-spec.ts''',
+  '''apps/backend/test/rls-integration.e2e-spec.ts''',
+]
+
+regexes = [
+  # Boilerplate CircleCI badge token from the NestJS starter. Allowlisted both
+  # with and without the `token=` prefix, because the generic-api-key rule
+  # captures the bare value as the secret.
+  '''token=abc123def456''',
+  '''abc123def456''',
+  # Deliberately fake JWT used by realtime.auth.spec.ts to assert that the
+  # realtime auth logger NEVER writes a token to the logs.
+  '''eyJhbGciOiJIUzI1NiJ9\.secreto''',
+]

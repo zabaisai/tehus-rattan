@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate, ValidationError } from 'class-validator';
-import * as bcrypt from 'bcryptjs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -23,6 +22,7 @@ import {
 } from '../invitation-codes/invitation-code.util';
 import { SessionsService } from '../sessions/sessions.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 
 export interface OnboardingLogoFiles {
   logo?: UploadedLogoFile;
@@ -60,6 +60,7 @@ export class OnboardingService {
     private authService: AuthService,
     private auditLogService: PlatformAuditLogService,
     private sessionsService: SessionsService,
+    private passwordHash: PasswordHashService,
   ) {}
 
   // Accepts either a plain JSON body (existing behavior, unchanged) or a
@@ -146,24 +147,47 @@ export class OnboardingService {
       );
     }
 
+    // Puerta de invitación ANTES de tocar los emails. Sin esto, un atacante con
+    // cualquier cadena como código podía enviar una lista de emails y leer, por
+    // el mensaje de error, cuáles existen (enumeración de cuentas). Ahora la
+    // comprobación de duplicados solo se alcanza con un código realmente usable.
+    // El reclamo atómico definitivo sigue dentro de la transacción de abajo;
+    // esto es solo un filtro de orden que nunca marca el código como usado.
+    const invitePrecheck = await this.prisma.invitationCode.findUnique({
+      where: { codeHash },
+      select: { status: true, expiresAt: true },
+    });
+    const inviteUsable =
+      invitePrecheck &&
+      invitePrecheck.status === 'ACTIVE' &&
+      (invitePrecheck.expiresAt === null ||
+        invitePrecheck.expiresAt.getTime() > Date.now());
+    if (!inviteUsable) {
+      // Mensaje genérico y único: no distingue inexistente/revocado/usado/
+      // vencido, para no ofrecer un oráculo del estado del código.
+      this.logger.warn('Onboarding rechazado: código de invitación no usable');
+      throw new BadRequestException(
+        'El código de invitación no es válido o ya no está disponible',
+      );
+    }
+
+    // El mensaje NO enumera qué emails existen: solo indica que hay colisión.
     const existingUsers = await this.prisma.user.findMany({
       where: { email: { in: allEmails } },
-      select: { email: true },
+      select: { id: true },
     });
     if (existingUsers.length > 0) {
       throw new ConflictException(
-        `Los siguientes emails ya están registrados: ${existingUsers
-          .map((u) => u.email)
-          .join(', ')}`,
+        'Uno o más de los emails indicados ya están registrados',
       );
     }
 
     const companyName = dto.company.name.trim();
     const slug = await this.generateUniqueSlug(companyName);
 
-    const adminPasswordHash = await bcrypt.hash(dto.admin.password, 10);
+    const adminPasswordHash = await this.passwordHash.hash(dto.admin.password);
     const agentPasswordHashes = await Promise.all(
-      agents.map((agent) => bcrypt.hash(agent.password, 10)),
+      agents.map((agent) => this.passwordHash.hash(agent.password)),
     );
 
     const settings = {

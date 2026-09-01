@@ -1,0 +1,105 @@
+name: Security
+
+# Supply-chain and secret scanning. Runs on pushes to the long-lived branches,
+# on every PR, and weekly (so newly-disclosed CVEs surface even without a push).
+# No deploy, no secrets of our own — all scanners run read-only.
+on:
+  push:
+    branches: [develop, main]
+  pull_request:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+# Default to read-only. Individual jobs raise only what they need.
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Full history so the scan covers every commit on the ref, not just
+          # the tip. The allowlist for verified false positives lives in
+          # .gitleaks.toml at the repo root.
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        env:
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # gitleaks-action exige GITHUB_TOKEN para escanear pull requests (lo
+          # usa para leer el diff del PR); es el token automático de solo lectura
+          # que ya concede `permissions: contents: read`. Sin él el job aborta
+          # ANTES de escanear (no es un secreto detectado).
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  npm-audit:
+    name: Dependency audit (npm)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [apps/backend, apps/frontend]
+    defaults:
+      run:
+        working-directory: ${{ matrix.app }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ${{ matrix.app }}/package-lock.json
+      # Project policy: the hard gate fails only on a CRITICAL advisory in the
+      # production dependency tree. HIGH advisories are reported on every run
+      # (step below) and tracked as accepted risks in
+      # SECURITY_HARDENING_20_CONTROLS.md — the current highs (prisma-CLI
+      # deepmerge-ts config DoS, Next's sharp/libvips) are not runtime-
+      # exploitable with untrusted input and have no non-breaking fix yet.
+      - name: Audit production dependencies (fail on critical)
+        run: npm audit --omit=dev --audit-level=critical
+      - name: Report high+ advisories (does not fail the build)
+        if: always()
+        run: npm audit --omit=dev --audit-level=high || true
+
+  codeql:
+    name: CodeQL (JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: javascript-typescript
+          # security-extended broadens the query set beyond the default.
+          queries: security-extended
+      - name: Analyze
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+
+  postgres-tls:
+    name: PostgreSQL TLS (verify-full) proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Levanta un Postgres TLS efímero con certificados FICTICIOS generados en
+      # un volumen Docker (no hay certificados en el repo, no hay secretos
+      # reales) y comprueba que verify-full+CA conecta, que sin TLS se rechaza y
+      # que verify-full sin la CA correcta falla. El script limpia con `trap`
+      # incluso si falla. No relaja verify-full ni acepta CA/hostname inválidos.
+      - name: Run ephemeral PostgreSQL TLS test
+        run: bash deploy/scripts/test-postgres-tls.sh

@@ -67,8 +67,15 @@ export class AnalyticsService {
 
     if (!targetPipelineId) return [];
 
+    // PipelineStage no tiene companyId propio: se llega a él por el embudo. Un
+    // pipelineId de otra empresa filtraría sus etapas (nombres, orden e ids).
+    // Se comprueba la pertenencia del embudo por el companyId del token antes
+    // de leer las etapas.
     const stages = await this.prisma.pipelineStage.findMany({
-      where: { pipelineId: targetPipelineId },
+      where: {
+        pipelineId: targetPipelineId,
+        pipeline: { companyId },
+      },
       orderBy: { order: 'asc' },
       include: {
         leads: {

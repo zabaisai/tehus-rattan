@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MAX_LIST_ROWS } from '../../common/pagination/limites';
 import { RealtimeEmitter } from '../../common/realtime/realtime.emitter';
 
 @Injectable()
@@ -253,6 +254,7 @@ export class LeadsService {
     // present, see create()) reads first, followed by each later
     // changeStage transition in the order they actually happened.
     return this.prisma.leadStageHistory.findMany({
+      take: MAX_LIST_ROWS,
       where: { leadId: id },
       include: {
         user: { select: { id: true, name: true } },
@@ -303,6 +305,9 @@ export class LeadsService {
       }
       pagination.skip = skip;
     }
+
+    // Guardia anti-runaway: sin limit explícito se aplica el tope máximo.
+    if (pagination.take === undefined) pagination.take = MAX_LIST_ROWS;
 
     return pagination;
   }

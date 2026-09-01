@@ -141,6 +141,38 @@ describe('WhatsApp webhook GET verify handshake, with main.ts globals (e2e)', ()
     await expectServerStillAlive();
   });
 
+  it('fails closed when no verify token is configured (no reflection)', async () => {
+    // With WHATSAPP_VERIFY_TOKEN unset, a bare `?hub.mode=subscribe` used to
+    // reflect hub.challenge as text/html with 200 (undefined === undefined).
+    // It must now be a flat 403 regardless of what the client sends.
+    delete process.env.WHATSAPP_VERIFY_TOKEN;
+    try {
+      await request(app.getHttpServer())
+        .get('/api/webhook')
+        .query({
+          'hub.mode': 'subscribe',
+          'hub.challenge': '<script>x</script>',
+        })
+        .expect(403)
+        .expect('Forbidden');
+    } finally {
+      process.env.WHATSAPP_VERIFY_TOKEN = VERIFY_TOKEN;
+    }
+  });
+
+  it('serves the challenge as text/plain, never text/html', async () => {
+    await request(app.getHttpServer())
+      .get('/api/webhook')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': VERIFY_TOKEN,
+        'hub.challenge': 'challenge-abc',
+      })
+      .expect(200)
+      .expect('Content-Type', /text\/plain/)
+      .expect('challenge-abc');
+  });
+
   it('valid token but no challenge: answers 200 with an empty body, no crash', async () => {
     // Documents today's behavior for a partial query (Meta always sends
     // hub.challenge). The point of the case is the absence of a 500, not the
@@ -154,6 +186,104 @@ describe('WhatsApp webhook GET verify handshake, with main.ts globals (e2e)', ()
     await expectServerStillAlive();
   });
 
+  // --- Reflected-XSS hardening on hub.challenge (CodeQL: reflected XSS) ------
+  //
+  // The challenge is echoed back to whoever completes the handshake. Even served
+  // as text/plain it must never reflect attacker-controlled markup, so a present
+  // challenge is echoed ONLY when it matches the strict token allowlist
+  // ([A-Za-z0-9_-], bounded length) — a superset of a real Meta challenge. A
+  // present-but-hostile challenge is rejected (400) and never appears in the
+  // body. Each case asserts BOTH the status and that the dangerous payload is
+  // absent from the response text.
+
+  it('valid token + <script> challenge: rejected (400), never reflected', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/webhook')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': VERIFY_TOKEN,
+        'hub.challenge': '<script>alert(1)</script>',
+      })
+      .expect(400)
+      .expect('Content-Type', /text\/plain/);
+
+    expect(res.text).toBe('Bad Request');
+    expect(res.text).not.toContain('<script>');
+    expect(res.text).not.toContain('alert(1)');
+    await expectServerStillAlive();
+  });
+
+  it('valid token + challenge with newlines: rejected (400), not reflected', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/webhook')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': VERIFY_TOKEN,
+        'hub.challenge': 'line1\nline2\r\n<b>x</b>',
+      })
+      .expect(400);
+
+    expect(res.text).toBe('Bad Request');
+    expect(res.text).not.toContain('\n');
+    expect(res.text).not.toContain('<b>');
+    await expectServerStillAlive();
+  });
+
+  it('valid token + excessively long challenge (>256): rejected (400)', async () => {
+    const enorme = 'A'.repeat(5000);
+    const res = await request(app.getHttpServer())
+      .get('/api/webhook')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': VERIFY_TOKEN,
+        'hub.challenge': enorme,
+      })
+      .expect(400);
+
+    expect(res.text).toBe('Bad Request');
+    expect(res.text).not.toContain(enorme);
+    await expectServerStillAlive();
+  });
+
+  it('valid token + other HTML/JS metacharacters: rejected (400)', async () => {
+    for (const hostil of [
+      '"><img src=x onerror=alert(1)>',
+      "javascript:alert('x')",
+      'a&b=c',
+      'foo bar',
+      '../../etc/passwd',
+    ]) {
+      const res = await request(app.getHttpServer())
+        .get('/api/webhook')
+        .query({
+          'hub.mode': 'subscribe',
+          'hub.verify_token': VERIFY_TOKEN,
+          'hub.challenge': hostil,
+        })
+        .expect(400);
+      expect(res.text).toBe('Bad Request');
+      expect(res.text).not.toContain(hostil);
+    }
+    await expectServerStillAlive();
+  });
+
+  it('valid token + realistic numeric Meta challenge: echoed intact (200)', async () => {
+    // Meta's real handshake challenge is a random token; a numeric one is the
+    // canonical case and must still round-trip untouched.
+    await request(app.getHttpServer())
+      .get('/api/webhook')
+      .query({
+        'hub.mode': 'subscribe',
+        'hub.verify_token': VERIFY_TOKEN,
+        'hub.challenge': '1158201444',
+      })
+      .expect(200)
+      .expect('Content-Type', /text\/plain/)
+      .expect('1158201444');
+
+    await expectServerStillAlive();
+  });
+
   it('never lets the handler return the Response object to the interceptor', () => {
     // The invariant behind every case above, asserted directly: a handler that
     // returns `res` is what the global serializer chokes on.
@@ -163,6 +293,7 @@ describe('WhatsApp webhook GET verify handshake, with main.ts globals (e2e)', ()
     const res = {
       status: jest.fn().mockReturnThis(),
       send: jest.fn().mockReturnThis(),
+      type: jest.fn().mockReturnThis(),
     };
 
     const returned = controller.verify(

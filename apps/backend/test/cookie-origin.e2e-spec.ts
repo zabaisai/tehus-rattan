@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuthController } from '../src/modules/auth/auth.controller';
+import { CaptchaGuard } from '../src/common/captcha/captcha.guard';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { CookieOriginGuard } from '../src/common/guards/cookie-origin.guard';
 
@@ -38,7 +39,12 @@ async function buildApp(nodeEnv: string): Promise<INestApplication> {
         },
       },
     ],
-  }).compile();
+  })
+    // Estos tests ejercitan la CSRF de cookies, no el antibot: el guard captcha
+    // se sustituye por un no-op para no montar todo el CaptchaModule.
+    .overrideGuard(CaptchaGuard)
+    .useValue({ canActivate: () => true })
+    .compile();
 
   const app = moduleRef.createNestApplication();
   app.setGlobalPrefix('api');

@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 import { PlatformCompaniesService } from './platform-companies.service';
 import { PlatformAuditLogService } from './platform-audit-log.service';
 
@@ -47,7 +48,11 @@ describe('PlatformCompaniesService', () => {
       ),
     };
     auditLogService = new PlatformAuditLogService(prisma);
-    service = new PlatformCompaniesService(prisma, auditLogService);
+    service = new PlatformCompaniesService(
+      prisma,
+      auditLogService,
+      new PasswordHashService(),
+    );
   });
 
   describe('listCompanies', () => {

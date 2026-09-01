@@ -59,3 +59,34 @@ export function verificarUrlDeApi(
     );
   }
 }
+
+/**
+ * Coherencia del antibot en la CONSTRUCCIÓN del frontend.
+ *
+ * Riesgo: si el backend tiene `CAPTCHA_ENABLED=true` (fail-closed: exige un token
+ * verificado) pero el frontend se construye SIN `NEXT_PUBLIC_TURNSTILE_SITE_KEY`,
+ * el login no muestra el widget, no manda token y el backend rechaza TODOS los
+ * inicios de sesión.
+ *
+ * Como son dos builds separados, el frontend no puede leer la variable del
+ * backend, pero SÍ puede exigir coherencia: si el despliegue declara que el
+ * captcha es obligatorio (`NEXT_PUBLIC_TURNSTILE_REQUIRED=true`, el espejo de
+ * `CAPTCHA_ENABLED`), la construcción de producción se niega si falta la site
+ * key. Así una configuración incoherente falla al construir, no en el login.
+ */
+export function verificarCaptcha(
+  siteKey: string | undefined,
+  required: boolean,
+  esProduccion: boolean,
+): void {
+  if (!esProduccion) return;
+  if (required && !siteKey?.trim()) {
+    throw new Error(
+      'NEXT_PUBLIC_TURNSTILE_REQUIRED=true pero falta NEXT_PUBLIC_TURNSTILE_SITE_KEY.\n' +
+        'Con el antibot obligatorio en el backend (CAPTCHA_ENABLED=true) y sin la\n' +
+        'site key en el frontend, el login no podría generar token y TODOS los\n' +
+        'inicios de sesión serían rechazados. Construye con la site key pública, o\n' +
+        'no marques el captcha como obligatorio.',
+    );
+  }
+}

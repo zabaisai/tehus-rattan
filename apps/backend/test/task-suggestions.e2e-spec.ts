@@ -22,6 +22,7 @@ describe('Propuestas de tarea (e2e, base real)', () => {
   let empresaA: string;
   let empresaB: string;
   let asesor: string;
+  let asesorB: string;
   let contactoA: string;
   let n = 0;
 
@@ -60,6 +61,19 @@ describe('Propuestas de tarea (e2e, base real)', () => {
       },
     });
     asesor = u.id;
+
+    // Un asesor de la OTRA empresa: aprobar una propuesta de A no puede
+    // asignarle una tarea a él (escritura cross-tenant).
+    const ub = await prisma.user.create({
+      data: {
+        companyId: empresaB,
+        email: `${PREFIJO.toLowerCase()}-asesor-b@qa.invalid`,
+        name: 'Ajeno',
+        password: 'no-se-usa',
+        role: 'AGENT',
+      },
+    });
+    asesorB = ub.id;
 
     const c = await prisma.contact.create({
       data: {
@@ -183,6 +197,27 @@ describe('Propuestas de tarea (e2e, base real)', () => {
     expect(r.tarea!.title).toBe('Llamar el lunes a primera hora');
     expect(r.tarea!.priority).toBe('URGENT');
     expect(r.tarea!.assignedTo).toBe(asesor);
+  });
+
+  it('NO deja asignar la tarea a un usuario de otra empresa', async () => {
+    // El `assignedTo` corregido por el cliente debe pertenecer a la empresa:
+    // asignar a un usuario de la empresa B desde una propuesta de A es una
+    // escritura cross-tenant y se rechaza sin crear la tarea.
+    const p = await propuesta();
+    const antes = await prisma.task.count({ where: { companyId: empresaA } });
+
+    await expect(
+      servicio.aprobar(p.id, empresaA, asesor, { assignedTo: asesorB }),
+    ).rejects.toThrow(/no encontrado/i);
+
+    expect(await prisma.task.count({ where: { companyId: empresaA } })).toBe(
+      antes,
+    );
+    // La propuesta no queda aprobada a medias.
+    const fila = await prisma.taskSuggestion.findUnique({
+      where: { id: p.id },
+    });
+    expect(fila!.status).toBe('PENDING');
   });
 
   /**

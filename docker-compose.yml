@@ -1,4 +1,15 @@
-version: '3.8'
+# ⚠️  DEVELOPMENT ONLY — do NOT run this on a server.
+#
+# This stack exists to give a local machine a Postgres + Redis (+ pgAdmin) to
+# develop against. It uses well-known local credentials and is NOT hardened for
+# any shared or public host. The production/staging stack is
+# docker-compose.staging.yml, which never publishes these ports and reads every
+# secret from .env.staging.
+#
+# All published ports are bound to 127.0.0.1 so nothing here is reachable from
+# the LAN — only from this machine. The backend/worker run on the host in dev
+# (npm run start) and reach these services via localhost, so loopback binding
+# does not affect them.
 
 services:
   postgres:
@@ -6,11 +17,12 @@ services:
     container_name: tehus_postgres
     restart: always
     environment:
-      POSTGRES_USER: tehus_user
-      POSTGRES_PASSWORD: tehus_pass
-      POSTGRES_DB: tehus_rattan
+      # Local dev defaults; override via a local .env if desired.
+      POSTGRES_USER: ${POSTGRES_USER:-tehus_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-tehus_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-tehus_rattan}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -19,15 +31,17 @@ services:
     container_name: tehus_pgadmin
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@tehus.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@tehus.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin123}
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     depends_on:
       - postgres
 
   # Paridad con staging: la cola durable tambien en desarrollo, para que un
   # comportamiento que dependa de Redis no aparezca solo al desplegar.
+  # Sin contraseña a propósito: solo escucha en loopback (127.0.0.1) en esta
+  # máquina; staging lo mantiene en una red interna sin puertos publicados.
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -36,7 +50,7 @@ services:
       --appendonly yes
       --maxmemory-policy noeviction
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data_dev:/data
     healthcheck:

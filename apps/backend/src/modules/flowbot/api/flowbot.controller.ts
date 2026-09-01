@@ -42,6 +42,11 @@ import {
   ActualizarDisparadorDto,
   ForzarHandoffDto,
   ImportarPulsoDto,
+  ReiniciarBreakerDto,
+  KillSwitchDto,
+  UsarPlantillaDto,
+  CambiarEstadoDto,
+  ValidarGrafoDto,
 } from './dto/flowbot.dto';
 
 /**
@@ -188,7 +193,7 @@ export class FlowBotController {
   async reiniciarBreaker(
     @Request() req: any,
     @Param('integrationId') integrationId: string,
-    @Body() body: { motivo?: string },
+    @Body() body: ReiniciarBreakerDto,
   ) {
     if (!body?.motivo?.trim()) {
       throw new BadRequestException(
@@ -228,10 +233,7 @@ export class FlowBotController {
    */
   @Roles('SUPER_ADMIN')
   @Post('kill-switch')
-  async cambiarKillSwitch(
-    @Request() req: any,
-    @Body() body: { activo: boolean; motivo?: string },
-  ) {
+  async cambiarKillSwitch(@Request() req: any, @Body() body: KillSwitchDto) {
     if (typeof body?.activo !== 'boolean') {
       throw new BadRequestException(
         'Falta indicar si se activa o se desactiva',
@@ -278,7 +280,7 @@ export class FlowBotController {
   async usarPlantilla(
     @Request() req: any,
     @Param('clave') clave: string,
-    @Body() body: { nombre?: string },
+    @Body() body: UsarPlantillaDto,
   ) {
     const bot = await this.admin.crearDesdePlantilla(
       req.user.companyId,
@@ -418,7 +420,7 @@ export class FlowBotController {
   async cambiarEstado(
     @Request() req: any,
     @Param('id') id: string,
-    @Body() body: { estado: string },
+    @Body() body: CambiarEstadoDto,
   ) {
     const estado = this.estado(body?.estado);
     if (!estado) throw new BadRequestException('Estado no válido');
@@ -481,7 +483,7 @@ export class FlowBotController {
    * pisar el trabajo de otro para descubrir que el tuyo está mal.
    */
   @Post('validate')
-  validar(@Request() req: any, @Body() body: { graph: unknown }) {
+  validar(@Request() req: any, @Body() body: ValidarGrafoDto) {
     return this.admin.validar(req.user.companyId, body?.graph);
   }
 

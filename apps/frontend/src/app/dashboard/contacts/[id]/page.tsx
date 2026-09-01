@@ -22,6 +22,7 @@ import { Avatar } from "@/components/ui/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { ForbiddenState } from "@/components/ui/ForbiddenState";
 import { TextoLargo } from "@/components/ui/TextoLargo";
+import { safeInternalPath } from "@/lib/safe-url";
 
 /**
  * Perfil 360 de un contacto (mockup 18).
@@ -145,8 +146,11 @@ function Perfil360({ contactId }: { contactId: string }) {
     (perfil.error as { response?: { status?: number } })?.response?.status ??
     null;
 
+  // `volverA` llega de la URL y va a parar a un <Link href> y a router.push:
+  // sin validar, `?volverA=https://evil.tld` convierte el botón "Volver" en un
+  // redirect abierto. Solo se acepta una ruta interna absoluta.
   const rutaDeRegreso = useMemo(
-    () => volverA || "/dashboard/contacts",
+    () => safeInternalPath(volverA, "/dashboard/contacts"),
     [volverA],
   );
 

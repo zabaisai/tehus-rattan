@@ -19,6 +19,12 @@ on:
     branches: [develop, main, "feature/**", "fix/**", "hotfix/**"]
   pull_request:
 
+# Least privilege: this workflow only reads the repo to build and test. No
+# write scope is ever needed, so the GITHUB_TOKEN is dropped to read-only
+# instead of inheriting the repository default.
+permissions:
+  contents: read
+
 # Cancel superseded runs on the same ref to save CI minutes.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -36,8 +42,8 @@ jobs:
       run:
         working-directory: apps/frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -123,8 +129,8 @@ jobs:
       # pruebas. No descifra ningun token real porque no hay ninguno.
       WHATSAPP_TOKEN_ENCRYPTION_KEY: ci-dummy-encryption-key-not-real
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm

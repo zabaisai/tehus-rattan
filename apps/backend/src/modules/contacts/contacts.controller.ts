@@ -20,6 +20,7 @@ import { ContactsService } from './contacts.service';
 import { ContactsEliminacionService } from './contacts-eliminacion.service';
 import { PerfilComercialService } from './perfil-comercial.service';
 import { CreateContactDto } from './dto/create-contact.dto';
+import { ArchivarContactoDto } from './dto/archivar-contacto.dto';
 import { UpdateContactDto } from './dto/update-contact.dto';
 import { EliminarContactoDto } from './dto/eliminar-contacto.dto';
 
@@ -105,7 +106,7 @@ export class ContactsController {
   async remove(
     @Param('id') id: string,
     @Request() req: any,
-    @Body() body?: { motivo?: string },
+    @Body() body?: ArchivarContactoDto,
   ) {
     const r = await this.contactsService.remove(
       id,

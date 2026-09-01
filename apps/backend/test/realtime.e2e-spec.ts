@@ -42,6 +42,10 @@ describe('Tiempo real (e2e, sockets reales, dos empresas)', () => {
     { id: CONV_B, companyId: EMPRESA_B },
   ];
 
+  // Sesiones activas por sid. El handshake ahora valida la sesión contra la
+  // base (igual que la API REST), así que el token lleva `sid` y aquí hay una
+  // fila ACTIVE que le corresponde. `sid` codifica userId|companyId para que el
+  // mock devuelva una sesión coherente con el token sin mantener un registro.
   const prismaFalso = {
     conversation: {
       findFirst: ({ where }: any) =>
@@ -50,6 +54,22 @@ describe('Tiempo real (e2e, sockets reales, dos empresas)', () => {
             (c) => c.id === where.id && c.companyId === where.companyId,
           ) ?? null,
         ),
+    },
+    userSession: {
+      findUnique: ({ where }: any) => {
+        const sid: string = where.id;
+        const sep = sid.indexOf('|');
+        if (sep < 0) return Promise.resolve(null);
+        return Promise.resolve({
+          userId: sid.slice(0, sep),
+          companyId: sid.slice(sep + 1),
+          // Un sid marcado como revocado prueba el fin-a-fin de la revocación.
+          status: sid.startsWith('revoked') ? 'REVOKED' : 'ACTIVE',
+          revokedAt: sid.startsWith('revoked') ? new Date() : null,
+          loggedOutAt: null,
+          lastSeenAt: new Date(),
+        });
+      },
     },
   };
 
@@ -85,7 +105,15 @@ describe('Tiempo real (e2e, sockets reales, dos empresas)', () => {
   });
 
   const token = (userId: string, companyId: string | null) =>
-    jwt.sign({ sub: userId, companyId, role: 'AGENT' });
+    jwt.sign({
+      sub: userId,
+      companyId,
+      role: 'AGENT',
+      // sid codifica userId|companyId para que el userSession falso devuelva
+      // una sesión ACTIVE coherente. Un SUPER_ADMIN sin empresa no llega a
+      // consultar sesión (se rechaza antes por companyId null).
+      sid: companyId ? `${userId}|${companyId}` : undefined,
+    });
 
   /** Conecta y resuelve cuando el handshake termina, en un sentido u otro. */
   const conectar = (auth: Record<string, unknown>): Promise<Socket> =>
@@ -135,6 +163,20 @@ describe('Tiempo real (e2e, sockets reales, dos empresas)', () => {
       await expect(
         conectar({ token: token('plat-1', null) }),
       ).rejects.toBeDefined();
+    });
+
+    it('un token cuya sesión fue revocada NO abre canal', async () => {
+      // Mismo secreto y misma empresa, pero la sesión ya no está activa: el
+      // handshake la consulta en base y la rechaza. Sin esto, revocar una
+      // sesión no cerraría el tiempo real hasta caducar el access token.
+      const revocado = jwt.sign({
+        sub: 'revoked',
+        companyId: EMPRESA_A,
+        role: 'AGENT',
+        sid: `revoked|${EMPRESA_A}`,
+      });
+
+      await expect(conectar({ token: revocado })).rejects.toBeDefined();
     });
   });
 

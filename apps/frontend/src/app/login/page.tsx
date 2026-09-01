@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { login, getMe } from '@/lib/auth';
 import { useAuthStore } from '@/store/auth.store';
 import { ConnectionUnavailable } from '@/components/auth/ConnectionUnavailable';
+import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
+import { isCaptchaConfigured } from '@/lib/turnstile';
 import { TaktoLogo } from '@/components/ui/TaktoLogo';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -31,6 +33,9 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetNotice, setResetNotice] = useState('');
+  // Antibot: solo si hay site key en build. `captchaToken` null = reto pendiente.
+  const captchaActivo = isCaptchaConfigured();
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   // Already logged in (e.g. bootstrap found a live session, or another tab) —
   // don't show the login form, go to the app.
@@ -57,10 +62,22 @@ export default function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    // Fail-closed en la UI: con el reto activo no se envía el login sin token.
+    // La autoridad sigue siendo el backend, que rechaza sin verificación.
+    if (captchaActivo && !captchaToken) {
+      setError('Completa la verificación de seguridad antes de continuar.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const { token, user } = await login(email, password);
+      const { token, user } = await login(
+        email,
+        password,
+        captchaToken ?? undefined,
+      );
       // The login response only carries id/email/name. role and companyId
       // (needed right away for role-gated nav like the platform section) only
       // come from /auth/me, so fetch the full profile before navigating. The
@@ -80,6 +97,8 @@ export default function LoginPage() {
     } catch (err) {
       const response = (err as ApiError).response;
       setError(response?.data?.message || 'Credenciales inválidas');
+      // Un token de un solo uso ya se gastó: se limpia para exigir uno nuevo.
+      if (captchaActivo) setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -168,7 +187,21 @@ export default function LoginPage() {
               </p>
             )}
 
-            <Button type="submit" disabled={loading} className="w-full py-2">
+            {captchaActivo && (
+              <div className="mb-4">
+                <TurnstileWidget
+                  onVerify={(token) => setCaptchaToken(token)}
+                  onExpire={() => setCaptchaToken(null)}
+                  onError={() => setCaptchaToken(null)}
+                />
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              disabled={loading || (captchaActivo && !captchaToken)}
+              className="w-full py-2"
+            >
               {loading ? 'Ingresando...' : 'Ingresar'}
             </Button>
           </form>

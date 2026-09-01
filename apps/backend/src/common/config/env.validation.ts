@@ -12,9 +12,42 @@ export const GRAPH_API_VERSION_FORMAT = /^v\d+\.\d+$/;
 
 export function validateEnv(config: Env): Env {
   const errors: string[] = [];
+  const isProduction = config.NODE_ENV?.trim() === 'production';
 
-  if (!config.JWT_SECRET?.trim()) {
+  const jwtSecret = config.JWT_SECRET?.trim();
+  if (!jwtSecret) {
     errors.push('JWT_SECRET is required');
+  } else if (isProduction && jwtSecret.length < 32) {
+    // In production a short symmetric secret is brute-forceable; require at
+    // least 32 chars (e.g. `openssl rand -base64 32`). Dev/test keep short
+    // fixtures working.
+    errors.push('JWT_SECRET must be at least 32 characters in production');
+  }
+
+  // DATABASE_URL is consumed only by the generated Prisma client, so a missing
+  // or malformed value otherwise fails lazily at first query. It is required in
+  // production; its shape is validated whenever present (dev/test may inject it
+  // through other means). Never print the value.
+  const databaseUrl = config.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    if (isProduction) errors.push('DATABASE_URL is required in production');
+  } else if (!/^postgres(ql)?:\/\/.+/i.test(databaseUrl)) {
+    errors.push('DATABASE_URL must be a postgres(ql):// connection string');
+  }
+
+  // The WhatsApp access-token encryption key decrypts per-company tokens.
+  // Without it the crypto service throws lazily on first encrypt/decrypt.
+  // Required in production, with a minimum length so a trivially short key
+  // never protects real tokens; dev/test keep short fixtures working.
+  const encryptionKey = config.WHATSAPP_TOKEN_ENCRYPTION_KEY?.trim();
+  if (!encryptionKey) {
+    if (isProduction) {
+      errors.push('WHATSAPP_TOKEN_ENCRYPTION_KEY is required in production');
+    }
+  } else if (isProduction && encryptionKey.length < 32) {
+    errors.push(
+      'WHATSAPP_TOKEN_ENCRYPTION_KEY must be at least 32 characters in production',
+    );
   }
 
   // Opt-in flag: only when the webhook is explicitly enabled do we demand the
@@ -109,6 +142,43 @@ export function validateEnv(config: Env): Env {
   const ttl = config.PASSWORD_RESET_TOKEN_TTL_MINUTES?.trim();
   if (ttl && !(Number.isInteger(Number(ttl)) && Number(ttl) > 0)) {
     errors.push('PASSWORD_RESET_TOKEN_TTL_MINUTES must be a positive integer');
+  }
+
+  // Coste bcrypt. Por defecto 12 (el mínimo razonable para 2026). En producción
+  // se exige >= 12 para no dejar contraseñas con un coste débil. Fuera de
+  // producción se permite un coste menor para que la suite sea rápida.
+  const bcryptCostRaw = config.BCRYPT_COST?.trim();
+  if (bcryptCostRaw) {
+    const cost = Number(bcryptCostRaw);
+    if (!Number.isInteger(cost) || cost < 4 || cost > 20) {
+      errors.push('BCRYPT_COST must be an integer between 4 and 20');
+    } else if (isProduction && cost < 12) {
+      errors.push('BCRYPT_COST must be at least 12 in production');
+    }
+  }
+
+  // Antibot (Cloudflare Turnstile). Opt-in vía CAPTCHA_ENABLED. Cuando el
+  // control es obligatorio (enabled) con el proveedor real, el secret es
+  // imprescindible: sin él no se puede verificar y el guard bloquearía todo.
+  // Fail-closed: en producción con captcha activo y Turnstile, exige el secret.
+  const captchaEnabled = config.CAPTCHA_ENABLED?.trim() === 'true';
+  const captchaProvider = config.CAPTCHA_PROVIDER?.trim();
+  const usaTurnstile = captchaProvider === 'turnstile' || isProduction;
+  if (captchaEnabled && usaTurnstile && !config.TURNSTILE_SECRET_KEY?.trim()) {
+    errors.push(
+      'TURNSTILE_SECRET_KEY is required when CAPTCHA_ENABLED=true with the turnstile provider',
+    );
+  }
+  if (
+    captchaEnabled &&
+    isProduction &&
+    captchaProvider &&
+    captchaProvider !== 'turnstile'
+  ) {
+    // El adaptador falso jamás debe ser el control real en producción.
+    errors.push(
+      'CAPTCHA_PROVIDER must be "turnstile" in production when CAPTCHA_ENABLED=true',
+    );
   }
 
   if (errors.length > 0) {

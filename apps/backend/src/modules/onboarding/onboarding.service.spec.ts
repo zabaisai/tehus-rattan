@@ -1,4 +1,5 @@
 import { ConflictException } from '@nestjs/common';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 import { OnboardingService } from './onboarding.service';
 import { CreateOnboardingCompanyDto } from './dto/create-onboarding-company.dto';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
@@ -165,6 +166,7 @@ describe('OnboardingService', () => {
       authService,
       auditLogService,
       sessionsService,
+      new PasswordHashService(),
     );
   });
 
@@ -332,6 +334,13 @@ describe('OnboardingService', () => {
     expect(prisma.user.findMany).not.toHaveBeenCalled();
   });
 
+  // Anti-enumeración: los estados no usables (inexistente / revocado / usado /
+  // vencido) colapsan en UN mensaje genérico, para no ofrecer un oráculo del
+  // estado del código. La comprobación ocurre además ANTES de tocar los emails,
+  // de modo que un código inválido no permite sondear qué cuentas existen.
+  const GENERIC_INVITE_ERROR =
+    'El código de invitación no es válido o ya no está disponible';
+
   it('rejects an invitation code that does not match any stored hash', async () => {
     prisma.invitationCode.findUnique.mockResolvedValue(null);
 
@@ -342,8 +351,10 @@ describe('OnboardingService', () => {
         VALID_INVITE_CODE,
         FAKE_CONTEXT,
       ),
-    ).rejects.toThrow('Código de invitación inválido');
+    ).rejects.toThrow(GENERIC_INVITE_ERROR);
     expect(prisma.company.create).not.toHaveBeenCalled();
+    // El código inválido corta ANTES de consultar los emails.
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
   });
 
   it('rejects a revoked invitation code', async () => {
@@ -360,7 +371,7 @@ describe('OnboardingService', () => {
         VALID_INVITE_CODE,
         FAKE_CONTEXT,
       ),
-    ).rejects.toThrow('Código de invitación revocado');
+    ).rejects.toThrow(GENERIC_INVITE_ERROR);
   });
 
   it('rejects an already-used invitation code', async () => {
@@ -377,7 +388,7 @@ describe('OnboardingService', () => {
         VALID_INVITE_CODE,
         FAKE_CONTEXT,
       ),
-    ).rejects.toThrow('Código de invitación ya utilizado');
+    ).rejects.toThrow(GENERIC_INVITE_ERROR);
   });
 
   it('rejects an expired invitation code', async () => {
@@ -394,7 +405,7 @@ describe('OnboardingService', () => {
         VALID_INVITE_CODE,
         FAKE_CONTEXT,
       ),
-    ).rejects.toThrow('Código de invitación vencido');
+    ).rejects.toThrow(GENERIC_INVITE_ERROR);
   });
 
   it('marks the invitation code as used exactly once and links it to the created company', async () => {

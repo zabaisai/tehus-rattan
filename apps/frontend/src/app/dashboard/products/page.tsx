@@ -20,6 +20,7 @@ import {
 } from "@/lib/products";
 import { Product } from "@/types";
 import { getMyCompany } from "@/lib/companies";
+import { isSafeHttpUrl } from "@/lib/safe-url";
 import {
   ProductModal,
   ProductFormData,
@@ -217,7 +218,7 @@ function ProductsPageContent() {
               className="flex flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-sm"
             >
               <div className="flex h-36 items-center justify-center bg-neutral-50">
-                {product.imageUrl ? (
+                {isSafeHttpUrl(product.imageUrl) ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={product.imageUrl}

@@ -7,7 +7,7 @@ import {
   LoginFailureReason,
 } from '../sessions/sessions.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
-import * as bcrypt from 'bcryptjs';
+import { PasswordHashService } from '../../common/password/password-hash.service';
 
 @Injectable()
 export class AuthService {
@@ -16,6 +16,7 @@ export class AuthService {
     private jwtService: JwtService,
     private prisma: PrismaService,
     private sessionsService: SessionsService,
+    private passwordHash: PasswordHashService,
   ) {}
 
   // Overloaded so the return type is precise at each call site: passing a
@@ -74,11 +75,25 @@ export class AuthService {
       throw new UnauthorizedException('Credenciales inválidas');
     }
 
-    const valid = await bcrypt.compare(password, user.password);
+    const valid = await this.passwordHash.compare(password, user.password);
     if (!valid) {
       recordFailure('INVALID_CREDENTIALS', user.id, user.companyId);
       throw new UnauthorizedException('Credenciales inválidas');
     }
+
+    // Rehash progresivo: si el hash guardado usa un coste inferior al objetivo
+    // (los `$2a$10$` heredados), se recifra la MISMA contraseña con el coste
+    // nuevo tras esta autenticación válida. Best-effort: nunca rompe el login.
+    void this.passwordHash.rehashSiHaceFalta(
+      password,
+      user.password,
+      async (nuevoHash) => {
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { password: nuevoHash },
+        });
+      },
+    );
 
     if (!user.isActive) {
       recordFailure('ACCOUNT_INACTIVE', user.id, user.companyId);

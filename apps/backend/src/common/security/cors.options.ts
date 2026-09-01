@@ -25,7 +25,14 @@ export function buildCorsOptions(env: {
     },
     credentials: true,
     methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    // X-Onboarding-Invite-Code is the header the multipart onboarding flow
+    // sends the invite code in (guards run before multer parses the body), so a
+    // cross-origin browser preflight for it must be allowed.
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Onboarding-Invite-Code',
+    ],
     maxAge: 86400,
   };
 }

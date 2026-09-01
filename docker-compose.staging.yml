@@ -122,6 +122,13 @@ services:
         # con Meta" button is present but the flow reports "no disponible".
         NEXT_PUBLIC_WHATSAPP_APP_ID: ${NEXT_PUBLIC_WHATSAPP_APP_ID:-}
         NEXT_PUBLIC_WHATSAPP_CONFIG_ID: ${NEXT_PUBLIC_WHATSAPP_CONFIG_ID:-}
+        # Antibot (Cloudflare Turnstile): site key PÚBLICA + bandera de
+        # obligatoriedad (espejo de CAPTCHA_ENABLED del backend). Si REQUIRED es
+        # "true" y falta la site key, la construcción del frontend FALLA
+        # (build-guard) para no bloquear todos los logins. El secret vive solo en
+        # el backend (TURNSTILE_SECRET_KEY), nunca aquí.
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-}
+        NEXT_PUBLIC_TURNSTILE_REQUIRED: ${NEXT_PUBLIC_TURNSTILE_REQUIRED:-false}
         GIT_SHA: ${GIT_SHA:-unknown}
     restart: unless-stopped
     init: true

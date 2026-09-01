@@ -7,6 +7,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
 import { AuthController } from '../src/modules/auth/auth.controller';
+import { CaptchaGuard } from '../src/common/captcha/captcha.guard';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
@@ -68,7 +69,11 @@ describe('Immediate session revocation via JwtStrategy (e2e)', () => {
         },
         { provide: PrismaService, useValue: prismaMock },
       ],
-    }).compile();
+    })
+      // Prueba de revocación de sesión, no de antibot: guard captcha no-op.
+      .overrideGuard(CaptchaGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.setGlobalPrefix('api');
