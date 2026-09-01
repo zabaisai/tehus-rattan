@@ -24,7 +24,12 @@ export function buildContentSecurityPolicy(opts: {
   const { apiOrigin, isDev, metaSdk } = opts;
 
   const META_SCRIPT = 'https://connect.facebook.net';
-  const META_FRAME = 'https://www.facebook.com https://web.facebook.com';
+  // staticxx.facebook.com hosts the SDK's hidden xd_arbiter relay iframe — the
+  // channel through which the FB.login popup returns the OAuth code to the
+  // opener. Without it the signup completes on Meta's side but the code never
+  // reaches the page (FB.login calls back with a null authResponse).
+  const META_FRAME =
+    'https://www.facebook.com https://web.facebook.com https://staticxx.facebook.com';
   const META_CONNECT = 'https://graph.facebook.com https://www.facebook.com';
 
   // Dev additionally needs 'unsafe-eval' for React Fast Refresh; prod never does.

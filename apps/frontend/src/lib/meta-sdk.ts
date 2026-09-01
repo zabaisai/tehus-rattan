@@ -4,7 +4,8 @@
 // Everything sensitive (code -> token exchange) happens server-side.
 //
 // Requires the app's CSP to allow https://connect.facebook.net (script) and
-// https://www.facebook.com (frame) — see docs/WHATSAPP_EMBEDDED_SIGNUP.md.
+// www/web/staticxx.facebook.com (frame — staticxx is the SDK's xd_arbiter
+// relay that returns the FB.login code) — see docs/WHATSAPP_EMBEDDED_SIGNUP.md.
 
 export type EmbeddedSignupErrorCode =
   | 'SDK_LOAD_FAILED'
@@ -120,6 +121,12 @@ const ALLOWED_META_ORIGINS = new Set([
   'https://web.facebook.com',
 ]);
 
+// Diagnostic breadcrumbs for the signup return path. Never logs the OAuth
+// code, tokens, or Meta identifiers — only presence flags and classifiers.
+const logSignup = (msg: string, detail?: Record<string, unknown>) =>
+  // eslint-disable-next-line no-console
+  console.info(`[wa-signup] ${msg}`, detail ?? '');
+
 // Launches Embedded Signup (Cloud API or WhatsApp Business App coexistence)
 // and resolves with the code + session info, or rejects with a typed
 // EmbeddedSignupError (cancelled / no code / incomplete / timeout).
@@ -169,6 +176,7 @@ export function launchEmbeddedSignup(
       if (settled) return;
       settled = true;
       cleanup();
+      logSignup('flujo terminado con error', { errorCode });
       reject(new EmbeddedSignupError(errorCode));
     };
 
@@ -176,6 +184,7 @@ export function launchEmbeddedSignup(
       if (settled) return;
       settled = true;
       cleanup();
+      logSignup('flujo completo: code y session info recibidos');
       resolve(result);
     };
 
@@ -224,11 +233,26 @@ export function launchEmbeddedSignup(
     };
 
     const onMessage = (event: MessageEvent) => {
-      if (!ALLOWED_META_ORIGINS.has(event.origin)) return;
+      if (!ALLOWED_META_ORIGINS.has(event.origin)) {
+        // A Meta-looking origin outside the allowlist would silently eat the
+        // session info — surface it so a regional host is diagnosable.
+        if (event.origin.endsWith('.facebook.com')) {
+          logSignup('mensaje descartado: origin de Meta no permitido', {
+            origin: event.origin,
+          });
+        }
+        return;
+      }
       try {
         const data =
           typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
         if (data?.type !== 'WA_EMBEDDED_SIGNUP') return;
+        logSignup('evento WA_EMBEDDED_SIGNUP recibido', {
+          origin: event.origin,
+          event: data.event,
+          hasPhoneNumberId: Boolean(data.data?.phone_number_id),
+          hasWabaId: Boolean(data.data?.waba_id),
+        });
         if (isFinishEvent(data.event)) {
           session = {
             phoneNumberId: data.data?.phone_number_id,
@@ -257,6 +281,10 @@ export function launchEmbeddedSignup(
       (response: FbLoginResponse) => {
         loginDone = true;
         code = response?.authResponse?.code || undefined;
+        logSignup('callback de FB.login', {
+          status: response?.status,
+          hasCode: Boolean(code),
+        });
         evaluate();
       },
       {

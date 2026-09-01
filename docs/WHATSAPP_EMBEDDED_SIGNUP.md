@@ -91,8 +91,13 @@ docs, or screenshots.
 
 ### CSP note
 Meta's SDK requires the app's CSP to allow `https://connect.facebook.net`
-(script), `https://www.facebook.com` (frame) and `https://graph.facebook.com`
-+ `https://www.facebook.com` (connect). This is added **only** when
+(script), `https://www.facebook.com` + `https://web.facebook.com` +
+`https://staticxx.facebook.com` (frame) and `https://graph.facebook.com`
++ `https://www.facebook.com` (connect). `staticxx.facebook.com` is the SDK's
+hidden xd_arbiter relay iframe: it is the channel through which the FB.login
+popup delivers the OAuth code back to the opener. If it is blocked, the signup
+finishes on Meta's side but `FB.login` calls back with a null `authResponse`
+and the UI reports `NO_CODE`. This is added **only** when
 `NEXT_PUBLIC_WHATSAPP_APP_ID` is set at build time; otherwise the CSP stays
 fully locked down. No app secret is ever exposed to the browser.
 
