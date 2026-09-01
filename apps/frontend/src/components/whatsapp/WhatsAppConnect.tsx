@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -18,6 +18,7 @@ import {
   reconnectWhatsApp,
   startEmbeddedSignup,
   testWhatsAppConnection,
+  type EmbeddedSignupStart,
   type WhatsAppConnectionStatus,
 } from '@/lib/whatsapp';
 import {
@@ -25,6 +26,7 @@ import {
   launchEmbeddedSignup,
   loadFacebookSdk,
   type EmbeddedSignupMode,
+  type FbInstance,
 } from '@/lib/meta-sdk';
 import { ManualConnectionSection } from './ManualConnectionSection';
 
@@ -96,50 +98,98 @@ export function WhatsAppConnect() {
   const [flowError, setFlowError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const runFlow = async (
-    start: typeof startEmbeddedSignup,
-    mode: EmbeddedSignupMode,
-  ) => {
+  // FB.login MUST run synchronously inside the click gesture (see the gesture
+  // contract in meta-sdk.ts): with any await between the click and FB.login,
+  // Chrome opens the SDK's popup outside the user-activation context and the
+  // dialog never reports back (callback with status 'unknown' at ~2s, zero
+  // postMessages — the staging bug). So everything async the flow needs is
+  // prepared BEFORE the click: the backend /start (public SDK config + a
+  // state) and Meta's SDK. The buttons stay disabled until this is ready.
+  const [prep, setPrep] = useState<{
+    fb: FbInstance;
+    cfg: EmbeddedSignupStart;
+  } | null>(null);
+  const [prepError, setPrepError] = useState<string | null>(null);
+  const [prepNonce, setPrepNonce] = useState(0);
+
+  const statusReady = !isLoading && !isError && Boolean(status);
+  const connected = status?.status === 'CONNECTED';
+
+  useEffect(() => {
+    if (!statusReady) return;
+    let alive = true;
+    const start = connected ? reconnectWhatsApp : startEmbeddedSignup;
+    (async () => {
+      setPrep(null);
+      setPrepError(null);
+      try {
+        const cfg = await start();
+        const fb = await loadFacebookSdk(cfg.appId, cfg.graphVersion);
+        if (alive) setPrep({ fb, cfg });
+      } catch (err) {
+        if (alive) setPrepError(mapError(err));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [statusReady, connected, prepNonce]);
+
+  const retryPrep = () => setPrepNonce((n) => n + 1);
+
+  // Click handler. Deliberately NOT async: FB.login (inside
+  // launchEmbeddedSignup) executes in this same tick, within the gesture.
+  const runFlow = (mode: EmbeddedSignupMode) => {
+    if (!prep || busy) return;
     setFlowError(null);
     setBusy(true);
-    setStep(0);
-    try {
-      const cfg = await start();
-      const fb = await loadFacebookSdk(cfg.appId, cfg.graphVersion);
-      setStep(1);
-      const result = await launchEmbeddedSignup(fb, cfg.configId, mode);
-      setStep(2);
-      console.info('[wa-signup] canjeando code en el backend');
-      const final = await completeEmbeddedSignup({
-        state: cfg.state,
-        code: result.code,
-        phoneNumberId: result.phoneNumberId,
-        wabaId: result.wabaId,
-        businessId: result.businessId,
-      });
-      console.info(
-        '[wa-signup] canje completado',
-        JSON.stringify({ status: final.status }),
-      );
-      setStep(STEPS.length); // all done
-      await queryClient.invalidateQueries({ queryKey: ['whatsapp-connection-status'] });
-      await queryClient.invalidateQueries({ queryKey: ['whatsapp-integration'] });
-    } catch (err) {
-      // Classifier / HTTP status only — never the code or Meta payloads.
-      // Stringified so captures/copies of the console show the detail instead
-      // of a collapsed "Object".
-      console.error(
-        '[wa-signup] flujo falló',
-        JSON.stringify({
-          code: err instanceof EmbeddedSignupError ? err.code : undefined,
-          httpStatus: (err as { response?: { status?: number } })?.response?.status,
-        }),
-      );
-      setFlowError(mapError(err));
-      setStep(-1);
-    } finally {
-      setBusy(false);
-    }
+    setStep(1); // config y SDK ya precargados; el popup se abre con este clic
+    const signup = launchEmbeddedSignup(prep.fb, prep.cfg.configId, mode);
+    // A fresh single-use state, minted in parallel — FB.login doesn't need
+    // it (only the final exchange does) and the prefetched one may be near
+    // its TTL by the time the user finishes the popup. Falls back to the
+    // prefetched state if this mint fails.
+    const freshStart = (connected ? reconnectWhatsApp : startEmbeddedSignup)()
+      .catch(() => null);
+    void (async () => {
+      try {
+        const result = await signup;
+        setStep(2);
+        const state = (await freshStart)?.state ?? prep.cfg.state;
+        console.info('[wa-signup] canjeando code en el backend');
+        const final = await completeEmbeddedSignup({
+          state,
+          code: result.code,
+          phoneNumberId: result.phoneNumberId,
+          wabaId: result.wabaId,
+          businessId: result.businessId,
+        });
+        console.info(
+          '[wa-signup] canje completado',
+          JSON.stringify({ status: final.status }),
+        );
+        setStep(STEPS.length); // all done
+        await queryClient.invalidateQueries({ queryKey: ['whatsapp-connection-status'] });
+        await queryClient.invalidateQueries({ queryKey: ['whatsapp-integration'] });
+      } catch (err) {
+        // Classifier / HTTP status only — never the code or Meta payloads.
+        // Stringified so captures/copies of the console show the detail
+        // instead of a collapsed "Object".
+        console.error(
+          '[wa-signup] flujo falló',
+          JSON.stringify({
+            code: err instanceof EmbeddedSignupError ? err.code : undefined,
+            httpStatus: (err as { response?: { status?: number } })?.response?.status,
+          }),
+        );
+        setFlowError(mapError(err));
+        setStep(-1);
+      } finally {
+        setBusy(false);
+        // States are single-use: re-prepare so a retry has a fresh one.
+        setPrepNonce((n) => n + 1);
+      }
+    })();
   };
 
   const [disconnecting, setDisconnecting] = useState(false);
@@ -187,8 +237,8 @@ export function WhatsAppConnect() {
     );
   }
 
-  const connected = status.status === 'CONNECTED';
   const inProgress = step >= 0 && step < STEPS.length;
+  const ready = prep !== null;
 
   return (
     <div className="space-y-6">
@@ -196,23 +246,24 @@ export function WhatsAppConnect() {
         <ConnectedView
           status={status}
           onReconnect={() =>
-            runFlow(
-              reconnectWhatsApp,
-              status.coexistence ? 'COEXISTENCE' : 'STANDARD',
-            )
+            runFlow(status.coexistence ? 'COEXISTENCE' : 'STANDARD')
           }
           onDisconnect={handleDisconnect}
           onTest={handleTest}
           busy={busy}
+          ready={ready}
           disconnecting={disconnecting}
           actionMsg={actionMsg}
         />
       ) : (
         <DisconnectedView
           status={status}
-          onConnectExisting={() => runFlow(startEmbeddedSignup, 'COEXISTENCE')}
-          onConnectNew={() => runFlow(startEmbeddedSignup, 'STANDARD')}
+          onConnectExisting={() => runFlow('COEXISTENCE')}
+          onConnectNew={() => runFlow('STANDARD')}
           busy={busy}
+          ready={ready}
+          prepError={prepError}
+          onRetryPrep={retryPrep}
           inProgress={inProgress}
           step={step}
           error={flowError}
@@ -246,6 +297,9 @@ function DisconnectedView({
   onConnectExisting,
   onConnectNew,
   busy,
+  ready,
+  prepError,
+  onRetryPrep,
   inProgress,
   step,
   error,
@@ -254,6 +308,9 @@ function DisconnectedView({
   onConnectExisting: () => void;
   onConnectNew: () => void;
   busy: boolean;
+  ready: boolean;
+  prepError: string | null;
+  onRetryPrep: () => void;
   inProgress: boolean;
   step: number;
   error: string | null;
@@ -305,7 +362,7 @@ function DisconnectedView({
             <button
               type="button"
               onClick={onConnectExisting}
-              disabled={busy}
+              disabled={busy || !ready}
               className="inline-flex items-center gap-2 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-900 disabled:opacity-50"
             >
               <MessageCircle className="h-4 w-4" aria-hidden />
@@ -314,12 +371,30 @@ function DisconnectedView({
             <button
               type="button"
               onClick={onConnectNew}
-              disabled={busy}
+              disabled={busy || !ready}
               className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
             >
               Usar un número nuevo
             </button>
           </div>
+          {!ready && !prepError && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-neutral-400">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+              Preparando la conexión segura con Meta…
+            </p>
+          )}
+          {prepError && (
+            <p className="mt-2 text-xs text-status-error" role="alert">
+              {prepError}{' '}
+              <button
+                type="button"
+                onClick={onRetryPrep}
+                className="font-medium underline"
+              >
+                Reintentar
+              </button>
+            </p>
+          )}
           <p className="mt-3 flex items-start gap-1.5 text-xs text-neutral-500">
             <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
             <span>
@@ -347,6 +422,7 @@ function ConnectedView({
   onDisconnect,
   onTest,
   busy,
+  ready,
   disconnecting,
   actionMsg,
 }: {
@@ -355,6 +431,7 @@ function ConnectedView({
   onDisconnect: () => void;
   onTest: (to: string) => Promise<string>;
   busy: boolean;
+  ready: boolean;
   disconnecting: boolean;
   actionMsg: string | null;
 }) {
@@ -449,7 +526,7 @@ function ConnectedView({
         <button
           type="button"
           onClick={onReconnect}
-          disabled={busy}
+          disabled={busy || !ready}
           className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
         >
           Reconectar
