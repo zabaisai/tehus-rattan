@@ -109,17 +109,24 @@ export function WhatsAppConnect() {
       setStep(1);
       const result = await launchEmbeddedSignup(fb, cfg.configId, mode);
       setStep(2);
-      await completeEmbeddedSignup({
+      console.info('[wa-signup] canjeando code en el backend');
+      const final = await completeEmbeddedSignup({
         state: cfg.state,
         code: result.code,
         phoneNumberId: result.phoneNumberId,
         wabaId: result.wabaId,
         businessId: result.businessId,
       });
+      console.info('[wa-signup] canje completado', { status: final.status });
       setStep(STEPS.length); // all done
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-connection-status'] });
       await queryClient.invalidateQueries({ queryKey: ['whatsapp-integration'] });
     } catch (err) {
+      // Classifier / HTTP status only — never the code or Meta payloads.
+      console.error('[wa-signup] flujo falló', {
+        code: err instanceof EmbeddedSignupError ? err.code : undefined,
+        httpStatus: (err as { response?: { status?: number } })?.response?.status,
+      });
       setFlowError(mapError(err));
       setStep(-1);
     } finally {

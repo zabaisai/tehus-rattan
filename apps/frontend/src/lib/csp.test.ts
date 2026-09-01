@@ -29,6 +29,8 @@ describe("buildContentSecurityPolicy (Meta Embedded Signup)", () => {
   it("allows the Facebook SDK script/frame/connect only when metaSdk is enabled", () => {
     expect(withMeta).toContain("https://connect.facebook.net");
     expect(withMeta).toContain("frame-src https://www.facebook.com");
+    // xd_arbiter relay frame: without it FB.login never delivers the code.
+    expect(withMeta).toContain("https://staticxx.facebook.com");
     expect(withMeta).toContain("https://graph.facebook.com");
     // Still no eval, still self-based.
     expect(withMeta).not.toContain("'unsafe-eval'");
