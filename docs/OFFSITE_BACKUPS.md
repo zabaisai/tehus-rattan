@@ -234,13 +234,44 @@ El cierre de H-01 requiere evidencia de los dos servicios exitosos, el latido
 verde y la existencia de objetos fuera del VPS. No habilitar el esquema para
 producción hasta completar una restauración de prueba.
 
-Solo después de esas comprobaciones, retirar cualquier cron de respaldo local a
-la misma hora (guardando antes una copia del crontab en `.secrets`), iniciar la
-programación y verificar la próxima ejecución calculada:
+Solo después de esas comprobaciones, retirar el cron de respaldo local de la
+misma hora. El procedimiento exige una coincidencia literal exacta de la línea
+completa esperada, elimina únicamente esa línea, conserva el resto del crontab
+(incluidos comentarios) y se detiene o restaura la copia ante cualquier
+diferencia inesperada. Nunca filtrar por un fragmento (`grep -v`): podría
+borrar más entradas de las previstas.
 
 ```bash
-crontab -l > /opt/tehus-crm/.secrets/crontab.bak-$(date -u +%Y%m%dT%H%M%SZ)
-crontab -l | grep -v 'deploy/scripts/backup-postgres.sh' | crontab -
+set -euo pipefail
+umask 077
+ts="$(date -u +%Y%m%dT%H%M%SZ)"
+copia="/opt/tehus-crm/.secrets/crontab.bak-$ts"
+actual="$(mktemp)"; nuevo="$(mktemp)"
+esperada='0 3 * * * cd /opt/tehus-crm && ./deploy/scripts/backup-postgres.sh >> /opt/tehus-crm/backups/backup.log 2>&1'
+
+# 1) Exportar el crontab completo y guardar la copia (600, sin sobrescribir).
+crontab -l > "$actual"
+[ ! -e "$copia" ] || { echo "la copia $copia ya existe"; exit 1; }
+cp "$actual" "$copia"; chmod 600 "$copia"
+sha256sum "$actual" "$copia"          # ambos hashes deben coincidir
+
+# 2) Exigir exactamente UNA coincidencia literal de la línea completa.
+coincidencias="$(grep -cFx -- "$esperada" "$actual" || true)"
+[ "$coincidencias" -eq 1 ] || { echo "se esperaba 1 coincidencia exacta, hay $coincidencias; nada cambiado"; exit 1; }
+
+# 3) Eliminar solo esa línea exacta (grep -v -F -x) y comparar antes/después.
+grep -vFx -- "$esperada" "$actual" > "$nuevo" || true
+eliminadas="$(diff "$actual" "$nuevo" | grep -c '^<' || true)"
+anadidas="$(diff "$actual" "$nuevo" | grep -c '^>' || true)"
+[ "$eliminadas" -eq 1 ] && [ "$anadidas" -eq 0 ] || { echo "diff inesperado ($eliminadas eliminadas, $anadidas añadidas); nada cambiado"; exit 1; }
+
+# 4) Instalar, releer y verificar; ante cualquier diferencia, restaurar la copia.
+crontab "$nuevo"
+if ! crontab -l | diff -q - "$nuevo" >/dev/null; then
+  crontab "$copia"; echo "crontab restaurado desde $copia"; exit 1
+fi
+echo "cron retirado; rollback disponible: crontab $copia"
+rm -f "$actual" "$nuevo"
 
 sudo systemctl enable --now tehus-backup.timer tehus-backup-drill.timer
 systemctl list-timers --all tehus-backup.timer tehus-backup-drill.timer
