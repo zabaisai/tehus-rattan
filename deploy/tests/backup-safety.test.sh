@@ -262,4 +262,161 @@ PY_TAR_FIXTURES
   done
 fi
 
+# ---------------------------------------------------------------------------
+# B-03 regression: every script a systemd unit runs — the ExecStart target and
+# every script those entry points invoke by path (not `source`d) — must be
+# committed as 100755. The VPS checks out with core.fileMode=false, so a
+# missing bit is invisible in `git status` until the unit dies with
+# "Permission denied" (restore-postgres.sh did exactly that in the drill path).
+unit_scripts=()
+for unit in "$ROOT"/deploy/systemd/*.service; do
+  exec_start="$(sed -n 's/^ExecStart=//p' "$unit" | head -1)"
+  [ -n "$exec_start" ] || { echo "no ExecStart in $unit" >&2; exit 1; }
+  unit_scripts+=("${exec_start#/opt/tehus-crm/}")
+done
+for entry in "${unit_scripts[@]}"; do
+  [ -f "$ROOT/$entry" ] || { echo "ExecStart target missing: $entry" >&2; exit 1; }
+  while IFS= read -r callee; do
+    [ -n "$callee" ] && unit_scripts+=("deploy/scripts/$callee")
+  done < <(grep -vE '^[[:space:]]*(source|\.)[[:space:]]' "$ROOT/$entry" \
+           | grep -oE '\$SCRIPT_DIR/[a-z-]+\.sh' | sed 's#^\$SCRIPT_DIR/##' | sort -u)
+done
+while IFS= read -r script; do
+  mode="$(git -C "$ROOT" ls-files --stage -- "$script" | awk '{print $1}')"
+  if [ "$mode" != 100755 ]; then
+    echo "script used by a systemd unit is not committed as executable (mode ${mode:-untracked}): $script" >&2
+    exit 1
+  fi
+done < <(printf '%s\n' "${unit_scripts[@]}" | sort -u)
+
+# ---------------------------------------------------------------------------
+# B-02 regression: the uploads tarball is produced by a root container, so the
+# script must hand it to the invoking user inside the container and fail closed
+# if it ends up owned by anyone else. Fake docker (no daemon, no volume): the
+# DB dump is a canned SQL stream and `docker run` tars a fixture directory.
+local_backup="$ROOT/deploy/scripts/backup-postgres.sh"
+mkdir -p "$tmp/uploads-fixture/sub" "$tmp/bin-docker" "$tmp/bin-foreign-owner"
+printf 'upload one\n' >"$tmp/uploads-fixture/a.txt"
+printf 'upload two\n' >"$tmp/uploads-fixture/sub/b.txt"
+printf 'POSTGRES_USER=test-only\nPOSTGRES_DB=test_only\nPOSTGRES_PASSWORD=test-only\n' >"$tmp/env.staging"
+
+cat >"$tmp/bin-docker/docker" <<'FAKE_DOCKER'
+#!/usr/bin/env bash
+# Only the three docker invocations backup-postgres.sh makes.
+set -euo pipefail
+case "${1:-}" in
+  volume) exit 0 ;;                                   # `volume inspect`: exists
+  compose) printf 'CREATE TABLE users ();\n'; exit 0 ;; # `compose exec ... pg_dump`
+  run)
+    # run --rm -v VOL:/data:ro -v DIR:/backup alpine sh -c SCRIPT sh NAME OWNER
+    name="${*: -2:1}"; owner="${*: -1}"; backup_dir=""
+    for arg in "$@"; do case "$arg" in *:/backup) backup_dir="${arg%:/backup}" ;; esac; done
+    [ -n "$backup_dir" ] || exit 2
+    tar -czf "$backup_dir/$name" -C "$FAKE_UPLOADS_DIR" .
+    chmod 600 "$backup_dir/$name"
+    printf 'chown %s\n' "$owner" >>"$DOCKER_TEST_LOG"
+    exit 0 ;;
+esac
+echo "fake docker: unexpected call: $*" >&2
+exit 2
+FAKE_DOCKER
+chmod +x "$tmp/bin-docker/docker"
+
+mkdir -p "$tmp/backups-local"
+PATH="$tmp/bin-docker:$tmp/bin:$PATH" \
+ENV_FILE="$tmp/env.staging" \
+BACKUP_DIR="$tmp/backups-local" \
+UPLOADS_VOLUME="fake_uploads" \
+FAKE_UPLOADS_DIR="$tmp/uploads-fixture" \
+DOCKER_TEST_LOG="$tmp/docker.log" \
+RETENTION_DAYS=3650 \
+bash "$local_backup" >"$tmp/local-backup.out" 2>&1 \
+  || { cat "$tmp/local-backup.out" >&2; echo "local backup failed" >&2; exit 1; }
+
+db_set=("$tmp"/backups-local/tehus-crm-staging-*.sql.gz)
+up_set=("$tmp"/backups-local/tehus-crm-staging-uploads-*.tar.gz)
+[ "${#db_set[@]}" -eq 1 ] && [ -f "${db_set[0]}" ] || { echo "expected exactly one DB dump" >&2; exit 1; }
+[ "${#up_set[@]}" -eq 1 ] && [ -f "${up_set[0]}" ] || { echo "expected exactly one uploads tarball" >&2; exit 1; }
+db_stamp="$(basename "${db_set[0]}")"; db_stamp="${db_stamp#tehus-crm-staging-}"; db_stamp="${db_stamp%.sql.gz}"
+up_stamp="$(basename "${up_set[0]}")"; up_stamp="${up_stamp#tehus-crm-staging-uploads-}"; up_stamp="${up_stamp%.tar.gz}"
+[ "$db_stamp" = "$up_stamp" ] || { echo "DB and uploads belong to different cycles: $db_stamp vs $up_stamp" >&2; exit 1; }
+( cd "$tmp/backups-local" && sha256sum -c "$(basename "${db_set[0]}").sha256" && sha256sum -c "$(basename "${up_set[0]}").sha256" ) >/dev/null
+gzip -t "${db_set[0]}"
+tar --force-local -tzf "${up_set[0]}" | grep -q 'b.txt'
+if ls "$tmp"/backups-local/*.partial >/dev/null 2>&1; then
+  echo "partial files left behind after a successful backup" >&2; exit 1
+fi
+# The container is told to hand the archive to the invoking user, never root.
+grep -Fxq "chown $(id -u):$(id -g)" "$tmp/docker.log"
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) ;;  # NTFS does not model POSIX bits; enforced on Linux/CI.
+  *)
+    for artifact in "${db_set[0]}" "${db_set[0]}.sha256" "${up_set[0]}" "${up_set[0]}.sha256"; do
+      [ "$(stat -c '%u:%g' "$artifact")" = "$(id -u):$(id -g)" ] \
+        || { echo "artifact not owned by the backup user: $artifact" >&2; exit 1; }
+      [ "$(stat -c '%a' "$artifact")" = 600 ] \
+        || { echo "artifact is readable by others: $artifact" >&2; exit 1; }
+    done
+    ;;
+esac
+
+# Ownership failure must be loud and must not publish the uploads archive.
+# A `stat` shim reports the .partial as root-owned, as the old bug produced.
+cat >"$tmp/bin-foreign-owner/stat" <<'FAKE_STAT'
+#!/usr/bin/env bash
+case "$*" in
+  *uploads-*.tar.gz.partial*) printf '0:0\n'; exit 0 ;;
+esac
+exec /usr/bin/stat "$@"
+FAKE_STAT
+chmod +x "$tmp/bin-foreign-owner/stat"
+
+mkdir -p "$tmp/backups-foreign"
+PATH="$tmp/bin-foreign-owner:$tmp/bin-docker:$tmp/bin:$PATH" \
+ENV_FILE="$tmp/env.staging" \
+BACKUP_DIR="$tmp/backups-foreign" \
+UPLOADS_VOLUME="fake_uploads" \
+FAKE_UPLOADS_DIR="$tmp/uploads-fixture" \
+DOCKER_TEST_LOG="$tmp/docker-foreign.log" \
+RETENTION_DAYS=3650 \
+bash "$local_backup" >"$tmp/foreign-backup.out" 2>&1 || true
+grep -Fq 'uploads snapshot is owned by 0:0' "$tmp/foreign-backup.out" \
+  || { cat "$tmp/foreign-backup.out" >&2; echo "ownership failure was not reported" >&2; exit 1; }
+if ls "$tmp"/backups-foreign/tehus-crm-staging-uploads-*.tar.gz >/dev/null 2>&1; then
+  echo "root-owned uploads archive was published" >&2; exit 1
+fi
+if ls "$tmp"/backups-foreign/*.partial >/dev/null 2>&1; then
+  echo "partial uploads archive left behind after ownership failure" >&2; exit 1
+fi
+ls "$tmp"/backups-foreign/tehus-crm-staging-*.sql.gz >/dev/null 2>&1 \
+  || { echo "DB dump must still be published when only uploads fail" >&2; exit 1; }
+
+# ...and the off-site pipeline, which requires the full set, must fail closed
+# on that same ownership failure and upload nothing.
+mkdir -p "$tmp/backups-foreign-offsite"
+if PATH="$tmp/bin-foreign-owner:$tmp/bin-docker:$tmp/bin:$PATH" \
+    ENV_FILE="$tmp/env.staging" \
+    UPLOADS_VOLUME="fake_uploads" \
+    FAKE_UPLOADS_DIR="$tmp/uploads-fixture" \
+    DOCKER_TEST_LOG="$tmp/docker-foreign-offsite.log" \
+    RETENTION_DAYS=3650 \
+    RESTIC_TEST_LOG="$tmp/restic-foreign.log" \
+    RESTIC_REPOSITORY="s3:https://example.invalid/bucket/test" \
+    RESTIC_PASSWORD_FILE="$tmp/restic-password" \
+    AWS_ACCESS_KEY_ID="test-only" \
+    AWS_SECRET_ACCESS_KEY="test-only" \
+    BACKUP_HEARTBEAT_URL="https://example.invalid/daily" \
+    BACKUP_DIR="$tmp/backups-foreign-offsite" \
+    BACKUP_SCRIPT="$local_backup" \
+    VERIFY_SCRIPT="$tmp/fake-verify.sh" \
+    BACKUP_LOCK_FILE="$tmp/backup-foreign.lock" \
+    "$offsite" >"$tmp/foreign-offsite.out" 2>&1; then
+  echo "off-site backup unexpectedly succeeded with a root-owned uploads archive" >&2
+  exit 1
+fi
+if grep -q '^backup ' "$tmp/restic-foreign.log" 2>/dev/null; then
+  echo "incomplete set was uploaded after an ownership failure" >&2
+  exit 1
+fi
+
 echo "Backup safety checks passed."

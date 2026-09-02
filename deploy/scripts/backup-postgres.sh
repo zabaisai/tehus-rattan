@@ -106,12 +106,28 @@ snapshot_uploads() {
   fi
 
   PARTIALS+=("$up_tmp" "$up_sum_tmp")
+  # The container must stay root to read every file in the uploads volume
+  # (they belong to the backend's unprivileged user), so the tarball is born
+  # root-owned. Hand it to the invoking host user INSIDE the container, where
+  # root may chown; a host-side chmod on a root-owned file is not permitted and
+  # used to leave the archive 644 root:root (world-readable).
+  local owner_expected
+  owner_expected="$(id -u):$(id -g)"
   docker run --rm -v "$UPLOADS_VOLUME":/data:ro -v "$BACKUP_DIR":/backup alpine \
-    tar czf "/backup/$(basename "$up_tmp")" -C /data . || return 1
+    sh -c 'umask 077 && tar czf "/backup/$1" -C /data . && chown "$2" "/backup/$1" && chmod 600 "/backup/$1"' \
+    sh "$(basename "$up_tmp")" "$owner_expected" || return 1
   [ -s "$up_tmp" ] || return 1
+  # Fail closed on ownership: a snapshot the backup user does not own cannot be
+  # protected, verified, shipped by Restic or cleaned up by this user later.
+  local owner_actual
+  owner_actual="$(stat -c '%u:%g' "$up_tmp")"
+  if [ "$owner_actual" != "$owner_expected" ]; then
+    echo "ERROR: uploads snapshot is owned by $owner_actual, expected $owner_expected — not published." >&2
+    return 1
+  fi
   tar --force-local -tzf "$up_tmp" >/dev/null 2>&1 || return 1
   write_sidecar "$up_tmp" "$(basename "$up_final")" "$up_sum_tmp"
-  chmod 600 "$up_tmp" "$up_sum_tmp"
+  chmod 600 "$up_tmp" "$up_sum_tmp" || return 1
   mv -f "$up_tmp" "$up_final"
   mv -f "$up_sum_tmp" "$up_sum_final"
   echo "Uploads backup:     $up_final ($(du -h "$up_final" | cut -f1))"
