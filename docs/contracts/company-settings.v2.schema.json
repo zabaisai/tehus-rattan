@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://takto.local/contracts/company-settings.v2.schema.json",
+  "title": "Company.settings v2 (BORRADOR Fase 0 — no implementado)",
+  "description": "Documenta la forma actual (v1) de Company.settings observada en el código de onboarding y en staging al commit d421021, y propone una v2 aditiva para la Fase 1. Ningún servicio valida hoy contra este esquema. La v2 no se ha implementado; se publica para revisión.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 2,
+      "description": "Ausente en v1. La Fase 1 debe tratar la ausencia como v1."
+    },
+    "commercial": {
+      "$ref": "#/$defs/commercialV1",
+      "description": "Mismas banderas que v1, agrupadas."
+    },
+    "vertical": {
+      "type": "object",
+      "description": "Plantilla de vertical aplicada en el onboarding. PENDIENTE: catálogo de verticales en onboarding-templates.",
+      "properties": {
+        "key": { "type": "string", "minLength": 1, "examples": ["generic", "furniture"] },
+        "templateVersion": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["key", "templateVersion"],
+      "additionalProperties": false
+    },
+    "catalog": {
+      "type": "object",
+      "description": "Categorías efectivas de la empresa. Reemplaza la constante global PRODUCT_CATEGORIES del frontend. Debe aceptar cualquier texto ya presente en products.category.",
+      "properties": {
+        "categories": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "uniqueItems": true,
+          "default": []
+        },
+        "allowFreeText": { "type": "boolean", "default": true }
+      },
+      "required": ["categories"],
+      "additionalProperties": false
+    },
+    "pipelineDefaults": {
+      "type": "object",
+      "description": "Solo informativo: el pipeline real vive en las tablas pipelines/pipeline_stages. Registra la plantilla usada al crearlo.",
+      "properties": {
+        "templateKey": { "type": "string" },
+        "stagesTyped": {
+          "type": "boolean",
+          "description": "true cuando las etapas se crearon con type WON/LOST e isInitial (hoy el onboarding no lo hace)."
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["version", "commercial"],
+  "additionalProperties": false,
+  "$defs": {
+    "commercialV1": {
+      "type": "object",
+      "description": "Forma v1 exacta que escribe apps/backend/src/modules/onboarding/onboarding.service.ts. En staging: 2 de 4 empresas la tienen; 'categories' se guarda pero ningún componente del frontend la lee.",
+      "properties": {
+        "sellsProducts": { "type": "boolean" },
+        "sellsServices": { "type": "boolean" },
+        "usesCatalog": { "type": "boolean" },
+        "usesQuotes": { "type": "boolean" },
+        "usesTasks": { "type": "boolean" },
+        "categories": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Selección del paso comercial del onboarding (sugerencias fijas de muebles + texto libre)."
+        }
+      },
+      "required": ["sellsProducts", "sellsServices", "usesCatalog", "usesQuotes", "usesTasks", "categories"],
+      "additionalProperties": false
+    },
+    "v1": {
+      "$ref": "#/$defs/commercialV1",
+      "description": "Alias: un Company.settings sin 'version' es exactamente commercialV1 (o null)."
+    }
+  },
+  "x-phase0": {
+    "status": "DRAFT",
+    "observedAt": "2026-09-02",
+    "sourceCommit": "d42102103a8659969bc886870ce1c7c1ae28d24f",
+    "migrationRule": "Aditiva y compatible: v1 sigue siendo válida; la conversión a v2 se hace en lectura o por script idempotente, nunca por migración destructiva.",
+    "pending": [
+      "Decidir si 'catalog.categories' se inicializa desde commercial.categories o desde la plantilla de vertical.",
+      "Definir dónde se persisten las plantillas de vertical (tabla vs. archivo versionado)."
+    ]
+  }
+}

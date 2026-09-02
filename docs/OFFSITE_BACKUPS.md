@@ -28,10 +28,36 @@ guardarse en el gestor de contraseñas corporativo y en una copia offline bajo
 custodia distinta al VPS.
 
 La política remota es **7 copias diarias, 4 semanales y 6 mensuales**. La copia
-diaria se ejecuta a las 03:00 de Bogotá. El primer día de cada mes se lee todo
-el repositorio, se restaura el último dump en `tehus_restore_drill`, se verifica
-el esquema, se extraen los uploads en un directorio temporal y se elimina la
-base aislada.
+diaria la ejecuta `tehus-backup.timer` a las 03:00 de Bogotá (08:00 UTC). El
+primer día de cada mes, entre las 04:30 y las 04:45 de Bogotá (09:30–09:45
+UTC), `tehus-backup-drill.timer` lee todo el repositorio, restaura el último
+dump en `tehus_restore_drill`, verifica el esquema, extrae los uploads en un
+directorio temporal y elimina la base aislada.
+
+El respaldo local diario ya no se programa por cron: `tehus-backup.service`
+ejecuta `backup-postgres.sh` como primer paso, así que una entrada de cron a la
+misma hora sería redundante y podría hacer abortar al off-site (que exige
+exactamente un dump nuevo por ciclo). La entrada de cron antigua se retiró en
+staging el 2026-09-02, con copia del crontab en `.secrets` para rollback.
+
+## Estado en staging (2026-09-02)
+
+| Elemento | Valor |
+|----------|-------|
+| Remote rclone | `takto-drive`, cliente OAuth propio, ámbito **`drive.file`** (mínimo privilegio) |
+| Repositorio activo | `rclone:takto-drive:TAKTO_BACKUPS_V2/staging` |
+| Repositorio histórico | `TAKTO_BACKUPS/staging`, creado con el cliente OAuth por defecto de rclone; se conserva **solo lectura**, no se reutiliza ni se borra |
+| Primer backup manual (`tehus-backup.service`) | exitoso: DB + uploads + sidecars, `restic check` sin errores |
+| Restauración aislada (`tehus-backup-drill.service`) | exitosa: `check --read-data`, restauración en `tehus_restore_drill`, base eliminada al final |
+| Timers | `tehus-backup.timer` y `tehus-backup-drill.timer` habilitados y activos |
+
+Con `drive.file` cada cliente OAuth solo ve las carpetas que él mismo creó.
+Por eso el repositorio histórico no es visible desde el cliente propio y se
+inicializó un repositorio nuevo en una carpeta propia. **No se debe ampliar el
+permiso al ámbito completo `auth/drive`** para "ver" el histórico: ese ámbito
+concede acceso a todos los archivos de la cuenta y contradice el principio de
+mínimo privilegio. Cada entorno usa una ruta exclusiva; producción usará además
+remote, contraseña Restic y latidos distintos.
 
 Una URL de latido externa recibe `/start`, éxito o `/fail`. El monitor diario
 se configura con periodo de 24 horas y gracia de 2 horas; así alerta si no hay
@@ -50,17 +76,26 @@ almacenamiento remoto recibe únicamente datos cifrados por Restic.
 ### Google Drive via rclone
 
 Para staging se usa un remote de rclone llamado `takto-drive` y la ruta
-`TAKTO_BACKUPS/staging`.
+`TAKTO_BACKUPS_V2/staging`. El remote usa un cliente OAuth propio (tipo
+"aplicación de escritorio") con el ámbito `drive.file`.
 
 Requisitos operativos:
 
 1. Usar una cuenta de Google controlada por la organización y protegida con MFA.
-2. No compartir públicamente `TAKTO_BACKUPS` ni su contenido.
+2. No compartir públicamente `TAKTO_BACKUPS_V2` (ni la carpeta histórica
+   `TAKTO_BACKUPS`) ni su contenido.
 3. Guardar el OAuth/config de rclone solamente en
    `/opt/tehus-crm/.secrets/rclone.conf`.
 4. Mantener `rclone.conf` con propietario `deploy:deploy` y permisos `600`.
 5. Guardar fuera del VPS la contraseña de Restic. El token OAuth de rclone no
    sustituye esa contraseña de cifrado.
+6. Ámbito OAuth `drive.file` únicamente. Está prohibido configurar el remote
+   con el ámbito completo `drive`.
+7. Antes de reautorizar o editar el remote, copiar `rclone.conf` con timestamp
+   dentro de `.secrets` (modo `600`) para poder volver atrás.
+8. Nunca ejecutar `rclone config show`, imprimir `rclone.conf` ni pegar
+   `client_id`, `client_secret` o tokens en chats, tickets o logs. Para
+   diagnosticar, comparar hashes o comprobar solo la presencia de claves.
 
 Cuando exista producción debe usar un destino lógico separado y secretos
 distintos; no se debe reutilizar el mismo repositorio Restic de staging.
@@ -100,7 +135,7 @@ trabajo confiable.
 
 Para Google Drive, confirmar en `.env.backup` únicamente:
 
-- `RESTIC_REPOSITORY=rclone:takto-drive:TAKTO_BACKUPS/staging`
+- `RESTIC_REPOSITORY=rclone:takto-drive:TAKTO_BACKUPS_V2/staging`
 - `RCLONE_CONFIG=/opt/tehus-crm/.secrets/rclone.conf`
 - `BACKUP_HEARTBEAT_URL`
 - `BACKUP_DRILL_HEARTBEAT_URL`
@@ -161,7 +196,12 @@ systemctl is-active tehus-backup.timer tehus-backup-drill.timer || true
 En una instalación nueva ambos deben permanecer `disabled` e `inactive` hasta
 terminar las pruebas observadas.
 
-Inicializar una sola vez y ejecutar el primer respaldo observado:
+Inicializar una sola vez y ejecutar el primer respaldo observado. La unidad de
+inicialización es `oneshot` con `RemainAfterExit=yes`: si ya figura como
+`active (exited)` por una inicialización anterior, `start` no hace nada y hay
+que usar `restart` de esa misma unidad. El script comprueba primero con
+`restic cat config` y solo inicializa si el repositorio no existe; nunca se
+ejecuta `restic init` a mano ni dos veces sobre la misma ruta.
 
 ```bash
 sudo systemctl start tehus-backup-init.service
@@ -178,7 +218,7 @@ contiene objetos del repositorio. También puede comprobarse con rclone:
 ```bash
 sudo -u deploy rclone lsf \
   --config /opt/tehus-crm/.secrets/rclone.conf \
-  takto-drive:TAKTO_BACKUPS/staging
+  takto-drive:TAKTO_BACKUPS_V2/staging
 ```
 
 No basta con que el comando local de backup diga éxito. Luego ejecutar el
@@ -194,13 +234,22 @@ El cierre de H-01 requiere evidencia de los dos servicios exitosos, el latido
 verde y la existencia de objetos fuera del VPS. No habilitar el esquema para
 producción hasta completar una restauración de prueba.
 
-Solo después de esas comprobaciones, iniciar la programación y verificar la
-próxima ejecución calculada:
+Solo después de esas comprobaciones, retirar cualquier cron de respaldo local a
+la misma hora (guardando antes una copia del crontab en `.secrets`), iniciar la
+programación y verificar la próxima ejecución calculada:
 
 ```bash
+crontab -l > /opt/tehus-crm/.secrets/crontab.bak-$(date -u +%Y%m%dT%H%M%SZ)
+crontab -l | grep -v 'deploy/scripts/backup-postgres.sh' | crontab -
+
 sudo systemctl enable --now tehus-backup.timer tehus-backup-drill.timer
 systemctl list-timers --all tehus-backup.timer tehus-backup-drill.timer
+systemctl is-active tehus-backup.service tehus-backup-drill.service
 ```
+
+`enable --now` arma los temporizadores, no los servicios. Aun así, con
+`Persistent=true` conviene comprobar que ningún servicio arrancó de inmediato
+y, si lo hizo, observarlo hasta el final sin interrumpirlo.
 
 ## Operación normal
 
@@ -294,6 +343,14 @@ sudo systemctl disable --now tehus-backup.timer tehus-backup-drill.timer
 Esto no elimina datos locales, snapshots de Restic, el destino externo ni
 credenciales. La eliminación de respaldos es una acción destructiva separada y
 requiere una autorización explícita.
+
+Rollback de configuración: cada cambio de `.env.backup`, `rclone.conf` o del
+crontab deja una copia con timestamp y modo `600` en `/opt/tehus-crm/.secrets/`
+(`.env.backup.bak-*`, `rclone.conf.bak-*`, `crontab.bak-*`). Volver atrás es
+copiar la versión anterior sobre el archivo vivo (o `crontab <copia>`),
+conservando modo y propietario, y volver a comprobar `restic snapshots` y
+`systemctl list-timers`. Al volver a un repositorio anterior no se pierde nada:
+los snapshots del repositorio abandonado siguen existiendo en Drive.
 
 ## Criterios auditables de cierre
 

@@ -1,0 +1,100 @@
+{
+  "$comment": "Fase 0 — inventario de los valores que hoy están fijados en el código del onboarding y del catálogo y que aplican a todas las empresas. No es una configuración consumida por la aplicación: documenta el punto de partida para que la Fase 1 los convierta en plantillas por vertical. Fuente: commit d42102103a8659969bc886870ce1c7c1ae28d24f.",
+  "version": 1,
+  "status": "INVENTORY_ONLY",
+  "observedAt": "2026-09-02",
+  "currentImplicitTemplate": {
+    "key": "furniture-implicit",
+    "description": "Lo que recibe cualquier empresa nueva hoy, independientemente de su negocio.",
+    "sources": {
+      "productCategories": "apps/frontend/src/lib/products.ts#PRODUCT_CATEGORIES",
+      "suggestedCategories": "apps/frontend/src/components/onboarding/steps/CommercialStep.tsx#SUGGESTED_CATEGORIES",
+      "pipelineDefaults": "apps/frontend/src/app/onboarding/page.tsx",
+      "brandDefaults": "apps/frontend/src/app/onboarding/page.tsx",
+      "productPlaceholder": "apps/frontend/src/components/products/ProductModal.tsx"
+    },
+    "productCategories": [
+      "Salas",
+      "Comedores",
+      "Sillas",
+      "Lámparas",
+      "Accesorios",
+      "Columpios",
+      "Asoleadoras",
+      "Zonas húmedas"
+    ],
+    "suggestedCategories": [
+      "Salas",
+      "Comedores",
+      "Sillas",
+      "Lámparas",
+      "Accesorios",
+      "Columpios",
+      "Asoleadoras",
+      "Zonas húmedas",
+      "Proyectos personalizados"
+    ],
+    "commercialDefaults": {
+      "sellsProducts": true,
+      "sellsServices": false,
+      "usesCatalog": true,
+      "usesQuotes": false,
+      "usesTasks": true,
+      "categories": []
+    },
+    "pipeline": {
+      "name": "Ventas",
+      "stages": [
+        { "name": "Nuevo lead", "type": null, "isInitial": null },
+        { "name": "Contactado", "type": null, "isInitial": null },
+        { "name": "Asesoría en proceso", "type": null, "isInitial": null },
+        { "name": "Cotización", "type": null, "isInitial": null },
+        { "name": "Seguimiento", "type": null, "isInitial": null },
+        { "name": "Cerrado ganado", "type": null, "isInitial": null },
+        { "name": "Cerrado perdido", "type": null, "isInitial": null }
+      ],
+      "$comment": "type e isInitial son null porque el onboarding crea las etapas solo con nombre y orden; el backend aplica el default OPEN/false."
+    },
+    "brand": {
+      "primaryColor": "#A57014",
+      "accentColor": "#FDDC7F",
+      "backgroundColor": "#FAF8F3",
+      "$comment": "Coinciden con los colores de marca guardados de un tenant existente; no son colores de TAKTO."
+    },
+    "productPlaceholder": "Sala Primavera"
+  },
+  "proposedTemplates": {
+    "$comment": "PENDIENTE (Fase 1): definir 'generic' (TAKTO, neutral) y 'furniture' (equivalente al implícito actual) y asignar 'furniture' al tenant Tehus sin tocar sus datos. Las listas de abajo son propuestas, no valores en uso.",
+    "generic": {
+      "productCategories": [],
+      "suggestedCategories": [],
+      "pipeline": {
+        "name": "Ventas",
+        "stages": [
+          { "name": "Nuevo", "type": "OPEN", "isInitial": true },
+          { "name": "Contactado", "type": "OPEN", "isInitial": false },
+          { "name": "Propuesta", "type": "OPEN", "isInitial": false },
+          { "name": "Negociación", "type": "OPEN", "isInitial": false },
+          { "name": "Ganado", "type": "WON", "isInitial": false },
+          { "name": "Perdido", "type": "LOST", "isInitial": false }
+        ]
+      },
+      "brand": { "primaryColor": null, "accentColor": null, "backgroundColor": null }
+    },
+    "furniture": {
+      "inheritsFrom": "currentImplicitTemplate",
+      "pipeline": {
+        "name": "Ventas",
+        "stages": [
+          { "name": "Nuevo lead", "type": "OPEN", "isInitial": true },
+          { "name": "Contactado", "type": "OPEN", "isInitial": false },
+          { "name": "Asesoría en proceso", "type": "OPEN", "isInitial": false },
+          { "name": "Cotización", "type": "OPEN", "isInitial": false },
+          { "name": "Seguimiento", "type": "OPEN", "isInitial": false },
+          { "name": "Cerrado ganado", "type": "WON", "isInitial": false },
+          { "name": "Cerrado perdido", "type": "LOST", "isInitial": false }
+        ]
+      }
+    }
+  }
+}
