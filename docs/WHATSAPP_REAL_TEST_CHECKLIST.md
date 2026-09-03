@@ -2,7 +2,7 @@
 
 ## 1. Propósito
 
-Esta guía sirve para preparar y ejecutar una prueba real de WhatsApp Cloud API contra el backend de Tehus Rattan, en un entorno de staging o similar, **sin exponer secretos** en el chat, en commits, en capturas de pantalla ni en ningún documento del repositorio. Ningún paso de esta guía se ejecuta desde esta conversación — todos los pasos con credenciales reales se hacen en tu propio entorno seguro.
+Esta guía sirve para preparar y ejecutar una prueba real de WhatsApp Cloud API contra el backend de TAKTO, en un entorno de staging o similar, **sin exponer secretos** en el chat, en commits, en capturas de pantalla ni en ningún documento del repositorio. Ningún paso de esta guía se ejecuta desde esta conversación — todos los pasos con credenciales reales se hacen en tu propio entorno seguro.
 
 ## 2. Estado actual del backend
 

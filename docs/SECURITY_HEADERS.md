@@ -1,6 +1,6 @@
 # HTTP security: headers, CSP, CORS, cookies, rate limiting, logging, uploads
 
-Staging-hardening layer for the Tehus Rattan CRM. Companion to
+Staging-hardening layer for the TAKTO CRM. Companion to
 [AUTH_SESSION_SECURITY.md](./AUTH_SESSION_SECURITY.md) (browser session/auth) and
 [DEPLOYMENT_RUNBOOK.md](./DEPLOYMENT_RUNBOOK.md) (deploy/backup/rollback).
 

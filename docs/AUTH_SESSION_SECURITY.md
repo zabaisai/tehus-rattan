@@ -70,14 +70,14 @@ autenticado.
 
 ## 5. Múltiples pestañas
 
-- `BroadcastChannel('tehus-auth')` solo transmite **tipos de evento**
+- `BroadcastChannel('takto-auth')` (durante la transición también se escucha el legacy `tehus-auth`; nunca se emite en él) solo transmite **tipos de evento**
   (`logout`, `session-invalidated`) — nunca tokens ni credenciales.
 - Cada pestaña mantiene su propio access token en memoria y lo deriva por
   refresh. Al recibir un evento de otra pestaña, limpia su sesión y va a
   `/login`. Degrada a no-op si `BroadcastChannel` no está disponible.
 - **Serialización de refresh entre pestañas (Web Locks API):** además del
   single-flight `refreshPromise` por pestaña, `refreshWithCrossTabLock`
-  (`lib/axios.ts`) toma el lock exclusivo con nombre estable `tehus-auth-refresh`
+  (`lib/axios.ts`) toma el lock exclusivo con nombre estable `takto-auth-refresh`
   (`navigator.locks.request`) para que dos pestañas no roten el mismo token en el
   mismo instante. El lock **solo ordena** los refresh: cada pestaña hace su propia
   petición y guarda su propio access token en memoria — nunca se comparte un token
@@ -158,7 +158,7 @@ expirado. `AuthGate` y `/login` renderizan `ConnectionUnavailable`:
 
 - El rate limiting global (`@nestjs/throttler`) es **por IP** en todas las rutas,
   **excepto** `POST /auth/refresh`, que `AppThrottlerGuard` agrupa **por
-  dispositivo** usando la cookie httpOnly `tehus_device_id`.
+  dispositivo** usando la cookie httpOnly `takto_device_id` (fallback temporal de lectura: `tehus_device_id`; ver `docs/phase-1/IDENTITY-CONTRACT.md` § Namespace técnico).
 - **Por qué:** con un único bucket por IP, toda una oficina detrás de un NAT/IP
   pública compartía un solo presupuesto de refresh, y varios compañeros recargando
   a la vez podían agotarlo y expulsarse entre sí (429). Con bucket por dispositivo,
