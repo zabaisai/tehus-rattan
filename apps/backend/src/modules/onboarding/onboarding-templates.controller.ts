@@ -5,7 +5,11 @@ import {
   THROTTLE_TTL_MS,
 } from '../../common/throttle/throttle.config';
 import { ONBOARDING_TEMPLATES } from './templates/onboarding-templates';
-import { CATEGORY_LIMITS, STAGE_LIMITS } from '../companies/company-settings';
+import {
+  BUSINESS_TYPE_LIMITS,
+  CATEGORY_LIMITS,
+  STAGE_LIMITS,
+} from '../companies/company-settings';
 
 /**
  * Plantillas de onboarding para el asistente de alta.
@@ -25,7 +29,11 @@ export class OnboardingTemplatesController {
   templates() {
     return {
       ...ONBOARDING_TEMPLATES,
-      limits: { categories: CATEGORY_LIMITS, stages: STAGE_LIMITS },
+      limits: {
+        categories: CATEGORY_LIMITS,
+        stages: STAGE_LIMITS,
+        businessType: BUSINESS_TYPE_LIMITS,
+      },
     };
   }
 }

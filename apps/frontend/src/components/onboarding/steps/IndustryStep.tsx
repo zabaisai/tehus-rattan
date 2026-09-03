@@ -1,6 +1,7 @@
 "use client";
 
 import { Field } from "@/components/ui/Field";
+import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import {
   BUSINESS_MODEL_LABELS,
@@ -13,6 +14,9 @@ export interface IndustrySelection {
   industry: string;
   businessType: string;
   businessModel: BusinessModel;
+  /** Solo para «Otro / Configurar manualmente»: lo que se guarda como
+   *  Company.businessType. Vacío con cualquier plantilla normal. */
+  customBusinessType: string;
 }
 
 interface IndustryStepProps {
@@ -21,8 +25,10 @@ interface IndustryStepProps {
   loadError: string;
   onRetry: () => void;
   value: IndustrySelection;
+  businessTypeMaxLength: number;
   onIndustryChange: (industry: string) => void;
   onBusinessTypeChange: (businessType: string) => void;
+  onCustomBusinessTypeChange: (text: string) => void;
   onBusinessModelChange: (model: BusinessModel) => void;
 }
 
@@ -40,11 +46,15 @@ export function IndustryStep({
   loadError,
   onRetry,
   value,
+  businessTypeMaxLength,
   onIndustryChange,
   onBusinessTypeChange,
+  onCustomBusinessTypeChange,
   onBusinessModelChange,
 }: IndustryStepProps) {
   const industry = findIndustry(templates, value.industry);
+  const selectedType = industry?.businessTypes.find((t) => t.key === value.businessType);
+  const isManual = Boolean(selectedType?.manual);
 
   return (
     <div>
@@ -134,6 +144,27 @@ export function IndustryStep({
               })}
             </div>
           </fieldset>
+
+          {/* Único lugar donde se define el tipo de negocio. Con una plantilla
+              normal el tipo visible ES el nombre de la plantilla; solo «Otro /
+              Configurar manualmente» pide una descripción, que es lo que se
+              guarda (nunca el literal «Otro»). */}
+          {isManual && (
+            <Field
+              label="Describe tu tipo de negocio"
+              required
+              hint={`Es el tipo de negocio que verá tu equipo. Máximo ${businessTypeMaxLength} caracteres.`}
+            >
+              <Input
+                type="text"
+                required
+                maxLength={businessTypeMaxLength}
+                value={value.customBusinessType}
+                onChange={(e) => onCustomBusinessTypeChange(e.target.value)}
+                placeholder="Ej.: distribuidora de insumos agrícolas"
+              />
+            </Field>
+          )}
 
           <fieldset>
             <legend className="mb-2 block text-sm font-medium text-neutral-700">

@@ -443,8 +443,9 @@ describe('OnboardingService', () => {
       );
     });
 
-    it('configuración manual («Otro»): acepta cualquier etapa tipada y categorías propias', async () => {
+    it('configuración manual («Otro»): guarda la descripción recortada, acepta cualquier etapa tipada y categorías propias', async () => {
       const dto = buildDto({
+        company: { name: 'Manual QA', businessType: '  Carpintería  fina  ' },
         commercial: {
           sellsProducts: true,
           sellsServices: true,
@@ -474,7 +475,7 @@ describe('OnboardingService', () => {
       );
 
       const data = prisma.company.create.mock.calls[0][0].data;
-      expect(data.businessType).toBe('Otro / Configurar manualmente');
+      expect(data.businessType).toBe('Carpintería fina');
       expect(data.settings.catalog.categories).toEqual(['Lo mío', 'Lo otro']);
       expect(data.settings.pipelineDefaults).toEqual({
         templateKey: 'other',
@@ -482,7 +483,24 @@ describe('OnboardingService', () => {
       });
     });
 
-    it('un tipo de negocio escrito por el usuario tiene prioridad sobre el nombre de la plantilla', async () => {
+    it('«Otro» sin descripción se rechaza antes de tocar la base', async () => {
+      const dto = buildDto({
+        company: { name: 'Manual QA', businessType: '   ' },
+        commercial: {
+          ...buildDto().commercial,
+          industry: 'automotive',
+          businessType: 'other',
+        },
+        pipeline: { name: 'Ventas', typedStages },
+      });
+      await expect(
+        service.createCompany(dto, undefined, VALID_INVITE_CODE, FAKE_CONTEXT),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.company.create).not.toHaveBeenCalled();
+      expect(prisma.invitationCode.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('con una plantilla normal manda el nombre canónico aunque el cliente envíe otro texto', async () => {
       const dto = buildDto({
         company: { name: 'X', businessType: 'Carpintería fina' },
         commercial: {
@@ -499,7 +517,7 @@ describe('OnboardingService', () => {
         FAKE_CONTEXT,
       );
       expect(prisma.company.create.mock.calls[0][0].data.businessType).toBe(
-        'Carpintería fina',
+        'Tienda / showroom',
       );
     });
 

@@ -54,8 +54,12 @@ export interface OnboardingTemplates {
   limits: {
     categories: { maxLength: number; maxCount: number };
     stages: { maxNameLength: number; maxCount: number };
+    /** Descripción manual del tipo de negocio («Otro / Configurar manualmente»). */
+    businessType?: { maxLength: number };
   };
 }
+
+export const DEFAULT_BUSINESS_TYPE_MAX_LENGTH = 60;
 
 export const BUSINESS_MODEL_LABELS: Record<BusinessModel, string> = {
   products: 'Vendo productos',

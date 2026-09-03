@@ -2,9 +2,11 @@ import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 
+// El tipo de negocio NO va aquí: se elige una sola vez en `IndustryStep`
+// (plantilla o descripción manual). Dos campos para el mismo dato acababan
+// guardando valores contradictorios.
 export interface CompanyInfoState {
   name: string;
-  businessType: string;
   city: string;
   country: string;
   phone: string;
@@ -41,15 +43,6 @@ export function CompanyInfoStep({ value, onChange }: CompanyInfoStepProps) {
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Tipo de negocio">
-            <Input
-              type="text"
-              value={value.businessType}
-              onChange={(e) => onChange({ businessType: e.target.value })}
-              placeholder="Ej.: tienda, consultoría, taller"
-            />
-          </Field>
-
           <Field label="Teléfono comercial">
             <Input
               type="tel"

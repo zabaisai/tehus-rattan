@@ -211,13 +211,10 @@ export class OnboardingService {
         stagesTyped: Boolean(dto.pipeline.typedStages),
       },
     });
-    // Tipo de negocio visible: lo que escribió el usuario o, si eligió una
-    // plantilla y no escribió nada, el nombre de esa plantilla.
-    const businessTypeLabel =
-      dto.company.businessType?.trim() ||
-      (vertical
-        ? findBusinessType(vertical.industry, vertical.businessType)?.name
-        : undefined);
+    const businessTypeLabel = this.resolveBusinessTypeLabel(
+      dto.company.businessType,
+      vertical,
+    );
 
     const result = await this.prisma.$transaction(async (tx) => {
       const invitation = await tx.invitationCode.findUnique({
@@ -556,6 +553,29 @@ export class OnboardingService {
       businessModel: businessModel ?? template.businessModel,
       templateVersion: ONBOARDING_TEMPLATES_VERSION,
     };
+  }
+
+  // Tipo de negocio VISIBLE de la empresa (Company.businessType). Con una
+  // plantilla normal manda el nombre canónico de la plantilla: un texto libre
+  // del cliente no puede contradecir a settings.vertical. Con «Otro /
+  // Configurar manualmente» la descripción es obligatoria y es lo que se
+  // guarda (nunca el literal «Otro / Configurar manualmente»). Sin vertical
+  // (cliente anterior a la Fase 1) se conserva el texto enviado.
+  private resolveBusinessTypeLabel(
+    freeText: string | undefined,
+    vertical: VerticalInfo | null,
+  ): string | undefined {
+    const text = freeText?.replace(/\s+/g, ' ').trim() || undefined;
+    if (!vertical) return text;
+    const template = findBusinessType(vertical.industry, vertical.businessType);
+    if (!template) return text;
+    if (!template.manual) return template.name;
+    if (!text) {
+      throw new BadRequestException(
+        'Describe tu tipo de negocio para la opción «Otro / Configurar manualmente»',
+      );
+    }
+    return text;
   }
 
   // Etapas finales del pipeline. Con `typedStages` se exigen las invariantes

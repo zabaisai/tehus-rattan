@@ -35,6 +35,7 @@ import {
 } from "@/lib/onboarding";
 import {
   categorySuggestionsFor,
+  DEFAULT_BUSINESS_TYPE_MAX_LENGTH,
   findBusinessType,
   findIndustry,
   flagsForModel,
@@ -45,6 +46,15 @@ import {
   type OnboardingTemplates,
 } from "@/lib/onboarding-templates";
 import { normalizeCategoryList } from "@/lib/company-settings";
+import { PASSWORD_RULES } from "@/lib/password-policy";
+
+// Misma política que `IsStrongPassword` en el backend; el mensaje nombra lo
+// que falta para que la persona sepa qué corregir sin adivinar.
+function passwordProblem(password: string): string | null {
+  const unmet = PASSWORD_RULES.filter((r) => !r.test(password)).map((r) => r.label.toLowerCase());
+  if (unmet.length === 0) return null;
+  return `La contraseña debe cumplir: ${unmet.join(", ")}.`;
+}
 
 type StepKey =
   | "invite"
@@ -78,6 +88,7 @@ const MANUAL_MODULES: ModulesTemplate = { catalog: false, quotes: false, tasks: 
 const FALLBACK_LIMITS = {
   categories: { maxLength: 60, maxCount: 30 },
   stages: { maxNameLength: 40, maxCount: 20 },
+  businessType: { maxLength: DEFAULT_BUSINESS_TYPE_MAX_LENGTH },
 };
 
 type ApiError = {
@@ -147,6 +158,8 @@ export default function OnboardingPage() {
     : "";
   const loadTemplates = () => templatesQuery.refetch();
   const limits = templates?.limits ?? FALLBACK_LIMITS;
+  const businessTypeMaxLength =
+    limits.businessType?.maxLength ?? DEFAULT_BUSINESS_TYPE_MAX_LENGTH;
   const coreModules = templates?.coreModules ?? ["conversations", "contacts", "leads", "pipeline"];
 
   // ── Estado del asistente.
@@ -159,7 +172,6 @@ export default function OnboardingPage() {
   const [inviteCode, setInviteCode] = useState("");
   const [company, setCompany] = useState<CompanyInfoState>({
     name: "",
-    businessType: "",
     city: "",
     country: "",
     phone: "",
@@ -171,6 +183,7 @@ export default function OnboardingPage() {
     industry: "generic",
     businessType: "",
     businessModel: "mixed",
+    customBusinessType: "",
   });
   const [modules, setModules] = useState<ModulesTemplate>({ ...MANUAL_MODULES });
   const [categories, setCategories] = useState<string[]>([]);
@@ -220,7 +233,13 @@ export default function OnboardingPage() {
     const type = findBusinessType(templates, next.industry, next.businessType);
     const s = suggestionsFrom(type);
     const model: BusinessModel = type ? type.businessModel : next.businessModel;
-    setSelection({ ...next, businessModel: model });
+    // La descripción manual solo tiene sentido con «Otro»: al pasar a una
+    // plantilla normal se descarta, así nunca viaja un texto contradictorio.
+    setSelection({
+      ...next,
+      businessModel: model,
+      customBusinessType: type?.manual ? next.customBusinessType : "",
+    });
     if (replaceEdited || !edited.modules) setModules(s.modules);
     if (replaceEdited || !edited.categories) setCategories(s.categories);
     if (replaceEdited || !edited.pipeline) setPipeline(s.pipeline);
@@ -244,11 +263,16 @@ export default function OnboardingPage() {
       industry: industryKey,
       businessType: first?.key ?? "",
       businessModel: first?.businessModel ?? selection.businessModel,
+      customBusinessType: selection.customBusinessType,
     });
   }
 
   function handleBusinessTypeChange(typeKey: string) {
     requestSelection({ ...selection, businessType: typeKey });
+  }
+
+  function handleCustomBusinessTypeChange(text: string) {
+    setSelection((prev) => ({ ...prev, customBusinessType: text }));
   }
 
   function restore(section: "modules" | "categories" | "pipeline") {
@@ -293,6 +317,13 @@ export default function OnboardingPage() {
         if (!templates) return "Espera a que carguen las opciones o reintenta.";
         if (!industry) return "Elige una industria.";
         if (!businessType) return "Elige un tipo de negocio (o «Otro / Configurar manualmente»).";
+        if (businessType.manual) {
+          const text = selection.customBusinessType.replace(/\s+/g, " ").trim();
+          if (!text) return "Describe tu tipo de negocio para continuar con la configuración manual.";
+          if (text.length > businessTypeMaxLength) {
+            return `La descripción del tipo de negocio debe tener como máximo ${businessTypeMaxLength} caracteres.`;
+          }
+        }
         return null;
       case "modules":
         return null;
@@ -316,7 +347,10 @@ export default function OnboardingPage() {
       case "admin":
         if (!admin.name.trim()) return "El nombre del administrador es requerido.";
         if (!EMAIL_REGEX.test(admin.email.trim())) return "El email del administrador no es válido.";
-        if (admin.password.length < 8) return "La contraseña debe tener al menos 8 caracteres.";
+        {
+          const problem = passwordProblem(admin.password);
+          if (problem) return problem;
+        }
         if (admin.password !== admin.confirmPassword) return "Las contraseñas no coinciden.";
         return null;
       case "agents": {
@@ -333,8 +367,11 @@ export default function OnboardingPage() {
             return `El email "${agent.email.trim()}" está repetido.`;
           }
           seen.add(email);
-          if (agent.password.length < 8) {
-            return `La contraseña de "${agent.name || "un asesor"}" debe tener al menos 8 caracteres.`;
+          {
+            const problem = passwordProblem(agent.password);
+            if (problem) {
+              return `Asesor ${agents.indexOf(agent) + 1} (${agent.name.trim() || "sin nombre"}): ${problem}`;
+            }
           }
         }
         return null;
@@ -376,7 +413,11 @@ export default function OnboardingPage() {
       const payload = {
         company: {
           name: company.name.trim(),
-          businessType: company.businessType.trim() || undefined,
+          // Solo con «Otro / Configurar manualmente» viaja un texto; con una
+          // plantilla normal el backend guarda el nombre canónico de la plantilla.
+          businessType: businessType?.manual
+            ? selection.customBusinessType.replace(/\s+/g, " ").trim() || undefined
+            : undefined,
           city: company.city.trim() || undefined,
           country: company.country.trim() || undefined,
           phone: company.phone.trim() || undefined,
@@ -478,8 +519,10 @@ export default function OnboardingPage() {
               loadError={templatesError}
               onRetry={() => void loadTemplates()}
               value={selection}
+              businessTypeMaxLength={businessTypeMaxLength}
               onIndustryChange={handleIndustryChange}
               onBusinessTypeChange={handleBusinessTypeChange}
+              onCustomBusinessTypeChange={handleCustomBusinessTypeChange}
               onBusinessModelChange={(businessModel) =>
                 setSelection((prev) => ({ ...prev, businessModel }))
               }
@@ -531,7 +574,9 @@ export default function OnboardingPage() {
           {step === "confirm" && (
             <ConfirmationStep
               companyName={company.name}
-              businessTypeLabel={company.businessType}
+              businessTypeLabel={
+                businessType?.manual ? selection.customBusinessType.trim() : ""
+              }
               city={company.city}
               country={company.country}
               industryName={industry?.name ?? ""}

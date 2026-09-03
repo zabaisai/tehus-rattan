@@ -5,6 +5,12 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
+import { PASSWORD_MIN_LENGTH, PASSWORD_RULES } from "@/lib/password-policy";
+
+// Un solo resumen de la política para todos los asesores (la lista viva
+// completa está en el paso del administrador); el error de validación
+// identifica a qué asesor le falta.
+const PASSWORD_HINT = `Contraseña temporal: ${PASSWORD_RULES.map((r) => r.label.toLowerCase()).join(", ")}.`;
 
 export interface AgentDraft {
   name: string;
@@ -37,6 +43,7 @@ export function AgentsStep({ value, onChange }: AgentsStepProps) {
         Puedes agregar asesores ahora o hacerlo después dentro del CRM. Todos
         se crean con rol Asesor.
       </p>
+      <p className="mt-1 text-xs text-content-secondary">{PASSWORD_HINT}</p>
 
       {value.length === 0 && (
         <div className="mt-6 rounded-lg border border-dashed border-line-strong bg-surface-subtle px-4 py-6 text-center">
@@ -93,6 +100,8 @@ export function AgentsStep({ value, onChange }: AgentsStepProps) {
                 <Input
                   type="password"
                   placeholder="Contraseña temporal"
+                  minLength={PASSWORD_MIN_LENGTH}
+                  autoComplete="new-password"
                   value={agent.password}
                   onChange={(e) =>
                     updateAgent(index, { password: e.target.value })

@@ -169,6 +169,169 @@ describe('Asistente de onboarding (Fase 1)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/exactamente una etapa de cierre ganado/);
   });
 
+  describe('contraseñas: la misma política que el backend (IsStrongPassword)', () => {
+    async function llegarAAdmin(user: ReturnType<typeof userEvent.setup>) {
+      await llegarAIndustria(user);
+      await user.click(screen.getByRole('radio', { name: /Venta de servicios/ }));
+      await avanzar(user); // módulos
+      await avanzar(user); // pipeline (sin catálogo: no hay paso de categorías)
+      await avanzar(user); // branding
+      await avanzar(user); // admin
+      expect(screen.getByRole('heading', { name: 'Administrador' })).toBeInTheDocument();
+      await user.type(screen.getByLabelText(/^Nombre/), 'Admin QA');
+      await user.type(screen.getByLabelText(/^Email/), 'admin@example.test');
+    }
+
+    it.each([
+      ['8 caracteres', 'Abc!1234', /10 caracteres/],
+      ['10 sin mayúscula', 'abcdef!123', /mayúscula/],
+      ['10 sin minúscula', 'ABCDEF!123', /minúscula/],
+      ['sin número', 'Abcdefgh!!', /número/],
+      ['sin símbolo', 'Abcdefgh12', /carácter especial/],
+    ])('el administrador no avanza con %s', async (_label, password, pattern) => {
+      const user = userEvent.setup();
+      montar();
+      await llegarAAdmin(user);
+      await user.type(screen.getByLabelText(/^Contraseña/), password);
+      await user.type(screen.getByLabelText(/Confirmar contraseña/), password);
+      await avanzar(user);
+      expect(screen.getByRole('alert')).toHaveTextContent(pattern);
+      expect(screen.getByRole('heading', { name: 'Administrador' })).toBeInTheDocument();
+    });
+
+    it('una contraseña válida permite continuar y no queda ninguna mención a «mínimo 8»', async () => {
+      const user = userEvent.setup();
+      montar();
+      await llegarAAdmin(user);
+      expect(document.body.textContent).not.toMatch(/m[ií]nimo 8/i);
+      await user.type(screen.getByLabelText(/^Contraseña/), 'SuperSecret!123');
+      await user.type(screen.getByLabelText(/Confirmar contraseña/), 'SuperSecret!123');
+      await avanzar(user);
+      expect(screen.getByRole('heading', { name: 'Asesores' })).toBeInTheDocument();
+    });
+
+    it('el error de un asesor identifica a ese asesor', async () => {
+      const user = userEvent.setup();
+      montar();
+      await llegarAAdmin(user);
+      await user.type(screen.getByLabelText(/^Contraseña/), 'SuperSecret!123');
+      await user.type(screen.getByLabelText(/Confirmar contraseña/), 'SuperSecret!123');
+      await avanzar(user); // asesores
+      await user.click(screen.getByRole('button', { name: /Agregar asesor/ }));
+      await user.click(screen.getByRole('button', { name: /Agregar asesor/ }));
+      await user.type(screen.getByLabelText('Nombre del asesor 1'), 'Ana');
+      await user.type(screen.getByLabelText('Email del asesor 1'), 'ana@example.test');
+      await user.type(screen.getByLabelText('Contraseña temporal del asesor 1'), 'SuperSecret!123');
+      await user.type(screen.getByLabelText('Nombre del asesor 2'), 'Luis');
+      await user.type(screen.getByLabelText('Email del asesor 2'), 'luis@example.test');
+      await user.type(screen.getByLabelText('Contraseña temporal del asesor 2'), 'abcdefgh12');
+      await avanzar(user);
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(/Asesor 2 \(Luis\)/);
+      expect(alert).toHaveTextContent(/mayúscula/);
+      expect(alert).toHaveTextContent(/carácter especial/);
+      // Escribe una docena de campos: bajo la suite completa supera los 5 s
+      // por defecto sin que nada falle.
+    }, 20000);
+  });
+
+  describe('tipo de negocio: una sola fuente (plantilla o descripción manual)', () => {
+    it('«Datos de empresa» ya no pide un tipo de negocio', async () => {
+      const user = userEvent.setup();
+      montar();
+      await user.type(screen.getByLabelText('Código de invitación'), 'TAKTO-AAAA-BBBB-CCCC-DDDD');
+      await avanzar(user);
+      expect(screen.getByRole('heading', { name: 'Datos de tu empresa' })).toBeInTheDocument();
+      expect(screen.queryByLabelText(/Tipo de negocio/)).not.toBeInTheDocument();
+    });
+
+    it('«Otro / Configurar manualmente» exige una descripción, la recorta y la envía; la confirmación la muestra', async () => {
+      const user = userEvent.setup();
+      createCompanyOnboarding.mockResolvedValue({
+        message: 'ok',
+        company: { id: 'c1', name: 'QA_PHASE1_Empresa', slug: 'qa', status: 'ACTIVE', logoUrl: null, secondaryLogoUrl: null },
+        admin: { id: 'u1', name: 'Admin', email: 'admin@example.test', role: 'ADMIN' },
+        agents: [],
+        pipeline: { id: 'p1', name: 'Ventas' },
+        stages: [],
+      });
+      montar();
+      await llegarAIndustria(user);
+      await user.click(screen.getByRole('radio', { name: /Otro \/ Configurar manualmente/ }));
+      await avanzar(user);
+      expect(screen.getByRole('alert')).toHaveTextContent(/Describe tu tipo de negocio/);
+      expect(screen.getByRole('heading', { name: '¿A qué se dedica tu empresa?' })).toBeInTheDocument();
+
+      await user.type(screen.getByLabelText(/Describe tu tipo de negocio/), '  Insumos   agrícolas  ');
+      await avanzar(user); // módulos
+      await avanzar(user); // pipeline (sin catálogo en «Otro»)
+      await avanzar(user); // branding
+      await avanzar(user); // admin
+      await user.type(screen.getByLabelText(/^Nombre/), 'Admin QA');
+      await user.type(screen.getByLabelText(/^Email/), 'admin@example.test');
+      await user.type(screen.getByLabelText(/^Contraseña/), 'SuperSecret!123');
+      await user.type(screen.getByLabelText(/Confirmar contraseña/), 'SuperSecret!123');
+      await avanzar(user); // asesores
+      await avanzar(user); // confirmación
+
+      // La fila «Tipo de negocio» muestra la descripción recortada; la fila
+      // «Plantilla» sigue nombrando la opción manual, que es informativa.
+      expect(screen.getByText('Insumos agrícolas')).toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Crear empresa' }));
+      await waitFor(() => expect(createCompanyOnboarding).toHaveBeenCalledTimes(1));
+      const [payload] = createCompanyOnboarding.mock.calls[0];
+      expect(payload.company.businessType).toBe('Insumos agrícolas');
+      expect(payload.commercial.businessType).toBe('other');
+    });
+
+    it('al pasar de manual a una plantilla normal el texto manual no viaja y el diálogo de protección sigue funcionando', async () => {
+      const user = userEvent.setup();
+      createCompanyOnboarding.mockResolvedValue({
+        message: 'ok',
+        company: { id: 'c1', name: 'QA_PHASE1_Empresa', slug: 'qa', status: 'ACTIVE', logoUrl: null, secondaryLogoUrl: null },
+        admin: { id: 'u1', name: 'Admin', email: 'admin@example.test', role: 'ADMIN' },
+        agents: [],
+        pipeline: { id: 'p1', name: 'Ventas' },
+        stages: [],
+      });
+      montar();
+      await llegarAIndustria(user);
+      await user.click(screen.getByRole('radio', { name: /Otro \/ Configurar manualmente/ }));
+      await user.type(screen.getByLabelText(/Describe tu tipo de negocio/), 'Texto manual');
+      await avanzar(user); // módulos
+      // Personaliza módulos para que el cambio de plantilla pida confirmación.
+      await user.click(screen.getByRole('checkbox', { name: /Cotizaciones/ }));
+      await user.click(screen.getByRole('button', { name: 'Atrás' }));
+      await user.click(screen.getByRole('radio', { name: /Venta de productos/ }));
+      const dialogo = await screen.findByRole('dialog');
+      await user.click(within(dialogo).getByRole('button', { name: 'Aplicar sugerencias' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(screen.queryByLabelText(/Describe tu tipo de negocio/)).not.toBeInTheDocument();
+
+      await avanzar(user); // módulos
+      await avanzar(user); // categorías
+      await avanzar(user); // pipeline
+      await avanzar(user); // branding
+      await avanzar(user); // admin
+      await user.type(screen.getByLabelText(/^Nombre/), 'Admin QA');
+      await user.type(screen.getByLabelText(/^Email/), 'admin@example.test');
+      await user.type(screen.getByLabelText(/^Contraseña/), 'SuperSecret!123');
+      await user.type(screen.getByLabelText(/Confirmar contraseña/), 'SuperSecret!123');
+      await avanzar(user); // asesores
+      await avanzar(user); // confirmación
+      // «Tipo de negocio» y «Plantilla» muestran ambas el nombre canónico.
+      expect(screen.getAllByText('Venta de productos', { selector: 'span.font-medium' }).length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText('Texto manual')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Crear empresa' }));
+      await waitFor(() => expect(createCompanyOnboarding).toHaveBeenCalledTimes(1));
+      const [payload] = createCompanyOnboarding.mock.calls[0];
+      expect(payload.company.businessType).toBeUndefined();
+      expect(payload.commercial.businessType).toBe('products');
+    });
+  });
+
   it('conserva la información al ir atrás y adelante, muestra el resumen y envía el contrato v2 sin colores por defecto', async () => {
     const user = userEvent.setup();
     createCompanyOnboarding.mockResolvedValue({
@@ -211,6 +374,9 @@ describe('Asistente de onboarding (Fase 1)', () => {
     const [payload, files, code] = createCompanyOnboarding.mock.calls[0];
     expect(code).toBe('TAKTO-AAAA-BBBB-CCCC-DDDD');
     expect(files).toEqual({ logo: undefined, secondaryLogo: undefined });
+    // Con una plantilla normal no viaja ningún texto libre: el backend guarda
+    // el nombre canónico de la plantilla.
+    expect(payload.company.businessType).toBeUndefined();
     expect(payload.branding).toEqual({
       primaryColor: undefined,
       accentColor: undefined,

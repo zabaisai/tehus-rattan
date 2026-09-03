@@ -16,6 +16,7 @@ import {
 } from 'class-validator';
 import { IsStrongPassword } from '../../../common/password/password-policy';
 import {
+  BUSINESS_TYPE_LIMITS,
   CATEGORY_LIMITS,
   STAGE_LIMITS,
 } from '../../companies/company-settings';
@@ -31,8 +32,14 @@ export class OnboardingCompanyInfoDto {
   @IsNotEmpty({ message: 'El nombre de la empresa es requerido' })
   name!: string;
 
+  // Solo se persiste tal cual para «Otro / Configurar manualmente» (o para
+  // clientes sin vertical); con una plantilla normal el servidor guarda el
+  // nombre canónico de la plantilla e ignora este texto.
   @IsOptional()
   @IsString()
+  @MaxLength(BUSINESS_TYPE_LIMITS.maxLength, {
+    message: `El tipo de negocio debe tener como máximo ${BUSINESS_TYPE_LIMITS.maxLength} caracteres`,
+  })
   businessType?: string;
 
   @IsOptional()
