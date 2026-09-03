@@ -3,24 +3,27 @@
 import { useEffect, useId, useMemo, useState } from "react";
 import { Upload, X } from "lucide-react";
 import { validateLogoFile } from "@/lib/onboarding";
+import { displayColor, PLATFORM_BRAND } from "@/lib/brand";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 
 /**
- * Colores por defecto de UNA EMPRESA NUEVA. NO son los de TAKTO y no deben
- * sustituirse por el navy/naranja de la plataforma: el manual prohíbe
- * expresamente vestir a la empresa cliente con la marca del producto. Aquí
- * TAKTO solo pone el armazón —etiquetas, campos, tarjetas—; lo que se elige
- * dentro es identidad de la empresa.
+ * Colores DE LA EMPRESA. Empiezan VACÍOS a propósito: la apariencia inicial
+ * de una empresa nueva es la neutral de TAKTO, y solo se guarda un color si la
+ * empresa lo elige. Antes venían pre-rellenados con los colores de un tenant
+ * concreto, que así se colaban como valor por defecto de todo el mundo.
  */
-const COLOR_EMPRESA_POR_DEFECTO = "#A57014";
-const ACENTO_EMPRESA_POR_DEFECTO = "#FDDC7F";
-
 export interface BrandingColorState {
   primaryColor: string;
   accentColor: string;
   backgroundColor: string;
 }
+
+export const EMPTY_BRANDING_COLORS: BrandingColorState = {
+  primaryColor: "",
+  accentColor: "",
+  backgroundColor: "",
+};
 
 interface BrandingStepProps {
   colors: BrandingColorState;
@@ -118,10 +121,12 @@ function LogoPicker({
 function ColorPicker({
   label,
   value,
+  fallback,
   onChange,
 }: {
   label: string;
   value: string;
+  fallback: string;
   onChange: (value: string) => void;
 }) {
   const idMuestra = useId();
@@ -135,22 +140,22 @@ function ColorPicker({
         {label}
       </label>
       <div className="flex items-center gap-2">
+        {/* La muestra necesita SIEMPRE un valor; cuando la empresa no ha
+            elegido nada se enseña el neutro de la plataforma, pero el estado
+            sigue vacío y no se envía. */}
         <input
           id={idMuestra}
           type="color"
-          value={value || COLOR_EMPRESA_POR_DEFECTO}
+          value={displayColor(value, fallback)}
           onChange={(e) => onChange(e.target.value)}
           className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
         />
-        {/* Segundo control para el mismo dato: escribir el hexadecimal a mano.
-            Lleva su propia etiqueta oculta porque la visible ya está tomada
-            por la muestra de color. */}
         <Field label={`${label} en hexadecimal`} labelOculta className="w-full">
           <Input
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder={COLOR_EMPRESA_POR_DEFECTO}
+            placeholder="Sin definir"
           />
         </Field>
       </div>
@@ -195,8 +200,9 @@ export function BrandingStep({
     <div>
       <h3 className="text-lg font-semibold text-content-primary">Branding</h3>
       <p className="mt-1.5 text-sm text-content-secondary">
-        Este paso es opcional. Puedes agregar tu logo y colores ahora o
-        configurarlos después dentro del CRM.
+        Este paso es opcional. Si no eliges nada, tu empresa empieza con la
+        apariencia neutral de TAKTO y podrás personalizarla después en
+        Configuración → Empresa.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2">
@@ -226,28 +232,23 @@ export function BrandingStep({
         <ColorPicker
           label="Color principal"
           value={colors.primaryColor}
+          fallback={PLATFORM_BRAND.primaryColor}
           onChange={(v) => onColorsChange({ primaryColor: v })}
         />
         <ColorPicker
           label="Color de acento"
           value={colors.accentColor}
+          fallback={PLATFORM_BRAND.accentColor}
           onChange={(v) => onColorsChange({ accentColor: v })}
         />
         <ColorPicker
           label="Fondo claro"
           value={colors.backgroundColor}
+          fallback={PLATFORM_BRAND.backgroundColor}
           onChange={(v) => onColorsChange({ backgroundColor: v })}
         />
       </div>
 
-      {/* Vista previa de la identidad DE LA EMPRESA. Los colores salen de lo
-          que el usuario acaba de elegir, nunca de los tokens de TAKTO: es lo
-          que se está configurando.
-
-          Esta tarjeta se titulaba «Login» y mostraba el logotipo de la empresa,
-          lo que prometía algo que el producto no hace: la pantalla de acceso es
-          la puerta de TAKTO y conserva la marca de TAKTO. El rótulo nuevo dice
-          dónde aparece de verdad el logotipo del cliente. */}
       <div className="mt-6 rounded-lg border border-line-default bg-surface-subtle p-4">
         <p className="text-sm font-medium text-content-primary">
           Identidad de tu empresa
@@ -280,15 +281,15 @@ export function BrandingStep({
           </div>
 
           <span
-            style={{ backgroundColor: colors.primaryColor || COLOR_EMPRESA_POR_DEFECTO }}
+            style={{ backgroundColor: displayColor(colors.primaryColor, PLATFORM_BRAND.primaryColor) }}
             className="rounded-md px-3 py-2 text-xs font-medium text-white"
           >
             Botón principal
           </span>
           <span
             style={{
-              backgroundColor: colors.accentColor || ACENTO_EMPRESA_POR_DEFECTO,
-              color: "#0B0F10",
+              backgroundColor: displayColor(colors.accentColor, PLATFORM_BRAND.accentColor),
+              color: PLATFORM_BRAND.primaryColor,
             }}
             className="rounded-md px-3 py-2 text-xs font-medium"
           >

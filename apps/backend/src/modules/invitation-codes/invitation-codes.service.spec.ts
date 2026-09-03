@@ -50,7 +50,7 @@ describe('InvitationCodesService', () => {
         }),
       );
       expect(result.code).toMatch(
-        /^TEHUS-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/,
+        /^TAKTO-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}$/,
       );
       expect(auditLogService.record).toHaveBeenCalledWith(
         prisma,
@@ -86,7 +86,7 @@ describe('InvitationCodesService', () => {
       const createCall = prisma.invitationCode.create.mock.calls[0][0];
       expect(createCall.data.codeHash).not.toBe(result.code);
       expect(createCall.data.codePreview).toMatch(
-        /^TEHUS-\*{4}-\*{4}-\*{4}-[0-9A-F]{4}$/,
+        /^TAKTO-\*{4}-\*{4}-\*{4}-[0-9A-F]{4}$/,
       );
       expect(createCall.data.codePreview).not.toBe(result.code);
     });

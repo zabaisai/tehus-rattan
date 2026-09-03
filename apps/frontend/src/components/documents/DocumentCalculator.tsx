@@ -102,7 +102,7 @@ export function DocumentCalculator() {
         <button
           type="button"
           onClick={() => window.print()}
-          className="flex items-center gap-1.5 rounded-md bg-[#A57014] px-4 py-2 text-sm font-medium text-white hover:bg-[#8c5f10]"
+          className="flex items-center gap-1.5 rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-900"
         >
           <Printer size={16} />
           Imprimir / Guardar como PDF

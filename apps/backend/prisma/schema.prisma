@@ -1535,7 +1535,8 @@ model InvitationCode {
   // SHA-256 hex digest of the normalized plaintext code. The plaintext
   // itself is never stored — only shown once, in the create-response.
   codeHash    String @unique
-  // Masked display form for the admin panel, e.g. "TEHUS-****-****-****-A7F2".
+  // Masked display form for the admin panel, e.g. "TAKTO-****-****-****-A7F2"
+  // (rows created before the TAKTO rename keep their "TEHUS-****-…" preview).
   codePreview String
 
   intendedCompanyName  String

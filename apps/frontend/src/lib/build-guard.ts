@@ -6,7 +6,7 @@
  * `axios` se queda sin `baseURL` y TODAS las llamadas —empezando por
  * `POST /auth/refresh`— salen contra el propio origen del frontend:
  *
- *     https://crm-staging.tehusrattan.com/auth/refresh  ->  404
+ *     https://crm-staging.takto.online/auth/refresh  ->  404
  *
  * Ese 404 se clasifica como fallo transitorio y la aplicación muestra «No
  * pudimos conectar con el servidor» en cada pantalla. No hay forma de usar el

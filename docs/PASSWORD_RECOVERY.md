@@ -1,6 +1,6 @@
 # Password recovery
 
-Secure, multi-tenant password recovery for the Tehus Rattan CRM. Companion to
+Secure, multi-tenant password recovery for the TAKTO CRM. Companion to
 [AUTH_SESSION_SECURITY.md](./AUTH_SESSION_SECURITY.md) and
 [SECURITY_HEADERS.md](./SECURITY_HEADERS.md).
 

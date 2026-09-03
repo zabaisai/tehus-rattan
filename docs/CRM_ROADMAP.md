@@ -1,4 +1,9 @@
-# Roadmap del CRM — Tehus-first
+# Roadmap del CRM — Tehus-first (HISTÓRICO)
+
+> Documento histórico de julio de 2026, anterior a la Fase 1. Desde entonces
+> TAKTO es la plataforma y Tehus Rattan un tenant más; el onboarding por
+> industria y los dominios `takto.online` están en `docs/phase-1/`. Se conserva
+> como contexto de las decisiones de producto de ese momento.
 
 > Reenfoque del roadmap comercial — 2026-07-09, sobre `main @ 6b23140`.
 >

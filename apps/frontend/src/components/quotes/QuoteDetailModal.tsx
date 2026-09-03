@@ -261,7 +261,7 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
               <button
                 type="button"
                 onClick={() => window.open(`/dashboard/quotes/${quoteId}/print`, '_blank')}
-                className="flex items-center gap-1.5 rounded-md bg-[#A57014] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#8c5f10]"
+                className="flex items-center gap-1.5 rounded-md bg-brand-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-900"
               >
                 <Printer size={14} />
                 Ver documento imprimible

@@ -9,8 +9,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$REPO_ROOT"
 
-FRONTEND_DOMAIN="${FRONTEND_DOMAIN:-crm-staging.tehusrattan.com}"
-API_DOMAIN="${API_DOMAIN:-api.crm-staging.tehusrattan.com}"
+FRONTEND_DOMAIN="${FRONTEND_DOMAIN:-crm-staging.takto.online}"
+API_DOMAIN="${API_DOMAIN:-api.crm-staging.takto.online}"
 
 failures=0
 warn() { printf '\033[1;33mWARN: %s\033[0m\n' "$1"; }

@@ -1,91 +1,110 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://takto.local/contracts/company-settings.v2.schema.json",
-  "title": "Company.settings v2 (BORRADOR Fase 0 — no implementado)",
-  "description": "Documenta la forma actual (v1) de Company.settings observada en el código de onboarding y en staging al commit d421021, y propone una v2 aditiva para la Fase 1. Ningún servicio valida hoy contra este esquema. La v2 no se ha implementado; se publica para revisión.",
+  "$id": "https://takto.online/contracts/company-settings.v2.schema.json",
+  "title": "Company.settings v2 (IMPLEMENTADO en la Fase 1)",
+  "description": "Forma que escribe el onboarding para las empresas nuevas desde la Fase 1 y que produce PATCH /companies/me/settings al editar (única vía de escritura: PATCH /companies/me rechaza `settings`, así que ningún objeto completo malformado puede persistirse). Implementación: apps/backend/src/modules/companies/company-settings.ts (parseCompanySettings / buildCompanySettingsV2). La forma v1 ($defs/v1) sigue siendo válida: se lee tal cual y NUNCA se reescribe salvo por una edición explícita de un administrador de esa empresa (sin backfill). Las claves desconocidas se conservan al escribir.",
   "type": "object",
   "properties": {
-    "version": {
-      "type": "integer",
-      "const": 2,
-      "description": "Ausente en v1. La Fase 1 debe tratar la ausencia como v1."
-    },
-    "commercial": {
-      "$ref": "#/$defs/commercialV1",
-      "description": "Mismas banderas que v1, agrupadas."
-    },
-    "vertical": {
-      "type": "object",
-      "description": "Plantilla de vertical aplicada en el onboarding. PENDIENTE: catálogo de verticales en onboarding-templates.",
-      "properties": {
-        "key": { "type": "string", "minLength": 1, "examples": ["generic", "furniture"] },
-        "templateVersion": { "type": "integer", "minimum": 1 }
-      },
-      "required": ["key", "templateVersion"],
-      "additionalProperties": false
-    },
+    "version": { "type": "integer", "const": 2 },
+    "commercial": { "$ref": "#/$defs/commercial" },
     "catalog": {
       "type": "object",
-      "description": "Categorías efectivas de la empresa. Reemplaza la constante global PRODUCT_CATEGORIES del frontend. Debe aceptar cualquier texto ya presente en products.category.",
+      "description": "Categorías efectivas de la empresa. Las leen el filtro del catálogo, el selector del producto y el selector de productos de una oportunidad. Vacío cuando la empresa no usa catálogo. El texto libre siempre se acepta en products.category.",
       "properties": {
         "categories": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "items": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "maxItems": 30,
           "uniqueItems": true,
-          "default": []
+          "description": "Normalizadas: recortadas, sin duplicados (sin distinguir mayúsculas), orden conservado."
         },
-        "allowFreeText": { "type": "boolean", "default": true }
+        "allowFreeText": { "type": "boolean", "const": true }
       },
-      "required": ["categories"],
+      "required": ["categories", "allowFreeText"],
+      "additionalProperties": false
+    },
+    "vertical": {
+      "type": "object",
+      "description": "Plantilla elegida en el onboarding (docs/contracts/onboarding-templates.v2.json). Ausente en empresas creadas sin asistente por industria.",
+      "properties": {
+        "industry": { "type": "string", "minLength": 1 },
+        "businessType": { "type": "string", "minLength": 1 },
+        "businessModel": { "type": "string", "enum": ["products", "services", "mixed"] },
+        "templateVersion": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["industry", "businessType", "businessModel", "templateVersion"],
       "additionalProperties": false
     },
     "pipelineDefaults": {
       "type": "object",
-      "description": "Solo informativo: el pipeline real vive en las tablas pipelines/pipeline_stages. Registra la plantilla usada al crearlo.",
+      "description": "Solo informativo: el pipeline real vive en pipelines/pipeline_stages. Registra la plantilla de partida y si las etapas se crearon con tipo explícito (OPEN/WON/LOST) y etapa inicial.",
       "properties": {
-        "templateKey": { "type": "string" },
-        "stagesTyped": {
-          "type": "boolean",
-          "description": "true cuando las etapas se crearon con type WON/LOST e isInitial (hoy el onboarding no lo hace)."
-        }
+        "templateKey": { "type": "string", "minLength": 1 },
+        "stagesTyped": { "type": "boolean" }
       },
+      "required": ["templateKey", "stagesTyped"],
       "additionalProperties": false
     }
   },
-  "required": ["version", "commercial"],
-  "additionalProperties": false,
+  "required": ["version", "commercial", "catalog"],
+  "additionalProperties": true,
   "$defs": {
-    "commercialV1": {
+    "commercial": {
       "type": "object",
-      "description": "Forma v1 exacta que escribe apps/backend/src/modules/onboarding/onboarding.service.ts. En staging: 2 de 4 empresas la tienen; 'categories' se guarda pero ningún componente del frontend la lee.",
+      "properties": {
+        "sellsProducts": { "type": "boolean" },
+        "sellsServices": { "type": "boolean" },
+        "usesCatalog": { "type": "boolean" },
+        "usesQuotes": { "type": "boolean" },
+        "usesTasks": { "type": "boolean" }
+      },
+      "required": ["sellsProducts", "sellsServices", "usesCatalog", "usesQuotes", "usesTasks"],
+      "additionalProperties": false
+    },
+    "v1": {
+      "type": "object",
+      "description": "Forma anterior a la Fase 1 (sin `version`), tal como la escribía el onboarding y como sigue existiendo en las empresas creadas antes (Tehus incluida). Se lee con parseCompanySettings: banderas planas + categories.",
       "properties": {
         "sellsProducts": { "type": "boolean" },
         "sellsServices": { "type": "boolean" },
         "usesCatalog": { "type": "boolean" },
         "usesQuotes": { "type": "boolean" },
         "usesTasks": { "type": "boolean" },
-        "categories": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Selección del paso comercial del onboarding (sugerencias fijas de muebles + texto libre)."
+        "categories": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    "publicView": {
+      "type": "object",
+      "description": "Respuesta de GET /companies/me/settings para cualquier versión guardada.",
+      "properties": {
+        "version": { "type": "integer", "enum": [0, 1, 2] },
+        "commercial": { "$ref": "#/$defs/commercial" },
+        "catalog": { "$ref": "#/properties/catalog" },
+        "vertical": { "oneOf": [{ "$ref": "#/properties/vertical" }, { "type": "null" }] },
+        "pipelineDefaults": { "oneOf": [{ "$ref": "#/properties/pipelineDefaults" }, { "type": "null" }] },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "categories": {
+              "type": "object",
+              "properties": { "maxLength": { "const": 60 }, "maxCount": { "const": 30 } }
+            }
+          }
         }
       },
-      "required": ["sellsProducts", "sellsServices", "usesCatalog", "usesQuotes", "usesTasks", "categories"],
-      "additionalProperties": false
-    },
-    "v1": {
-      "$ref": "#/$defs/commercialV1",
-      "description": "Alias: un Company.settings sin 'version' es exactamente commercialV1 (o null)."
+      "required": ["version", "commercial", "catalog", "vertical", "pipelineDefaults", "limits"]
     }
   },
-  "x-phase0": {
-    "status": "DRAFT",
-    "observedAt": "2026-09-02",
-    "sourceCommit": "d42102103a8659969bc886870ce1c7c1ae28d24f",
-    "migrationRule": "Aditiva y compatible: v1 sigue siendo válida; la conversión a v2 se hace en lectura o por script idempotente, nunca por migración destructiva.",
-    "pending": [
-      "Decidir si 'catalog.categories' se inicializa desde commercial.categories o desde la plantilla de vertical.",
-      "Definir dónde se persisten las plantillas de vertical (tabla vs. archivo versionado)."
+  "x-phase1": {
+    "status": "IMPLEMENTED",
+    "implementedAt": "2026-09-03",
+    "migrationRule": "Aditiva y compatible: v1 sigue siendo válida y se lee sin modificar; la conversión a v2 ocurre únicamente al editar los settings desde la empresa (PATCH /companies/me/settings), conservando banderas y claves desconocidas. Ninguna migración Prisma: Company.settings sigue siendo Json.",
+    "consumers": [
+      "apps/frontend/src/app/dashboard/products/page.tsx (filtro)",
+      "apps/frontend/src/components/products/ProductModal.tsx (selector con texto libre)",
+      "apps/frontend/src/components/leads/AddProductToLeadModal.tsx (filtro)",
+      "apps/frontend/src/components/settings/CompanyCategoriesEditor.tsx (edición)"
     ]
   }
 }

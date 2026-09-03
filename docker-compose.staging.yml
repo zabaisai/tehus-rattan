@@ -116,7 +116,11 @@ services:
       context: ./apps/frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        # `:-` (vacío por defecto): así `docker compose` invocado sin
+        # `--env-file` (health check, backup) no avisa de variable no definida.
+        # No es una puerta a construir mal: `next build` en producción FALLA
+        # de forma explícita si la URL está vacía (apps/frontend/src/lib/build-guard.ts).
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         # Public Meta Embedded Signup identifiers, inlined into the client
         # bundle at build time (never the app secret). Empty => the "Conectar
         # con Meta" button is present but the flow reports "no disponible".

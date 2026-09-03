@@ -47,7 +47,7 @@ export function DocumentHeader({ title, fields, company, readOnly }: DocumentHea
           {company.legalName && company.legalName !== companyName && (
             <p className="text-[10px] text-neutral-500">{company.legalName}</p>
           )}
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#A57014]">
+          <p className="text-xs font-semibold uppercase tracking-wide text-brand-primary">
             {title}
           </p>
         </div>

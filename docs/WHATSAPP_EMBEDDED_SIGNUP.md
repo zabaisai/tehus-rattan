@@ -1,6 +1,6 @@
 # WhatsApp Embedded Signup (Conectar con Meta)
 
-Official Meta Embedded Signup onboarding for the Tehus Rattan CRM, replacing
+Official Meta Embedded Signup onboarding for the TAKTO CRM, replacing
 manual Phone Number ID / Access Token / WABA ID entry as the primary way to
 connect WhatsApp Business. Companion to [WHATSAPP_MULTI_TENANT.md](./WHATSAPP_MULTI_TENANT.md)
 and [WEBHOOK_SECURITY.md](./WHATSAPP_REAL_TEST_CHECKLIST.md).

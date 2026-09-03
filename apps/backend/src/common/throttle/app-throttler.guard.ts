@@ -1,7 +1,11 @@
 import { createHash } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { DEVICE_ID_COOKIE } from '../../modules/sessions/sessions.constants';
+import {
+  DEVICE_ID_COOKIE,
+  LEGACY_DEVICE_ID_COOKIE,
+  readCookieWithLegacy,
+} from '../../modules/sessions/sessions.constants';
 
 // Global rate-limit guard. Identical to the stock ThrottlerGuard for every
 // route EXCEPT the browser-only POST /auth/refresh, where it buckets by the
@@ -10,7 +14,7 @@ import { DEVICE_ID_COOKIE } from '../../modules/sessions/sessions.constants';
 // Why: refresh is called by every authenticated tab. With a single per-IP
 // bucket, a whole office behind one NAT/public IP shares one refresh budget, so
 // a handful of colleagues reloading at once can rate-limit each other out and be
-// logged of. Bucketing refresh by the httpOnly `tehus_device_id` cookie gives
+// logged of. Bucketing refresh by the httpOnly `takto_device_id` cookie gives
 // each real browser its own budget, so colleagues never exhaust each other's.
 //
 // Abuse safety:
@@ -31,7 +35,13 @@ export class AppThrottlerGuard extends ThrottlerGuard {
   protected async getTracker(req: Record<string, any>): Promise<string> {
     const path: string = req.originalUrl ?? req.url ?? '';
     if (path.includes('/auth/refresh')) {
-      const sentDeviceId = req.cookies?.[DEVICE_ID_COOKIE];
+      // Canonical `takto_device_id`, falling back to the legacy `tehus_*`
+      // name during the transition so a returning device keeps its bucket.
+      const { value: sentDeviceId } = readCookieWithLegacy(
+        req.cookies as Record<string, unknown> | undefined,
+        DEVICE_ID_COOKIE,
+        LEGACY_DEVICE_ID_COOKIE,
+      );
       if (typeof sentDeviceId === 'string' && sentDeviceId.length > 0) {
         const fingerprint = createHash('sha256')
           .update(sentDeviceId)

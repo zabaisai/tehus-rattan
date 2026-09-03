@@ -28,6 +28,8 @@ const SIN_SESION: Record<string, string> = {
     'Es donde se obtiene la sesión: exigirla aquí impediría iniciarla.',
   'onboarding.controller.ts':
     'El registro ocurre antes de que exista el usuario; se protege con el código de invitación.',
+  'onboarding-templates.controller.ts':
+    'Solo lectura de las plantillas de onboarding, versionadas en código y sin datos de ninguna empresa; el alta ocurre antes de que exista el usuario y va limitada por IP.',
   'password-recovery.controller.ts':
     'Quien ha perdido la contraseña no puede autenticarse. Se protege con origen, límite de intentos y token de un solo uso.',
 };

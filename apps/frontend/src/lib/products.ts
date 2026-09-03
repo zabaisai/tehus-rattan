@@ -58,17 +58,6 @@ export function validateProductImportFile(
   return null;
 }
 
-export const PRODUCT_CATEGORIES = [
-  "Salas",
-  "Comedores",
-  "Sillas",
-  "Lámparas",
-  "Accesorios",
-  "Columpios",
-  "Asoleadoras",
-  "Zonas húmedas",
-];
-
 export async function getProducts(filters?: {
   category?: string;
   search?: string;

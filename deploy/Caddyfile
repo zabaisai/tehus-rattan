@@ -9,14 +9,27 @@
 #     the Server header and enforcing a request-body ceiling.
 #   - The apps own their own CSP and the rest of the security headers
 #     (Next.js for the frontend, Helmet for the API), so those are NOT set here.
+#
+# DOMINIOS (Fase 1 — TAKTO es la plataforma; ver docs/phase-1/DOMAIN-MIGRATION.md)
+#   Canónicos de staging:  crm-staging.takto.online / api.crm-staging.takto.online
+#   Antiguos (temporal):   crm-staging.tehusrattan.com / api.crm-staging.tehusrattan.com
+#     · La API antigua se sirve como ALIAS del mismo backend (mismo bloque):
+#       sin redirecciones, para no romper preflights, callbacks ni clientes
+#       que todavía apunten ahí.
+#     · El frontend antiguo REDIRIGE al nuevo (302: temporal y reversible;
+#       pasar a `permanent` solo tras verificar el login en el dominio nuevo
+#       y decidir el retiro del antiguo).
+#   Producción (crm.takto.online / api.crm.takto.online) NO va aquí: ver
+#   deploy/Caddyfile.production.example. Nunca apuntar producción a staging.
 {
 	# CHANGE this to a monitored address before the first deploy so Let's
-	# Encrypt can send certificate/account expiry notices.
+	# Encrypt can send certificate/account expiry notices. Pendiente: buzón
+	# monitorizado bajo takto.online (decisión del propietario).
 	email admin@tehusrattan.com
 }
 
 # ---- Frontend (Next.js) ----------------------------------------------------
-crm-staging.tehusrattan.com {
+crm-staging.takto.online {
 	encode zstd gzip
 
 	# HSTS is set here (HTTPS edge) and nowhere else. No `preload` on purpose —
@@ -32,8 +45,18 @@ crm-staging.tehusrattan.com {
 	reverse_proxy frontend:3000
 }
 
+# Frontend antiguo → nuevo, conservando ruta y query. Temporal (302) a
+# propósito: reversible sin esperar a que caduque una caché de 301.
+crm-staging.tehusrattan.com {
+	header -Server
+	redir https://crm-staging.takto.online{uri} temporary
+}
+
 # ---- API (NestJS) ----------------------------------------------------------
-api.crm-staging.tehusrattan.com {
+# Un solo bloque para el dominio canónico y el alias antiguo: mismo backend,
+# mismos certificados, mismas cabeceras. CORS/CSRF los decide la aplicación
+# por Origin (FRONTEND_URL + CSRF_ALLOWED_ORIGINS), no Caddy.
+api.crm-staging.takto.online, api.crm-staging.tehusrattan.com {
 	encode zstd gzip
 
 	header Strict-Transport-Security "max-age=31536000; includeSubDomains"

@@ -1,4 +1,4 @@
-# Despliegue en VPS — Tehus Rattan CRM (Staging)
+# Despliegue en VPS — TAKTO CRM (Staging)
 
 Este documento cubre el despliegue del stack en un VPS Ubuntu para el
 entorno **STAGING**. Producción definitiva requiere pasos adicionales — ver
@@ -9,8 +9,8 @@ el checklist al final de este documento.
 ```
 Internet
    │
-   ├── crm-staging.tehusrattan.com      (443/80)
-   └── api.crm-staging.tehusrattan.com  (443/80)
+   ├── crm-staging.takto.online      (443/80)
+   └── api.crm-staging.takto.online  (443/80)
    │
    ▼
 ┌─────────────────────────────────────────────────────────┐
@@ -54,23 +54,23 @@ Internet
 
 | Servicio | Dominio |
 |---|---|
-| Frontend | `https://crm-staging.tehusrattan.com` |
-| Backend  | `https://api.crm-staging.tehusrattan.com/api` |
+| Frontend | `https://crm-staging.takto.online` |
+| Backend  | `https://api.crm-staging.takto.online/api` |
 
 ## Configuración DNS
 
 Crear dos registros **A**:
 
 ```
-crm-staging.tehusrattan.com       A    <IP_DEL_VPS>
-api.crm-staging.tehusrattan.com   A    <IP_DEL_VPS>
+crm-staging.takto.online       A    <IP_DEL_VPS>
+api.crm-staging.takto.online   A    <IP_DEL_VPS>
 ```
 
 Verificar propagación:
 
 ```bash
-dig +short crm-staging.tehusrattan.com
-dig +short api.crm-staging.tehusrattan.com
+dig +short crm-staging.takto.online
+dig +short api.crm-staging.takto.online
 ```
 
 Ambos deben devolver la IP del VPS antes de que Caddy pueda emitir
@@ -144,8 +144,8 @@ mismos pasos con validaciones adicionales:
 Verificar:
 
 ```bash
-curl -I https://api.crm-staging.tehusrattan.com/api/health
-curl -I https://crm-staging.tehusrattan.com/login
+curl -I https://api.crm-staging.takto.online/api/health
+curl -I https://crm-staging.takto.online/login
 ```
 
 Ambos deben responder `200` con un certificado válido.

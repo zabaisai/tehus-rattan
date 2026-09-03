@@ -1,6 +1,6 @@
 # Deployment runbook — staging
 
-Operational runbook for the private staging deploy of the Tehus Rattan CRM.
+Operational runbook for the private staging deploy of the TAKTO CRM.
 Companion to [VPS_DEPLOYMENT.md](./VPS_DEPLOYMENT.md) (host/DNS/first-time setup),
 [SECURITY_HEADERS.md](./SECURITY_HEADERS.md), and
 [AUTH_SESSION_SECURITY.md](./AUTH_SESSION_SECURITY.md).
@@ -132,8 +132,8 @@ invalid login → generic 401, unsigned webhook rejected, protected endpoint →
 without a JWT, and the release/version. Parametric via env:
 
 ```
-API_URL=https://api.crm-staging.tehusrattan.com/api \
-FRONTEND_URL=https://crm-staging.tehusrattan.com \
+API_URL=https://api.crm-staging.takto.online/api \
+FRONTEND_URL=https://crm-staging.takto.online \
 EXPECTED_RELEASE=$(git rev-parse HEAD) \
 ./deploy/scripts/smoke-test.sh
 ```

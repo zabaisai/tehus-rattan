@@ -1,22 +1,31 @@
 import { Card } from "@/components/ui/Card";
-import { CommercialState } from "./CommercialStep";
-import { PipelineState } from "./PipelineStep";
-
-/** Colores por defecto de la EMPRESA, no de TAKTO. Ver `BrandingStep`. */
-const COLOR_EMPRESA_POR_DEFECTO = "#A57014";
-const ACENTO_EMPRESA_POR_DEFECTO = "#FDDC7F";
+import { displayColor, PLATFORM_BRAND } from "@/lib/brand";
+import {
+  BUSINESS_MODEL_LABELS,
+  CORE_MODULE_LABELS,
+  OPTIONAL_MODULE_LABELS,
+  STAGE_TYPE_LABELS,
+  type ModulesTemplate,
+} from "@/lib/onboarding-templates";
+import type { PipelineState } from "./PipelineStep";
+import type { IndustrySelection } from "./IndustryStep";
 
 interface ConfirmationStepProps {
   companyName: string;
-  businessType: string;
+  businessTypeLabel: string;
   city: string;
   country: string;
+  industryName: string;
+  businessTypeName: string;
+  selection: IndustrySelection;
+  coreModules: string[];
+  modules: ModulesTemplate;
+  categories: string[];
+  pipeline: PipelineState;
   hasLogo: boolean;
   hasSecondaryLogo: boolean;
   primaryColor: string;
   accentColor: string;
-  commercial: CommercialState;
-  pipeline: PipelineState;
   adminName: string;
   adminEmail: string;
   agentsCount: number;
@@ -25,8 +34,10 @@ interface ConfirmationStepProps {
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-start justify-between gap-4 py-1.5 text-sm">
-      <span className="text-content-secondary">{label}</span>
-      <span className="text-right font-medium text-content-primary">{value}</span>
+      <span className="shrink-0 text-content-secondary">{label}</span>
+      <span className="min-w-0 break-words text-right font-medium text-content-primary">
+        {value}
+      </span>
     </div>
   );
 }
@@ -46,26 +57,33 @@ function SummaryCard({ title, children }: { title: string; children: React.React
 
 export function ConfirmationStep({
   companyName,
-  businessType,
+  businessTypeLabel,
   city,
   country,
+  industryName,
+  businessTypeName,
+  selection,
+  coreModules,
+  modules,
+  categories,
+  pipeline,
   hasLogo,
   hasSecondaryLogo,
   primaryColor,
   accentColor,
-  commercial,
-  pipeline,
   adminName,
   adminEmail,
   agentsCount,
 }: ConfirmationStepProps) {
-  const activeModules = [
-    commercial.sellsProducts && "Venta de productos",
-    commercial.sellsServices && "Venta de servicios",
-    commercial.usesCatalog && "Catálogo",
-    commercial.usesQuotes && "Cotizaciones",
-    commercial.usesTasks && "Tareas/seguimientos",
-  ].filter(Boolean) as string[];
+  const optionalOn = (Object.keys(OPTIONAL_MODULE_LABELS) as (keyof ModulesTemplate)[])
+    .filter((k) => modules[k])
+    .map((k) => OPTIONAL_MODULE_LABELS[k]);
+  const stagesText = pipeline.stages
+    .map((s) =>
+      s.type === "OPEN" ? s.name : `${s.name} (${STAGE_TYPE_LABELS[s.type].toLowerCase()})`,
+    )
+    .join(" → ");
+  const brandingDefined = Boolean(primaryColor || accentColor);
 
   return (
     <div>
@@ -77,50 +95,65 @@ export function ConfirmationStep({
       <div className="mt-6 space-y-3">
         <SummaryCard title="Empresa">
           <SummaryRow label="Nombre" value={companyName || "—"} />
-          <SummaryRow label="Tipo de negocio" value={businessType || "—"} />
+          <SummaryRow label="Tipo de negocio" value={businessTypeLabel || businessTypeName || "—"} />
           <SummaryRow label="Ubicación" value={[city, country].filter(Boolean).join(", ") || "—"} />
+        </SummaryCard>
+
+        <SummaryCard title="Actividad">
+          <SummaryRow label="Industria" value={industryName || "—"} />
+          <SummaryRow label="Plantilla" value={businessTypeName || "—"} />
+          <SummaryRow label="Modelo comercial" value={BUSINESS_MODEL_LABELS[selection.businessModel]} />
+        </SummaryCard>
+
+        <SummaryCard title="Módulos">
+          <SummaryRow
+            label="Incluidos"
+            value={coreModules.map((k) => CORE_MODULE_LABELS[k] ?? k).join(", ")}
+          />
+          <SummaryRow
+            label="Opcionales"
+            value={optionalOn.length > 0 ? optionalOn.join(", ") : "Ninguno"}
+          />
+          {modules.catalog && (
+            <SummaryRow
+              label="Categorías"
+              value={categories.length > 0 ? categories.join(", ") : "Sin categorías (podrás crearlas después)"}
+            />
+          )}
+        </SummaryCard>
+
+        <SummaryCard title="Pipeline">
+          <SummaryRow label="Nombre" value={pipeline.name || "—"} />
+          <SummaryRow label="Etapas" value={stagesText || "—"} />
         </SummaryCard>
 
         <SummaryCard title="Branding">
           <SummaryRow label="Logo principal" value={hasLogo ? "Incluido" : "No incluido"} />
           <SummaryRow label="Logo secundario" value={hasSecondaryLogo ? "Incluido" : "No incluido"} />
-          {/* Muestras de los colores DE LA EMPRESA. El nombre va en texto y no
-              solo en el color: dos discos sin etiqueta no dicen nada a quien
-              usa lector de pantalla ni a quien no distingue esos dos tonos. */}
-          <div className="mt-2 flex items-center gap-4">
-            <span className="flex items-center gap-2 text-xs text-content-secondary">
-              <span
-                aria-hidden="true"
-                className="h-5 w-5 rounded-full border border-line-default"
-                style={{ backgroundColor: primaryColor || COLOR_EMPRESA_POR_DEFECTO }}
-              />
-              Principal
-            </span>
-            <span className="flex items-center gap-2 text-xs text-content-secondary">
-              <span
-                aria-hidden="true"
-                className="h-5 w-5 rounded-full border border-line-default"
-                style={{ backgroundColor: accentColor || ACENTO_EMPRESA_POR_DEFECTO }}
-              />
-              Acento
-            </span>
-          </div>
-        </SummaryCard>
-
-        <SummaryCard title="Configuración comercial">
           <SummaryRow
-            label="Módulos activos"
-            value={activeModules.length > 0 ? activeModules.join(", ") : "Ninguno"}
+            label="Colores"
+            value={brandingDefined ? "Personalizados" : "Apariencia neutral TAKTO (se puede cambiar después)"}
           />
-          <SummaryRow
-            label="Categorías"
-            value={commercial.categories.length > 0 ? commercial.categories.join(", ") : "—"}
-          />
-        </SummaryCard>
-
-        <SummaryCard title="Pipeline">
-          <SummaryRow label="Nombre" value={pipeline.name || "—"} />
-          <SummaryRow label="Etapas" value={pipeline.stages.filter(Boolean).join(" → ") || "—"} />
+          {brandingDefined && (
+            <div className="mt-2 flex items-center gap-4">
+              <span className="flex items-center gap-2 text-xs text-content-secondary">
+                <span
+                  aria-hidden="true"
+                  className="h-5 w-5 rounded-full border border-line-default"
+                  style={{ backgroundColor: displayColor(primaryColor, PLATFORM_BRAND.primaryColor) }}
+                />
+                Principal
+              </span>
+              <span className="flex items-center gap-2 text-xs text-content-secondary">
+                <span
+                  aria-hidden="true"
+                  className="h-5 w-5 rounded-full border border-line-default"
+                  style={{ backgroundColor: displayColor(accentColor, PLATFORM_BRAND.accentColor) }}
+                />
+                Acento
+              </span>
+            </div>
+          )}
         </SummaryCard>
 
         <SummaryCard title="Administrador">

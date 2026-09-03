@@ -6,7 +6,7 @@ import { AuthController } from '../src/modules/auth/auth.controller';
 import { AuthService } from '../src/modules/auth/auth.service';
 import { CookieOriginGuard } from '../src/common/guards/cookie-origin.guard';
 
-const ALLOWED_ORIGIN = 'https://crm-staging.tehusrattan.com';
+const ALLOWED_ORIGIN = 'https://crm-staging.takto.online';
 
 // AuthService is fully mocked — this only proves the CookieOriginGuard is wired
 // on the cookie-based auth POSTs and enforces the Origin policy.

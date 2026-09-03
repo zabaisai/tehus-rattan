@@ -3,7 +3,7 @@
 ## Qué es SUPER_ADMIN
 
 `SUPER_ADMIN` es un rol de plataforma, distinto de un `ADMIN` de empresa. Un
-`SUPER_ADMIN` **global** administra Tehus Rattan como producto (crear
+`SUPER_ADMIN` **global** administra TAKTO como producto (crear
 empresas, listarlas, suspenderlas, marcarlas como eliminadas), no pertenece
 a ninguna empresa cliente y nunca queda sujeto al filtrado por
 `companyId` que aplica al resto del sistema.

@@ -1,5 +1,9 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
+import {
+  hashInvitationCode,
+  normalizeInvitationCode,
+} from '../invitation-codes/invitation-code.util';
 import { CreateOnboardingCompanyDto } from './dto/create-onboarding-company.dto';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
@@ -252,20 +256,366 @@ describe('OnboardingService', () => {
       FAKE_CONTEXT,
     );
 
+    // Fase 1: las empresas nuevas se guardan en la forma v2 del contrato
+    // (docs/contracts/company-settings.v2.schema.json). Las existentes con
+    // v1 no se tocan (ver company-settings.spec.ts).
     expect(prisma.company.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           settings: {
-            sellsProducts: true,
-            sellsServices: false,
-            usesCatalog: true,
-            usesQuotes: false,
-            usesTasks: true,
-            categories: ['Salas', 'Comedores'],
+            version: 2,
+            commercial: {
+              sellsProducts: true,
+              sellsServices: false,
+              usesCatalog: true,
+              usesQuotes: false,
+              usesTasks: true,
+            },
+            catalog: {
+              categories: ['Salas', 'Comedores'],
+              allowFreeText: true,
+            },
+            pipelineDefaults: { templateKey: 'custom', stagesTyped: false },
           },
         }),
       }),
     );
+  });
+
+  describe('plantillas por industria (Fase 1)', () => {
+    const typedStages = [
+      { name: 'Nuevo lead', type: 'OPEN' as const },
+      { name: 'Contactado', type: 'OPEN' as const },
+      { name: 'Cerrado ganado', type: 'WON' as const },
+      { name: 'Cerrado perdido', type: 'LOST' as const },
+    ];
+
+    it('empresa de muebles: guarda vertical, categorías de la plantilla y etapas tipadas con una sola inicial', async () => {
+      const dto = buildDto({
+        company: { name: 'Muebles QA' },
+        commercial: {
+          sellsProducts: true,
+          sellsServices: false,
+          usesCatalog: true,
+          usesQuotes: true,
+          usesTasks: true,
+          categories: ['Salas', ' salas ', 'Comedores', 'Dormitorios'],
+          industry: 'furniture_decor',
+          businessType: 'showroom',
+        },
+        pipeline: { name: 'Ventas', typedStages, templateKey: 'showroom' },
+      });
+
+      const result = await service.createCompany(
+        dto,
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+
+      expect(prisma.company.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            businessType: 'Tienda / showroom',
+            settings: expect.objectContaining({
+              version: 2,
+              catalog: {
+                categories: ['Salas', 'Comedores', 'Dormitorios'],
+                allowFreeText: true,
+              },
+              vertical: {
+                industry: 'furniture_decor',
+                businessType: 'showroom',
+                businessModel: 'products',
+                templateVersion: 2,
+              },
+              pipelineDefaults: { templateKey: 'showroom', stagesTyped: true },
+            }),
+          }),
+        }),
+      );
+      const stageCalls = prisma.pipelineStage.create.mock.calls.map(
+        (c: any) => c[0].data,
+      );
+      expect(stageCalls).toEqual([
+        expect.objectContaining({
+          name: 'Nuevo lead',
+          order: 0,
+          type: 'OPEN',
+          isInitial: true,
+        }),
+        expect.objectContaining({
+          name: 'Contactado',
+          order: 1,
+          type: 'OPEN',
+          isInitial: false,
+        }),
+        expect.objectContaining({
+          name: 'Cerrado ganado',
+          order: 2,
+          type: 'WON',
+          isInitial: false,
+        }),
+        expect.objectContaining({
+          name: 'Cerrado perdido',
+          order: 3,
+          type: 'LOST',
+          isInitial: false,
+        }),
+      ]);
+      expect(result.stages.map((s) => [s.type, s.isInitial])).toEqual([
+        ['OPEN', true],
+        ['OPEN', false],
+        ['WON', false],
+        ['LOST', false],
+      ]);
+    });
+
+    it('empresa genérica de servicios sin catálogo: no guarda categorías aunque lleguen', async () => {
+      const dto = buildDto({
+        commercial: {
+          sellsProducts: false,
+          sellsServices: true,
+          usesCatalog: false,
+          usesQuotes: true,
+          usesTasks: true,
+          categories: ['Salas'],
+          industry: 'generic',
+          businessType: 'services',
+          businessModel: 'services',
+        },
+        pipeline: { name: 'Ventas', typedStages },
+      });
+
+      await service.createCompany(
+        dto,
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+
+      const data = prisma.company.create.mock.calls[0][0].data;
+      expect(data.settings.catalog.categories).toEqual([]);
+      expect(data.settings.vertical.businessModel).toBe('services');
+      expect(JSON.stringify(data.settings)).not.toMatch(
+        /salas|comedor|mueble/i,
+      );
+    });
+
+    it('veterinaria / grooming: flujo comercial y sin categorías de muebles', async () => {
+      const dto = buildDto({
+        commercial: {
+          sellsProducts: false,
+          sellsServices: true,
+          usesCatalog: true,
+          usesQuotes: false,
+          usesTasks: true,
+          categories: ['Grooming', 'Otros servicios'],
+          industry: 'veterinary_pet',
+          businessType: 'grooming',
+        },
+        pipeline: {
+          name: 'Citas',
+          typedStages: [
+            { name: 'Nuevo contacto', type: 'OPEN' },
+            { name: 'Cita agendada', type: 'OPEN' },
+            { name: 'Cerrado ganado', type: 'WON' },
+            { name: 'Cerrado perdido', type: 'LOST' },
+          ],
+        },
+      });
+
+      await service.createCompany(
+        dto,
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+
+      const data = prisma.company.create.mock.calls[0][0].data;
+      expect(data.settings.vertical.industry).toBe('veterinary_pet');
+      expect(data.settings.catalog.categories).toEqual([
+        'Grooming',
+        'Otros servicios',
+      ]);
+      expect(JSON.stringify(data.settings)).not.toMatch(
+        /salas|comedor|mueble|historia cl/i,
+      );
+    });
+
+    it('configuración manual («Otro»): guarda la descripción recortada, acepta cualquier etapa tipada y categorías propias', async () => {
+      const dto = buildDto({
+        company: { name: 'Manual QA', businessType: '  Carpintería  fina  ' },
+        commercial: {
+          sellsProducts: true,
+          sellsServices: true,
+          usesCatalog: true,
+          usesQuotes: false,
+          usesTasks: false,
+          categories: ['Lo mío', 'Lo otro'],
+          industry: 'automotive',
+          businessType: 'other',
+          businessModel: 'mixed',
+        },
+        pipeline: {
+          name: 'Mi proceso',
+          typedStages: [
+            { name: 'Entra', type: 'OPEN' },
+            { name: 'Gana', type: 'WON' },
+            { name: 'Pierde', type: 'LOST' },
+          ],
+        },
+      });
+
+      await service.createCompany(
+        dto,
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+
+      const data = prisma.company.create.mock.calls[0][0].data;
+      expect(data.businessType).toBe('Carpintería fina');
+      expect(data.settings.catalog.categories).toEqual(['Lo mío', 'Lo otro']);
+      expect(data.settings.pipelineDefaults).toEqual({
+        templateKey: 'other',
+        stagesTyped: true,
+      });
+    });
+
+    it('«Otro» sin descripción se rechaza antes de tocar la base', async () => {
+      const dto = buildDto({
+        company: { name: 'Manual QA', businessType: '   ' },
+        commercial: {
+          ...buildDto().commercial,
+          industry: 'automotive',
+          businessType: 'other',
+        },
+        pipeline: { name: 'Ventas', typedStages },
+      });
+      await expect(
+        service.createCompany(dto, undefined, VALID_INVITE_CODE, FAKE_CONTEXT),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.company.create).not.toHaveBeenCalled();
+      expect(prisma.invitationCode.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('con una plantilla normal manda el nombre canónico aunque el cliente envíe otro texto', async () => {
+      const dto = buildDto({
+        company: { name: 'X', businessType: 'Carpintería fina' },
+        commercial: {
+          ...buildDto().commercial,
+          industry: 'furniture_decor',
+          businessType: 'showroom',
+        },
+        pipeline: { name: 'Ventas', typedStages },
+      });
+      await service.createCompany(
+        dto,
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+      expect(prisma.company.create.mock.calls[0][0].data.businessType).toBe(
+        'Tienda / showroom',
+      );
+    });
+
+    it.each([
+      ['industria desconocida', { industry: 'nope', businessType: 'services' }],
+      [
+        'tipo que no pertenece a la industria',
+        { industry: 'generic', businessType: 'grooming' },
+      ],
+      ['industria sin tipo', { industry: 'generic' }],
+      ['tipo sin industria', { businessType: 'services' }],
+    ])('rechaza %s sin escribir nada', async (_label, vertical) => {
+      const dto = buildDto({
+        commercial: { ...buildDto().commercial, ...vertical },
+        pipeline: { name: 'Ventas', typedStages },
+      });
+      await expect(
+        service.createCompany(dto, undefined, VALID_INVITE_CODE, FAKE_CONTEXT),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.company.create).not.toHaveBeenCalled();
+      expect(prisma.invitationCode.updateMany).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'dos etapas WON',
+        [...typedStages, { name: 'Otro ganado', type: 'WON' as const }],
+      ],
+      ['sin LOST', typedStages.slice(0, 3)],
+      ['sin OPEN', typedStages.slice(2)],
+      [
+        'nombres duplicados',
+        [{ name: 'nuevo lead', type: 'OPEN' as const }, ...typedStages],
+      ],
+    ])(
+      'rechaza un pipeline tipado con %s antes de tocar la base',
+      async (_label, stages) => {
+        const dto = buildDto({
+          pipeline: { name: 'Ventas', typedStages: stages },
+        });
+        await expect(
+          service.createCompany(
+            dto,
+            undefined,
+            VALID_INVITE_CODE,
+            FAKE_CONTEXT,
+          ),
+        ).rejects.toThrow(BadRequestException);
+        expect(prisma.company.create).not.toHaveBeenCalled();
+        expect(prisma.invitationCode.updateMany).not.toHaveBeenCalled();
+      },
+    );
+
+    it('la forma anterior (solo nombres) sigue funcionando: todas OPEN y la primera inicial', async () => {
+      await service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+      const stageCalls = prisma.pipelineStage.create.mock.calls.map(
+        (c: any) => c[0].data,
+      );
+      expect(stageCalls.map((s: any) => [s.type, s.isInitial])).toEqual([
+        ['OPEN', true],
+        ['OPEN', false],
+        ['OPEN', false],
+      ]);
+    });
+
+    it('un código TAKTO nuevo y un código TEHUS legacy se validan igual: por hash y estado', async () => {
+      const takto = 'TAKTO-1111-2222-3333-4444';
+      await service.createCompany(buildDto(), undefined, takto, FAKE_CONTEXT);
+      expect(prisma.invitationCode.findUnique).toHaveBeenCalledWith({
+        where: { codeHash: hashInvitationCode(normalizeInvitationCode(takto)) },
+      });
+      expect(prisma.invitationCode.findUnique).not.toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ codePreview: expect.anything() }),
+        }),
+      );
+
+      jest.clearAllMocks();
+      await service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+      expect(prisma.invitationCode.findUnique).toHaveBeenCalledWith({
+        where: {
+          codeHash: hashInvitationCode(
+            normalizeInvitationCode(VALID_INVITE_CODE),
+          ),
+        },
+      });
+      expect(prisma.company.create).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('never allows an agent to be created with a role other than AGENT', async () => {
