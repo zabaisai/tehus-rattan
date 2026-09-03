@@ -29,7 +29,7 @@ Rama: `feature/phase-1-takto-platform-independence` (desde `origin/main`
 | 3 | Identidad TAKTO | HECHA — README, ejemplos de entorno, placeholders, docs operativas |
 | 4 | Invitaciones | HECHA — prefijo `TAKTO`, códigos `TEHUS` válidos por hash y estado |
 | 5 | Onboarding | HECHA — plantillas en código, endpoint público, settings v2, categorías conectadas al catálogo |
-| 6 | Dominios y autenticación | HECHA en código — cookies/canales con fallback legacy, Caddy y variables preparadas; **DNS pendiente** |
+| 6 | Dominios y autenticación | HECHA — cookies/canales con fallback legacy, Caddy, variables y DNS de staging verificados bajo `takto.online` |
 | 7 | Pruebas | HECHA en local — ver `STAGING-EVIDENCE.md` (conteos, QA visual 320–1440 px, auditoría final); e2e de backend en CI |
 | 8 | PR | HECHA — PR #18 fusionado en `main` (merge `5cb991f`, 2026-09-03 21:17 UTC) con CI verde en el HEAD `d662bd4` |
 | 9 | Staging | HECHA — DNS creado por el propietario y verificado; `.env.staging` actualizado con copia `600`; `deploy.sh` sobre `5cb991f`; certificados emitidos para los dos dominios nuevos; health 12/12, smoke 22/22 (ver `STAGING-EVIDENCE.md`) |
