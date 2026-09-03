@@ -1,0 +1,29 @@
+# EJEMPLO para producción (crm.takto.online / api.crm.takto.online).
+# NO se usa en staging y NO se despliega en esta fase: producción tendrá su
+# propio VPS o stack, sus propios DNS, certificados y secretos. Nunca apuntar
+# estos dominios al servidor de staging.
+{
+	# Buzón monitorizado del propietario para avisos de Let's Encrypt.
+	email admin@takto.online
+}
+
+crm.takto.online {
+	encode zstd gzip
+	# En producción sí puede valorarse `preload` tras un periodo estable.
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+	request_body {
+		max_size 2MB
+	}
+	reverse_proxy frontend:3000
+}
+
+api.crm.takto.online {
+	encode zstd gzip
+	header Strict-Transport-Security "max-age=31536000; includeSubDomains"
+	header -Server
+	request_body {
+		max_size 55MB
+	}
+	reverse_proxy backend:3001
+}

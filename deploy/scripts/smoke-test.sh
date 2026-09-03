@@ -12,7 +12,7 @@
 #
 # CONTRA STAGING HAY QUE PASAR EL DOMINIO PUBLICO, no localhost:
 #
-#   BASE_URL=https://crm-staging.tehusrattan.com ./smoke-test.sh
+#   BASE_URL=https://crm-staging.takto.online ./smoke-test.sh
 #
 # Los puertos 3000/3001 NO estan publicados en el VPS: el unico punto de
 # entrada es Caddy en 80/443. Ejecutarlo con los valores por defecto contra
@@ -75,7 +75,7 @@ producto, comprueba la URL:
   · Contra STAGING pasa el dominio publico. Los puertos 3000 y 3001 no estan
     publicados en el VPS; la unica entrada es Caddy.
 
-      BASE_URL=https://crm-staging.tehusrattan.com ./deploy/scripts/smoke-test.sh
+      BASE_URL=https://crm-staging.takto.online ./deploy/scripts/smoke-test.sh
 
   · En LOCAL, levanta antes el entorno y usa los puertos que expongas.
 
