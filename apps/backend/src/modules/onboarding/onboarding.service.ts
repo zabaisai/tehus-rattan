@@ -16,11 +16,28 @@ import {
   CompanyBrandingService,
   UploadedLogoFile,
 } from '../companies/company-branding.service';
-import { CreateOnboardingCompanyDto } from './dto/create-onboarding-company.dto';
+import { Prisma } from '@prisma/client';
+import {
+  CreateOnboardingCompanyDto,
+  OnboardingCommercialDto,
+  OnboardingPipelineDto,
+} from './dto/create-onboarding-company.dto';
 import {
   hashInvitationCode,
   normalizeInvitationCode,
 } from '../invitation-codes/invitation-code.util';
+import {
+  buildCompanySettingsV2,
+  normalizeCategories,
+  validateTypedStages,
+  type TypedStageInput,
+  type VerticalInfo,
+} from '../companies/company-settings';
+import {
+  findBusinessType,
+  findIndustry,
+  ONBOARDING_TEMPLATES_VERSION,
+} from './templates/onboarding-templates';
 import { SessionsService } from '../sessions/sessions.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
@@ -166,14 +183,41 @@ export class OnboardingService {
       agents.map((agent) => bcrypt.hash(agent.password, 10)),
     );
 
-    const settings = {
+    // ── Vertical y plantilla (Fase 1). Todo lo que llega del asistente son
+    // SUGERENCIAS ya editadas por el usuario: aquí se valida el resultado
+    // final contra los mismos límites e invariantes que usan las plantillas.
+    const vertical = this.resolveVertical(dto.commercial);
+    const stages = this.resolveStages(dto.pipeline);
+    const commercial = {
       sellsProducts: dto.commercial.sellsProducts,
       sellsServices: dto.commercial.sellsServices,
       usesCatalog: dto.commercial.usesCatalog,
       usesQuotes: dto.commercial.usesQuotes,
       usesTasks: dto.commercial.usesTasks,
-      categories: dto.commercial.categories,
     };
+    // Sin catálogo no hay categorías que guardar, se hayan enviado o no: el
+    // paso de categorías no aplica y no debe dejar rastro.
+    const settings = buildCompanySettingsV2({
+      commercial,
+      categories: commercial.usesCatalog
+        ? normalizeCategories(dto.commercial.categories, { strict: true })
+        : [],
+      vertical,
+      pipelineDefaults: {
+        templateKey:
+          dto.pipeline.templateKey?.trim() ||
+          vertical?.businessType ||
+          'custom',
+        stagesTyped: Boolean(dto.pipeline.typedStages),
+      },
+    });
+    // Tipo de negocio visible: lo que escribió el usuario o, si eligió una
+    // plantilla y no escribió nada, el nombre de esa plantilla.
+    const businessTypeLabel =
+      dto.company.businessType?.trim() ||
+      (vertical
+        ? findBusinessType(vertical.industry, vertical.businessType)?.name
+        : undefined);
 
     const result = await this.prisma.$transaction(async (tx) => {
       const invitation = await tx.invitationCode.findUnique({
@@ -233,7 +277,7 @@ export class OnboardingService {
         data: {
           name: companyName,
           slug,
-          businessType: dto.company.businessType?.trim() || undefined,
+          businessType: businessTypeLabel || undefined,
           city: dto.company.city?.trim() || undefined,
           country: dto.company.country?.trim() || undefined,
           phone: dto.company.phone?.trim() || undefined,
@@ -245,7 +289,7 @@ export class OnboardingService {
           primaryColor: dto.branding?.primaryColor?.trim() || undefined,
           accentColor: dto.branding?.accentColor?.trim() || undefined,
           backgroundColor: dto.branding?.backgroundColor?.trim() || undefined,
-          settings,
+          settings: settings as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -303,14 +347,30 @@ export class OnboardingService {
         },
       });
 
-      const stages: Array<{ id: string; name: string; order: number }> = [];
-      for (let i = 0; i < dto.pipeline.stages.length; i++) {
-        const stageName = dto.pipeline.stages[i].trim();
-        if (!stageName) continue;
+      // Etapas con tipo explícito y una sola etapa inicial (la primera OPEN),
+      // para que la entrada automática de leads, las métricas y las
+      // automatizaciones por cambio de etapa funcionen desde el primer día.
+      const createdStages: Array<{
+        id: string;
+        name: string;
+        order: number;
+        type: string;
+        isInitial: boolean;
+      }> = [];
+      let initialAssigned = false;
+      for (let i = 0; i < stages.length; i++) {
+        const isInitial = !initialAssigned && stages[i].type === 'OPEN';
+        if (isInitial) initialAssigned = true;
         const stage = await tx.pipelineStage.create({
-          data: { name: stageName, order: i, pipelineId: pipeline.id },
+          data: {
+            name: stages[i].name,
+            order: i,
+            type: stages[i].type,
+            isInitial,
+            pipelineId: pipeline.id,
+          },
         });
-        stages.push(stage);
+        createdStages.push({ ...stage, type: stages[i].type, isInitial });
       }
 
       await tx.invitationCode.update({
@@ -341,7 +401,7 @@ export class OnboardingService {
         admin,
         createdAgents,
         pipeline,
-        stages,
+        stages: createdStages,
         invitationId: invitation.id,
         sessionId,
         refreshToken,
@@ -414,6 +474,8 @@ export class OnboardingService {
         id: stage.id,
         name: stage.name,
         order: stage.order,
+        type: stage.type,
+        isInitial: stage.isInitial,
       })),
       token: session.token,
       user: session.user,
@@ -463,6 +525,55 @@ export class OnboardingService {
       );
       fs.rmSync(uploadsDir, { recursive: true, force: true });
     }
+  }
+
+  // Valida la vertical elegida contra las plantillas versionadas. Ausente
+  // (cliente antiguo) → sin vertical. Presente → industria y tipo deben
+  // existir; el modelo comercial es el del usuario (editable) o el de la
+  // plantilla.
+  private resolveVertical(
+    commercial: OnboardingCommercialDto,
+  ): VerticalInfo | null {
+    const { industry, businessType, businessModel } = commercial;
+    if (!industry && !businessType && !businessModel) return null;
+    if (!industry || !businessType) {
+      throw new BadRequestException(
+        'industry y businessType deben enviarse juntos',
+      );
+    }
+    if (!findIndustry(industry)) {
+      throw new BadRequestException('industry no es una industria conocida');
+    }
+    const template = findBusinessType(industry, businessType);
+    if (!template) {
+      throw new BadRequestException(
+        'businessType no pertenece a la industria elegida',
+      );
+    }
+    return {
+      industry,
+      businessType,
+      businessModel: businessModel ?? template.businessModel,
+      templateVersion: ONBOARDING_TEMPLATES_VERSION,
+    };
+  }
+
+  // Etapas finales del pipeline. Con `typedStages` se exigen las invariantes
+  // (≥1 OPEN, 1 WON, 1 LOST, sin duplicados). Con la forma anterior (solo
+  // nombres) se conserva el comportamiento previo: todas OPEN.
+  private resolveStages(pipeline: OnboardingPipelineDto): TypedStageInput[] {
+    if (pipeline.typedStages && pipeline.typedStages.length > 0) {
+      return validateTypedStages(
+        pipeline.typedStages.map((s) => ({ name: s.name, type: s.type })),
+      );
+    }
+    const names = (pipeline.stages ?? []).map((s) => s.trim()).filter(Boolean);
+    if (names.length === 0) {
+      throw new BadRequestException(
+        'El pipeline debe tener al menos una etapa',
+      );
+    }
+    return names.map((name) => ({ name, type: 'OPEN' as const }));
   }
 
   private toSafeUser(user: {

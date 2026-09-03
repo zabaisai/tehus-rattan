@@ -17,6 +17,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CompaniesService } from './companies.service';
 import { CompanyBrandingService } from './company-branding.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
+import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
 import { UploadCompanyLogoDto } from './dto/upload-company-logo.dto';
 
 const MAX_LOGO_UPLOAD_SIZE = 2 * 1024 * 1024;
@@ -38,6 +39,23 @@ export class CompaniesController {
   @Patch('me')
   updateMyCompany(@Request() req: any, @Body() body: UpdateCompanyDto) {
     return this.companiesService.update(req.user.companyId, body);
+  }
+
+  // Vista normalizada de Company.settings (v1 o v2). La leen todos los roles
+  // de la empresa: el catálogo necesita las categorías para el filtro y el
+  // selector, y un asesor también crea productos.
+  @Get('me/settings')
+  getMySettings(@Request() req: any) {
+    return this.companiesService.getSettings(req.user.companyId);
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Patch('me/settings')
+  updateMySettings(
+    @Request() req: any,
+    @Body() body: UpdateCompanySettingsDto,
+  ) {
+    return this.companiesService.updateSettings(req.user.companyId, body);
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
