@@ -40,7 +40,7 @@ misma hora sería redundante y podría hacer abortar al off-site (que exige
 exactamente un dump nuevo por ciclo). La entrada de cron antigua se retiró en
 staging el 2026-09-02, con copia del crontab en `.secrets` para rollback.
 
-## Estado en staging (2026-09-02)
+## Estado en staging (2026-09-03)
 
 | Elemento | Valor |
 |----------|-------|
@@ -50,6 +50,7 @@ staging el 2026-09-02, con copia del crontab en `.secrets` para rollback.
 | Primer backup manual (`tehus-backup.service`) | exitoso: DB + uploads + sidecars, `restic check` sin errores |
 | Restauración aislada (`tehus-backup-drill.service`) | exitosa: `check --read-data`, restauración en `tehus_restore_drill`, base eliminada al final |
 | Timers | `tehus-backup.timer` y `tehus-backup-drill.timer` habilitados y activos |
+| Primer ciclo automático (`tehus-backup.timer`, 2026-09-03 03:00 Bogotá) | exitoso: `Result=success`, `ExecMainStatus=0`, 52 s, snapshot cifrado `c0c2d8e4…`, checksums y `restic check` sin errores; 2 snapshots en el repositorio activo, histórico intacto con 1 snapshot |
 
 Con `drive.file` cada cliente OAuth solo ve las carpetas que él mismo creó.
 Por eso el repositorio histórico no es visible desde el cliente propio y se
@@ -385,11 +386,11 @@ los snapshots del repositorio abandonado siguen existiendo en Drive.
 
 ## Criterios auditables de cierre
 
-- [ ] Almacenamiento externo independiente, privado y con acceso de mínimo privilegio.
+- [x] Almacenamiento externo independiente, privado y con acceso de mínimo privilegio (staging, `drive.file`, 2026-09-02).
 - [ ] Contraseña Restic almacenada fuera del VPS y recuperable por dos custodios.
-- [ ] Primera copia DB + uploads verificada fuera del VPS.
+- [x] Primera copia DB + uploads verificada fuera del VPS (manual 2026-09-02; automática 2026-09-03).
 - [ ] Retención 7/4/6 visible en `restic snapshots` tras ciclos suficientes.
-- [ ] Temporizadores `systemd` habilitados desde archivos versionados.
+- [x] Temporizadores `systemd` habilitados desde archivos versionados (2026-09-02; primer disparo automático 2026-09-03).
 - [ ] Monitor diario con 24 h + 2 h de gracia y alertas probadas.
 - [ ] Restauración mensual exitosa y documentada.
 - [ ] Procedimiento repetido para producción con destino externo y secretos distintos.

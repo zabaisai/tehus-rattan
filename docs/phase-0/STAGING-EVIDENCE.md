@@ -1,6 +1,6 @@
 # Fase 0 — Evidencia de staging
 
-Evidencia sanitizada de la sesión de cierre de Fase 0. Todo lo que contenga
+Evidencia sanitizada de las sesiones de cierre de la Fase 0 (2026-09-02 y 2026-09-03). Todo lo que contenga
 identificadores internos, nombres de clientes, correos, códigos o rutas
 sensibles vive en el directorio de evidencia privada fuera de Git (ver
 [README](README.md#evidencia-privada)).
@@ -71,7 +71,7 @@ Hallazgos funcionales derivados del inventario (sin identificar empresas):
 ## Backup nuevo (mecanismo oficial local)
 
 Comando: `RETENTION_DAYS=3650 ./deploy/scripts/backup-postgres.sh` (el mismo
-script que ejecuta el cron diario de las 03:00; la retención se elevó por
+script que entonces ejecutaba el cron diario de las 03:00, retirado más tarde ese día; la retención se elevó por
 variable de entorno para no borrar ningún respaldo previo durante la sesión).
 
 | Artefacto | Resultado |
@@ -96,8 +96,10 @@ variable de entorno para no borrar ningún respaldo previo durante la sesión).
 | Timers | deshabilitados, 0 timers listados |
 | Existencia y fecha de un snapshot remoto | **no verificable** (no hay acceso) |
 
-Conclusión: hoy no existe evidencia de ninguna copia cifrada fuera del VPS.
-El respaldo diario existente es únicamente local (cron + `backup-postgres.sh`).
+Conclusión en ese momento (16:59Z, superada ese mismo día; ver las
+actualizaciones siguientes): no existía evidencia de ninguna copia cifrada
+fuera del VPS y el respaldo diario era únicamente local (cron +
+`backup-postgres.sh`).
 
 ## Restore drill aislado
 
@@ -146,7 +148,7 @@ porque el archivo no tiene bit de ejecución (ver hallazgo B-03).
 | Backup previo del deploy (`…-122828`) y backup controlado (`…-123015`, `RETENTION_DAYS=3650`) | dump, uploads y ambos sidecars `600 deploy:deploy`, mismo ciclo, `backup-verify.sh` OK, `sha256sum -c` OK en uploads, 6 entradas |
 | Artefactos anteriores al parche | 17 tarballs de uploads siguen `644 root:root` dentro del directorio `700`; expiran por retención (7 días). No se tocaron |
 
-Controles 6 (backup de uploads) y B-03 pasan a **PASS** sin hallazgo. B-01 sigue abierto.
+Controles 6 (backup de uploads) y B-03 pasan a **PASS** sin hallazgo. B-01 seguía abierto en ese momento (cerrado en las actualizaciones siguientes).
 
 ### B-01 — diagnóstico sanitizado (solo lectura)
 
@@ -156,7 +158,7 @@ Controles 6 (backup de uploads) y B-03 pasan a **PASS** sin hallazgo. B-01 sigue
 - A través del remote legacy (solo lectura, sin cambiar configuración) el repositorio Restic existe (`config`, `data/`, `index/`, `keys/`, `snapshots/`), la contraseña Restic lo descifra y contiene **1 snapshot** (2026-08-20 15:30, host y tag esperados). No hay que inicializar otro repositorio.
 - `.env.backup` sigue apuntando a `rclone:takto-drive`. Los servicios systemd nunca han corrido (journal vacío); el snapshot existente se creó manualmente.
 
-Opciones (decisión humana, pendiente): reparar el cliente OAuth en Google Cloud y reconectar `takto-drive`, o cambiar `RESTIC_REPOSITORY` al remote legacy. En ambos casos, después: `tehus-backup.service` y `tehus-backup-drill.service` bajo observación; timers sin habilitar hasta autorización separada.
+Opciones evaluadas en ese momento (resueltas en la actualización de las 19:03Z): reparar el cliente OAuth en Google Cloud y reconectar `takto-drive`, o cambiar `RESTIC_REPOSITORY` al remote legacy. En ambos casos, después: `tehus-backup.service` y `tehus-backup-drill.service` bajo observación; timers sin habilitar hasta autorización separada.
 
 ## Actualización 2026-09-02 19:03Z–19:12Z — B-01: repositorio off-site nuevo, primer backup y drill
 
@@ -178,9 +180,11 @@ lectura y se creó un repositorio nuevo en una carpeta propia.
 | Verificaciones finales | `health-check.sh` 12/12 OK, release a95da7e sin cambios, 6 contenedores healthy; repositorio nuevo con 1 snapshot; histórico vía legacy sin cambios (1 snapshot 2026-08-20, mismos objetos); `.env.backup`, `rclone.conf` y `restic-password` en `600 deploy:deploy` |
 | Timers | `tehus-backup.timer` y `tehus-backup-drill.timer` siguen `disabled`/`inactive`; próximas ejecuciones teóricas según `OnCalendar`: 2026-09-03 03:00 y 2026-10-01 04:30 (Bogotá). No se habilitaron |
 
-Control 8 (snapshot cifrado off-site) y control 9 (drill Restic) pasan a
-**PASS provisional**: falta activar los timers con autorización separada y
-observar el primer ciclo automático.
+Control 8 (snapshot cifrado off-site) y control 9 (drill Restic) pasaron en
+ese momento a PASS condicionado a activar los timers con autorización separada
+y a observar el primer ciclo automático. Ambas condiciones se cumplieron:
+timers habilitados a las 19:21Z (actualización siguiente) y primer ciclo
+automático exitoso el 2026-09-03 (ver más abajo). Hoy son PASS definitivo.
 
 ## Actualización 2026-09-02 19:21Z — timers off-site habilitados
 
@@ -194,10 +198,58 @@ observar el primer ciclo automático.
 | Próximas ejecuciones | Backup: 2026-09-03 03:00 Colombia (08:00 UTC), diario. Drill: 2026-10-01 04:41 Colombia (09:41 UTC), ventana 04:30–04:45 (09:30–09:45 UTC), mensual |
 | Comprobaciones | sin unidades `failed`, sin procesos ni locks bloqueados, `RESTIC_REPOSITORY` en la ruta v2, snapshot nuevo accesible, histórico intacto vía remote legacy (1 snapshot), `health-check.sh` 12/12 OK, release a95da7e y contenedores sin cambios, repo del VPS limpio |
 
-Con esto B-01 pasa a **PASS** y la parte operativa de la Fase 0 queda en
-**PASS**. Queda pendiente, en un PR posterior, alinear
-`deploy/env/backup.env.example` y `docs/OFFSITE_BACKUPS.md` con la ruta v2 y
-el retiro del cron, y observar el primer ciclo automático del 2026-09-03.
+Con esto B-01 pasó a **PASS** y la parte operativa de la Fase 0 quedó en
+**PASS**. La alineación de `deploy/env/backup.env.example` y
+`docs/OFFSITE_BACKUPS.md` con la ruta v2 y el retiro del cron se hizo en este
+mismo PR (#17), y el primer ciclo automático del 2026-09-03 se verificó en la
+sección siguiente.
+
+## Primer ciclo automático (2026-09-03, solo lectura)
+
+Revisión estrictamente de lectura del primer disparo de `tehus-backup.timer`:
+sin ejecutar backups, sin comandos de escritura de Restic o rclone, sin
+reinicios ni cambios de configuración. Contexto: VPS `srv1829292`, usuario
+`deploy`, `/opt/tehus-crm` en `main` a95da7e (worktree limpio),
+`/api/health/version` con `release` a95da7e… y `builtAt`
+2026-09-02T17:24:29Z, reloj sincronizado por NTP en `America/Bogota` (-05).
+No había despliegues, migraciones, backups ni drills en curso. Producción no
+fue tocada.
+
+| Control | Evidencia sanitizada | Resultado |
+|---------|----------------------|-----------|
+| Timer habilitado | `tehus-backup.timer`: `loaded`, `active`, `waiting`, `enabled`, `Persistent=yes`, `OnCalendar=*-*-* 03:00:00 America/Bogota`, `AccuracySec=1m`, sin retardo aleatorio | PASS |
+| Disparo automático 03:00 | `LastTriggerUSec` = 2026-09-03 03:00:18 -05; journal de systemd "Starting tehus-backup.service"; `TriggeredBy=tehus-backup.timer`; ningún arranque manual ese día | PASS |
+| Servicio success | `Result=success`, `ExecMainCode=exited`, `ExecMainStatus=0`, inicio 03:00:18, fin 03:01:10 (hora de Colombia), duración 52 s, `NRestarts=0` | PASS |
+| Próxima ejecución | 2026-09-04 03:00:00 -05 (calendario efectivo `America/Bogota`) | PASS |
+| Repositorio V2 correcto | `RESTIC_REPOSITORY=rclone:takto-drive:TAKTO_BACKUPS_V2/staging`; `restic cat config --no-lock` abre el repositorio (formato v2); contraseña vía `RESTIC_PASSWORD_FILE`, nunca impresa | PASS |
+| Snapshot automático nuevo | `c0c2d8e4…`, 2026-09-03 03:00:34 Colombia (08:00:34 UTC), host `tehus-crm-staging`, tag `takto-staging`, 4 rutas; objetos `snapshots/`, `index/` y `data/` creados 03:00:43–03:00:48 en `TAKTO_BACKUPS_V2/staging`. Total V2: 2 snapshots (`937a…` manual del 2026-09-02 y `c0c2d8e4…` automático) | PASS |
+| Artefactos locales | Ciclo `20260903-030028`: dump 52 177 bytes, uploads 917 642 bytes (6 entradas), dos sidecars `.sha256`; todos `600 deploy:deploy`; dump con cabecera pg_dump 16.14 y marcador de fin | PASS |
+| Checksums | `sha256sum -c` OK en dump y uploads; `gzip -t` OK; `tar -tzf` OK; `backup-verify.sh` OK | PASS |
+| Restic check | Journal de la invocación: `forget --prune` conservó 2/2 snapshots; `restic check`: "check all packs", "2 / 2 snapshots", "no errors were found" | PASS |
+| Histórico intacto | `rclone:takto-drive-legacy:TAKTO_BACKUPS/staging`: 1 snapshot `57f35a26…` del 2026-08-20, 6 objetos todos con fecha 2026-08-20, ningún objeto posterior, sin locks | PASS |
+| Salud de staging | `health-check.sh` 12/12 OK; `/api/health` ok; `/api/health/status` ok con `database`, `queue`, `worker`, `outbox`, `realtime` y `flowbot` en `up`; 6 contenedores en ejecución (5 `healthy`, caddy sin healthcheck definido); backend, worker y frontend con el mismo `StartedAt` del deploy de PR #16; release a95da7e sin cambios | PASS |
+| Sin residuos | Sin procesos restic, rclone ni pg_dump; `restic list locks` vacío en V2 e histórico; sin `*.partial` ni temporales; solo las bases `postgres` y `tehus_crm_staging`; 0 unidades `failed` | PASS |
+| Cron redundante ausente | `crontab -l` de `deploy` vacío; sin referencias a `backup-postgres` en `/etc/cron*` | PASS |
+| PR #17 y CI | Abierto sobre `docs/phase-0-closure`, HEAD `8523bf3`, `MERGEABLE`/`CLEAN`; workflows `CI` (backend y frontend) y `Backup safety` en verde | PASS |
+
+Resultado: 14/14 controles en PASS. Los controles 8 y 9 pasan a PASS
+definitivo y B-01 queda cerrado de forma definitiva.
+
+### Observaciones no bloqueantes
+
+- Docker Compose avisa de que `NEXT_PUBLIC_API_URL` no está definida en el
+  entorno del host cuando lo invocan el script de backup y `health-check.sh`.
+  No afecta a los contenedores ni al respaldo.
+- La política de retención (7 diarias, 4 semanales, 6 mensuales) todavía no ha
+  eliminado ningún snapshot porque solo existen dos; su efecto se observará de
+  forma natural después de los primeros siete ciclos diarios.
+- Los archivos vacíos `.tehus-offsite-backup.lock` y
+  `.tehus-restore-drill.lock` en `backups/` son los descriptores de `flock`
+  del diseño de los scripts; sin ningún proceso sosteniéndolos no representan
+  locks activos.
+- `backup-offsite.sh` descargó la imagen `alpine:latest` durante el ciclo
+  porque no estaba en la caché local. Es una dependencia de red no bloqueante
+  que conviene fijar en una fase posterior.
 
 ## Resultado por control
 
@@ -210,7 +262,7 @@ el retiro del cron, y observar el primer ciclo automático del 2026-09-03.
 | 5 | Backup nuevo de base de datos | PASS |
 | 6 | Backup nuevo de uploads | PASS (hallazgo B-02 corregido y desplegado, PR #16) |
 | 7 | Checksums correctos | PASS |
-| 8 | Snapshot cifrado off-site confirmado | PASS (repositorio v2, snapshot cifrado verificado, timers habilitados) |
+| 8 | Snapshot cifrado off-site confirmado | PASS (repositorio v2, snapshot cifrado verificado, timers habilitados, primer ciclo automático 2026-09-03 exitoso) |
 | 9 | Restore drill aislado exitoso | PASS (ruta local y drill Restic oficial completado) |
 | 10 | Conteos de origen y restauración coincidentes | PASS |
 | 11 | Base temporal eliminada | PASS |
@@ -220,16 +272,16 @@ el retiro del cron, y observar el primer ciclo automático del 2026-09-03.
 | 15 | Ningún secreto expuesto | PASS |
 | 16 | Producción no tocada | PASS |
 
-**Fase 0 — PASS operativo; pendiente únicamente observar el primer ciclo automático programado antes del cierre formal.** Los 16 controles
-tienen evidencia. Primer ciclo automático programado: 2026-09-03 03:00 hora de
-Colombia (08:00 UTC); su evidencia se añadirá a este documento antes del cierre
-formal. `deploy/env/backup.env.example` y `docs/OFFSITE_BACKUPS.md` ya reflejan
-la ruta V2, el ámbito `drive.file` y el retiro del cron.
+**FASE 0 CERRADA — PASS.** Fecha de cierre: 2026-09-03. Los 16 controles
+tienen evidencia en PASS y el primer ciclo automático del 2026-09-03 03:00 hora
+de Colombia (08:00 UTC) se verificó con éxito (sección anterior).
+`deploy/env/backup.env.example` y `docs/OFFSITE_BACKUPS.md` reflejan la ruta
+V2, el ámbito `drive.file` y el retiro del cron.
 
-## Bloqueadores pendientes
+## Bloqueadores
 
-| ID | Bloqueador | Acción requerida (humana, fuera del alcance de esta sesión) |
-|----|------------|-------------------------------------------------------------|
-| B-01 | PASS: remote reautorizado, repositorio v2, primer backup cifrado y drill oficial exitosos; timers habilitados y cron redundante retirado el 2026-09-02 | Seguimiento: observar el ciclo del 2026-09-03; PR posterior para `backup.env.example` y `docs/OFFSITE_BACKUPS.md` |
-| B-02 | RESUELTO (PR #16, desplegado en a95da7e): el contenedor entrega el tarball al usuario invocante (`chown` + `chmod 600`) y el script falla cerrado si el propietario no coincide | — |
-| B-03 | RESUELTO (PR #16): `restore-postgres.sh`, `backup-postgres.sh` y `backup-verify.sh` en Git como `100755`; prueba de regresión sobre todo script alcanzado desde un `ExecStart` | — |
+| ID | Estado | Acción pendiente |
+|----|--------|------------------|
+| B-01 | PASS definitivo: remote reautorizado, repositorio v2, primer backup cifrado y drill oficial exitosos, timers habilitados y cron redundante retirado el 2026-09-02; primer ciclo automático exitoso el 2026-09-03 (snapshot `c0c2d8e4…`) | — |
+| B-02 | PASS definitivo (PR #16, desplegado en a95da7e): el contenedor entrega el tarball al usuario invocante (`chown` + `chmod 600`) y el script falla cerrado si el propietario no coincide | — |
+| B-03 | PASS definitivo (PR #16): `restore-postgres.sh`, `backup-postgres.sh` y `backup-verify.sh` en Git como `100755`; prueba de regresión sobre todo script alcanzado desde un `ExecStart` | — |

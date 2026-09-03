@@ -21,7 +21,7 @@ punto de partida antes de separar TAKTO de Tehus (Fase 1).
 |-----------|-----------|
 | [TECHNICAL-INVENTORY.md](TECHNICAL-INVENTORY.md) | Stack, servicios, base de datos, respaldo, dependencias globales de un tenant |
 | [FUNCTIONAL-CONTRACT.md](FUNCTIONAL-CONTRACT.md) | Comportamiento actual observado e invariantes que la Fase 1 debe conservar |
-| [STAGING-EVIDENCE.md](STAGING-EVIDENCE.md) | Evidencia de la sesión 2026-09-02: salud, inventario, backup, restore drill, resultado por control |
+| [STAGING-EVIDENCE.md](STAGING-EVIDENCE.md) | Evidencia de las sesiones 2026-09-02 y 2026-09-03: salud, inventario, backup, restore drill, primer ciclo automático, resultado por control |
 | [STAGING-RUNBOOK.md](STAGING-RUNBOOK.md) | Procedimiento reproducible de solo lectura + backup + restore aislado |
 | [staging-inventory.sql](staging-inventory.sql) | Consulta de inventario en transacción de solo lectura, parametrizada |
 | [../contracts/company-settings.v2.schema.json](../contracts/company-settings.v2.schema.json) | Forma actual (v1) de `Company.settings` y propuesta v2 (BORRADOR, no implementado) |
@@ -29,9 +29,16 @@ punto de partida antes de separar TAKTO de Tehus (Fase 1).
 
 ## Estado
 
-**Fase 0 — PASS operativo; pendiente únicamente observar el primer ciclo automático programado antes del cierre formal.**
+**FASE 0 CERRADA — PASS.** Fecha de cierre: 2026-09-03.
 
-Última verificación: 2026-09-02. Primer ciclo automático programado: 2026-09-03 03:00 hora de Colombia (08:00 UTC).
+Última verificación: 2026-09-03. El primer ciclo automático de
+`tehus-backup.timer` se verificó en solo lectura ese día: disparo a las
+03:00:18 hora de Colombia, `Result=success`, `ExecMainStatus=0`, 52 s de
+duración, snapshot cifrado `c0c2d8e4…` (03:00:34 Colombia / 08:00:34 UTC),
+2 snapshots en el repositorio V2, histórico intacto con 1 snapshot, checksums y
+`restic check` sin errores, `health-check.sh` 12/12 OK, cron redundante
+ausente, sin locks ni residuos. Detalle en
+[STAGING-EVIDENCE.md](STAGING-EVIDENCE.md#primer-ciclo-automático-2026-09-03-solo-lectura).
 
 | Criterio | Estado |
 |----------|--------|
@@ -42,7 +49,7 @@ punto de partida antes de separar TAKTO de Tehus (Fase 1).
 | Backup nuevo de base de datos | PASS |
 | Backup nuevo de uploads | PASS (B-02 corregido, PR #16) |
 | Checksums correctos | PASS |
-| Snapshot cifrado off-site confirmado | PASS (B-01 cerrado, timers habilitados) |
+| Snapshot cifrado off-site confirmado | PASS (B-01 cerrado; timers habilitados; primer ciclo automático 2026-09-03 exitoso) |
 | Restore drill aislado exitoso | PASS (local y drill Restic oficial) |
 | Conteos de origen y restauración coincidentes | PASS |
 | Base temporal eliminada | PASS |
@@ -52,9 +59,17 @@ punto de partida antes de separar TAKTO de Tehus (Fase 1).
 | Ningún secreto expuesto | PASS |
 | Producción no tocada | PASS |
 
-B-02 y B-03 quedaron resueltos y desplegados el 2026-09-02 (PR #16, `main` a95da7e). B-01 quedó en PASS el mismo día (repositorio off-site v2, primer backup cifrado, drill oficial, timers habilitados y cron redundante retirado). Los tres están descritos en
-[STAGING-EVIDENCE.md](STAGING-EVIDENCE.md#bloqueadores-pendientes). La Fase 0
-se declara cerrada solo cuando los 16 criterios estén en PASS.
+B-02 y B-03 quedaron resueltos y desplegados el 2026-09-02 (PR #16, `main` a95da7e). B-01 quedó en PASS el mismo día (repositorio off-site v2, primer backup cifrado, drill oficial, timers habilitados y cron redundante retirado) y en PASS definitivo el 2026-09-03 con el primer ciclo automático. Los tres están descritos en
+[STAGING-EVIDENCE.md](STAGING-EVIDENCE.md#bloqueadores). Los 16 criterios
+están en PASS: la Fase 0 quedó cerrada formalmente el 2026-09-03.
+
+Observaciones no bloqueantes registradas al cierre (detalle en
+[STAGING-EVIDENCE.md](STAGING-EVIDENCE.md#observaciones-no-bloqueantes)):
+`NEXT_PUBLIC_API_URL` no definida en el entorno del host al invocar Docker
+Compose (sin efecto en contenedores ni respaldo); la retención 7/4/6 aún no ha
+eliminado snapshots porque solo existen dos (se observará tras los primeros
+siete ciclos diarios); los archivos vacíos de `flock` en `backups/` son parte
+del diseño y no representan locks activos.
 
 ## Evidencia privada
 
