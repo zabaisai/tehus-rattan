@@ -62,7 +62,7 @@ describe('OnboardingController', () => {
       expect.objectContaining({ deviceIdHash: expect.any(String) }),
     );
     expect(res.cookie).toHaveBeenCalledWith(
-      'tehus_refresh_token',
+      'takto_refresh_token',
       'plain-refresh-token',
       expect.objectContaining({ httpOnly: true, path: '/api/auth' }),
     );

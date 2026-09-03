@@ -1,5 +1,7 @@
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import {
+  LEGACY_REFRESH_TOKEN_COOKIE,
+  readCookieWithLegacy,
   REFRESH_TOKEN_COOKIE,
   SESSION_INACTIVITY_EXPIRY_MS,
 } from '../sessions.constants';
@@ -10,7 +12,7 @@ export const REFRESH_COOKIE_PATH = '/api/auth';
 
 // Shared by AuthController (login/refresh) and OnboardingController (the
 // admin auto-login after creating a company) so both mint the exact same
-// httpOnly cookie the exact same way.
+// httpOnly cookie the exact same way. Always writes the canonical TAKTO name.
 export function setRefreshTokenCookie(
   res: Response,
   refreshToken: string,
@@ -24,6 +26,29 @@ export function setRefreshTokenCookie(
   });
 }
 
+// Reads the refresh token: canonical name first, legacy `tehus_*` name as a
+// temporary fallback so sessions opened before the rename survive the
+// deploy. The value itself is never logged.
+export function readRefreshTokenCookie(req: Request): {
+  value: string | undefined;
+  fromLegacy: boolean;
+} {
+  return readCookieWithLegacy(
+    req.cookies as Record<string, unknown> | undefined,
+    REFRESH_TOKEN_COOKIE,
+    LEGACY_REFRESH_TOKEN_COOKIE,
+  );
+}
+
+// Retires the legacy cookie once the session has been rotated onto the
+// canonical one, so a browser never carries two refresh tokens at once.
+export function clearLegacyRefreshTokenCookie(res: Response): void {
+  res.clearCookie(LEGACY_REFRESH_TOKEN_COOKIE, { path: REFRESH_COOKIE_PATH });
+}
+
+// Logout clears BOTH names: whichever one the browser still holds, the
+// session must be gone client-side.
 export function clearRefreshTokenCookie(res: Response): void {
   res.clearCookie(REFRESH_TOKEN_COOKIE, { path: REFRESH_COOKIE_PATH });
+  clearLegacyRefreshTokenCookie(res);
 }

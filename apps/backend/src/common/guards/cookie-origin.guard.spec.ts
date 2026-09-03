@@ -20,17 +20,17 @@ function guardWith(
 describe('CookieOriginGuard', () => {
   it('allows a request whose Origin matches FRONTEND_URL', () => {
     const guard = guardWith({
-      FRONTEND_URL: 'https://crm-staging.tehusrattan.com',
+      FRONTEND_URL: 'https://crm-staging.takto.online',
       NODE_ENV: 'production',
     });
-    expect(guard.canActivate(ctx('https://crm-staging.tehusrattan.com'))).toBe(
+    expect(guard.canActivate(ctx('https://crm-staging.takto.online'))).toBe(
       true,
     );
   });
 
   it('rejects a request from an arbitrary/foreign Origin with 403', () => {
     const guard = guardWith({
-      FRONTEND_URL: 'https://crm-staging.tehusrattan.com',
+      FRONTEND_URL: 'https://crm-staging.takto.online',
       NODE_ENV: 'production',
     });
     expect(() => guard.canActivate(ctx('https://evil.example.com'))).toThrow(
@@ -40,7 +40,7 @@ describe('CookieOriginGuard', () => {
 
   it('rejects the literal Origin "null" (opaque/sandboxed origin) with 403', () => {
     const guard = guardWith({
-      FRONTEND_URL: 'https://crm-staging.tehusrattan.com',
+      FRONTEND_URL: 'https://crm-staging.takto.online',
       NODE_ENV: 'production',
     });
     expect(() => guard.canActivate(ctx('null'))).toThrow(ForbiddenException);

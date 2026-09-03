@@ -1,5 +1,30 @@
-export const DEVICE_ID_COOKIE = 'tehus_device_id';
-export const REFRESH_TOKEN_COOKIE = 'tehus_refresh_token';
+// Nombres canónicos (TAKTO). Los nombres `tehus_*` son los que llevaban las
+// cookies hasta la Fase 1; se siguen LEYENDO como fallback temporal para que
+// nadie pierda su sesión al desplegar, se ESCRIBEN siempre los nuevos, y en
+// logout se limpian ambos. Criterio de retiro del fallback: ver
+// docs/phase-1/IDENTITY-CONTRACT.md § Retiro del fallback.
+export const DEVICE_ID_COOKIE = 'takto_device_id';
+export const REFRESH_TOKEN_COOKIE = 'takto_refresh_token';
+export const LEGACY_DEVICE_ID_COOKIE = 'tehus_device_id';
+export const LEGACY_REFRESH_TOKEN_COOKIE = 'tehus_refresh_token';
+
+// Lee una cookie por su nombre canónico y, si falta, por el legacy. Devuelve
+// también cuál se usó para que quien escribe pueda retirar la antigua.
+export function readCookieWithLegacy(
+  cookies: Record<string, unknown> | undefined,
+  canonical: string,
+  legacy: string,
+): { value: string | undefined; fromLegacy: boolean } {
+  const current = cookies?.[canonical];
+  if (typeof current === 'string' && current.length > 0) {
+    return { value: current, fromLegacy: false };
+  }
+  const old = cookies?.[legacy];
+  if (typeof old === 'string' && old.length > 0) {
+    return { value: old, fromLegacy: true };
+  }
+  return { value: undefined, fromLegacy: false };
+}
 
 // A session/device cookie that survives long enough to keep recognizing a
 // returning browser, but isn't effectively "forever".

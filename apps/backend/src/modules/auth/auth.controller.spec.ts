@@ -60,7 +60,7 @@ describe('AuthController', () => {
         expect.objectContaining({ deviceIdHash: expect.any(String) }),
       );
       expect(res.cookie).toHaveBeenCalledWith(
-        'tehus_refresh_token',
+        'takto_refresh_token',
         'plain-refresh-token',
         expect.objectContaining({ httpOnly: true, path: '/api/auth' }),
       );
@@ -81,7 +81,7 @@ describe('AuthController', () => {
       });
       const res = buildRes();
       const req = buildReq({
-        cookies: { tehus_refresh_token: 'old-plain-refresh-token' },
+        cookies: { takto_refresh_token: 'old-plain-refresh-token' },
       });
 
       const result = await controller.refresh(req, res);
@@ -91,7 +91,7 @@ describe('AuthController', () => {
         expect.objectContaining({ deviceIdHash: expect.any(String) }),
       );
       expect(res.cookie).toHaveBeenCalledWith(
-        'tehus_refresh_token',
+        'takto_refresh_token',
         'new-plain-refresh-token',
         expect.objectContaining({ httpOnly: true }),
       );
@@ -117,14 +117,14 @@ describe('AuthController', () => {
       authService.logout.mockResolvedValue(undefined);
       const res = buildRes();
       const req = buildReq({
-        cookies: { tehus_refresh_token: 'plain-refresh-token' },
+        cookies: { takto_refresh_token: 'plain-refresh-token' },
       });
 
       await controller.logout(req, res);
 
       expect(authService.logout).toHaveBeenCalledWith('plain-refresh-token');
       expect(res.clearCookie).toHaveBeenCalledWith(
-        'tehus_refresh_token',
+        'takto_refresh_token',
         expect.objectContaining({ path: '/api/auth' }),
       );
     });
@@ -137,6 +137,110 @@ describe('AuthController', () => {
 
       expect(authService.logout).toHaveBeenCalledWith(undefined);
       expect(res.clearCookie).toHaveBeenCalled();
+    });
+  });
+
+  // Fase 1: las cookies pasan de `tehus_*` a `takto_*` con fallback temporal.
+  describe('legacy cookie fallback (tehus_* → takto_*)', () => {
+    it('refresh accepts the legacy cookie, writes the canonical one and retires the legacy one', async () => {
+      authService.refresh.mockResolvedValue({
+        token: 'new-t',
+        user: { id: 'u1', email: 'a@co.test', name: 'A' },
+        refreshToken: 'rotated-refresh-token',
+      });
+      const res = buildRes();
+      const req = buildReq({
+        cookies: { tehus_refresh_token: 'legacy-plain-refresh-token' },
+      });
+
+      await controller.refresh(req, res);
+
+      expect(authService.refresh).toHaveBeenCalledWith(
+        'legacy-plain-refresh-token',
+        expect.anything(),
+      );
+      expect(res.cookie).toHaveBeenCalledWith(
+        'takto_refresh_token',
+        'rotated-refresh-token',
+        expect.objectContaining({
+          httpOnly: true,
+          sameSite: 'lax',
+          path: '/api/auth',
+        }),
+      );
+      // Nunca se escribe el nombre antiguo y se borra en la misma respuesta.
+      expect(res.cookie).not.toHaveBeenCalledWith(
+        'tehus_refresh_token',
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'tehus_refresh_token',
+        expect.objectContaining({ path: '/api/auth' }),
+      );
+    });
+
+    it('refresh prefers the canonical cookie when both are present and does not touch the legacy one', async () => {
+      authService.refresh.mockResolvedValue({
+        token: 'new-t',
+        user: { id: 'u1', email: 'a@co.test', name: 'A' },
+        refreshToken: 'rotated',
+      });
+      const res = buildRes();
+      const req = buildReq({
+        cookies: {
+          takto_refresh_token: 'canonical-token',
+          tehus_refresh_token: 'legacy-token',
+        },
+      });
+
+      await controller.refresh(req, res);
+
+      expect(authService.refresh).toHaveBeenCalledWith(
+        'canonical-token',
+        expect.anything(),
+      );
+      expect(res.clearCookie).not.toHaveBeenCalled();
+    });
+
+    it('logout reads the legacy cookie and clears BOTH names', async () => {
+      authService.logout.mockResolvedValue(undefined);
+      const res = buildRes();
+      const req = buildReq({
+        cookies: { tehus_refresh_token: 'legacy-plain-refresh-token' },
+      });
+
+      await controller.logout(req, res);
+
+      expect(authService.logout).toHaveBeenCalledWith(
+        'legacy-plain-refresh-token',
+      );
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'takto_refresh_token',
+        expect.objectContaining({ path: '/api/auth' }),
+      );
+      expect(res.clearCookie).toHaveBeenCalledWith(
+        'tehus_refresh_token',
+        expect.objectContaining({ path: '/api/auth' }),
+      );
+    });
+
+    it('login never sets the legacy cookie name', async () => {
+      authService.login.mockResolvedValue({
+        token: 't',
+        user: { id: 'u1', email: 'a@co.test', name: 'A' },
+        refreshToken: 'plain',
+      });
+      const res = buildRes();
+
+      await controller.login(
+        { email: 'a@co.test', password: 'password123' },
+        buildReq(),
+        res,
+      );
+
+      const names = res.cookie.mock.calls.map((c: unknown[]) => c[0]);
+      expect(names).toEqual(['takto_refresh_token']);
     });
   });
 });

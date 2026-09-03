@@ -19,10 +19,11 @@ import {
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { buildSessionRequestContext } from '../sessions/utils/request-context.util';
-import { REFRESH_TOKEN_COOKIE } from '../sessions/sessions.constants';
 import {
   setRefreshTokenCookie,
   clearRefreshTokenCookie,
+  clearLegacyRefreshTokenCookie,
+  readRefreshTokenCookie,
 } from '../sessions/utils/refresh-cookie.util';
 
 @Controller('auth')
@@ -67,13 +68,18 @@ export class AuthController {
     @Req() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const plainRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+    // Canonical `takto_refresh_token` first; the legacy `tehus_*` cookie is
+    // accepted for one rotation and then retired, so a session opened before
+    // the rename migrates onto the new name without logging anyone out.
+    const { value: plainRefreshToken, fromLegacy } =
+      readRefreshTokenCookie(req);
     const context = buildSessionRequestContext(req);
     const { refreshToken, ...result } = await this.authService.refresh(
       plainRefreshToken,
       context,
     );
     setRefreshTokenCookie(res, refreshToken);
+    if (fromLegacy) clearLegacyRefreshTokenCookie(res);
     return result;
   }
 
@@ -86,8 +92,9 @@ export class AuthController {
     @Req() req: ExpressRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const plainRefreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
+    const { value: plainRefreshToken } = readRefreshTokenCookie(req);
     await this.authService.logout(plainRefreshToken);
+    // Clears the canonical AND the legacy cookie name.
     clearRefreshTokenCookie(res);
     return { message: 'Sesión cerrada' };
   }
