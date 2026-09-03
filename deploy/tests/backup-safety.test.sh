@@ -32,7 +32,27 @@ grep -Fq -- '--group-by host,tags' "$offsite"
 grep -Fq -- 'restic check --read-data' "$drill"
 grep -Fq 'rclone:*)' "$backup_lib"
 grep -Fq 'backup_require_value RCLONE_CONFIG' "$backup_lib"
-grep -Fq 'RESTIC_REPOSITORY=rclone:takto-drive:TAKTO_BACKUPS/staging' "$ROOT/deploy/env/backup.env.example"
+# The example must point at the canonical staging repository through its
+# ACTIVE assignment only: blank lines and comments are ignored, so a historical
+# or commented-out path can never satisfy this check, and exactly one active
+# assignment is allowed. The V1 path is reserved as a read-only historical
+# repository and must never come back as the effective value.
+example_env="$ROOT/deploy/env/backup.env.example"
+active_repo_lines="$(grep -vE '^[[:space:]]*(#|$)' "$example_env" | grep -E '^[[:space:]]*RESTIC_REPOSITORY=' || true)"
+active_repo_count="$(printf '%s\n' "$active_repo_lines" | grep -c . || true)"
+if [ "$active_repo_count" -ne 1 ]; then
+  echo "backup.env.example must contain exactly one active RESTIC_REPOSITORY assignment (found $active_repo_count)" >&2
+  exit 1
+fi
+active_repo_value="$(printf '%s\n' "$active_repo_lines" | sed -E 's/^[[:space:]]*RESTIC_REPOSITORY=//; s/[[:space:]]+$//')"
+if [ "$active_repo_value" != 'rclone:takto-drive:TAKTO_BACKUPS_V2/staging' ]; then
+  echo "backup.env.example active RESTIC_REPOSITORY must be the canonical V2 example path (found: $active_repo_value)" >&2
+  exit 1
+fi
+if grep -vE '^[[:space:]]*(#|$)' "$example_env" | grep -Eq 'TAKTO_BACKUPS/staging([^_]|$)'; then
+  echo "backup.env.example must not use the historical V1 repository path as an active value" >&2
+  exit 1
+fi
 grep -Fq 'command -v rclone' "$installer"
 grep -Fq 'unsupported RESTIC_REPOSITORY backend; expected s3: or rclone:' "$installer"
 grep -Fq 'Google Drive via rclone' "$ROOT/docs/OFFSITE_BACKUPS.md"
