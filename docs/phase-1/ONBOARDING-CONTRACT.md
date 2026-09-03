@@ -50,6 +50,19 @@ Comportamiento del asistente (`apps/frontend/src/app/onboarding/page.tsx`):
   envían categorías aunque se hubieran marcado antes.
 - Si no hay asesores adicionales se continúa solo con el administrador; con
   asesores se rechazan correos duplicados (entre sí y con el administrador).
+- Contraseñas (administrador y asesores): la misma política que el backend
+  (`IsStrongPassword`: 10 caracteres, minúscula, mayúscula, número y símbolo),
+  validada antes de avanzar con `lib/password-policy.ts` y mostrada con
+  `PasswordRequirements`; el error de un asesor lo identifica. El backend es
+  la autoridad final.
+- Tipo de negocio: se define UNA sola vez, en el paso de industria. Con una
+  plantilla normal el tipo visible de la empresa (`Company.businessType`) es
+  el nombre canónico de la plantilla y el frontend no envía texto libre. Con
+  «Otro / Configurar manualmente» se pide «Describe tu tipo de negocio»
+  (obligatorio, recortado, máximo 60 caracteres; `BUSINESS_TYPE_LIMITS`) y
+  eso es lo que se guarda, nunca el literal «Otro». Al pasar de manual a una
+  plantilla, la descripción se descarta. El backend aplica la misma regla
+  (`resolveBusinessTypeLabel`) e ignora cualquier texto contradictorio.
 - La información se conserva al ir atrás y adelante; el resumen final muestra
   actividad, módulos, categorías, pipeline con tipos, branding y usuarios.
 - Validación en frontend (aviso junto al campo) y en backend (400) con las
@@ -127,12 +140,18 @@ Contrato: `docs/contracts/company-settings.v2.schema.json`. Implementación:
   banderas y claves desconocidas.
 - `GET /companies/me/settings` devuelve la vista normalizada más los límites.
 - Ninguna migración Prisma: `Company.settings` sigue siendo `Json`.
+- **Escritura solo tipada.** `PATCH /companies/me` NO acepta `settings`
+  (el campo se rechaza con 400): el parser tolerante existe para leer datos
+  históricos, no para validar escrituras completas, y un v2 malformado no
+  puede llegar a la base. La única vía de cambio es
+  `PATCH /companies/me/settings` con `UpdateCompanySettingsDto`.
 
 ## API
 
 | Método | Ruta | Acceso | Uso |
 |---|---|---|---|
-| GET | `/onboarding/templates` | público (throttle) | Plantillas + límites |
+| GET | `/onboarding/templates` | público (throttle) | Plantillas + límites (`categories`, `stages`, `businessType`) |
 | POST | `/onboarding/company` | código de invitación | Crea la empresa (acepta `commercial.industry/businessType/businessModel`, `pipeline.typedStages`, `pipeline.templateKey`; forma anterior compatible) |
 | GET | `/companies/me/settings` | sesión de empresa | Vista normalizada |
-| PATCH | `/companies/me/settings` | ADMIN / SUPER_ADMIN de la empresa | `catalog.categories`, `commercial.*` |
+| PATCH | `/companies/me/settings` | ADMIN / SUPER_ADMIN de la empresa | `catalog.categories`, `commercial.*` (única vía de escritura de settings) |
+| PATCH | `/companies/me` | ADMIN / SUPER_ADMIN de la empresa | Perfil, branding y datos fiscales; **rechaza `settings`** |

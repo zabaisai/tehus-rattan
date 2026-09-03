@@ -18,11 +18,11 @@ completos, tokens ni datos de empresas reales. Fecha: 2026-09-03.
 
 | Suite | Resultado |
 |---|---|
-| Backend unitarias (`jest --runInBand`) | 140 suites, 2233 pruebas, 0 fallos (incluye política de acceso de controladores con el endpoint público justificado) |
+| Backend unitarias (`jest --runInBand`) | 140 suites, 2252 pruebas, 0 fallos (tras la revisión correctiva) (incluye política de acceso de controladores con el endpoint público justificado) |
 | Backend typecheck (`tsc --noEmit`) | OK |
 | Backend lint (`eslint --no-fix`) | 0 errores |
 | Backend e2e | requieren PostgreSQL + Redis; no hay Docker Desktop ni PostgreSQL local en la máquina de trabajo, así que se ejecutan en CI (`Backend (validate / test / build / e2e)`). Nueva suite `test/onboarding-plantillas.e2e-spec.ts` (10 casos, base real) |
-| Frontend `vitest` | 93 archivos, 1005 pruebas, 0 fallos |
+| Frontend `vitest` | 95 archivos, 1018 pruebas, 0 fallos (tras la revisión correctiva) |
 | Frontend typecheck | OK |
 | Frontend lint | 0 errores (2 avisos preexistentes) |
 | Frontend `next build` | OK (`NEXT_PUBLIC_API_URL` de prueba) |
@@ -51,11 +51,13 @@ Casos mínimos del encargo cubiertos:
 Construcción de producción del frontend servida con `next start` y un stub
 local de la API que devuelve `docs/contracts/onboarding-templates.v2.json`
 (sin backend real, sin datos). Recorrido automatizado por Chrome DevTools
-Protocol en 320, 360, 390, 768, 1024 y 1440 px: 108 capturas.
+Protocol en 320, 360, 390, 768, 1024 y 1440 px: 120 capturas (incluye la
+opción «Otro / Configurar manualmente»: sin descripción no avanza y el aviso
+se muestra junto al paso).
 
 | Comprobación | Resultado |
 |---|---|
-| Scroll horizontal (`scrollWidth > innerWidth`) | 0 de 108 pasos |
+| Scroll horizontal (`scrollWidth > innerWidth`) | 0 de 120 pasos |
 | Selector de industria visible | sí en los 6 anchos |
 | Diálogo «¿Reemplazar tus cambios?» dentro del viewport | sí en los 6 anchos (hoja inferior en móvil) |
 | Validaciones junto al paso | «Ingresa el código de invitación», «Debe haber exactamente una etapa de cierre ganado» visibles con `role="alert"` |
@@ -88,9 +90,11 @@ generado:
 
 ## Seguridad del diff
 
-- 92 archivos, +7869/−618 líneas; solo `apps/*/src`, `apps/backend/test`,
-  `deploy/`, `docs/`, `docker-compose.staging.yml`, `README.md`,
-  `.env.example` (plantilla, solo `SMTP_FROM_NAME`).
+- El conteo exacto de archivos y líneas es el que muestra el PR #18 en
+  GitHub (cambia con cada corrección; no se fija aquí). Todo el diff está
+  en `apps/*/src`, `apps/backend/test`, `deploy/`, `docs/`,
+  `docker-compose.staging.yml`, `README.md` y `.env.example` (plantilla,
+  solo `SMTP_FROM_NAME`).
 - Sin secretos, tokens, claves privadas ni correos reales (los únicos
   «tokens» son placeholders de pruebas); sin archivos `.env`, artefactos de
   build ni datos QA; el archivo ajeno del worktree principal no está en el
@@ -100,6 +104,16 @@ generado:
   invitación de un solo uso con reclamo atómico y auditoría (probado en base
   real); creación de empresa en una transacción con rollback; validación de
   backend independiente del frontend; sin migraciones.
+
+## Revisión correctiva previa al DNS (2026-09-03, PR #18)
+
+Tres hallazgos de la revisión del PR, corregidos en la misma rama:
+
+| # | Hallazgo | Corrección | Pruebas |
+|---|---|---|---|
+| 1 | El asistente validaba contraseñas con `length < 8` y mostraba «Mínimo 8 caracteres», mientras el backend exige `IsStrongPassword` (10 caracteres, minúscula, mayúscula, número y símbolo) | Administrador y asesores validan con `PASSWORD_RULES`/`isStrongPassword` de `lib/password-policy.ts` (espejo del backend); `AdminStep` muestra la lista viva `PasswordRequirements`; `AgentsStep` muestra un único resumen de la política; el error de un asesor lo identifica («Asesor 2 (Luis): …»); `minLength` = `PASSWORD_MIN_LENGTH`; sin ninguna mención a «mínimo 8» | `AdminStep.test.tsx`, `AgentsStep.test.tsx`, `page.test.tsx` (8, sin mayúscula, sin minúscula, sin número, sin símbolo, válida, asesor identificado) |
+| 2 | `PATCH /companies/me` aceptaba `settings` como objeto completo validado solo con el parser tolerante de lectura: un v2 malformado (`commercial: "x"`) podía persistirse | Sin consumidor legítimo del campo (ni frontend, ni scripts), se eliminó `settings` de `UpdateCompanyDto` y de `CompaniesService.update`; la configuración comercial solo cambia por `PATCH /companies/me/settings` con `UpdateCompanySettingsDto` (tipado + `normalizeCategories` estricto). El validador permisivo `assertParsableSettings` desapareció. Lectura v1/v2 intacta | `update-company.dto.spec` (16 formas malformadas o válidas de `settings` rechazadas con 400 antes del servicio: no objeto, versión desconocida, sin/mal `commercial`, bandera no booleana, sin/mal `catalog`, categorías no array/no string/largas/exceso, `vertical` parcial o con modelo inválido, `pipelineDefaults` parcial), `companies.service.spec` (v1 se lee sin escribir; `updateSettings` migra v1→v2 conservando banderas y claves desconocidas; categorías inválidas → 400 sin Prisma; `update()` no pasa `settings`), e2e existente de aislamiento |
+| 3 | El tipo de negocio se pedía dos veces (texto libre en «Datos de empresa» y plantilla en «Industria»); el backend priorizaba el texto libre, con riesgo de `Company.businessType` contradictorio con `settings.vertical`, y «Otro» podía guardar el literal «Otro / Configurar manualmente» | Campo eliminado de `CompanyInfoStep`; con plantilla normal el frontend no envía texto y el backend guarda el nombre canónico de la plantilla (ignora cualquier texto); con «Otro / Configurar manualmente» `IndustryStep` pide «Describe tu tipo de negocio» (obligatorio, recortado, máximo 60 caracteres, límite compartido `BUSINESS_TYPE_LIMITS` expuesto por `/onboarding/templates`) y eso es lo que se guarda; al cambiar de manual a plantilla el texto se descarta; el resumen muestra industria, tipo canónico o descripción manual, y modelo comercial | `onboarding.service.spec` (canónico gana sobre texto del cliente; manual recortado; manual sin descripción → 400 sin tocar la base), `page.test.tsx` (sin campo en «Datos de empresa», manual obligatorio/recortado/enviado, manual→plantilla sin texto, resumen, diálogo de protección) |
 
 ## Staging
 

@@ -36,6 +36,11 @@ Rama: `feature/phase-1-takto-platform-independence` (desde `origin/main`
 | 10 | QA en staging | PENDIENTE — depende de 9 |
 | 11 | Documentación y cierre | PENDIENTE — la fase no se cierra sin 9 y 10 |
 
+Revisión correctiva previa al DNS (2026-09-03): contraseñas del onboarding
+alineadas con la política del backend, escritura de `settings` solo tipada
+(`PATCH /companies/me` la rechaza) y tipo de negocio definido una sola vez
+(plantilla canónica o descripción manual). Detalle en `STAGING-EVIDENCE.md`.
+
 Estado de la fase: **FASE 1 PERMANECE ABIERTA** (bloqueador: DNS de staging).
 Última actualización: 2026-09-03.
 

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://takto.online/contracts/company-settings.v2.schema.json",
   "title": "Company.settings v2 (IMPLEMENTADO en la Fase 1)",
-  "description": "Forma que escribe el onboarding para las empresas nuevas desde la Fase 1 y que produce PATCH /companies/me/settings al editar. Implementación: apps/backend/src/modules/companies/company-settings.ts (parseCompanySettings / buildCompanySettingsV2). La forma v1 ($defs/v1) sigue siendo válida: se lee tal cual y NUNCA se reescribe salvo por una edición explícita de un administrador de esa empresa (sin backfill). Las claves desconocidas se conservan al escribir.",
+  "description": "Forma que escribe el onboarding para las empresas nuevas desde la Fase 1 y que produce PATCH /companies/me/settings al editar (única vía de escritura: PATCH /companies/me rechaza `settings`, así que ningún objeto completo malformado puede persistirse). Implementación: apps/backend/src/modules/companies/company-settings.ts (parseCompanySettings / buildCompanySettingsV2). La forma v1 ($defs/v1) sigue siendo válida: se lee tal cual y NUNCA se reescribe salvo por una edición explícita de un administrador de esa empresa (sin backfill). Las claves desconocidas se conservan al escribir.",
   "type": "object",
   "properties": {
     "version": { "type": "integer", "const": 2 },
