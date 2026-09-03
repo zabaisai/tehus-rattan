@@ -12,23 +12,23 @@ Dominio raíz administrado por el propietario: `takto.online`. Producción no
 se toca en esta fase: ni DNS, ni certificados, ni despliegue, ni se apunta a
 staging.
 
-## Estado del DNS (verificado el 2026-09-03 desde el VPS)
+## Estado del DNS (verificado el 2026-09-03; registros creados por el propietario)
 
 | Nombre | Resuelve a | Estado |
 |---|---|---|
 | `takto.online` | IPv4 del VPS de staging (sitio comercial `takto-web`) | existe |
 | `crm-staging.tehusrattan.com` | IPv4 del VPS de staging | existe (dominio antiguo) |
 | `api.crm-staging.tehusrattan.com` | IPv4 del VPS de staging | existe (dominio antiguo) |
-| `crm-staging.takto.online` | — | **no existe** |
-| `api.crm-staging.takto.online` | — | **no existe** |
+| `crm-staging.takto.online` | IPv4 del VPS de staging (A, TTL 300) | **existe** — igual desde el VPS, `dig` directo, 1.1.1.1, 8.8.8.8 y el autoritativo de Hostinger; sin AAAA ni CNAME |
+| `api.crm-staging.takto.online` | IPv4 del VPS de staging (A, TTL 300) | **existe** — misma verificación |
 
 Servidores de nombres de `takto.online`: `aster.dns-parking.com` y
 `helios.dns-parking.com` (zona gestionada en el panel DNS de Hostinger).
 
-No hay credenciales del proveedor DNS en la máquina de trabajo ni en el VPS
-(sin variables de entorno, sin CLI, sin archivos de configuración). Por eso
-esta fase **se detiene antes de crear registros**, tal como exige el
-encargo, y entrega los registros exactos para que el propietario los cree.
+No hay credenciales del proveedor DNS en la máquina de trabajo ni en el VPS.
+Los dos registros los creó el propietario (2026-09-03) con los valores de la
+tabla siguiente; `crm.takto.online` y `api.crm.takto.online` (producción) no
+existen y no se han creado.
 
 ### Registros DNS a crear en `takto.online` (acción del propietario)
 
@@ -65,11 +65,18 @@ dig +short takto.online
 - `crm-staging.tehusrattan.com` → redirección **temporal (302)** a
   `https://crm-staging.takto.online{uri}`. Se pasa a `permanent` solo después
   de verificar el login en el dominio nuevo y decidir el retiro del antiguo.
-- Certificados: Caddy los emite en cuanto el DNS resuelve y 80/443 son
-  alcanzables. Mientras el DNS nuevo no exista, Caddy reintenta la emisión de
-  esos dos nombres con retroceso exponencial y sigue sirviendo los demás; aun
-  así, **no se despliega el Caddyfile nuevo antes de que existan los registros**
-  para no llenar el log de fallos ACME.
+- Certificados: emitidos por Let's Encrypt el 2026-09-03 para los dos
+  nombres nuevos (SAN individual, válidos hasta el 2026-12-02) en ~10 s tras
+  recrear el contenedor de Caddy; sin errores ACME.
+- **Recarga del Caddyfile.** El archivo se monta como bind mount de un solo
+  archivo; cuando `git pull` lo reemplaza, el contenedor sigue leyendo el
+  inodo antiguo y `caddy reload` responde «config is unchanged». En el
+  despliegue de esta fase hubo que recrear el contenedor:
+  `docker compose --env-file .env.staging -f docker-compose.staging.yml up -d --force-recreate --no-deps caddy`
+  (corte de segundos; los certificados existentes se conservan en
+  `caddy_data`). `deploy.sh` no lo hace por sí solo: tras cualquier cambio del
+  Caddyfile hay que recrear `caddy` explícitamente. Deuda: montar el
+  directorio `deploy/` en lugar del archivo.
 - `takto.online` / `www.takto.online` (sitio comercial) no cambian.
 - Contacto ACME: sigue `admin@tehusrattan.com` hasta que el propietario
   indique un buzón monitorizado bajo `takto.online` (interno, no visible).
@@ -110,7 +117,17 @@ no cambian.
   (alias) y en la nueva; no se modifica ninguna configuración en Meta en esta
   fase.
 
-## Orden de ejecución (cuando exista el DNS)
+## Ejecución realizada (2026-09-03)
+
+| Paso | Resultado |
+|---|---|
+| DNS | Verificado desde 4 puntos (VPS, `dig` directo, 1.1.1.1/8.8.8.8, autoritativo Hostinger): solo `179.197.73.188`, sin AAAA/CNAME, producción inexistente, `takto.online`/`www` intactos |
+| Merge | PR #18 → `main` `5cb991f` (21:17 UTC) con CI verde en `d662bd4` |
+| `.env.staging` | Copia `600 deploy:deploy` en `.secrets/.env.staging.bak-20260903T211834Z` (hash igual); diff limitado a las 5 variables (`CSRF_ALLOWED_ORIGINS` no existía y se añadió); rollback: `cp -p` de la copia |
+| `deploy.sh` | Release `5cb991f` (built 21:18:56Z); backup previo; «No pending migrations to apply»; backend/worker/frontend/postgres recreados; el paso 11 falló por el bit de ejecución perdido de `health-check.sh` (PR #19) y porque Caddy aún leía el Caddyfile antiguo; tras recrear `caddy`: `health-check.sh` 12/12 |
+| Verificación | `/api/health/version` = `5cb991f…`; `/api/health/status` ok (database, queue, worker, outbox, realtime, flowbot `up`); HSTS, `Server` oculto; smoke 22/22 con `EXPECTED_RELEASE`; 302 `crm-staging.tehusrattan.com/ruta?qa=1` → `crm-staging.takto.online/ruta?qa=1`; API antigua 200 sin redirección; `takto.online` 200, `www` 301 |
+
+## Orden de ejecución (referencia)
 
 1. Propietario crea los dos registros A y confirma con `dig`.
 2. Verificar en el VPS: `getent ahosts crm-staging.takto.online` y

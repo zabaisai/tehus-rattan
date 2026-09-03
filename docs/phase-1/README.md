@@ -31,18 +31,19 @@ Rama: `feature/phase-1-takto-platform-independence` (desde `origin/main`
 | 5 | Onboarding | HECHA — plantillas en código, endpoint público, settings v2, categorías conectadas al catálogo |
 | 6 | Dominios y autenticación | HECHA en código — cookies/canales con fallback legacy, Caddy y variables preparadas; **DNS pendiente** |
 | 7 | Pruebas | HECHA en local — ver `STAGING-EVIDENCE.md` (conteos, QA visual 320–1440 px, auditoría final); e2e de backend en CI |
-| 8 | PR | ABIERTO — PR contra `main`; estado de CI en el PR |
-| 9 | Staging | BLOQUEADA — los registros DNS de staging no existen y no hay acceso autenticado al DNS de `takto.online` (registros exactos en `DOMAIN-MIGRATION.md` § Registros DNS). Sin merge ni despliegue |
-| 10 | QA en staging | PENDIENTE — depende de 9 |
-| 11 | Documentación y cierre | PENDIENTE — la fase no se cierra sin 9 y 10 |
+| 8 | PR | HECHA — PR #18 fusionado en `main` (merge `5cb991f`, 2026-09-03 21:17 UTC) con CI verde en el HEAD `d662bd4` |
+| 9 | Staging | HECHA — DNS creado por el propietario y verificado; `.env.staging` actualizado con copia `600`; `deploy.sh` sobre `5cb991f`; certificados emitidos para los dos dominios nuevos; health 12/12, smoke 22/22 (ver `STAGING-EVIDENCE.md`) |
+| 10 | QA en staging | HECHA — genérica / muebles / veterinaria con códigos `TAKTO`, cookies `takto_*`, fallback legacy, aislamiento, realtime; datos `QA_PHASE1_` eliminados por ID, cero residuos, huellas de datos existentes intactas |
+| 11 | Documentación y cierre | HECHA — este documento y `STAGING-EVIDENCE.md` (PR documental de cierre) |
 
 Revisión correctiva previa al DNS (2026-09-03): contraseñas del onboarding
 alineadas con la política del backend, escritura de `settings` solo tipada
 (`PATCH /companies/me` la rechaza) y tipo de negocio definido una sola vez
 (plantilla canónica o descripción manual). Detalle en `STAGING-EVIDENCE.md`.
 
-Estado de la fase: **FASE 1 PERMANECE ABIERTA** (bloqueador: DNS de staging).
-Última actualización: 2026-09-03.
+Estado de la fase: **FASE 1 CERRADA — PASS** (2026-09-03). Producción NO
+desplegada: `crm.takto.online` / `api.crm.takto.online` siguen sin DNS, sin
+certificados y sin stack; solo existen los ejemplos.
 
 ## Fuera de alcance (no realizado)
 
@@ -65,6 +66,24 @@ participaron.
   canal `tehus-auth`): retirar cuando se cumpla el criterio de
   `IDENTITY-CONTRACT.md` § Retiro del fallback.
 - Contacto ACME de Caddy (`admin@tehusrattan.com`): cambiar a un buzón
-  monitorizado bajo `takto.online` cuando el propietario lo confirme.
+  monitorizado bajo `takto.online` cuando el propietario lo confirme. No se
+  inventa ni activa un buzón que no existe.
+- Inicio de sesión único tras el cambio de host: las cookies son host-only
+  en el host de la API, así que cada usuario existente inicia sesión una vez
+  en `crm-staging.takto.online` (las sesiones del servidor no se pierden).
+- El Caddyfile se monta como archivo único (bind mount): tras un `git pull`
+  que lo reemplace, `caddy reload` responde «config is unchanged» porque el
+  contenedor conserva el inodo antiguo; hay que recrear el contenedor
+  (`compose up -d --force-recreate --no-deps caddy`, segundos de corte).
+  Ocurrió en este despliegue; documentado en `DOMAIN-MIGRATION.md` y
+  `ROLLBACK.md`. Conviene montar el directorio en lugar del archivo.
+- `deploy.sh`, `health-check.sh` y `smoke-test.sh` estaban rastreados como
+  `100644` (deuda anterior a la fase): el checkout de Fase 1 les quitó el bit
+  local y el paso 11 de `deploy.sh` falló con «Permission denied» con la pila
+  sana. Corregido en `main` por el PR #19 (`d262ce8`, solo modo de archivo); el
+  VPS lo recibe en su próximo `git pull`.
+- e2e intermitente en CI: `flowbot-vertical.e2e-spec` caso 27 («dos mensajes
+  concurrentes no duplican nada») falló una vez en el PR #19 (cambio solo de
+  modo) y pasó al relanzar; misma clase que el caso de `contact-fusion`.
 - `docs/CRM_ROADMAP.md` es un roadmap histórico "Tehus-first" anterior a esta
   fase; conviene reemplazarlo por un roadmap de plataforma.
