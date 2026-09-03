@@ -30,11 +30,14 @@ Rama: `feature/phase-1-takto-platform-independence` (desde `origin/main`
 | 4 | Invitaciones | HECHA — prefijo `TAKTO`, códigos `TEHUS` válidos por hash y estado |
 | 5 | Onboarding | HECHA — plantillas en código, endpoint público, settings v2, categorías conectadas al catálogo |
 | 6 | Dominios y autenticación | HECHA en código — cookies/canales con fallback legacy, Caddy y variables preparadas; **DNS pendiente** |
-| 7 | Pruebas | HECHA — ver `STAGING-EVIDENCE.md` (conteos) |
-| 8 | PR | HECHA — PR contra `main`, CI en verde |
-| 9 | Staging | BLOQUEADA — sin acceso autenticado al DNS de `takto.online` (ver `DOMAIN-MIGRATION.md` § Registros DNS) |
-| 10 | QA | PENDIENTE — depende de 9 |
+| 7 | Pruebas | HECHA en local — ver `STAGING-EVIDENCE.md` (conteos, QA visual 320–1440 px, auditoría final); e2e de backend en CI |
+| 8 | PR | ABIERTO — PR contra `main`; estado de CI en el PR |
+| 9 | Staging | BLOQUEADA — los registros DNS de staging no existen y no hay acceso autenticado al DNS de `takto.online` (registros exactos en `DOMAIN-MIGRATION.md` § Registros DNS). Sin merge ni despliegue |
+| 10 | QA en staging | PENDIENTE — depende de 9 |
 | 11 | Documentación y cierre | PENDIENTE — la fase no se cierra sin 9 y 10 |
+
+Estado de la fase: **FASE 1 PERMANECE ABIERTA** (bloqueador: DNS de staging).
+Última actualización: 2026-09-03.
 
 ## Fuera de alcance (no realizado)
 
