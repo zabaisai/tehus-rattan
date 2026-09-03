@@ -52,7 +52,10 @@ function handleSessionInvalidated() {
 }
 
 const REFRESH_URL = `${process.env.NEXT_PUBLIC_API_URL}/auth/refresh`;
-const CROSS_TAB_LOCK = 'tehus-auth-refresh';
+// Nombre canónico TAKTO. No hay fallback: dos pestañas con bundles distintos
+// solo coexisten durante el despliegue, y el backend serializa la rotación
+// por compare-and-swap de todas formas.
+const CROSS_TAB_LOCK = 'takto-auth-refresh';
 const LOCK_TIMEOUT_MS = 5000;
 
 // A refresh attempt has four genuinely different outcomes. Collapsing them all

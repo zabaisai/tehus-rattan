@@ -318,7 +318,7 @@ describe('axios refresh interceptor', () => {
 
       expect(result).toEqual({ status: 'success', token: 'locked-token' });
       expect(requestMock).toHaveBeenCalledTimes(1);
-      expect(requestMock.mock.calls[0][0]).toBe('tehus-auth-refresh');
+      expect(requestMock.mock.calls[0][0]).toBe('takto-auth-refresh');
       expect(requestMock.mock.calls[0][1]).toMatchObject({ mode: 'exclusive' });
 
       Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, 'locks');

@@ -36,7 +36,7 @@ export function CompanyInfoStep({ value, onChange }: CompanyInfoStepProps) {
             required
             value={value.name}
             onChange={(e) => onChange({ name: e.target.value })}
-            placeholder="Tehus Rattan"
+            placeholder="Nombre de tu empresa"
           />
         </Field>
 
@@ -46,7 +46,7 @@ export function CompanyInfoStep({ value, onChange }: CompanyInfoStepProps) {
               type="text"
               value={value.businessType}
               onChange={(e) => onChange({ businessType: e.target.value })}
-              placeholder="Muebles y decoración"
+              placeholder="Ej.: tienda, consultoría, taller"
             />
           </Field>
 

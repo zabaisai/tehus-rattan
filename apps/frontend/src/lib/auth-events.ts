@@ -8,19 +8,25 @@
 
 export type AuthEventType = 'logout' | 'session-invalidated';
 
-const CHANNEL_NAME = 'tehus-auth';
+// Canal canónico (TAKTO). El nombre antiguo se sigue ESCUCHANDO durante la
+// transición para que una pestaña con el bundle anterior (abierta antes del
+// despliegue) siga enterándose de un cierre de sesión; nunca se emite en él.
+// Retiro: en el despliegue siguiente al de la Fase 1 (ver
+// docs/phase-1/IDENTITY-CONTRACT.md § Retiro del fallback).
+export const AUTH_CHANNEL_NAME = 'takto-auth';
+export const LEGACY_AUTH_CHANNEL_NAME = 'tehus-auth';
 
-function getChannel(): BroadcastChannel | null {
+function openChannel(name: string): BroadcastChannel | null {
   if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') {
     return null;
   }
-  return new BroadcastChannel(CHANNEL_NAME);
+  return new BroadcastChannel(name);
 }
 
 // Fire-and-forget; opens and closes a short-lived channel so we never hold a
 // listener that could double-handle our own message.
 export function broadcastAuthEvent(type: AuthEventType): void {
-  const channel = getChannel();
+  const channel = openChannel(AUTH_CHANNEL_NAME);
   if (!channel) return;
   try {
     channel.postMessage({ type });
@@ -33,8 +39,11 @@ export function broadcastAuthEvent(type: AuthEventType): void {
 export function subscribeAuthEvents(
   handler: (type: AuthEventType) => void,
 ): () => void {
-  const channel = getChannel();
-  if (!channel) return () => {};
+  const channels = [
+    openChannel(AUTH_CHANNEL_NAME),
+    openChannel(LEGACY_AUTH_CHANNEL_NAME),
+  ].filter((c): c is BroadcastChannel => c !== null);
+  if (channels.length === 0) return () => {};
 
   const listener = (event: MessageEvent) => {
     const type = event.data?.type;
@@ -42,10 +51,12 @@ export function subscribeAuthEvents(
       handler(type);
     }
   };
-  channel.addEventListener('message', listener);
+  for (const channel of channels) channel.addEventListener('message', listener);
 
   return () => {
-    channel.removeEventListener('message', listener);
-    channel.close();
+    for (const channel of channels) {
+      channel.removeEventListener('message', listener);
+      channel.close();
+    }
   };
 }

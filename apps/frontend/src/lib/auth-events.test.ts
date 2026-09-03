@@ -18,7 +18,7 @@ describe('cross-tab auth events', () => {
     async () => {
       const raw: unknown[] = [];
       // Capture the raw message payload to prove it never contains a token.
-      const spyChannel = new BroadcastChannel('tehus-auth');
+      const spyChannel = new BroadcastChannel('takto-auth');
       spyChannel.addEventListener('message', (e: MessageEvent) => raw.push(e.data));
 
       unsubscribe = subscribeAuthEvents((type) => received.push(type));
@@ -56,4 +56,28 @@ describe('cross-tab auth events', () => {
     expect(typeof unsub).toBe('function');
     unsub();
   });
+  // Fase 1: el canal pasa de 'tehus-auth' a 'takto-auth'. Una pestaña con el
+  // bundle anterior sigue emitiendo en el nombre antiguo durante el despliegue.
+  it.runIf(hasBroadcastChannel)(
+    'sigue recibiendo eventos emitidos en el canal legacy tehus-auth, pero nunca emite en él',
+    async () => {
+      const legacySpy: unknown[] = [];
+      const legacy = new BroadcastChannel('tehus-auth');
+      legacy.addEventListener('message', (e: MessageEvent) => legacySpy.push(e.data));
+      unsubscribe = subscribeAuthEvents((type) => received.push(type));
+
+      broadcastAuthEvent('logout');
+      await new Promise((r) => setTimeout(r, 20));
+      expect(legacySpy).toEqual([]);
+
+      const oldTab = new BroadcastChannel('tehus-auth');
+      oldTab.postMessage({ type: 'session-invalidated' });
+      await new Promise((r) => setTimeout(r, 20));
+      expect(received).toContain('session-invalidated');
+
+      unsubscribe();
+      legacy.close();
+      oldTab.close();
+    },
+  );
 });

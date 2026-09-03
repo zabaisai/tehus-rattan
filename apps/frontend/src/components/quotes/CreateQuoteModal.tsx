@@ -67,7 +67,7 @@ export function CreateQuoteModal({ leadId, onClose, onCreated }: CreateQuoteModa
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Cotización sala Primavera"
+              placeholder="Ej.: Cotización pedido mayo"
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
             />
           </div>
