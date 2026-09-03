@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Product } from "@/types";
-import { PRODUCT_CATEGORIES } from "@/lib/products";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
-import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
 
 type ApiError = {
@@ -29,16 +27,20 @@ export interface ProductFormData {
 
 interface ProductModalProps {
   product: Product | null;
+  /** Categorías de la empresa (sugerencias); el campo admite texto libre. */
+  categories?: string[];
   onClose: () => void;
   onSubmit: (data: ProductFormData) => Promise<void>;
 }
 
 export function ProductModal({
   product,
+  categories = [],
   onClose,
   onSubmit,
 }: ProductModalProps) {
   const isEditing = !!product;
+  const categoriesListId = useId();
 
   const [name, setName] = useState(product?.name ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
@@ -84,23 +86,28 @@ export function ProductModal({
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Sala Primavera"
+            placeholder="Nombre del producto o servicio"
           />
         </Field>
 
         <div className="mb-3 grid grid-cols-2 gap-2">
-          <Field label="Categoría">
-            <Select
+          {/* Texto libre con las categorías de LA EMPRESA como sugerencia
+              (datalist): así un producto nunca se ve obligado a encajar en
+              una lista fija de la plataforma. */}
+          <Field label="Categoría" hint="Opcional. Elige una o escribe una nueva.">
+            <Input
+              type="text"
+              list={categoriesListId}
               value={category}
+              maxLength={60}
               onChange={(e) => setCategory(e.target.value)}
-            >
-              <option value="">Sin categoría</option>
-              {PRODUCT_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+              placeholder="Sin categoría"
+            />
+            <datalist id={categoriesListId}>
+              {categories.map((c) => (
+                <option key={c} value={c} />
               ))}
-            </Select>
+            </datalist>
           </Field>
           <Field label="Precio base" required>
             <Input
@@ -110,7 +117,7 @@ export function ProductModal({
               step="0.01"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
-              placeholder="11700000"
+              placeholder="0"
             />
           </Field>
         </div>
@@ -124,7 +131,7 @@ export function ProductModal({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
-            placeholder="Material: Ratán natural. Medidas: Sofá 230x93x63, poltronas 117x93."
+            placeholder="Detalles que ayudan a vender: material, medidas, duración, incluye…"
           />
         </Field>
 

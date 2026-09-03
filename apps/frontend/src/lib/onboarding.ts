@@ -1,5 +1,6 @@
 import api from './axios';
 import { AuthResponse } from '@/types';
+import type { BusinessModel, StageTemplate } from './onboarding-templates';
 
 export interface OnboardingCompanyInfo {
   name: string;
@@ -25,11 +26,19 @@ export interface OnboardingCommercial {
   usesQuotes: boolean;
   usesTasks: boolean;
   categories: string[];
+  // Fase 1: vertical elegida en el asistente (plantillas versionadas).
+  industry?: string;
+  businessType?: string;
+  businessModel?: BusinessModel;
 }
 
 export interface OnboardingPipeline {
   name: string;
-  stages: string[];
+  /** Forma anterior: solo nombres (todas OPEN). */
+  stages?: string[];
+  /** Fase 1: etapas con tipo explícito; exactamente una WON y una LOST. */
+  typedStages?: StageTemplate[];
+  templateKey?: string;
 }
 
 export interface OnboardingAdmin {
@@ -102,7 +111,7 @@ export interface OnboardingResult {
   admin: OnboardingSafeUser;
   agents: OnboardingSafeUser[];
   pipeline: { id: string; name: string };
-  stages: Array<{ id: string; name: string; order: number }>;
+  stages: Array<{ id: string; name: string; order: number; type?: string; isInitial?: boolean }>;
   // Present when the backend successfully issued a session for the admin
   // it just created — absent (never guessed at) if that step didn't happen,
   // in which case the wizard falls back to the "go to /login" screen.

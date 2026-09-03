@@ -10,6 +10,8 @@ import { useAuthStore } from "@/store/auth.store";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
+import { CompanyCategoriesEditor } from "@/components/settings/CompanyCategoriesEditor";
+import { displayColor, PLATFORM_BRAND } from "@/lib/brand";
 
 type ApiError = {
   response?: {
@@ -45,10 +47,13 @@ const labelClass = "mb-1.5 block text-sm font-medium text-neutral-700";
 function SelectorDeColor({
   label,
   value,
+  fallback,
   onChange,
 }: {
   label: string;
   value: string;
+  /** Neutro de la PLATAFORMA que se muestra cuando la empresa no eligió color. */
+  fallback: string;
   onChange: (value: string) => void;
 }) {
   const idMuestra = useId();
@@ -59,10 +64,12 @@ function SelectorDeColor({
         {label}
       </label>
       <div className="flex items-center gap-2">
+        {/* La muestra necesita un valor siempre; si la empresa no tiene color
+            se enseña el neutro de TAKTO sin guardarlo: el estado sigue vacío. */}
         <input
           id={idMuestra}
           type="color"
-          value={value}
+          value={displayColor(value, fallback)}
           onChange={(e) => onChange(e.target.value)}
           className="h-9 w-10 shrink-0 cursor-pointer rounded border border-neutral-300 bg-transparent p-0.5"
         />
@@ -70,6 +77,7 @@ function SelectorDeColor({
           <Input
             type="text"
             value={value}
+            placeholder="Sin definir"
             onChange={(e) => onChange(e.target.value)}
           />
         </Field>
@@ -174,9 +182,11 @@ function CompanySettingsForm({ company }: { company: Company }) {
     taxId: company.taxId ?? "",
     address: company.address ?? "",
     quoteFooter: company.quoteFooter ?? "",
-    primaryColor: company.primaryColor ?? "#A57014",
-    accentColor: company.accentColor ?? "#FDDC7F",
-    backgroundColor: company.backgroundColor ?? "#FAF8F3",
+    // Vacío = sin color propio (apariencia neutral TAKTO). No se rellena con
+    // ningún valor por defecto para no persistirlo por accidente al guardar.
+    primaryColor: company.primaryColor ?? "",
+    accentColor: company.accentColor ?? "",
+    backgroundColor: company.backgroundColor ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -367,16 +377,19 @@ function CompanySettingsForm({ company }: { company: Company }) {
           <SelectorDeColor
             label="Color principal"
             value={form.primaryColor}
+            fallback={PLATFORM_BRAND.primaryColor}
             onChange={(v) => patch({ primaryColor: v })}
           />
           <SelectorDeColor
             label="Color de acento"
             value={form.accentColor}
+            fallback={PLATFORM_BRAND.accentColor}
             onChange={(v) => patch({ accentColor: v })}
           />
           <SelectorDeColor
             label="Fondo claro"
             value={form.backgroundColor}
+            fallback={PLATFORM_BRAND.backgroundColor}
             onChange={(v) => patch({ backgroundColor: v })}
           />
         </div>
@@ -394,6 +407,10 @@ function CompanySettingsForm({ company }: { company: Company }) {
           </button>
         </div>
       </form>
+
+      {/* Categorías del catálogo: lo que el onboarding guardó, editable aquí
+          y leído por el filtro y el selector del catálogo. */}
+      <CompanyCategoriesEditor />
     </div>
   );
 }

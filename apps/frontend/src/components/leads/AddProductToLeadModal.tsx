@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Package } from 'lucide-react';
-import { getProducts, PRODUCT_CATEGORIES } from '@/lib/products';
+import { getProducts } from '@/lib/products';
+import { useCompanySettings } from '@/lib/company-settings';
 import { AddLeadProductPayload } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 
@@ -47,6 +48,26 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
     if (!term) return products;
     return products.filter((p) => p.name.toLowerCase().includes(term));
   }, [products, search]);
+
+  // Categorías de LA EMPRESA más las que ya usan sus productos: nunca una
+  // lista fija de la plataforma.
+  const { data: settings } = useCompanySettings();
+  const categoryOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of [
+      ...(settings?.catalog.categories ?? []),
+      ...(products ?? []).map((p) => p.category ?? ''),
+    ]) {
+      const value = c.trim();
+      if (!value) continue;
+      const key = value.toLocaleLowerCase('es');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(value);
+    }
+    return out;
+  }, [settings, products]);
 
   const selectedProduct = products?.find((p) => p.id === selectedProductId) ?? null;
 
@@ -112,7 +133,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                 className="rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               >
                 <option value="">Todas</option>
-                {PRODUCT_CATEGORIES.map((c) => (
+                {categoryOptions.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>

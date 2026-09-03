@@ -16,10 +16,10 @@ import {
   createProduct,
   updateProduct,
   deactivateProduct,
-  PRODUCT_CATEGORIES,
 } from "@/lib/products";
 import { Product } from "@/types";
 import { getMyCompany } from "@/lib/companies";
+import { useCompanySettings } from "@/lib/company-settings";
 import {
   ProductModal,
   ProductFormData,
@@ -58,6 +58,27 @@ function ProductsPageContent() {
     queryKey: ["company-me"],
     queryFn: getMyCompany,
   });
+
+  // Categorías DE ESTA EMPRESA (Company.settings, v1 o v2), no una lista
+  // fija de la plataforma. Se les suman las que ya usan sus productos, para
+  // que nada creado antes deje de poder filtrarse.
+  const { data: settings } = useCompanySettings();
+  const categoryOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const c of [
+      ...(settings?.catalog.categories ?? []),
+      ...(products ?? []).map((p) => p.category ?? ""),
+    ]) {
+      const value = c.trim();
+      if (!value) continue;
+      const key = value.toLocaleLowerCase("es");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(value);
+    }
+    return out;
+  }, [settings, products]);
   const catalogSubtitle = company
     ? `Productos activos de ${company.name}${company.city ? ` · ${company.city}` : ""}`
     : "Productos activos del catálogo";
@@ -187,7 +208,7 @@ function ProductsPageContent() {
             onChange={(e) => setCategory(e.target.value)}
           >
             <option value="">Todas las categorías</option>
-            {PRODUCT_CATEGORIES.map((c) => (
+            {categoryOptions.map((c) => (
               <option key={c} value={c}>
                 {c}
               </option>
@@ -296,6 +317,7 @@ function ProductsPageContent() {
         <ProductModal
           key={editingProduct?.id ?? "new"}
           product={editingProduct}
+          categories={categoryOptions}
           onClose={() => setModalOpen(false)}
           onSubmit={handleSubmit}
         />
