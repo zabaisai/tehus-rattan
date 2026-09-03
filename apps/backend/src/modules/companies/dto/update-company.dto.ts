@@ -1,8 +1,6 @@
-import { Prisma } from '@prisma/client';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
-  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -67,10 +65,6 @@ export class UpdateCompanyDto {
   })
   backgroundColor?: string;
 
-  @IsOptional()
-  @IsObject()
-  settings?: Prisma.InputJsonValue;
-
   // ── Per-company fiscal identity (used to render quotes) ──
   // Optional and normalized (trimmed) with sane max lengths. Empty values are
   // omitted from the printed document, never replaced by a global fallback.
@@ -99,8 +93,10 @@ export class UpdateCompanyDto {
   quoteFooter?: string;
 
   // Deliberately NOT declared here: id, status, slug, companyId, createdAt,
-  // updatedAt, logoUrl, secondaryLogoUrl. The global ValidationPipe
+  // updatedAt, logoUrl, secondaryLogoUrl, settings. The global ValidationPipe
   // (whitelist + forbidNonWhitelisted) rejects a request that includes any
   // of them with a 400 — logoUrl/secondaryLogoUrl only ever change via
-  // POST /companies/me/logo.
+  // POST /companies/me/logo. `settings` (Fase 1) only changes through
+  // PATCH /companies/me/settings with the typed UpdateCompanySettingsDto — a
+  // whole-object write would let a malformed v2 reach the database.
 }

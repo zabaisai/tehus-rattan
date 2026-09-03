@@ -31,6 +31,11 @@ export const CATEGORY_LIMITS = {
   maxCount: 30,
 } as const;
 
+/** Descripción manual del tipo de negocio («Otro / Configurar manualmente»). */
+export const BUSINESS_TYPE_LIMITS = {
+  maxLength: 60,
+} as const;
+
 export const STAGE_LIMITS = {
   maxNameLength: 40,
   maxCount: 20,
@@ -286,30 +291,6 @@ export function toPublicSettings(parsed: NormalizedCompanySettings) {
     pipelineDefaults: parsed.pipelineDefaults,
     limits: { categories: CATEGORY_LIMITS },
   };
-}
-
-/**
- * Comprueba que un objeto enviado por un cliente como `settings` completo
- * (PATCH /companies/me con `settings`) sea una forma reconocible. Devuelve el
- * objeto tal cual si es v1 o v2 válida; lanza 400 si no lo es. No convierte:
- * escribir settings completos es un uso avanzado y no debe mutar en silencio.
- */
-export function assertParsableSettings(raw: unknown): void {
-  if (!isRecord(raw)) {
-    throw new BadRequestException('settings debe ser un objeto');
-  }
-  if (raw.version !== undefined && raw.version !== COMPANY_SETTINGS_VERSION) {
-    throw new BadRequestException(
-      `settings.version debe ser ${COMPANY_SETTINGS_VERSION}`,
-    );
-  }
-  const parsed = parseCompanySettings(raw);
-  // Categorías: los límites se aplican de forma estricta aquí.
-  const source =
-    parsed.storedVersion === 2 && isRecord(raw.catalog)
-      ? raw.catalog.categories
-      : raw.categories;
-  normalizeCategories(source, { strict: true });
 }
 
 export interface TypedStageInput {

@@ -24,7 +24,6 @@ describe('UpdateCompanyDto', () => {
       primaryColor: '#A57014',
       accentColor: '#FDD',
       backgroundColor: '#FAF8F3',
-      settings: { sellsProducts: true },
     });
 
     expect(errors).toHaveLength(0);
@@ -59,6 +58,9 @@ describe('UpdateCompanyDto', () => {
     'updatedAt',
     'logoUrl',
     'secondaryLogoUrl',
+    // Fase 1: la configuración comercial solo cambia por
+    // PATCH /companies/me/settings (DTO tipado), nunca como objeto completo.
+    'settings',
   ])(
     'rejects the forbidden field "%s" instead of silently ignoring it',
     async (field) => {
@@ -170,5 +172,102 @@ describe('UpdateCompanyDto', () => {
       });
       expect(errors).toHaveLength(0);
     });
+  });
+
+  // Fase 1: ninguna forma de `settings` —válida o malformada— entra por el
+  // PATCH genérico. Sin campo en el DTO, `forbidNonWhitelisted` la rechaza
+  // con 400 antes de llegar al servicio, así que un v2 malformado no puede
+  // persistirse por esta vía.
+  it.each([
+    ['no objeto', 'texto'],
+    ['versión desconocida', { version: 3 }],
+    ['v2 sin commercial', { version: 2, catalog: { categories: [] } }],
+    [
+      'v2 con commercial no objeto',
+      { version: 2, commercial: 'x', catalog: { categories: [] } },
+    ],
+    [
+      'bandera comercial no booleana',
+      {
+        version: 2,
+        commercial: { sellsProducts: 'sí' },
+        catalog: { categories: [] },
+      },
+    ],
+    ['v2 sin catalog', { version: 2, commercial: {} }],
+    ['catalog no objeto', { version: 2, commercial: {}, catalog: 'x' }],
+    [
+      'categorías no array',
+      { version: 2, commercial: {}, catalog: { categories: 'Salas' } },
+    ],
+    [
+      'categoría no string',
+      { version: 2, commercial: {}, catalog: { categories: [5] } },
+    ],
+    [
+      'categoría demasiado larga',
+      { version: 2, commercial: {}, catalog: { categories: ['x'.repeat(61)] } },
+    ],
+    [
+      'exceso de categorías',
+      {
+        version: 2,
+        commercial: {},
+        catalog: { categories: Array.from({ length: 31 }, (_, i) => `c${i}`) },
+      },
+    ],
+    [
+      'vertical parcial',
+      {
+        version: 2,
+        commercial: {},
+        catalog: { categories: [] },
+        vertical: { industry: 'generic' },
+      },
+    ],
+    [
+      'vertical con modelo inválido',
+      {
+        version: 2,
+        commercial: {},
+        catalog: { categories: [] },
+        vertical: {
+          industry: 'generic',
+          businessType: 'products',
+          businessModel: 'raro',
+          templateVersion: 2,
+        },
+      },
+    ],
+    [
+      'pipelineDefaults parcial',
+      {
+        version: 2,
+        commercial: {},
+        catalog: { categories: [] },
+        pipelineDefaults: { templateKey: 'x' },
+      },
+    ],
+    [
+      'v1 válida (tampoco: solo por /companies/me/settings)',
+      { sellsProducts: true, categories: ['A'] },
+    ],
+    [
+      'v2 válida (tampoco: solo por /companies/me/settings)',
+      {
+        version: 2,
+        commercial: {
+          sellsProducts: true,
+          sellsServices: false,
+          usesCatalog: true,
+          usesQuotes: false,
+          usesTasks: true,
+        },
+        catalog: { categories: ['A'], allowFreeText: true },
+      },
+    ],
+  ])('rechaza settings %s en el PATCH genérico', async (_label, settings) => {
+    const errors = await validatePayload({ name: 'Empresa', settings });
+    expect(errors.some((e) => e.property === 'settings')).toBe(true);
   });
 });

@@ -6,7 +6,6 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
-  assertParsableSettings,
   buildCompanySettingsV2,
   normalizeCategories,
   parseCompanySettings,
@@ -36,7 +35,6 @@ export class CompaniesService {
       primaryColor?: string;
       accentColor?: string;
       backgroundColor?: string;
-      settings?: Prisma.InputJsonValue;
       // Nullable so the settings form can clear a fiscal field (sets the
       // column back to NULL) rather than only ever setting a new value.
       legalName?: string | null;
@@ -45,10 +43,10 @@ export class CompaniesService {
       quoteFooter?: string | null;
     },
   ) {
-    // A whole-object `settings` write must at least be a recognizable v1/v2
-    // shape with valid categories — never arbitrary JSON that the rest of
-    // the app then fails to read.
-    if (data.settings !== undefined) assertParsableSettings(data.settings);
+    // `settings` is deliberately not accepted here: the tolerant reader
+    // (parseCompanySettings) exists to read historical data, not to validate
+    // a whole-object write. Commercial settings change only through
+    // updateSettings() with the typed DTO.
     try {
       return await this.prisma.company.update({ where: { id }, data });
     } catch (error) {

@@ -1,6 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
 import {
-  assertParsableSettings,
   buildCompanySettingsV2,
   CATEGORY_LIMITS,
   normalizeCategories,
@@ -221,31 +220,6 @@ describe('Company.settings — parser central', () => {
       });
       expect(built.version).toBe(2);
       expect(built.catalog).toEqual({ categories: [], allowFreeText: true });
-    });
-  });
-
-  describe('assertParsableSettings', () => {
-    it('acepta v1 y v2 válidas', () => {
-      expect(() =>
-        assertParsableSettings({ sellsProducts: true, categories: ['A'] }),
-      ).not.toThrow();
-      expect(() =>
-        assertParsableSettings({
-          version: 2,
-          commercial: {},
-          catalog: { categories: [] },
-        }),
-      ).not.toThrow();
-    });
-
-    it('rechaza no-objetos, versiones desconocidas y categorías inválidas', () => {
-      expect(() => assertParsableSettings('x')).toThrow(BadRequestException);
-      expect(() => assertParsableSettings({ version: 3 })).toThrow(
-        BadRequestException,
-      );
-      expect(() =>
-        assertParsableSettings({ version: 2, catalog: { categories: [5] } }),
-      ).toThrow(BadRequestException);
     });
   });
 
