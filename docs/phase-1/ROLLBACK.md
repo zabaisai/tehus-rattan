@@ -16,17 +16,20 @@ esta fase incluye migraciones Prisma ni escribe sobre empresas existentes.
 ## Variables de entorno (`.env.staging`)
 
 Antes de editar: `cp -p .env.staging .secrets/.env.staging.bak-<timestamp>`
-(modo `600`). Volver atrás = copiar la copia sobre el archivo vivo y
+(modo `600`). Copia real del despliegue de Fase 1:
+`/opt/tehus-crm/.secrets/.env.staging.bak-20260903T211834Z`. Volver atrás = copiar la copia sobre el archivo vivo y
 `docker compose --env-file .env.staging -f docker-compose.staging.yml up -d`
 (recrea backend, worker y frontend; el frontend se reconstruye con la URL
 antigua de la API mediante `deploy.sh` o `compose build frontend`).
 
 ## Caddy / dominios
 
-- El Caddyfile vive en Git y se monta en el contenedor: volver al commit
-  anterior y recrear `caddy` (`compose up -d caddy`) restaura el archivo
-  antiguo. Los certificados ya emitidos quedan en el volumen `caddy_data` y
-  no estorban.
+- El Caddyfile vive en Git y se monta en el contenedor como archivo único:
+  volver al commit anterior y **recrear** `caddy`
+  (`compose up -d --force-recreate --no-deps caddy`) restaura el archivo
+  antiguo; `caddy reload` no basta porque el contenedor conserva el inodo
+  anterior tras un `git pull`. Los certificados ya emitidos quedan en el
+  volumen `caddy_data` y no estorban.
 - La redirección del frontend antiguo es **302** (temporal): al retirarla, los
   navegadores no la recuerdan.
 - DNS: eliminar los registros A `crm-staging` y `api.crm-staging` de

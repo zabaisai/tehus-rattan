@@ -63,8 +63,8 @@ vertical a empresas existentes es una decisión posterior del propietario.
 | Entorno | Frontend | API | Estado |
 |---|---|---|---|
 | Producción | `crm.takto.online` | `api.crm.takto.online` | Documentado y con ejemplos; sin DNS, sin certificados, sin despliegue |
-| Staging (nuevo, canónico) | `crm-staging.takto.online` | `api.crm-staging.takto.online` | Configurado en código; DNS pendiente |
-| Staging (antiguo, compatibilidad temporal) | `crm-staging.tehusrattan.com` | `api.crm-staging.tehusrattan.com` | Frontend: redirección al nuevo tras verificar login; API: alias compatible |
+| Staging (nuevo, canónico) | `crm-staging.takto.online` | `api.crm-staging.takto.online` | Desplegado y verificado el 2026-09-03 (TLS, CORS, auth, onboarding) |
+| Staging (antiguo, compatibilidad temporal) | `crm-staging.tehusrattan.com` | `api.crm-staging.tehusrattan.com` | Frontend: 302 al nuevo conservando ruta y query; API: alias del mismo backend (verificado 2026-09-03); no se eliminan en esta fase |
 
 Estrategia de convivencia: la API antigua se mantiene como alias del mismo
 backend (mismos certificados, sin redirecciones que rompan preflight,
