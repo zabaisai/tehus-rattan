@@ -51,9 +51,11 @@ Casos mínimos del encargo cubiertos:
 Construcción de producción del frontend servida con `next start` y un stub
 local de la API que devuelve `docs/contracts/onboarding-templates.v2.json`
 (sin backend real, sin datos). Recorrido automatizado por Chrome DevTools
-Protocol en 320, 360, 390, 768, 1024 y 1440 px: 120 capturas (incluye la
-opción «Otro / Configurar manualmente»: sin descripción no avanza y el aviso
-se muestra junto al paso).
+Protocol en 320, 360, 390, 768, 1024 y 1440 px. Dos recorridos: el inicial
+(antes de la revisión correctiva) capturó 108 pasos; el final, sobre el HEAD
+corregido, 120 pasos porque añade la opción «Otro / Configurar manualmente»
+(sin descripción no avanza y el aviso se muestra junto al paso). Las cifras
+de la tabla corresponden al recorrido final.
 
 | Comprobación | Resultado |
 |---|---|
