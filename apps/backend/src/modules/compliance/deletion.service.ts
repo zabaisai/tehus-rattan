@@ -43,7 +43,7 @@ export interface ResumenEliminacion {
  *
  * 3. **Doble confirmación**: aprobar es un paso, ejecutar es otro, y ejecutar
  *    exige teclear el nombre exacto de la empresa. Un botón de confirmación
- *    se pulsa por inercia; escribir «Muebles Ejemplo S.A.S.» a mano, no.
+ *    se pulsa por inercia; escribir «Empresa Ejemplo S.A.S.» a mano, no.
  *
  * 4. **La empresa NO se borra.** Se borran sus datos operativos y queda la
  *    ficha con el rastro de auditoría. Borrar la fila de la empresa se
