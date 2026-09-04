@@ -12,10 +12,9 @@ import {
   type StageType,
 } from "@/lib/onboarding-templates";
 
-export interface PipelineState {
-  name: string;
-  stages: StageTemplate[];
-}
+import type { PipelineState } from "@/lib/onboarding-wizard";
+
+export type { PipelineState };
 
 interface PipelineStepProps {
   value: PipelineState;

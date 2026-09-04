@@ -12,11 +12,9 @@ import { PASSWORD_MIN_LENGTH, PASSWORD_RULES } from "@/lib/password-policy";
 // identifica a qué asesor le falta.
 const PASSWORD_HINT = `Contraseña temporal: ${PASSWORD_RULES.map((r) => r.label.toLowerCase()).join(", ")}.`;
 
-export interface AgentDraft {
-  name: string;
-  email: string;
-  password: string;
-}
+import type { AgentDraft } from "@/lib/onboarding-wizard";
+
+export type { AgentDraft };
 
 interface AgentsStepProps {
   value: AgentDraft[];

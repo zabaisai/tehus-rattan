@@ -3,12 +3,9 @@ import { Input } from "@/components/ui/Input";
 import { PasswordRequirements } from "@/components/auth/PasswordRequirements";
 import { PASSWORD_MIN_LENGTH } from "@/lib/password-policy";
 
-export interface AdminState {
-  name: string;
-  email: string;
-  password: string;
-  confirmPassword: string;
-}
+import type { AdminState } from "@/lib/onboarding-wizard";
+
+export type { AdminState };
 
 interface AdminStepProps {
   value: AdminState;

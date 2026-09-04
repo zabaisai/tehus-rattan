@@ -13,11 +13,9 @@ import { Input } from "@/components/ui/Input";
  * empresa lo elige. Antes venían pre-rellenados con los colores de un tenant
  * concreto, que así se colaban como valor por defecto de todo el mundo.
  */
-export interface BrandingColorState {
-  primaryColor: string;
-  accentColor: string;
-  backgroundColor: string;
-}
+import type { BrandingColorState } from "@/lib/onboarding-wizard";
+
+export type { BrandingColorState };
 
 export const EMPTY_BRANDING_COLORS: BrandingColorState = {
   primaryColor: "",

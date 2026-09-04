@@ -1,0 +1,1560 @@
+{
+  "version": 3,
+  "coreModules": [
+    "conversations",
+    "contacts",
+    "leads",
+    "pipeline"
+  ],
+  "industries": [
+    {
+      "key": "generic",
+      "name": "Genérico",
+      "description": "Cualquier negocio que vende por WhatsApp. Punto de partida neutral.",
+      "categorySuggestions": [
+        "Productos",
+        "Servicios",
+        "Otros"
+      ],
+      "businessTypes": [
+        {
+          "key": "products",
+          "name": "Venta de productos",
+          "description": "Vendes artículos físicos o digitales con un catálogo.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Productos",
+            "Otros"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Calificado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta o cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "services",
+          "name": "Venta de servicios",
+          "description": "Vendes servicios o tiempo; normalmente sin catálogo de productos.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": false,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Calificado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "mixed",
+          "name": "Modelo mixto",
+          "description": "Vendes productos y también servicios.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Productos",
+            "Servicios",
+            "Otros"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Calificado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta o cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "other",
+          "name": "Otro / Configurar manualmente",
+          "description": "Sin sugerencias predefinidas: eliges módulos, categorías y etapas a tu medida.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": false,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          },
+          "manual": true
+        }
+      ]
+    },
+    {
+      "key": "retail_ecommerce",
+      "name": "Retail y ecommerce",
+      "description": "Tiendas físicas, tiendas en línea y distribución.",
+      "categorySuggestions": [
+        "Productos",
+        "Novedades",
+        "Promociones",
+        "Mayorista",
+        "Otros"
+      ],
+      "businessTypes": [
+        {
+          "key": "physical_store",
+          "name": "Tienda física",
+          "description": "Atiendes en un local y cierras ventas por WhatsApp.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Productos",
+            "Novedades",
+            "Promociones",
+            "Otros"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Interesado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Reserva o pedido",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "ecommerce",
+          "name": "Ecommerce",
+          "description": "Vendes en línea y acompañas pedidos por WhatsApp.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Productos",
+            "Novedades",
+            "Promociones",
+            "Otros"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Pedido en curso",
+                "type": "OPEN"
+              },
+              {
+                "name": "Pago pendiente",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "wholesale",
+          "name": "Distribuidor / mayorista",
+          "description": "Vendes por volumen a otros negocios con cotización.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Productos",
+            "Mayorista",
+            "Otros"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "other",
+          "name": "Otro / Configurar manualmente",
+          "description": "Sin sugerencias predefinidas: eliges módulos, categorías y etapas a tu medida.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": false,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          },
+          "manual": true
+        }
+      ]
+    },
+    {
+      "key": "furniture_decor",
+      "name": "Muebles y decoración",
+      "description": "Showrooms, diseño de interiores y fabricación a medida.",
+      "categorySuggestions": [
+        "Salas",
+        "Comedores",
+        "Sillas",
+        "Dormitorios",
+        "Exterior",
+        "Decoración",
+        "Instalación",
+        "Personalizados"
+      ],
+      "businessTypes": [
+        {
+          "key": "showroom",
+          "name": "Tienda / showroom",
+          "description": "Exhibes y vendes muebles con asesoría, cotización e instalación.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Salas",
+            "Comedores",
+            "Sillas",
+            "Decoración",
+            "Instalación"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Asesoría en proceso",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "interior_design",
+          "name": "Diseño de interiores",
+          "description": "Vendes proyectos de diseño; el catálogo es opcional.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": false,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Proyectos",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Visita o brief",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta de diseño",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "custom_manufacturing",
+          "name": "Fabricación personalizada",
+          "description": "Fabricas a medida a partir de una cotización.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Personalizados",
+            "Salas",
+            "Comedores",
+            "Dormitorios",
+            "Exterior"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Levantamiento de medidas",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "other",
+          "name": "Otro / Configurar manualmente",
+          "description": "Sin sugerencias predefinidas: eliges módulos, categorías y etapas a tu medida.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": false,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          },
+          "manual": true
+        }
+      ]
+    },
+    {
+      "key": "veterinary_pet",
+      "name": "Veterinaria y mascotas",
+      "description": "Clínicas, pet shops, grooming y guarderías. Flujo comercial: citas, reservas y seguimiento.",
+      "categorySuggestions": [
+        "Consultas",
+        "Vacunas",
+        "Peluquería",
+        "Alimentos",
+        "Medicamentos",
+        "Consulta veterinaria",
+        "Vacunación",
+        "Grooming",
+        "Pet shop",
+        "Guardería y hotel",
+        "Otros servicios"
+      ],
+      "businessTypes": [
+        {
+          "key": "vet_petshop",
+          "name": "Veterinaria y pet shop",
+          "description": "Atiendes consultas y vacunas y además vendes alimentos, medicamentos y accesorios.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Consultas",
+            "Vacunas",
+            "Peluquería",
+            "Alimentos",
+            "Medicamentos"
+          ],
+          "pipeline": {
+            "name": "Citas y pedidos",
+            "stages": [
+              {
+                "name": "Nueva solicitud",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cita o pedido confirmado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "clinic",
+          "name": "Clínica veterinaria",
+          "description": "Agendas consultas y vacunación por WhatsApp.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Consulta veterinaria",
+            "Vacunación",
+            "Otros servicios"
+          ],
+          "pipeline": {
+            "name": "Citas",
+            "stages": [
+              {
+                "name": "Nuevo contacto",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cita agendada",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento comercial",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "pet_shop",
+          "name": "Pet shop",
+          "description": "Vendes alimento, accesorios y productos para mascotas.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Pet shop",
+            "Otros servicios"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Interesado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Reserva o pedido",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "grooming",
+          "name": "Grooming",
+          "description": "Agendas baños, cortes y servicios de estética.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Grooming",
+            "Otros servicios"
+          ],
+          "pipeline": {
+            "name": "Citas",
+            "stages": [
+              {
+                "name": "Nuevo contacto",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cita agendada",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "boarding",
+          "name": "Guardería / hotel",
+          "description": "Gestionas reservas de estadía por WhatsApp.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Guardería y hotel",
+            "Otros servicios"
+          ],
+          "pipeline": {
+            "name": "Reservas",
+            "stages": [
+              {
+                "name": "Nuevo contacto",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Reserva solicitada",
+                "type": "OPEN"
+              },
+              {
+                "name": "Confirmación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "other",
+          "name": "Otro / Configurar manualmente",
+          "description": "Sin sugerencias predefinidas: eliges módulos, categorías y etapas a tu medida.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": false,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          },
+          "manual": true
+        }
+      ]
+    },
+    {
+      "key": "professional_services",
+      "name": "Servicios profesionales",
+      "description": "Consultoría, agencias, servicios técnicos y proyectos.",
+      "categorySuggestions": [
+        "Implementación",
+        "Consultoría",
+        "Soporte",
+        "Licencias",
+        "Proyectos",
+        "Otros servicios"
+      ],
+      "businessTypes": [
+        {
+          "key": "software",
+          "name": "Software y tecnología",
+          "description": "Vendes licencias, implementación y soporte con propuesta y negociación.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Implementación",
+            "Consultoría",
+            "Soporte",
+            "Licencias"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Descubrimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "consulting",
+          "name": "Consultoría",
+          "description": "Vendes diagnóstico y acompañamiento con propuesta.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": false,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Diagnóstico",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "agency",
+          "name": "Agencia",
+          "description": "Recibes briefs y presentas propuestas.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": false,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Brief",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "technical_services",
+          "name": "Servicios técnicos",
+          "description": "Visitas, soporte e implementación con cotización.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Soporte",
+            "Implementación",
+            "Otros servicios"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Visita técnica",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "projects",
+          "name": "Proyectos",
+          "description": "Vendes proyectos con alcance definido y propuesta.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": false,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Proyectos",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Alcance definido",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "other",
+          "name": "Otro / Configurar manualmente",
+          "description": "Sin sugerencias predefinidas: eliges módulos, categorías y etapas a tu medida.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": false,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          },
+          "manual": true
+        }
+      ]
+    },
+    {
+      "key": "real_estate",
+      "name": "Bienes raíces",
+      "description": "Venta, arriendo y proyectos nuevos.",
+      "categorySuggestions": [
+        "Venta",
+        "Arriendo",
+        "Proyecto nuevo",
+        "Inversión"
+      ],
+      "businessTypes": [
+        {
+          "key": "sale",
+          "name": "Venta",
+          "description": "Vendes inmuebles usados o nuevos de terceros.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Venta",
+            "Inversión"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Visita agendada",
+                "type": "OPEN"
+              },
+              {
+                "name": "Oferta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "rent",
+          "name": "Arriendo",
+          "description": "Gestionas arriendos y documentación.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": true,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [
+            "Arriendo"
+          ],
+          "pipeline": {
+            "name": "Arriendos",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Visita agendada",
+                "type": "OPEN"
+              },
+              {
+                "name": "Documentos en revisión",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "new_projects",
+          "name": "Proyectos nuevos",
+          "description": "Vendes unidades sobre planos o en construcción.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Proyecto nuevo",
+            "Inversión"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Visita al proyecto",
+                "type": "OPEN"
+              },
+              {
+                "name": "Separación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "other",
+          "name": "Otro / Configurar manualmente",
+          "description": "Sin sugerencias predefinidas: eliges módulos, categorías y etapas a tu medida.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": false,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          },
+          "manual": true
+        }
+      ]
+    },
+    {
+      "key": "automotive",
+      "name": "Automotriz",
+      "description": "Concesionarios, talleres y repuestos.",
+      "categorySuggestions": [
+        "Vehículos",
+        "Taller",
+        "Repuestos",
+        "Accesorios"
+      ],
+      "businessTypes": [
+        {
+          "key": "dealership",
+          "name": "Concesionario",
+          "description": "Vendes vehículos con prueba de manejo y cotización.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Vehículos",
+            "Accesorios"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Prueba de manejo",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "workshop",
+          "name": "Taller",
+          "description": "Diagnosticas y cotizas servicios de taller.",
+          "businessModel": "services",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Taller",
+            "Repuestos"
+          ],
+          "pipeline": {
+            "name": "Servicios",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Diagnóstico",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "parts",
+          "name": "Repuestos / accesorios",
+          "description": "Vendes repuestos y accesorios con cotización.",
+          "businessModel": "products",
+          "modules": {
+            "catalog": true,
+            "quotes": true,
+            "tasks": true
+          },
+          "categories": [
+            "Repuestos",
+            "Accesorios"
+          ],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cotización",
+                "type": "OPEN"
+              },
+              {
+                "name": "Negociación",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          }
+        },
+        {
+          "key": "other",
+          "name": "Otro / Configurar manualmente",
+          "description": "Sin sugerencias predefinidas: eliges módulos, categorías y etapas a tu medida.",
+          "businessModel": "mixed",
+          "modules": {
+            "catalog": false,
+            "quotes": false,
+            "tasks": true
+          },
+          "categories": [],
+          "pipeline": {
+            "name": "Ventas",
+            "stages": [
+              {
+                "name": "Nuevo lead",
+                "type": "OPEN"
+              },
+              {
+                "name": "Contactado",
+                "type": "OPEN"
+              },
+              {
+                "name": "Propuesta",
+                "type": "OPEN"
+              },
+              {
+                "name": "Seguimiento",
+                "type": "OPEN"
+              },
+              {
+                "name": "Cerrado ganado",
+                "type": "WON"
+              },
+              {
+                "name": "Cerrado perdido",
+                "type": "LOST"
+              }
+            ]
+          },
+          "manual": true
+        }
+      ]
+    }
+  ]
+}

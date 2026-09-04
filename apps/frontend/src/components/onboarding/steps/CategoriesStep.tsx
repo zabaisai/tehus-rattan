@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Pencil, X } from "lucide-react";
 import { SuggestionHeader } from "@/components/onboarding/SuggestionHeader";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
@@ -20,9 +20,9 @@ interface CategoriesStepProps {
 }
 
 /**
- * Categorías del catálogo: sugeridas por la plantilla, editables, sin
- * duplicados ni vacíos, con las propias del negocio. Solo aparece cuando el
- * módulo de catálogo está activo.
+ * Categorías del catálogo: sugeridas por la plantilla, editables (marcar,
+ * quitar, agregar, renombrar), sin duplicados ni vacíos, con las propias del
+ * negocio. Solo aparece cuando el módulo de catálogo está activo.
  */
 export function CategoriesStep({
   value,
@@ -35,6 +35,8 @@ export function CategoriesStep({
 }: CategoriesStepProps) {
   const [custom, setCustom] = useState("");
   const [customError, setCustomError] = useState("");
+  const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
+  const [renameError, setRenameError] = useState("");
 
   const extras = value.filter((c) => !hasCategory(suggestions, c));
 
@@ -70,8 +72,31 @@ export function CategoriesStep({
     setCustom("");
   }
 
+  function confirmRename() {
+    if (!renaming) return;
+    const { categories, error } = normalizeCategoryList([renaming.to], limits);
+    if (error) {
+      setRenameError(error);
+      return;
+    }
+    const next = categories[0];
+    if (!next) {
+      setRenameError("Escribe un nombre de categoría.");
+      return;
+    }
+    const others = value.filter((c) => c !== renaming.from);
+    if (hasCategory(others, next)) {
+      setRenameError("Ya existe una categoría con ese nombre.");
+      return;
+    }
+    // Se conserva la posición: renombrar no reordena.
+    onChange(value.map((c) => (c === renaming.from ? next : c)));
+    setRenaming(null);
+    setRenameError("");
+  }
+
   const chipBase =
-    "rounded-full px-3 py-1.5 text-xs font-medium transition-colors " +
+    "rounded-full px-3 py-1.5 text-xs font-medium transition-colors motion-reduce:transition-none " +
     "outline-none focus-visible:ring-2 focus-visible:ring-line-focus focus-visible:ring-offset-1";
   // Naranja de FONDO con texto navy: la regla del manual.
   const chipOn = "bg-brand-secondary text-brand-primary";
@@ -81,7 +106,7 @@ export function CategoriesStep({
     <div>
       <SuggestionHeader
         title="Categorías del catálogo"
-        description="Sirven para organizar y filtrar tus productos o servicios. Marca las que apliquen y agrega las tuyas."
+        description="Sirven para organizar y filtrar tus productos o servicios. Marca las que apliquen, agrega las tuyas o renómbralas."
         edited={edited}
         canRestore={canRestore}
         onRestore={onRestore}
@@ -121,19 +146,79 @@ export function CategoriesStep({
             </button>
           ))}
           {suggestions.length === 0 && extras.length === 0 && (
-            <p className="text-sm text-content-secondary">
-              Aún no hay categorías. Agrega la primera abajo.
-            </p>
+            <p className="text-sm text-content-secondary">Aún no hay categorías. Agrega la primera abajo.</p>
           )}
         </div>
 
+        {value.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-1 text-sm font-medium text-neutral-700">Tu lista, en orden</p>
+            <ol aria-label="Categorías elegidas" className="space-y-1">
+              {value.map((category) => (
+                <li key={category} className="flex items-center justify-between gap-2 text-sm">
+                  {renaming?.from === category ? (
+                    <div className="flex w-full flex-col gap-1 sm:flex-row sm:items-start">
+                      <Field label={`Nuevo nombre para ${category}`} labelOculta error={renameError} className="w-full">
+                        <Input
+                          type="text"
+                          autoFocus
+                          maxLength={limits.maxLength}
+                          value={renaming.to}
+                          onChange={(e) => {
+                            setRenaming({ from: category, to: e.target.value });
+                            if (renameError) setRenameError("");
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              confirmRename();
+                            }
+                            if (e.key === "Escape") {
+                              e.preventDefault();
+                              setRenaming(null);
+                              setRenameError("");
+                            }
+                          }}
+                        />
+                      </Field>
+                      <div className="flex shrink-0 gap-1">
+                        <Button size="sm" onClick={confirmRename}>
+                          Guardar nombre
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="quiet"
+                          onClick={() => {
+                            setRenaming(null);
+                            setRenameError("");
+                          }}
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-content-primary">{category}</span>
+                      <Button
+                        variant="quiet"
+                        size="sm"
+                        aria-label={`Renombrar categoría ${category}`}
+                        onClick={() => setRenaming({ from: category, to: category })}
+                        className="p-1.5"
+                      >
+                        <Pencil size={14} aria-hidden="true" />
+                      </Button>
+                    </>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+
         <div className="mt-3 flex items-start gap-2">
-          <Field
-            label="Categoría personalizada"
-            labelOculta
-            error={customError}
-            className="w-full"
-          >
+          <Field label="Categoría personalizada" labelOculta error={customError} className="w-full">
             <Input
               type="text"
               value={custom}

@@ -33,7 +33,7 @@ const FURNITURE_TERMS =
 const MEDICAL_TERMS =
   /\b(historia cl[ií]nica|diagn[oó]stico m[eé]dico|receta|tratamiento)\b/i;
 
-describe('Plantillas de onboarding (v2, versionadas en código)', () => {
+describe('Plantillas de onboarding (v3, versionadas en código)', () => {
   it('declara la versión y los módulos centrales', () => {
     expect(ONBOARDING_TEMPLATES.version).toBe(ONBOARDING_TEMPLATES_VERSION);
     expect(ONBOARDING_TEMPLATES.coreModules).toEqual(CORE_MODULES);
@@ -90,12 +90,14 @@ describe('Plantillas de onboarding (v2, versionadas en código)', () => {
       'custom_manufacturing',
     ]);
     expectTypes('veterinary_pet', [
+      'vet_petshop',
       'clinic',
       'pet_shop',
       'grooming',
       'boarding',
     ]);
     expectTypes('professional_services', [
+      'software',
       'consulting',
       'agency',
       'technical_services',
@@ -174,12 +176,12 @@ describe('Plantillas de onboarding (v2, versionadas en código)', () => {
     expect(findBusinessType('nope', 'services')).toBeUndefined();
   });
 
-  it('el contrato publicado docs/contracts/onboarding-templates.v2.json es exactamente esta exportación', () => {
+  it('el contrato publicado docs/contracts/onboarding-templates.v3.json es exactamente esta exportación', () => {
     // Si este test falla, regenerar el JSON desde el código (ver el README de
     // la Fase 1): el documento nunca se edita a mano.
     const file = path.resolve(
       __dirname,
-      '../../../../../../docs/contracts/onboarding-templates.v2.json',
+      '../../../../../../docs/contracts/onboarding-templates.v3.json',
     );
     const published = JSON.parse(fs.readFileSync(file, 'utf8'));
     expect(published).toEqual(JSON.parse(JSON.stringify(ONBOARDING_TEMPLATES)));
