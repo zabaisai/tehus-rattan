@@ -1,5 +1,11 @@
 # Fase 1 — Contrato del onboarding por industria
 
+> **Actualización (Fase 3, 2026-09-04):** las plantillas están en la **versión 3**
+> (`docs/contracts/onboarding-templates.v3.json`; `v2.json` queda como histórico)
+> y el asistente añade región, forma de vender, recomendación explicada,
+> comprobación previa del código y resumen construido desde el payload. Ver
+> `docs/phase-3/ONBOARDING-CONTRACT.md` y `docs/phase-3/TEMPLATE-CATALOG.md`.
+
 ## Principios
 
 1. **Las plantillas son sugerencias.** Nada de lo que propone una plantilla es
