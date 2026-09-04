@@ -15,6 +15,7 @@ import { getMyCompany } from '@/lib/companies';
 import { getInbox } from '@/lib/conversations';
 import { getTasks } from '@/lib/tasks';
 import { estaPendiente } from '@/lib/tareas';
+import { useTenantCapabilities } from '@/lib/tenant-capabilities';
 import { ForbiddenState } from '@/components/ui/ForbiddenState';
 import { ComparacionMetrica, MetricCard } from '@/components/ui/MetricCard';
 import { Panel, esSinPermiso } from '@/components/ui/Panel';
@@ -98,6 +99,15 @@ export default function DashboardHomePage() {
   const puedeVerMetricas =
     user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
+  // Módulos de la empresa (Fase 4). Sin Tareas no hay agenda ni «Tareas
+  // vencidas», y sus consultas no se lanzan: el servidor respondería
+  // `403 MODULE_DISABLED` y la pantalla se llenaría de avisos por algo que la
+  // empresa decidió no usar. `can()` es falso hasta conocer la configuración,
+  // así que un módulo apagado tampoco parpadea mientras carga.
+  const { can } = useTenantCapabilities();
+  const conTareas = can('tasks');
+  const conCotizaciones = can('quotes');
+
   const overview = useQuery({
     queryKey: ['analytics-overview'],
     queryFn: getOverview,
@@ -116,7 +126,7 @@ export default function DashboardHomePage() {
   const vencidas = useQuery({
     queryKey: ['analytics-overdue'],
     queryFn: getOverdueTasksCount,
-    enabled: puedeVerMetricas,
+    enabled: puedeVerMetricas && conTareas,
   });
   const tendencia = useQuery({
     queryKey: ['analytics-trend', DIAS_TENDENCIA],
@@ -131,7 +141,11 @@ export default function DashboardHomePage() {
 
   // Tareas y conversaciones las ve cualquier usuario de la empresa: son los
   // dos bloques que sostienen el Inicio de un asesor.
-  const tareas = useQuery({ queryKey: ['tasks'], queryFn: getTasks });
+  const tareas = useQuery({
+    queryKey: ['tasks'],
+    queryFn: getTasks,
+    enabled: conTareas,
+  });
 
   // «Requieren respuesta» = sin leer por QUIEN MIRA. Es la bandeja de siempre
   // con `unread`, no un contrato nuevo: el backend ya deriva los no leídos
@@ -152,16 +166,41 @@ export default function DashboardHomePage() {
     (tareas.data ?? []).filter((t) => estaPendiente(t.status)),
   ).slice(0, 5);
 
+  // Columnas que de verdad tienen algo: la de administración (embudo y
+  // tendencia), la del equipo (conversaciones y rendimiento) y la de agenda
+  // (tareas y actividad). Si una queda vacía —un asesor sin Tareas, por
+  // ejemplo— no se reserva su tercio de pantalla: las que quedan se reparten
+  // el ancho y la retícula no deja huecos.
+  const conColumnaAdmin = puedeVerMetricas;
+  const conColumnaAgenda = conTareas || puedeVerMetricas;
+  const numeroDeColumnas =
+    1 + (conColumnaAdmin ? 1 : 0) + (conColumnaAgenda ? 1 : 0);
+  const anchoDeColumna =
+    numeroDeColumnas === 3
+      ? 'xl:col-span-4'
+      : numeroDeColumnas === 2
+        ? 'xl:col-span-6'
+        : 'xl:col-span-12';
+  const claseColumna = `contents ${anchoDeColumna} xl:flex xl:flex-col xl:gap-4`;
+
   return (
     <div className="mx-auto flex max-w-[1600px] flex-col gap-4">
-      <HeroInicio nombreUsuario={user?.name} nombreEmpresa={company?.name} />
+      <HeroInicio
+        nombreUsuario={user?.name}
+        nombreEmpresa={company?.name}
+        conCotizaciones={conCotizaciones}
+      />
 
       {/* Métricas. Cada una enlaza a donde se actúa sobre ella. */}
       {puedeVerMetricas ? (
         // Cuatro en fila solo a partir de 1280: a 1024 la tarjeta se queda en
         // ~115 px de texto y «$ 27,6 M» sale cortado, que en una métrica es
-        // peor que no enseñarla.
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        // peor que no enseñarla. Sin Tareas son tres, y tres sí caben a 1024.
+        <div
+          className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${
+            conTareas ? 'xl:grid-cols-4' : 'lg:grid-cols-3'
+          }`}
+        >
           <MetricCard
             etiqueta="Oportunidades abiertas"
             valor={porEtapa.isLoading ? '' : abiertas}
@@ -214,16 +253,18 @@ export default function DashboardHomePage() {
             // pasado de cada oportunidad, que no se guarda.
             nota="acumulado histórico"
           />
-          <MetricCard
-            etiqueta="Tareas vencidas"
-            valor={vencidas.isLoading ? '' : (vencidas.data ?? 0)}
-            cargando={vencidas.isLoading}
-            icono={CalendarClock}
-            href="/dashboard/tasks"
-            hrefLabel="Abrir tareas"
-            tono={(vencidas.data ?? 0) > 0 ? 'atencion' : 'neutral'}
-            nota="ahora mismo"
-          />
+          {conTareas && (
+            <MetricCard
+              etiqueta="Tareas vencidas"
+              valor={vencidas.isLoading ? '' : (vencidas.data ?? 0)}
+              cargando={vencidas.isLoading}
+              icono={CalendarClock}
+              href="/dashboard/tasks"
+              hrefLabel="Abrir tareas"
+              tono={(vencidas.data ?? 0) > 0 ? 'atencion' : 'neutral'}
+              nota="ahora mismo"
+            />
+          )}
         </div>
       ) : (
         <ForbiddenState
@@ -267,8 +308,8 @@ export default function DashboardHomePage() {
             La primera columna es entera de administración: si no se puede ver,
             no se monta el envoltorio tampoco, para no dejar un tercio de
             pantalla reservado a nada. */}
-        {puedeVerMetricas && (
-          <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-4">
+        {conColumnaAdmin && (
+          <div className={claseColumna}>
             <Panel
               titulo="Embudo comercial"
               accion={{ href: '/dashboard/pipeline', etiqueta: 'Ver embudo' }}
@@ -300,7 +341,7 @@ export default function DashboardHomePage() {
           </div>
         )}
 
-        <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-4">
+        <div className={claseColumna}>
           {/* Es lo único del Inicio que un asesor atiende AHORA, así que va por
               delante de la agenda. Cualquier rol lo ve: la bandeja es del
               equipo. */}
@@ -336,18 +377,21 @@ export default function DashboardHomePage() {
           )}
         </div>
 
-        <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-4">
-          <Panel
-            titulo="Agenda de hoy"
-            accion={{ href: '/dashboard/tasks', etiqueta: 'Ver todas' }}
-            cargando={tareas.isLoading}
-            error={tareas.error}
-            vacio={proximas.length === 0}
-            mensajeVacio="No tienes tareas pendientes."
-            className="lg:col-span-6"
-          >
-            <AgendaDeHoy tareas={proximas} />
-          </Panel>
+        {conColumnaAgenda && (
+        <div className={claseColumna}>
+          {conTareas && (
+            <Panel
+              titulo="Agenda de hoy"
+              accion={{ href: '/dashboard/tasks', etiqueta: 'Ver todas' }}
+              cargando={tareas.isLoading}
+              error={tareas.error}
+              vacio={proximas.length === 0}
+              mensajeVacio="No tienes tareas pendientes."
+              className="lg:col-span-6"
+            >
+              <AgendaDeHoy tareas={proximas} />
+            </Panel>
+          )}
 
           {puedeVerMetricas && (
             <Panel
@@ -365,6 +409,7 @@ export default function DashboardHomePage() {
             </Panel>
           )}
         </div>
+        )}
       </div>
     </div>
   );

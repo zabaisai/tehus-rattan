@@ -6,6 +6,11 @@ import { Search, Package } from 'lucide-react';
 import { getProducts } from '@/lib/products';
 import { useCompanySettings } from '@/lib/company-settings';
 import { effectiveItemType, ITEM_TYPE_LABELS } from '@/lib/tenant-configuration';
+import {
+  catalogVocabulary,
+  isLegacyItemType,
+  useTenantCapabilities,
+} from '@/lib/tenant-capabilities';
 import { AddLeadProductPayload, CatalogItemType } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 import { Badge } from '@/components/ui/Badge';
@@ -43,8 +48,19 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
   // anuncia un cuadro de texto sin nombre.
   const ids = useId();
 
-  // Ambos tipos son seleccionables; el filtro por tipo lo resuelve el
-  // servidor (PRODUCT incluye los elementos anteriores sin tipo).
+  // Vocabulario según lo que la empresa vende (Fase 4): «producto»,
+  // «servicio» o, si crea de los dos, el neutro. El filtro por tipo solo se
+  // dibuja cuando hay dos tipos entre los que elegir.
+  const capacidades = useTenantCapabilities();
+  const vocabulario = catalogVocabulary(capacidades.catalog);
+  const titulo =
+    vocabulario.mode === 'mixed'
+      ? 'Agregar producto o servicio'
+      : `Agregar ${vocabulario.singular}`;
+
+  // Ambos tipos son seleccionables (los heredados también se cotizan); el
+  // filtro por tipo lo resuelve el servidor (PRODUCT incluye los elementos
+  // anteriores sin tipo).
   const { data: products, isLoading } = useQuery({
     queryKey: ['products', category, itemType],
     queryFn: () =>
@@ -93,7 +109,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedProductId) {
-      setError('Selecciona un elemento del catálogo');
+      setError(`Selecciona un ${vocabulario.singular} del catálogo`);
       return;
     }
     setError('');
@@ -117,13 +133,15 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
   const noProductsAtAll = !isLoading && (products?.length ?? 0) === 0;
 
   return (
-    <Modal title="Agregar producto o servicio" onClose={onClose} maxWidth="md" stackedZIndex>
+    <Modal title={titulo} onClose={onClose} maxWidth="md" stackedZIndex>
         {isLoading && <p className="text-sm text-neutral-400">Cargando catálogo...</p>}
 
         {noProductsAtAll && (
           <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-neutral-300 py-8 text-center text-neutral-400">
             <Package size={24} strokeWidth={1.5} />
-            <p className="text-sm">Primero crea o importa productos o servicios en el catálogo.</p>
+            <p className="text-sm">
+              Primero crea o importa {vocabulario.plural} en el catálogo.
+            </p>
           </div>
         )}
 
@@ -141,16 +159,18 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                   className="w-full rounded-md border border-neutral-300 py-2 pl-7 pr-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
               </div>
-              <select
-                value={itemType}
-                onChange={(e) => setItemType(e.target.value as '' | CatalogItemType)}
-                aria-label="Filtrar por tipo"
-                className="rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
-              >
-                <option value="">Todos</option>
-                <option value="PRODUCT">Productos</option>
-                <option value="SERVICE">Servicios</option>
-              </select>
+              {vocabulario.showTypeChooser && (
+                <select
+                  value={itemType}
+                  onChange={(e) => setItemType(e.target.value as '' | CatalogItemType)}
+                  aria-label="Filtrar por tipo"
+                  className="rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+                >
+                  <option value="">Todos</option>
+                  <option value="PRODUCT">Productos</option>
+                  <option value="SERVICE">Servicios</option>
+                </select>
+              )}
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
@@ -191,6 +211,10 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                     >
                       {ITEM_TYPE_LABELS[effectiveItemType(product.itemType)]}
                     </Badge>
+                    {isLegacyItemType(
+                      capacidades.catalog,
+                      effectiveItemType(product.itemType),
+                    ) && <Badge tone="neutral">Heredado</Badge>}
                   </span>
                   <span className="text-xs text-neutral-500">
                     {currencyFormatter.format(product.price)}
@@ -241,14 +265,18 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={2}
-                    placeholder="Color, acabado, condiciones..."
+                    placeholder="Notas para esta línea"
                     className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                   />
                 </div>
               </>
             )}
 
-            {error && <p className="mb-3 text-xs text-status-error">{error}</p>}
+            {error && (
+              <p role="alert" className="mb-3 text-xs text-status-error">
+                {error}
+              </p>
+            )}
 
             <div className="flex justify-end gap-2">
               <button

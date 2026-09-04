@@ -61,12 +61,44 @@ export interface RegionalLimits {
   locale: { maxLength: number };
 }
 
+export type OptionalModuleKey = 'catalog' | 'quotes' | 'tasks';
+
+/**
+ * Definición de una capacidad tal como la publica el backend (Fase 4). La
+ * interfaz muestra etiqueta, descripción y dependencias desde aquí: el
+ * registro vive en el servidor y no se duplica en el navegador.
+ */
+export interface CapabilityDefinition {
+  key: keyof TenantModules;
+  label: string;
+  description: string;
+  group: 'core' | 'commercial';
+  alwaysOn: boolean;
+  configurable: boolean;
+  dependsOn: OptionalModuleKey[];
+  relatedTo: OptionalModuleKey[];
+}
+
+/** Capacidades efectivas (Fase 4): acompañan a `modules` con su explicación. */
+export interface TenantCapabilitiesView {
+  /** Opcionales activos por compatibilidad (la empresa nunca los declaró). */
+  legacyDefaultsApplied: OptionalModuleKey[];
+  catalog: {
+    /** Tipos que la empresa puede CREAR; los heredados se leen siempre. */
+    allowedItemTypes: CatalogItemType[];
+    defaultItemType: CatalogItemType;
+  };
+  definitions: CapabilityDefinition[];
+}
+
 export interface TenantConfiguration {
   contractVersion: 1;
   storageVersion: 0 | 1 | 2;
   identity: TenantIdentity;
   regional: TenantRegional;
+  /** Módulos EFECTIVOS: ya aplicada la regla de compatibilidad del servidor. */
   modules: TenantModules;
+  capabilities: TenantCapabilitiesView;
   catalog: { categories: string[]; allowFreeText: true };
   pipeline: TenantPipeline | null;
   limits: {

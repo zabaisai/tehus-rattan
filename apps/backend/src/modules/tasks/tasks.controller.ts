@@ -12,11 +12,14 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
+import { RequiresTenantCapability } from '../../common/decorators/requires-tenant-capability.decorator';
+import { TenantCapabilityGuard } from '../companies/tenant-capability.guard';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 
-@UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, TenantCapabilityGuard)
+@RequiresTenantCapability('tasks')
 @Controller('tasks')
 export class TasksController {
   constructor(private tasksService: TasksService) {}

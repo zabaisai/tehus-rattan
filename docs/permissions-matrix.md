@@ -34,6 +34,7 @@ Controllers use two patterns:
 | Notes | `/notes/*` | JWT | Any authenticated role | JWT `companyId`, JWT `sub` for `createdBy` |
 | Leads | `/leads/*` | JWT | Any authenticated role | JWT `companyId` |
 | Tasks | `/tasks/*` | JWT | Any authenticated role | JWT `companyId` |
+| Módulos por empresa (Fase 4) | `/products/**`, `/leads/:leadId/products/**` (catalog); `/quotes/**` (quotes); `/tasks/**`, `/task-suggestions/**` (tasks) | JWT + BusinessTenantGuard (+ RolesGuard donde ya existía) + `TenantCapabilityGuard` | Igual que antes por rol; además el módulo debe estar activo para la empresa del JWT, si no `403 { code: MODULE_DISABLED, module }`. `/search` filtra los tipos de módulos inactivos en el servicio. Ver `docs/phase-4/MODULE-MATRIX.md` | JWT `companyId`; configuración efectiva resuelta por `TenantConfigurationService.resolveCapabilities` (caché 5 s por empresa, invalidada al escribir) |
 | Pipelines | read endpoints | JWT + RolesGuard | Any authenticated role when no method `@Roles` is present | JWT `companyId` |
 | Pipelines | create/update/delete/reorder stages | JWT + RolesGuard | `ADMIN`, `SUPER_ADMIN` | JWT `companyId` |
 | Automations | `/automations/*` | JWT + RolesGuard | `ADMIN`, `SUPER_ADMIN` | JWT `companyId` |

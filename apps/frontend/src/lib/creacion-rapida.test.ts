@@ -47,6 +47,50 @@ describe('accionesPara — permisos espejados del backend', () => {
     expect(accionesPara(undefined)).toEqual([]);
   });
 
+  describe('módulos de la empresa (Fase 4)', () => {
+    const solo =
+      (...activas: string[]) =>
+      (k: string) =>
+        activas.includes(k);
+
+    it('sin catálogo no se ofrece crear producto; sin tareas, tarea; sin cotizaciones, cotización', () => {
+      const acciones = accionesPara('ADMIN', { can: solo() }).map((a) => a.accion);
+
+      expect(acciones).toEqual(['contacto', 'oportunidad', 'bot']);
+    });
+
+    it('cada acción opcional vuelve con su módulo', () => {
+      expect(accionesPara('ADMIN', { can: solo('tasks') }).map((a) => a.accion)).toContain('tarea');
+      expect(accionesPara('ADMIN', { can: solo('quotes') }).map((a) => a.accion)).toContain(
+        'cotizacion',
+      );
+      expect(accionesPara('ADMIN', { can: solo('catalog') }).map((a) => a.accion)).toContain(
+        'producto',
+      );
+    });
+
+    it('el rol sigue mandando primero: un AGENT con catálogo activo no crea productos', () => {
+      expect(accionesPara('AGENT', { can: () => true }).map((a) => a.accion)).not.toContain(
+        'producto',
+      );
+    });
+
+    it('sin `can` no filtra por módulo: es el comportamiento de antes', () => {
+      expect(accionesPara('ADMIN')).toHaveLength(ACCIONES_RAPIDAS.length);
+    });
+
+    it('la acción del catálogo habla como la empresa: servicio, producto o elemento', () => {
+      const etiqueta = (allowed: Array<'PRODUCT' | 'SERVICE'>) =>
+        accionesPara('ADMIN', {
+          catalogo: { allowedItemTypes: allowed, defaultItemType: allowed[0] },
+        }).find((a) => a.accion === 'producto')?.etiqueta;
+
+      expect(etiqueta(['SERVICE'])).toBe('Nuevo servicio');
+      expect(etiqueta(['PRODUCT'])).toBe('Nuevo producto');
+      expect(etiqueta(['PRODUCT', 'SERVICE'])).toBe('Nuevo elemento');
+    });
+  });
+
   it('las acciones que navegan lo avisan', () => {
     // Una cotizacion pertenece SIEMPRE a una oportunidad, y un bot se edita en
     // su pantalla. Pulsar y que no aparezca un formulario seria una sorpresa.

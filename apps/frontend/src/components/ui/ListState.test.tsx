@@ -83,6 +83,19 @@ describe('mensajeDeError', () => {
     );
   });
 
+  it('un módulo apagado se explica como tal, no como falta de permiso', () => {
+    // También es un 403, pero pedir otro rol no arreglaría nada: el módulo lo
+    // activa la empresa en su configuración.
+    expect(
+      mensajeDeError({
+        response: {
+          status: 403,
+          data: { statusCode: 403, code: 'MODULE_DISABLED', module: 'catalog', message: 'x' },
+        },
+      }),
+    ).toBe('Este módulo no está activo para tu empresa.');
+  });
+
   it('un 401 manda a volver a entrar', () => {
     expect(mensajeDeError({ response: { status: 401 } })).toMatch(/caducó/i);
   });

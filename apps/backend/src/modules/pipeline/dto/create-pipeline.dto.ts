@@ -4,12 +4,17 @@ import {
   IsOptional,
   IsBoolean,
   IsInt,
+  MaxLength,
   Min,
 } from 'class-validator';
+import { PIPELINE_LIMITS } from '../../companies/company-settings';
 
 export class CreatePipelineDto {
   @IsString()
   @IsNotEmpty({ message: 'El nombre del pipeline es requerido' })
+  @MaxLength(PIPELINE_LIMITS.maxNameLength, {
+    message: `El nombre del pipeline debe tener como máximo ${PIPELINE_LIMITS.maxNameLength} caracteres`,
+  })
   name!: string;
 
   @IsOptional()

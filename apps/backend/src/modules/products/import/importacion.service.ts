@@ -23,6 +23,14 @@ import {
 // `emitDecoratorMetadata` TypeScript intentaria emitirlo como valor.
 import type { AlmacenamientoDeImportaciones } from './almacenamiento-importaciones';
 import { type CatalogItemType, parseItemTypeLabel } from '../catalog-item-type';
+import { TenantConfigurationService } from '../../companies/tenant-configuration.service';
+import {
+  itemTypeNotAllowedMessage,
+  type TenantCapabilities,
+} from '../../companies/tenant-capabilities';
+
+/** Lo que la importación necesita saber del catálogo de la empresa (Fase 4). */
+type ReglasDeCatalogo = TenantCapabilities['catalog'];
 
 export interface IncidenciaDeFila {
   fila: number;
@@ -39,6 +47,7 @@ export class ImportacionDeProductosService {
 
   constructor(
     private prisma: PrismaService,
+    private configuration: TenantConfigurationService,
     /**
      * El archivo NO vive en el `/tmp` de este proceso.
      *
@@ -264,12 +273,23 @@ export class ImportacionDeProductosService {
     let ultimaFila = imp.lastCommittedRow;
 
     try {
+      // Reglas del catálogo de ESTA empresa, resueltas una vez por ejecución:
+      // qué tipos puede crear y cuál es el default cuando la celda viene vacía.
+      const catalogo = (
+        await this.configuration.resolveCapabilities(imp.companyId)
+      ).catalog;
+
       const { cabeceras, cancelada } = await leerEnStreaming(
         this.almacenamiento.rutaFisica(imp.tempPath),
         imp.fileName,
         async (fila, numero) => {
           const activo = mapeo ?? mapearCabeceras(cabecerasDe(fila.length));
-          const resultado = this.interpretarFila(fila, activo, imp.companyId);
+          const resultado = this.interpretarFila(
+            fila,
+            activo,
+            imp.companyId,
+            catalogo,
+          );
 
           if (!resultado) {
             contadores.skipped++;
@@ -402,14 +422,16 @@ export class ImportacionDeProductosService {
 
     if (nuevos.length > 0) {
       try {
-        const r = await this.prisma.product.createMany({ data: nuevos });
+        const r = await this.prisma.product.createMany({
+          data: nuevos.map(paraCrear),
+        });
         created += r.count;
       } catch {
         // Si el lote entero falla, se reintenta fila a fila para no perder las
         // buenas por culpa de una mala.
         for (const datos of nuevos) {
           try {
-            await this.prisma.product.create({ data: datos });
+            await this.prisma.product.create({ data: paraCrear(datos) });
             created++;
           } catch {
             failed++;
@@ -434,7 +456,7 @@ export class ImportacionDeProductosService {
             select: { id: true },
           });
           if (!yaEsta) {
-            await this.prisma.product.create({ data: datos });
+            await this.prisma.product.create({ data: paraCrear(datos) });
             created++;
             continue;
           }
@@ -495,6 +517,7 @@ export class ImportacionDeProductosService {
     fila: FilaCruda,
     mapeo: MapeoDeColumnas,
     companyId: string,
+    catalogo: ReglasDeCatalogo,
   ): ResultadoDeFila | null {
     const leer = (campo: string): string => {
       const i = mapeo.campos[campo];
@@ -517,8 +540,20 @@ export class ImportacionDeProductosService {
           nombre: name.slice(0, 300),
         };
       }
+      // El modelo comercial manda también aquí: una empresa «solo servicios»
+      // no crea productos por un archivo. La fila se cuenta como fallida con
+      // el motivo, nunca se convierte en silencio.
+      if (!catalogo.allowedItemTypes.includes(tipo)) {
+        return {
+          fallida: itemTypeNotAllowedMessage(tipo, catalogo.allowedItemTypes),
+          nombre: name.slice(0, 300),
+        };
+      }
       itemType = tipo;
     }
+    // Celda vacía: al crear se usa el default efectivo de la empresa (SERVICE
+    // en «solo servicios»); al actualizar, `escribirLote` no toca el tipo.
+    const itemTypePorDefecto = catalogo.defaultItemType;
 
     return {
       datos: {
@@ -531,6 +566,7 @@ export class ImportacionDeProductosService {
         sku: leer('sku') || undefined,
         stock: leer('stock') ? interpretarEntero(leer('stock')) : undefined,
         itemType,
+        itemTypePorDefecto,
       },
     };
   }
@@ -619,8 +655,16 @@ interface DatosDeProducto {
   code?: string;
   sku?: string;
   stock?: number;
-  /** Solo cuando el archivo lo informa; al crear sin él, la columna aplica PRODUCT. */
+  /** Solo cuando el archivo lo informa; al actualizar sin él, el tipo no cambia. */
   itemType?: CatalogItemType;
+  /** Default efectivo de la empresa para las filas NUEVAS sin tipo (Fase 4). */
+  itemTypePorDefecto: CatalogItemType;
+}
+
+/** Fila lista para `create`: el default solo aplica a lo que se crea. */
+function paraCrear(datos: DatosDeProducto): Prisma.ProductUncheckedCreateInput {
+  const { itemTypePorDefecto, itemType, ...resto } = datos;
+  return { ...resto, itemType: itemType ?? itemTypePorDefecto };
 }
 
 type ResultadoDeFila =

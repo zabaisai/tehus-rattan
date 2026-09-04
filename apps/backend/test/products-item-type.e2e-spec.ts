@@ -3,6 +3,8 @@ import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { TenantConfigurationService } from '../src/modules/companies/tenant-configuration.service';
+import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { ProductsController } from '../src/modules/products/products.controller';
 import { ProductsService } from '../src/modules/products/products.service';
 import { ImportacionDeProductosService } from '../src/modules/products/import/importacion.service';
@@ -43,6 +45,8 @@ describe('Catálogo: tipo de elemento (e2e, HTTP + base real)', () => {
       controllers: [ProductsController],
       providers: [
         ProductsService,
+        TenantConfigurationService,
+        PlatformAuditLogService,
         { provide: ImportacionDeProductosService, useValue: {} },
         { provide: ImportacionQueue, useValue: { encolar: jest.fn() } },
       ],

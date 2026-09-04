@@ -1,6 +1,7 @@
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SearchService } from './search.service';
+import { TenantConfigurationService } from '../companies/tenant-configuration.service';
 
 /** Prisma falso: interesa QUÉ `where` se construye, no qué devuelve la base. */
 function prismaFalso() {
@@ -20,7 +21,26 @@ describe('SearchService', () => {
   beforeEach(async () => {
     prisma = prismaFalso();
     const moduleRef = await Test.createTestingModule({
-      providers: [SearchService, { provide: PrismaService, useValue: prisma }],
+      providers: [
+        SearchService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: TenantConfigurationService,
+          useValue: {
+            resolveCapabilities: async () => ({
+              modules: {
+                conversations: true,
+                contacts: true,
+                opportunities: true,
+                pipeline: true,
+                catalog: true,
+                quotes: true,
+                tasks: true,
+              },
+            }),
+          },
+        },
+      ],
     }).compile();
     service = moduleRef.get(SearchService);
   });

@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { AuthGate } from '@/components/auth/AuthGate';
+import { TenantCapabilitiesProvider } from '@/lib/tenant-capabilities';
 import { useAuthStore } from '@/store/auth.store';
 
 export default function DashboardLayout({
@@ -15,9 +16,15 @@ export default function DashboardLayout({
   // AuthGate waits for the client-side bootstrap: it only renders the shell
   // once the session is confirmed authenticated (otherwise a loader, or a
   // redirect to /login for anonymous). No token is read from storage here.
+  // Las capacidades de la empresa (Fase 4) se resuelven UNA vez para todo el
+  // shell: barra lateral, menú «Crear», buscador, Inicio y guardas de ruta
+  // leen el mismo estado. El proveedor se desactiva solo para el SUPER_ADMIN
+  // de plataforma, que no tiene empresa.
   return (
     <AuthGate>
-      <DashboardShell>{children}</DashboardShell>
+      <TenantCapabilitiesProvider>
+        <DashboardShell>{children}</DashboardShell>
+      </TenantCapabilitiesProvider>
     </AuthGate>
   );
 }

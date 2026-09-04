@@ -4,9 +4,9 @@ import { useId, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
-import { COMPANY_SETTINGS_QUERY_KEY } from "@/lib/company-settings";
 import { STAGE_TYPE_LABELS } from "@/lib/onboarding-templates";
 import {
   BUSINESS_MODEL_TEXT,
@@ -20,6 +20,8 @@ import {
   updateMyTenantConfiguration,
   useTenantConfiguration,
   validateRegionalDraft,
+  type CapabilityDefinition,
+  type OptionalModuleKey,
   type RegionalDraft,
   type RegionalDraftErrors,
   type TenantConfiguration,
@@ -41,23 +43,94 @@ interface Draft {
 
 type FieldErrors = RegionalDraftErrors & { commercial?: string };
 
-const OPTIONAL_MODULES = [
+const OPTIONAL_MODULE_KEYS: OptionalModuleKey[] = ["catalog", "quotes", "tasks"];
+
+function isOptionalModule(key: string): key is OptionalModuleKey {
+  return (OPTIONAL_MODULE_KEYS as string[]).includes(key);
+}
+
+/**
+ * Si el servidor no publica definiciones (versión anterior a la Fase 4), la
+ * sección sigue funcionando con estas. Mismo texto que había escrito aquí.
+ */
+const FALLBACK_DEFINITIONS: CapabilityDefinition[] = [
+  ...(
+    Object.keys(CORE_MODULE_LABELS) as Array<keyof typeof CORE_MODULE_LABELS>
+  ).map(
+    (key): CapabilityDefinition => ({
+      key,
+      label: CORE_MODULE_LABELS[key],
+      description: "",
+      group: "core",
+      alwaysOn: true,
+      configurable: false,
+      dependsOn: [],
+      relatedTo: [],
+    }),
+  ),
   {
     key: "catalog",
     label: "Catálogo",
-    hint: "Lista de productos o servicios con precio y categorías.",
+    description: "Lista de productos o servicios con precio y categorías.",
+    group: "commercial",
+    alwaysOn: false,
+    configurable: true,
+    dependsOn: [],
+    relatedTo: ["quotes"],
   },
   {
     key: "quotes",
     label: "Cotizaciones",
-    hint: "Documentos de venta a partir de una oportunidad.",
+    description: "Documentos de venta a partir de una oportunidad.",
+    group: "commercial",
+    alwaysOn: false,
+    configurable: true,
+    dependsOn: [],
+    relatedTo: ["catalog"],
   },
   {
     key: "tasks",
     label: "Tareas",
-    hint: "Seguimientos y recordatorios del equipo.",
+    description: "Seguimientos y recordatorios del equipo.",
+    group: "commercial",
+    alwaysOn: false,
+    configurable: true,
+    dependsOn: [],
+    relatedTo: [],
   },
-] as const;
+];
+
+function definitionsOf(config: TenantConfiguration): CapabilityDefinition[] {
+  const published = config.capabilities?.definitions;
+  return published && published.length > 0 ? published : FALLBACK_DEFINITIONS;
+}
+
+/**
+ * Aviso cuando un módulo activo se apoya en otro apagado. La relación la
+ * publica el servidor (`relatedTo`); la frase la pone la interfaz y es
+ * DIRECCIONAL: una cotización se puede leer sin catálogo, pero no empezar
+ * una nueva; un catálogo sin cotizaciones, en cambio, no necesita aviso.
+ * Sin frase para el par, no hay aviso.
+ */
+const RELATED_HINTS: Partial<Record<`${OptionalModuleKey}>${OptionalModuleKey}`, string>> = {
+  "quotes>catalog": "Crear cotizaciones nuevas necesita elementos del catálogo.",
+};
+
+function relatedHints(
+  definitions: CapabilityDefinition[],
+  active: Record<OptionalModuleKey, boolean>,
+): string[] {
+  const hints: string[] = [];
+  for (const d of definitions) {
+    if (!isOptionalModule(d.key) || !active[d.key]) continue;
+    for (const r of d.relatedTo) {
+      if (active[r]) continue;
+      const hint = RELATED_HINTS[`${d.key}>${r}`];
+      if (hint) hints.push(hint);
+    }
+  }
+  return hints;
+}
 
 function draftFrom(config: TenantConfiguration): Draft {
   return {
@@ -196,6 +269,26 @@ export function TenantConfigurationSection({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  // Apagar un módulo pide confirmación: la casilla no cambia hasta que se
+  // confirma en el diálogo. Encenderlo es inmediato.
+  const [pendingOff, setPendingOff] = useState<OptionalModuleKey | null>(null);
+
+  const definitions = config ? definitionsOf(config) : FALLBACK_DEFINITIONS;
+  const coreDefinitions = definitions.filter((d) => d.alwaysOn);
+  const optionalDefinitions = definitions.filter(
+    (d) => d.configurable && isOptionalModule(d.key),
+  );
+  const legacyDefaults = config?.capabilities?.legacyDefaultsApplied ?? [];
+  const hints = draft
+    ? relatedHints(definitions, {
+        catalog: draft.catalog,
+        quotes: draft.quotes,
+        tasks: draft.tasks,
+      })
+    : [];
+  const pendingDefinition = pendingOff
+    ? definitions.find((d) => d.key === pendingOff)
+    : undefined;
 
   const dirty =
     config !== undefined &&
@@ -226,6 +319,14 @@ export function TenantConfigurationSection({
     setSuccess("");
   }
 
+  function toggleModule(key: OptionalModuleKey, value: boolean) {
+    if (value) {
+      setFlag(key, true);
+      return;
+    }
+    setPendingOff(key);
+  }
+
   async function save() {
     if (!config || !draft || readOnly) return;
     setError("");
@@ -247,11 +348,15 @@ export function TenantConfigurationSection({
 
     setSaving(true);
     try {
-      await updateMyTenantConfiguration(payload);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: TENANT_CONFIGURATION_QUERY_KEY }),
-        queryClient.invalidateQueries({ queryKey: COMPANY_SETTINGS_QUERY_KEY }),
-      ]);
+      const response = await updateMyTenantConfiguration(payload);
+      // Primero la respuesta canónica del servidor —la barra lateral, el menú
+      // «Crear» y el buscador cambian en este mismo instante—, después la
+      // invalidación de todo lo que deriva de la empresa (`company-me`:
+      // configuración, ajustes, perfil) para que nadie se quede con lo viejo.
+      if (response) {
+        queryClient.setQueryData(TENANT_CONFIGURATION_QUERY_KEY, response);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["company-me"] });
       setSuccess("Configuración guardada.");
     } catch (err) {
       const mapped = mapServerError(err);
@@ -419,45 +524,94 @@ export function TenantConfigurationSection({
               aria-label="Módulos centrales"
               className="mb-3 flex flex-wrap gap-2"
             >
-              {(
-                Object.keys(CORE_MODULE_LABELS) as Array<
-                  keyof typeof CORE_MODULE_LABELS
-                >
-              ).map((key) => (
+              {coreDefinitions.map((d) => (
                 <li
-                  key={key}
+                  key={d.key}
+                  title={d.description || undefined}
                   className="flex items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1 text-xs text-neutral-700"
                 >
-                  {CORE_MODULE_LABELS[key]}
+                  {d.label}
                   <Badge tone="success">Siempre activo</Badge>
                 </li>
               ))}
             </ul>
             <ul aria-label="Módulos opcionales" className="space-y-2">
-              {OPTIONAL_MODULES.map((m) => (
-                <li key={m.key}>
-                  <label className="flex items-start gap-2 text-sm text-neutral-700">
-                    <input
-                      type="checkbox"
-                      checked={draft[m.key]}
-                      onChange={(e) => setFlag(m.key, e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-neutral-300 accent-brand-primary"
-                    />
-                    <span>
-                      {m.label}
-                      <span className="block text-xs text-neutral-400">
-                        {m.hint}
+              {optionalDefinitions.map((d) => {
+                const key = d.key as OptionalModuleKey;
+                const legacy = legacyDefaults.includes(key);
+                return (
+                  <li key={key}>
+                    <label className="flex items-start gap-2 text-sm text-neutral-700">
+                      <input
+                        type="checkbox"
+                        checked={draft[key]}
+                        onChange={(e) => toggleModule(key, e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-neutral-300 accent-brand-primary"
+                      />
+                      <span>
+                        {d.label}
+                        <span className="block text-xs text-neutral-400">
+                          {d.description}
+                        </span>
+                        {/* Activo porque la empresa nunca dijo lo contrario:
+                            se avisa para que la decisión sea suya, no de la
+                            compatibilidad. */}
+                        {legacy && draft[key] && (
+                          <span className="mt-0.5 block text-xs text-neutral-500">
+                            Activo por compatibilidad: tu empresa nunca lo
+                            desactivó.
+                          </span>
+                        )}
                       </span>
-                    </span>
-                  </label>
-                </li>
-              ))}
+                    </label>
+                  </li>
+                );
+              })}
             </ul>
+            {hints.length > 0 && (
+              <ul
+                role="note"
+                aria-label="Avisos entre módulos"
+                className="mt-2 space-y-1 rounded-md bg-status-info-surface px-3 py-2 text-xs text-status-info"
+              >
+                {hints.map((h) => (
+                  <li key={h}>{h}</li>
+                ))}
+              </ul>
+            )}
             <p className="mt-2 text-xs text-neutral-400">
               Desactivar un módulo no borra categorías, productos, cotizaciones
               ni tareas: solo deja de proponerse.
             </p>
           </fieldset>
+
+          {pendingOff && (
+            <ConfirmDialog
+              title={`Desactivar ${pendingDefinition?.label ?? pendingOff}`}
+              message={
+                <>
+                  <p>
+                    {pendingDefinition?.label ?? "El módulo"} dejará de verse
+                    en el menú, en el buscador y en el panel «Crear» para todo
+                    el equipo.
+                  </p>
+                  <p className="mt-2">
+                    Desactivar no borra nada: los datos vuelven al reactivarlo.
+                  </p>
+                  <p className="mt-2">
+                    El cambio se aplica al pulsar «Guardar configuración».
+                  </p>
+                </>
+              }
+              confirmLabel="Desactivar"
+              confirmVariant="primary"
+              onClose={() => setPendingOff(null)}
+              onConfirm={async () => {
+                setFlag(pendingOff, false);
+                setPendingOff(null);
+              }}
+            />
+          )}
 
           {/* ── Informativo ────────────────────────────────────────── */}
           <div>

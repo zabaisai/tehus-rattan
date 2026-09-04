@@ -23,6 +23,18 @@ vi.mock('@/lib/notifications', () => ({
   markAllNotificationsRead: vi.fn(),
 }));
 
+// La paleta que abre «Crear» lee las capacidades de la empresa (Fase 4); aquí
+// se dan resueltas para que no salga ninguna petición real.
+vi.mock('@/lib/tenant-capabilities', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-capabilities')>(
+    '@/lib/tenant-capabilities',
+  );
+  const { capacidadesDePrueba } = await import(
+    '@/lib/__fixtures__/tenant-capabilities.fixture'
+  );
+  return { ...real, useTenantCapabilities: () => capacidadesDePrueba() };
+});
+
 function renderHeader(props: { onMenuClick: () => void }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(

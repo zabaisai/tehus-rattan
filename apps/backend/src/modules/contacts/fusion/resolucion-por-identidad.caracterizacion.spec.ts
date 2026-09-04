@@ -33,7 +33,23 @@ describe('CARACTERIZACIÓN — resolución de contacto por identidad, antes de l
         product: { findMany: jest.fn().mockResolvedValue([]) },
         quote: { findMany: jest.fn().mockResolvedValue([]) },
       };
-      return { prisma, service: new SearchService(prisma) };
+      const configuracion = {
+        resolveCapabilities: async () => ({
+          modules: {
+            conversations: true,
+            contacts: true,
+            opportunities: true,
+            pipeline: true,
+            catalog: true,
+            quotes: true,
+            tasks: true,
+          },
+        }),
+      };
+      return {
+        prisma,
+        service: new SearchService(prisma, configuracion as any),
+      };
     }
 
     it('acota por empresa y busca en nombre, teléfono y correo', async () => {

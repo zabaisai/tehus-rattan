@@ -4,8 +4,17 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { AddProductToLeadModal } from './AddProductToLeadModal';
 import type { Product } from '@/types';
+import type { CatalogItemType } from '@/lib/tenant-configuration';
+import { capacidadesDeCatalogo } from '@/lib/__fixtures__/catalogo.fixture';
 
 const getProducts = vi.fn();
+let tipos: CatalogItemType[] = ['PRODUCT', 'SERVICE'];
+let capacidades = capacidadesDeCatalogo(tipos);
+
+vi.mock('@/lib/tenant-capabilities', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-capabilities')>('@/lib/tenant-capabilities');
+  return { ...real, useTenantCapabilities: () => capacidades };
+});
 
 vi.mock('@/lib/products', async () => {
   const real = await vi.importActual<typeof import('@/lib/products')>('@/lib/products');
@@ -46,6 +55,8 @@ function montar() {
 
 describe('AddProductToLeadModal — producto o servicio', () => {
   beforeEach(() => {
+    tipos = ['PRODUCT', 'SERVICE'];
+    capacidades = capacidadesDeCatalogo(tipos);
     getProducts.mockReset().mockResolvedValue(productos);
   });
 
@@ -72,5 +83,49 @@ describe('AddProductToLeadModal — producto o servicio', () => {
     await user.selectOptions(screen.getByLabelText('Filtrar por tipo'), 'SERVICE');
     await screen.findByText('Sala Toscana'); // sigue mostrando lo que devuelve el doble
     expect(getProducts).toHaveBeenLastCalledWith({ itemType: 'SERVICE' });
+  });
+
+  it('las notas de la línea tienen un ejemplo neutro', async () => {
+    const user = userEvent.setup();
+    montar();
+    const fila = (await screen.findByText('Instalación')).closest('label')!;
+    await user.click(within(fila).getByRole('radio'));
+    expect(screen.getByLabelText(/Notas/)).toHaveAttribute('placeholder', 'Notas para esta línea');
+  });
+
+  describe('empresa que vende solo servicios (Fase 4)', () => {
+    beforeEach(() => {
+      tipos = ['SERVICE'];
+      capacidades = capacidadesDeCatalogo(tipos);
+    });
+
+    it('titula «Agregar servicio», esconde el filtro por tipo y marca el producto como heredado', async () => {
+      montar();
+      expect(screen.getByRole('dialog')).toHaveTextContent('Agregar servicio');
+      const sala = (await screen.findByText('Sala Toscana')).closest('label')!;
+      expect(screen.queryByLabelText('Filtrar por tipo')).not.toBeInTheDocument();
+      expect(within(sala).getByText('Heredado')).toBeInTheDocument();
+      const instalacion = screen.getByText('Instalación').closest('label')!;
+      expect(within(instalacion).queryByText('Heredado')).not.toBeInTheDocument();
+      // Un heredado sigue pudiendo cotizarse.
+      expect(within(sala).getByRole('radio')).toBeEnabled();
+    });
+
+    it('sin catálogo, el vacío habla de servicios', async () => {
+      getProducts.mockResolvedValue([]);
+      montar();
+      expect(
+        await screen.findByText('Primero crea o importa servicios en el catálogo.'),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('empresa que vende solo productos: «Agregar producto»', async () => {
+    tipos = ['PRODUCT'];
+    capacidades = capacidadesDeCatalogo(tipos);
+    montar();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Agregar producto');
+    await screen.findByText('Sala Toscana');
+    expect(screen.queryByLabelText('Filtrar por tipo')).not.toBeInTheDocument();
   });
 });

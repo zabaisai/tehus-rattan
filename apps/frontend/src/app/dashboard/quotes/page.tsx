@@ -1,6 +1,7 @@
 'use client';
 
 import { Suspense, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { FileText, Printer, Trash2 } from 'lucide-react';
@@ -10,6 +11,9 @@ import { getQuotes, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS,
 import { QuoteStatus } from '@/types';
 import { QuoteDetailModal } from '@/components/quotes/QuoteDetailModal';
 import { ListState } from '@/components/ui/ListState';
+import { RequireTenantCapability } from '@/components/capabilities/RequireTenantCapability';
+import { useTenantCapabilities } from '@/lib/tenant-capabilities';
+import { useAuthStore } from '@/store/auth.store';
 
 type ApiError = {
   response?: {
@@ -43,6 +47,15 @@ function QuotesPageContent() {
     searchParams.get('open'),
   );
   const [error, setError] = useState('');
+
+  // Una cotización nueva nace de los elementos del catálogo de una
+  // oportunidad. Con cotizaciones activas y catálogo apagado se puede ver lo
+  // que ya existe, pero no crear: se dice aquí, antes de que alguien lo busque.
+  const capacidades = useTenantCapabilities();
+  const rol = useAuthStore((s) => s.user?.role);
+  const sinCatalogo =
+    capacidades.isReady && capacidades.can('quotes') && !capacidades.can('catalog');
+  const puedeConfigurar = rol === 'ADMIN' || rol === 'SUPER_ADMIN';
 
   const {
     data: quotes,
@@ -81,10 +94,33 @@ function QuotesPageContent() {
       <div className="mb-5">
         <h2 className="text-xl font-semibold text-neutral-900">Cotizaciones</h2>
         <p className="text-xs text-neutral-500">
-          Nueva cotización desde lead: abre un lead con productos asociados y usa
-          &quot;Crear cotización&quot;.
+          Nueva cotización desde una oportunidad: abre una oportunidad con
+          elementos del catálogo y usa «Crear cotización».
         </p>
       </div>
+
+      {sinCatalogo && (
+        <p
+          role="status"
+          data-testid="aviso-sin-catalogo"
+          className="mb-4 rounded-md border border-status-info/20 bg-status-info-surface px-3 py-2 text-xs text-status-info"
+        >
+          Para crear cotizaciones nuevas, la oportunidad necesita elementos del
+          catálogo. El catálogo está desactivado; un administrador puede
+          activarlo en{' '}
+          {puedeConfigurar ? (
+            <Link
+              href="/dashboard/settings/company"
+              className="font-medium underline outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
+            >
+              Configuración
+            </Link>
+          ) : (
+            'Configuración'
+          )}
+          .
+        </p>
+      )}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <select
@@ -281,8 +317,10 @@ function QuotesPageContent() {
 
 export default function QuotesPage() {
   return (
-    <Suspense fallback={<p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>}>
-      <QuotesPageContent />
-    </Suspense>
+    <RequireTenantCapability capability="quotes">
+      <Suspense fallback={<p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>}>
+        <QuotesPageContent />
+      </Suspense>
+    </RequireTenantCapability>
   );
 }

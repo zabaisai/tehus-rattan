@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CompaniesModule } from '../companies/companies.module';
 import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
 import { ImportacionDeProductosService } from './import/importacion.service';
@@ -11,6 +12,7 @@ import {
 } from './import/almacenamiento-importaciones';
 
 @Module({
+  imports: [CompaniesModule],
   controllers: [ProductsController],
   providers: [
     ProductsService,

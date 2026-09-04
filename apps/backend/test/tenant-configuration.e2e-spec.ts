@@ -255,11 +255,17 @@ describe('Configuración por empresa (e2e, HTTP + base real)', () => {
       locale: 'es-CO',
     });
     expect(res.body.pipeline).toBeNull();
+    // Fase 4: lo nunca declarado queda activo por compatibilidad, y se dice.
     expect(res.body.modules).toMatchObject({
-      catalog: false,
-      quotes: false,
-      tasks: false,
+      catalog: true,
+      quotes: true,
+      tasks: true,
     });
+    expect(res.body.capabilities.legacyDefaultsApplied).toEqual([
+      'catalog',
+      'quotes',
+      'tasks',
+    ]);
     const raw = await prisma.company.findUniqueOrThrow({
       where: { id: L.companyId },
       select: { settings: true },

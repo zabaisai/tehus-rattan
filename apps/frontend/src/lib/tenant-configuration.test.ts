@@ -29,6 +29,11 @@ function config(over: Partial<TenantConfiguration['identity']> = {}): TenantConf
       quotes: false,
       tasks: false,
     },
+    capabilities: {
+      legacyDefaultsApplied: [],
+      catalog: { allowedItemTypes: ['PRODUCT'], defaultItemType: 'PRODUCT' },
+      definitions: [],
+    },
     catalog: { categories: [], allowFreeText: true },
     pipeline: null,
     limits: {

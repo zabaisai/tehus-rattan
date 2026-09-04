@@ -3,8 +3,19 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '@/store/auth.store';
+import { capacidadesDePrueba } from '@/lib/__fixtures__/tenant-capabilities.fixture';
 
 let currentPathname = '/dashboard';
+
+// Capacidades de la empresa (Fase 4): por defecto todo activo y listo. Las
+// pruebas de módulos las sustituyen antes de montar.
+let capacidades = capacidadesDePrueba();
+vi.mock('@/lib/tenant-capabilities', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-capabilities')>(
+    '@/lib/tenant-capabilities',
+  );
+  return { ...real, useTenantCapabilities: () => capacidades };
+});
 
 vi.mock('next/navigation', () => ({
   usePathname: () => currentPathname,
@@ -32,6 +43,7 @@ function renderSidebar(props: { mobileOpen: boolean; onMobileClose: () => void }
 describe('Sidebar', () => {
   beforeEach(() => {
     currentPathname = '/dashboard';
+    capacidades = capacidadesDePrueba();
   });
 
   it('cerrado: fuera de pantalla, y NO es un diálogo', () => {
@@ -145,9 +157,80 @@ describe('Sidebar', () => {
   });
 });
 
+describe('Sidebar — módulos de la empresa (Fase 4)', () => {
+  const admin = () =>
+    useAuthStore.setState({
+      user: { id: 'u1', name: 'Ana', email: 'a@co.test', role: 'ADMIN', companyId: 'c1' } as never,
+    });
+  const enlaces = (nombre: RegExp) => screen.queryAllByRole('link', { name: nombre });
+
+  beforeEach(() => {
+    currentPathname = '/dashboard';
+    admin();
+  });
+
+  it('con todo activo enseña Tareas, Catálogo y Cotizaciones (escritorio y móvil)', () => {
+    capacidades = capacidadesDePrueba();
+    renderSidebar({ mobileOpen: true, onMobileClose: vi.fn() });
+
+    expect(enlaces(/^Tareas$/)).toHaveLength(2);
+    expect(enlaces(/^Catálogo$/)).toHaveLength(2);
+    expect(enlaces(/^Cotizaciones$/)).toHaveLength(2);
+    // La entrada se llama por el módulo, no por lo que vende la empresa.
+    expect(screen.queryByText('Productos')).not.toBeInTheDocument();
+  });
+
+  it('un módulo apagado no tiene entrada; los demás siguen', () => {
+    capacidades = capacidadesDePrueba({ modules: { catalog: false, quotes: false } });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(enlaces(/^Catálogo$/)).toHaveLength(0);
+    expect(enlaces(/^Cotizaciones$/)).toHaveLength(0);
+    expect(enlaces(/^Tareas$/).length).toBeGreaterThan(0);
+    expect(enlaces(/^Pipeline$/).length).toBeGreaterThan(0);
+  });
+
+  it('mientras carga la configuración, ningún módulo opcional aparece y se anuncia la carga', () => {
+    // Un módulo prohibido no debe aparecer un instante y desaparecer.
+    capacidades = capacidadesDePrueba({ status: 'loading' });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(enlaces(/^Tareas$/)).toHaveLength(0);
+    expect(enlaces(/^Catálogo$/)).toHaveLength(0);
+    expect(enlaces(/^Cotizaciones$/)).toHaveLength(0);
+    expect(enlaces(/^Contactos$/).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('status')[0]).toHaveTextContent('Cargando módulos');
+  });
+
+  it('si la configuración falla, la navegación central sigue entera y nada revienta', () => {
+    capacidades = capacidadesDePrueba({ status: 'error' });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    for (const n of [/^Inicio$/, /^Contactos$/, /^Pipeline$/, /^Conversaciones$/, /^Empresa$/]) {
+      expect(enlaces(n).length).toBeGreaterThan(0);
+    }
+    expect(enlaces(/^Catálogo$/)).toHaveLength(0);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('la sección de plataforma no depende de las capacidades de ninguna empresa', () => {
+    useAuthStore.setState({
+      user: { id: 'u2', name: 'Root', email: 'root@co.test', role: 'SUPER_ADMIN', companyId: null } as never,
+    });
+    capacidades = capacidadesDePrueba({ status: 'platform' });
+    renderSidebar({ mobileOpen: false, onMobileClose: vi.fn() });
+
+    expect(enlaces(/^Empresas$/).length).toBeGreaterThan(0);
+    expect(enlaces(/^Auditoría$/).length).toBeGreaterThan(0);
+    expect(enlaces(/^Catálogo$/)).toHaveLength(0);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
+
 describe('Sidebar — identidad del producto y de la empresa', () => {
   beforeEach(() => {
     currentPathname = '/dashboard';
+    capacidades = capacidadesDePrueba();
     useAuthStore.setState({
       user: { id: 'u1', name: 'Ana', email: 'a@co.test', role: 'ADMIN', companyId: 'c1' } as never,
     });

@@ -11,11 +11,14 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
+import { RequiresTenantCapability } from '../../common/decorators/requires-tenant-capability.decorator';
+import { TenantCapabilityGuard } from '../companies/tenant-capability.guard';
 import { LeadProductsService } from './lead-products.service';
 import { CreateLeadProductDto } from './dto/create-lead-product.dto';
 import { UpdateLeadProductDto } from './dto/update-lead-product.dto';
 
-@UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, TenantCapabilityGuard)
+@RequiresTenantCapability('catalog')
 @Controller('leads/:leadId/products')
 export class LeadProductsController {
   constructor(private leadProductsService: LeadProductsService) {}

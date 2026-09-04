@@ -72,6 +72,14 @@ export function LeadFormModal({
     queryFn: getCompanyUsers,
   });
 
+  // El ejemplo del título se arma con el contacto elegido, no con un producto
+  // de un sector concreto: esta pantalla la usan empresas de cualquier ramo.
+  const contactoElegido = contacts?.find((c) => c.id === contactId);
+  const nombreContacto = contactoElegido?.name || contactoElegido?.phone;
+  const ejemploDeTitulo = nombreContacto
+    ? `Ej.: Propuesta para ${nombreContacto}`
+    : 'Describe la oportunidad';
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
@@ -117,7 +125,8 @@ export function LeadFormModal({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Venta de muebles de rattan"
+              maxLength={200}
+              placeholder={ejemploDeTitulo}
             />
           </Field>
 

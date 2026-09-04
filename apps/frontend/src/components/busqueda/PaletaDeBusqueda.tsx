@@ -15,16 +15,19 @@ import {
 import {
   buscar,
   ETIQUETA_DE_TIPO,
+  filtrarRespuesta,
   LONGITUD_MINIMA_CONSULTA,
   resultadosEnOrden,
   rutaDelResultado,
   TIPOS_BUSCABLES,
+  tiposBuscablesPara,
   TipoBuscable,
   ResultadoDeBusqueda,
 } from '@/lib/busqueda';
 import { mensajeDeError } from '@/components/ui/ListState';
 import { useDialogoModal } from '@/components/ui/useDialogoModal';
 import { useAuthStore } from '@/store/auth.store';
+import { useTenantCapabilities } from '@/lib/tenant-capabilities';
 import { registrarReciente } from '@/lib/creacion-rapida';
 import { CreacionRapida } from './CreacionRapida';
 
@@ -38,6 +41,16 @@ const ICONO: Record<TipoBuscable, typeof User> = {
 
 /** Espera antes de consultar: teclear «laura» son cinco peticiones, no una. */
 const RETARDO_MS = 250;
+
+/** «Buscar contactos, conversaciones u oportunidades», con lo que haya. */
+function textoDeAyuda(tipos: readonly TipoBuscable[]): string {
+  const nombres = tipos.map((t) => ETIQUETA_DE_TIPO[t].toLowerCase());
+  if (nombres.length === 0) return 'Buscar en la empresa';
+  if (nombres.length === 1) return `Buscar ${nombres[0]}`;
+  const ultimo = nombres[nombres.length - 1];
+  const conjuncion = /^[oO]/.test(ultimo) ? 'u' : 'o';
+  return `Buscar ${nombres.slice(0, -1).join(', ')} ${conjuncion} ${ultimo}`;
+}
 
 export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
   const router = useRouter();
@@ -66,12 +79,31 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
 
   const suficiente = consulta.length >= LONGITUD_MINIMA_CONSULTA;
 
+  // Tipos que ESTA empresa puede buscar (Fase 4): los centrales siempre;
+  // productos y cotizaciones solo con su módulo activo. Se aplica antes de
+  // pedir y al pintar, así que un módulo apagado no aparece ni como filtro
+  // ni como grupo de resultados aunque el servidor lo devolviera.
+  const { can } = useTenantCapabilities();
+  const permitidos = useMemo(() => tiposBuscablesPara(can), [can]);
+  const todosPermitidos = permitidos.length === TIPOS_BUSCABLES.length;
+  // Si el filtro elegido dejó de estar disponible, se vuelve a «Todo».
+  const tipoEfectivo: TipoBuscable | 'todo' =
+    tipo === 'todo' || permitidos.includes(tipo) ? tipo : 'todo';
+
   const { data, isFetching, isError, error } = useQuery({
-    queryKey: ['busqueda', consulta, tipo, incluirPapelera],
+    queryKey: ['busqueda', consulta, tipoEfectivo, incluirPapelera, permitidos.join(',')],
     queryFn: ({ signal }) =>
       buscar({
         q: consulta,
-        tipos: tipo === 'todo' ? undefined : [tipo],
+        // Con todos los tipos disponibles no se manda la lista: la URL sigue
+        // limpia y el servidor decide. Con alguno apagado, se pide solo lo
+        // permitido.
+        tipos:
+          tipoEfectivo === 'todo'
+            ? todosPermitidos
+              ? undefined
+              : permitidos
+            : [tipoEfectivo],
         incluirPapelera,
         signal,
       }),
@@ -81,7 +113,11 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
     placeholderData: (previo) => previo,
   });
 
-  const planos = useMemo(() => resultadosEnOrden(data), [data]);
+  const respuesta = useMemo(
+    () => (data ? filtrarRespuesta(data, permitidos) : undefined),
+    [data, permitidos],
+  );
+  const planos = useMemo(() => resultadosEnOrden(respuesta), [respuesta]);
 
   // Al cambiar la consulta o el filtro, la selección vuelve al principio: si
   // no, Enter abriría un resultado que ya no está donde estaba.
@@ -90,7 +126,7 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
   // con la selección vieja sobre la lista nueva, que es justo el instante en
   // el que alguien pulsa Enter. Es el patrón que React documenta para
   // reaccionar a un cambio de entrada.
-  const claveDeVista = `${consulta}|${tipo}|${incluirPapelera}`;
+  const claveDeVista = `${consulta}|${tipoEfectivo}|${incluirPapelera}`;
   const [vistaAnterior, setVistaAnterior] = useState(claveDeVista);
   if (claveDeVista !== vistaAnterior) {
     setVistaAnterior(claveDeVista);
@@ -157,7 +193,7 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
 
-            placeholder="Buscar contactos, conversaciones, oportunidades, productos o cotizaciones"
+            placeholder={textoDeAyuda(permitidos)}
             aria-label="Buscar en la empresa"
             // `combobox` + `listbox`: sin esto el lector de pantalla anuncia un
             // cuadro de texto corriente y nunca menciona los resultados.
@@ -175,15 +211,15 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
 
         <div className="flex flex-wrap items-center gap-1 border-b border-line-default px-3 py-2">
           <Filtro
-            activo={tipo === 'todo'}
+            activo={tipoEfectivo === 'todo'}
             onClick={() => { setTipo('todo'); devolverFoco(); }}
           >
             Todo
           </Filtro>
-          {TIPOS_BUSCABLES.map((t) => (
+          {permitidos.map((t) => (
             <Filtro
               key={t}
-              activo={tipo === t}
+              activo={tipoEfectivo === t}
               onClick={() => { setTipo(t); devolverFoco(); }}
             >
               {ETIQUETA_DE_TIPO[t]}
@@ -217,10 +253,10 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
             </p>
           )}
 
-          {suficiente && !isError && data && data.total === 0 && !isFetching && (
+          {suficiente && !isError && respuesta && respuesta.total === 0 && !isFetching && (
             <div className="px-4 py-8 text-center">
               <p className="text-sm text-content-secondary">
-                Sin resultados para «{data.consulta}».
+                Sin resultados para «{respuesta.consulta}».
               </p>
               {!incluirPapelera && (
                 <button
@@ -236,7 +272,7 @@ export function PaletaDeBusqueda({ onCerrar }: { onCerrar: () => void }) {
 
           {suficiente &&
             !isError &&
-            data?.grupos.map((grupo) => (
+            respuesta?.grupos.map((grupo) => (
               <div key={grupo.tipo} className="py-1">
                 <p className="px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-content-secondary">
                   {ETIQUETA_DE_TIPO[grupo.tipo]}

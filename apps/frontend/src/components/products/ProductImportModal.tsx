@@ -19,6 +19,11 @@ import type {
   MapeoDeColumnas,
   VistaPreviaDeImportacion,
 } from "@/types";
+import { ITEM_TYPE_LABELS } from "@/lib/tenant-configuration";
+import {
+  catalogVocabulary,
+  useTenantCapabilities,
+} from "@/lib/tenant-capabilities";
 import { Modal } from "@/components/ui/Modal";
 
 type ApiError = {
@@ -94,6 +99,15 @@ export function ProductImportModal({
     queryFn: getLimitesDeImportacion,
     staleTime: 5 * 60_000,
   });
+
+  // Qué tipos puede crear ESTA empresa (Fase 4). El servidor aplica la misma
+  // regla fila a fila: un tipo no permitido deja la fila como fallida en el
+  // reporte, y conviene decirlo antes de arrancar.
+  const capacidades = useTenantCapabilities();
+  const vocabulario = catalogVocabulary(capacidades.catalog);
+  const tipoUnico = vocabulario.showTypeChooser
+    ? null
+    : (capacidades.catalog?.defaultItemType ?? null);
 
   /**
    * Sondeo del progreso mientras corre.
@@ -344,14 +358,32 @@ export function ProductImportModal({
             </p>
           )}
 
-          {/* Tipo de elemento (Fase 2): sin columna, todo es Producto. */}
+          {/* Tipo de elemento (Fase 2/4): sin columna, cada fila toma el tipo
+              por defecto de la empresa; con columna, solo se admiten los tipos
+              que la empresa crea. */}
           <p className="text-xs text-neutral-500" data-testid="nota-tipo">
             {campos.itemType !== undefined ? (
+              tipoUnico ? (
+                <>
+                  La columna{" "}
+                  <strong>{previa.cabeceras[campos.itemType]}</strong> indica el
+                  tipo de elemento. Esta empresa solo crea{" "}
+                  <strong>{vocabulario.plural}</strong>: las filas con otro tipo
+                  se reportan como fallidas.
+                </>
+              ) : (
+                <>
+                  La columna{" "}
+                  <strong>{previa.cabeceras[campos.itemType]}</strong> indica el
+                  tipo de elemento: admite «Producto» o «Servicio»; otro valor
+                  deja la fila como fallida en el reporte.
+                </>
+              )
+            ) : tipoUnico ? (
               <>
-                La columna{" "}
-                <strong>{previa.cabeceras[campos.itemType]}</strong> indica el
-                tipo de elemento: admite «Producto» o «Servicio»; otro valor
-                deja la fila como fallida en el reporte.
+                Sin una columna de <strong>Tipo de elemento</strong>, todo se
+                importa como <strong>{ITEM_TYPE_LABELS[tipoUnico]}</strong>,
+                que es lo único que crea esta empresa.
               </>
             ) : (
               <>

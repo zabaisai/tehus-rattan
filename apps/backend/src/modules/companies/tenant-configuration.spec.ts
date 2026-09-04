@@ -40,13 +40,15 @@ describe('TenantConfigurationV1 — reglas puras', () => {
   });
 
   describe('deriveModules', () => {
-    it('los centrales son siempre true y los opcionales salen de las banderas', () => {
+    it('los centrales son siempre true y los opcionales salen de las banderas declaradas', () => {
       const modules = deriveModules({
-        sellsProducts: true,
-        sellsServices: false,
-        usesCatalog: false,
-        usesQuotes: true,
-        usesTasks: false,
+        declaredFlags: {
+          sellsProducts: true,
+          sellsServices: false,
+          usesCatalog: false,
+          usesQuotes: true,
+          usesTasks: false,
+        },
       });
       expect(modules).toEqual({
         conversations: true,
@@ -246,7 +248,7 @@ describe('TenantConfigurationV1 — reglas puras', () => {
       ],
     };
 
-    it('v0 (sin settings): identidad nula, modelo nulo, módulos opcionales apagados, storageVersion 0', () => {
+    it('v0 (sin settings): identidad nula, modelo nulo, módulos opcionales activos por compatibilidad, storageVersion 0', () => {
       const config = buildTenantConfiguration({
         company: ROW,
         settings: parseCompanySettings(null),
@@ -260,15 +262,22 @@ describe('TenantConfigurationV1 — reglas puras', () => {
         businessModel: null,
         templateVersion: null,
       });
+      // Fase 4: los opcionales no declarados quedan ACTIVOS por compatibilidad.
       expect(config.modules).toMatchObject({
         conversations: true,
         contacts: true,
         opportunities: true,
         pipeline: true,
-        catalog: false,
-        quotes: false,
-        tasks: false,
+        catalog: true,
+        quotes: true,
+        tasks: true,
       });
+      expect(config.capabilities.legacyDefaultsApplied).toEqual([
+        'catalog',
+        'quotes',
+        'tasks',
+      ]);
+      expect(config.capabilities.definitions).toHaveLength(7);
       expect(config.catalog).toEqual({ categories: [], allowFreeText: true });
       expect(config.pipeline).toBeNull();
       expect(config.limits.categories).toEqual({ maxLength: 60, maxCount: 30 });
