@@ -111,6 +111,45 @@ export function validateEnv(config: Env): Env {
     errors.push('PASSWORD_RESET_TOKEN_TTL_MINUTES must be a positive integer');
   }
 
+  // Verificación de dispositivo (Fase 4.5). El interruptor es explícito y de
+  // texto: cualquier valor distinto de 'true'/'false' se rechaza al arrancar
+  // en vez de interpretarse como apagado por accidente.
+  const deviceVerification = config.AUTH_DEVICE_VERIFICATION_ENABLED?.trim();
+  if (deviceVerification && !['true', 'false'].includes(deviceVerification)) {
+    errors.push(
+      "AUTH_DEVICE_VERIFICATION_ENABLED must be exactly 'true' or 'false'",
+    );
+  }
+  if (deviceVerification === 'true') {
+    // Sin secreto no hay digest posible, y sin SMTP el código no llega a
+    // ninguna parte: encender la verificación sin ellos dejaría a la gente
+    // fuera de su cuenta.
+    const secret = config.AUTH_CHALLENGE_HMAC_SECRET?.trim();
+    if (!secret) {
+      errors.push(
+        'AUTH_CHALLENGE_HMAC_SECRET is required when AUTH_DEVICE_VERIFICATION_ENABLED=true',
+      );
+    } else if (secret.length < 32) {
+      errors.push('AUTH_CHALLENGE_HMAC_SECRET must be at least 32 characters');
+    } else if (secret === config.JWT_SECRET?.trim()) {
+      errors.push(
+        'AUTH_CHALLENGE_HMAC_SECRET must not reuse JWT_SECRET (separate blast radius)',
+      );
+    }
+    for (const key of [
+      'SMTP_HOST',
+      'SMTP_USER',
+      'SMTP_PASSWORD',
+      'SMTP_FROM_EMAIL',
+    ]) {
+      if (!config[key]?.trim()) {
+        errors.push(
+          `${key} is required when AUTH_DEVICE_VERIFICATION_ENABLED=true`,
+        );
+      }
+    }
+  }
+
   if (errors.length > 0) {
     throw new Error(
       `Invalid environment configuration:\n- ${errors.join('\n- ')}`,

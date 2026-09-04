@@ -8,6 +8,28 @@ import {
 } from '../sessions/sessions.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
 import * as bcrypt from 'bcryptjs';
+import { DeviceVerificationConfig } from './device-verification/device-verification.config';
+import {
+  DeviceVerificationService,
+  type ChallengeView,
+} from './device-verification/device-verification.service';
+import { TrustedDeviceService } from './device-verification/trusted-device.service';
+
+/**
+ * Resultado de un intento de acceso (Fase 4.5).
+ *
+ * Unión discriminada a propósito: el controlador no puede confundir «hay
+ * sesión» con «falta verificar», y cuando falta verificar no existe token ni
+ * refresh token que devolver.
+ */
+export type LoginOutcome =
+  | {
+      outcome: 'authenticated';
+      token: string;
+      user: { id: string; email: string; name: string };
+      refreshToken: string;
+    }
+  | { outcome: 'verification_required'; challenge: ChallengeView };
 
 @Injectable()
 export class AuthService {
@@ -16,6 +38,9 @@ export class AuthService {
     private jwtService: JwtService,
     private prisma: PrismaService,
     private sessionsService: SessionsService,
+    private deviceVerificationConfig: DeviceVerificationConfig,
+    private deviceVerification: DeviceVerificationService,
+    private trustedDevices: TrustedDeviceService,
   ) {}
 
   // Overloaded so the return type is precise at each call site: passing a
@@ -39,6 +64,153 @@ export class AuthService {
     refreshToken: string;
   }>;
   async login(
+    email: string,
+    password: string,
+    context?: SessionRequestContext,
+  ) {
+    const user = await this.authenticate(email, password, context);
+
+    if (!context) {
+      return this.issueSession(user);
+    }
+
+    return this.startSession(user, context);
+  }
+
+  /**
+   * Acceso con verificación de dispositivo (Fase 4.5).
+   *
+   * Valida las credenciales EXACTAMENTE igual que `login` —mismos errores,
+   * mismos eventos de fallo, misma respuesta ante una cuenta que no existe— y
+   * solo entonces decide si este dispositivo necesita un código. Con el
+   * interruptor apagado, o si la cuenta queda fuera del despliegue controlado,
+   * el camino es el de siempre. Cuando hace falta verificar NO se crea sesión:
+   * se devuelve el reto y nada más.
+   */
+  async loginWithDeviceVerification(
+    email: string,
+    password: string,
+    context: SessionRequestContext,
+    trustedDeviceToken: string | null,
+  ): Promise<LoginOutcome> {
+    const user = await this.authenticate(email, password, context);
+
+    const necesitaVerificar =
+      this.deviceVerificationConfig.appliesTo(user.email) &&
+      !(await this.trustedDevices.isTrusted(user.id, trustedDeviceToken));
+
+    if (!necesitaVerificar) {
+      const sesion = await this.startSession(user, context);
+      return { outcome: 'authenticated', ...sesion };
+    }
+
+    const challenge = await this.deviceVerification.createChallenge({
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        companyId: user.companyId,
+      },
+      context,
+    });
+    return { outcome: 'verification_required', challenge };
+  }
+
+  /**
+   * Consume el reto y ABRE la sesión. Es el único punto donde nace una sesión
+   * en el camino verificado: sin código correcto no hay token ni cookie.
+   */
+  async completeDeviceVerification(input: {
+    challengeId: string;
+    code: string;
+    trustDevice: boolean;
+    context: SessionRequestContext;
+  }): Promise<{
+    token: string;
+    user: { id: string; email: string; name: string };
+    refreshToken: string;
+    trustedDeviceToken: string | null;
+  }> {
+    const verificado = await this.deviceVerification.verifyChallenge({
+      challengeId: input.challengeId,
+      code: input.code,
+      context: input.context,
+    });
+
+    // La cuenta o la empresa pudieron cambiar de estado entre el envío del
+    // código y su uso: se vuelve a comprobar antes de abrir nada.
+    const user = await this.prisma.user.findUnique({
+      where: { id: verificado.id },
+      include: { company: true },
+    });
+    if (!user || !user.isActive) {
+      throw new UnauthorizedException('Credenciales inválidas');
+    }
+    if (user.role !== 'SUPER_ADMIN') {
+      if (!user.company) {
+        throw new UnauthorizedException('Credenciales inválidas');
+      }
+      if (user.company.status === 'SUSPENDED') {
+        throw new UnauthorizedException('La empresa está suspendida');
+      }
+      if (user.company.status === 'DELETED') {
+        throw new UnauthorizedException('La empresa fue eliminada');
+      }
+    }
+
+    const sesion = await this.startSession(user, input.context);
+    const trustedDeviceToken = input.trustDevice
+      ? await this.trustedDevices.trustDevice({
+          user: { id: user.id, role: user.role, companyId: user.companyId },
+          context: input.context,
+        })
+      : null;
+
+    return { ...sesion, trustedDeviceToken };
+  }
+
+  /** Reenvía el código del reto en curso (con su espera mínima). */
+  async resendDeviceVerification(
+    challengeId: string,
+    context: SessionRequestContext,
+  ): Promise<ChallengeView> {
+    return this.deviceVerification.resendChallenge({ challengeId, context });
+  }
+
+  /** Crea la sesión y emite el par de tokens. */
+  private async startSession(
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      role: string;
+      companyId: string | null;
+    },
+    context: SessionRequestContext,
+  ) {
+    const { sessionId, refreshToken } =
+      await this.sessionsService.recordLoginSuccess({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          companyId: user.companyId,
+        },
+        context,
+      });
+
+    return { ...this.issueSession(user, sessionId), refreshToken };
+  }
+
+  /**
+   * Credenciales y estado de la cuenta y de la empresa.
+   *
+   * Es la mitad de `login` que el camino verificado reutiliza tal cual, para
+   * que no existan dos listas de comprobaciones capaces de divergir.
+   */
+  private async authenticate(
     email: string,
     password: string,
     context?: SessionRequestContext,
@@ -100,23 +272,7 @@ export class AuthService {
       }
     }
 
-    if (!context) {
-      return this.issueSession(user);
-    }
-
-    const { sessionId, refreshToken } =
-      await this.sessionsService.recordLoginSuccess({
-        user: {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          role: user.role,
-          companyId: user.companyId,
-        },
-        context,
-      });
-
-    return { ...this.issueSession(user, sessionId), refreshToken };
+    return user;
   }
 
   async me(userId: string) {

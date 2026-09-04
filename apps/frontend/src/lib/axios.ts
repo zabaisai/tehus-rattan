@@ -26,6 +26,12 @@ api.interceptors.request.use((config) => {
 // not try to refresh itself, and onboarding is a public pre-auth flow.
 const NO_REFRESH_PATHS = [
   "/auth/login",
+  // La verificacion de dispositivo ocurre ANTES de que exista sesion: un 401
+  // aqui es «el codigo no vale», nunca «el token caduco». Sin esta entrada el
+  // interceptor intentaria refrescar una sesion que todavia no existe, y el
+  // error real llegaria tarde o convertido en un cierre de sesion.
+  "/auth/verify-device",
+  "/auth/verify-device/resend",
   "/auth/refresh",
   "/auth/logout",
   "/onboarding",

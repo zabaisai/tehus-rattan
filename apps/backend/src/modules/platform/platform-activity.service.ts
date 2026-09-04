@@ -356,6 +356,12 @@ export class PlatformActivityService {
           revokedByUserId: actor.actorUserId,
         },
       });
+      // Fase 4.5: expulsar a alguien tiene que retirarle también la confianza
+      // del dispositivo, o volvería a entrar sin segundo factor.
+      await tx.trustedDevice.updateMany({
+        where: { userId: trimmedId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
 
       await this.auditLogService.record(tx, {
         actorUserId: actor.actorUserId,
@@ -396,6 +402,11 @@ export class PlatformActivityService {
           revokedAt: new Date(),
           revokedByUserId: actor.actorUserId,
         },
+      });
+      // Misma regla por empresa: se retira la confianza de todos sus usuarios.
+      await tx.trustedDevice.updateMany({
+        where: { user: { companyId: trimmedId }, revokedAt: null },
+        data: { revokedAt: new Date() },
       });
 
       await this.auditLogService.record(tx, {

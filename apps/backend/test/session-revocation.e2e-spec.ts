@@ -8,6 +8,7 @@ import { App } from 'supertest/types';
 import { JwtStrategy } from '../src/modules/auth/jwt.strategy';
 import { AuthController } from '../src/modules/auth/auth.controller';
 import { AuthService } from '../src/modules/auth/auth.service';
+import { TrustedDeviceService } from '../src/modules/auth/device-verification/trusted-device.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 // Test-only secret, never read from .env and never logged.
@@ -57,6 +58,13 @@ describe('Immediate session revocation via JwtStrategy (e2e)', () => {
       providers: [
         JwtStrategy,
         { provide: AuthService, useValue: authServiceMock },
+        // Fase 4.5: AuthController now also injects TrustedDeviceService (for
+        // POST /auth/trusted-devices/revoke-all). Stubbed — this suite only
+        // exercises GET /auth/me.
+        {
+          provide: TrustedDeviceService,
+          useValue: { revokeAllForUser: jest.fn() },
+        },
         {
           provide: ConfigService,
           useValue: {

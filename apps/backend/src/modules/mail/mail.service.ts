@@ -5,8 +5,16 @@ import {
   renderPasswordResetEmail,
   type PasswordResetEmailData,
 } from './templates/password-reset-email.template';
+import {
+  renderDeviceVerificationEmail,
+  type DeviceVerificationEmailData,
+} from './templates/device-verification-email.template';
 
 export interface SendPasswordResetInput extends PasswordResetEmailData {
+  to: string;
+}
+
+export interface SendDeviceVerificationInput extends DeviceVerificationEmailData {
   to: string;
 }
 
@@ -71,6 +79,39 @@ export class MailService {
       !!this.config.get<string>('SMTP_PASSWORD')?.trim() &&
       !!this.config.get<string>('SMTP_FROM_EMAIL')?.trim()
     );
+  }
+
+  /**
+   * Código de verificación de dispositivo (Fase 4.5).
+   *
+   * Depende solo de que el SMTP esté configurado, NO de
+   * `PASSWORD_RESET_ENABLED`: son dos funciones distintas y encender una no
+   * puede encender la otra por accidente.
+   *
+   * Si no hay SMTP, LANZA. Es deliberado y opuesto al correo de notificación:
+   * sin código entregado no puede haber una sesión a medias, así que quien
+   * llama revoca el reto y responde un error claro. El registro no menciona
+   * jamás el código ni el destinatario.
+   */
+  async sendDeviceVerificationEmail(
+    input: SendDeviceVerificationInput,
+  ): Promise<void> {
+    if (!this.isSmtpConfigured()) {
+      throw new Error('SMTP no configurado: no se puede enviar el código');
+    }
+    const fromName =
+      this.config.get<string>('SMTP_FROM_NAME')?.trim() || 'TAKTO';
+    const fromEmail = this.config.getOrThrow<string>('SMTP_FROM_EMAIL');
+    const { subject, html, text } = renderDeviceVerificationEmail(input);
+
+    await this.getTransporter().sendMail({
+      from: `"${fromName}" <${fromEmail}>`,
+      to: input.to,
+      subject,
+      text,
+      html,
+    });
+    this.logger.log('Device verification email dispatched');
   }
 
   async sendNotificationEmail(input: {

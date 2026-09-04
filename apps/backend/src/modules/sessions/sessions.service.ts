@@ -26,7 +26,10 @@ export interface SessionUser {
 // company/admin it just created, so a failure anywhere rolls back all of
 // it together, never leaving an orphaned "successful login" audit trail
 // for a company that doesn't exist.
-type SessionWriter = Pick<PrismaService, 'userSession' | 'loginEvent'>;
+type SessionWriter = Pick<
+  PrismaService,
+  'userSession' | 'trustedDevice' | 'loginEvent'
+>;
 
 @Injectable()
 export class SessionsService {
@@ -238,6 +241,15 @@ export class SessionsService {
   // transaction client so it can enroll in the caller's atomic password change,
   // and returns how many sessions were revoked. `revokedByUserId` is the user
   // themselves for a self-service reset.
+  /**
+   * Cierra TODAS las sesiones de una cuenta y retira la confianza de sus
+   * dispositivos (Fase 4.5).
+   *
+   * Van juntas a propósito: si la contraseña dejó de ser secreta o un
+   * administrador está expulsando a alguien, un dispositivo recordado seguiría
+   * saltándose el segundo factor. Se escribe con el mismo cliente —el de la
+   * transacción cuando la hay— para que ambas cosas ocurran o ninguna.
+   */
   async revokeAllActiveForUser(
     userId: string,
     revokedByUserId: string | null,
@@ -251,6 +263,12 @@ export class SessionsService {
         revokedByUserId: revokedByUserId ?? undefined,
       },
     });
+    // La confianza del dispositivo muere con las sesiones.
+    await tx.trustedDevice.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+
     return result.count;
   }
 }

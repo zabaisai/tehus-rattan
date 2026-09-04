@@ -30,6 +30,10 @@ describe('PlatformActivityService', () => {
         findUnique: jest.fn(),
         findUniqueOrThrow: jest.fn(),
       },
+      // Fase 4.5: revocar sesiones retira también la confianza del dispositivo.
+      trustedDevice: {
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
       loginEvent: {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),

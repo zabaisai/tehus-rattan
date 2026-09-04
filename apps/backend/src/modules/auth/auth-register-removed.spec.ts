@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { TrustedDeviceService } from './device-verification/trusted-device.service';
 import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 
 // Regression guard for the removed legacy endpoint POST /api/auth/register
@@ -14,6 +15,7 @@ describe('POST /api/auth/register (removed legacy endpoint)', () => {
   let app: INestApplication;
 
   const authServiceMock = {
+    loginWithDeviceVerification: jest.fn(),
     // Only login is exercised (as a positive control below); if register were
     // ever wired back it would need a method here too — but the point of this
     // suite is that the ROUTE must not exist regardless.
@@ -30,7 +32,14 @@ describe('POST /api/auth/register (removed legacy endpoint)', () => {
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
       controllers: [AuthController],
-      providers: [{ provide: AuthService, useValue: authServiceMock }],
+      providers: [
+        { provide: AuthService, useValue: authServiceMock },
+        // Fase 4.5: el controlador también revoca dispositivos confiables.
+        {
+          provide: TrustedDeviceService,
+          useValue: { revokeAllForUser: jest.fn().mockResolvedValue(0) },
+        },
+      ],
     })
       // Bypass the Origin allowlist guard so the positive-control login route
       // is reachable without a ConfigService; irrelevant to the 404 assertion.
