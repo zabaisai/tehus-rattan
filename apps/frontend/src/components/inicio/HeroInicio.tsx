@@ -50,10 +50,13 @@ export function HeroInicio({
   nombreUsuario,
   nombreEmpresa,
   hora = new Date().getHours(),
+  conCotizaciones = true,
 }: {
   nombreUsuario: string | null | undefined;
   nombreEmpresa: string | null | undefined;
   hora?: number;
+  /** `false` cuando la empresa no tiene el módulo de cotizaciones (Fase 4). */
+  conCotizaciones?: boolean;
 }) {
   const nombre = primerNombre(nombreUsuario);
 
@@ -113,6 +116,7 @@ export function HeroInicio({
             Abrir conversaciones
           </Link>
 
+          {conCotizaciones && (
           <span className="flex flex-col items-center gap-1">
             <Link
               href={COTIZACION.ruta!}
@@ -126,6 +130,7 @@ export function HeroInicio({
                 dice a dónde va. */}
             <span className="text-[11px] text-white/60">{COTIZACION.nota}</span>
           </span>
+          )}
         </div>
       </div>
     </section>

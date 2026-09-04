@@ -16,6 +16,13 @@ vi.mock('@/components/layout/Header', () => ({
   Header: () => <header data-testid="header" />,
 }));
 vi.mock('@/lib/auth-bootstrap', () => ({ retryBootstrap: vi.fn() }));
+// El proveedor de capacidades (Fase 4) arrastra react-query y la consulta de
+// configuración; aquí solo se comprueba que ENVUELVE el shell.
+vi.mock('@/lib/tenant-capabilities', () => ({
+  TenantCapabilitiesProvider: vi.fn(({ children }: { children: React.ReactNode }) => (
+    <>{children}</>
+  )),
+}));
 
 function renderShell() {
   return render(
@@ -81,5 +88,20 @@ describe('shell del dashboard — una sola zona de desplazamiento', () => {
 
     const main = screen.getByRole('main');
     expect(main).toHaveTextContent('CONTENIDO');
+  });
+
+  it('las capacidades de la empresa envuelven TODO el shell: barra, cabecera y página leen el mismo estado', async () => {
+    const { TenantCapabilitiesProvider } = await import('@/lib/tenant-capabilities');
+    const proveedor = vi.mocked(TenantCapabilitiesProvider);
+    proveedor.mockClear();
+
+    renderShell();
+
+    // Un solo proveedor, montado por encima del shell (que es su único hijo).
+    expect(proveedor).toHaveBeenCalledTimes(1);
+    const hijo = proveedor.mock.calls[0][0].children as React.ReactElement;
+    expect(hijo).toBeTruthy();
+    expect(screen.getByTestId('sidebar')).toBeInTheDocument();
+    expect(screen.getByTestId('header')).toBeInTheDocument();
   });
 });

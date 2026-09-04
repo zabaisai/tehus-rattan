@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowDown,
@@ -16,7 +16,10 @@ import {
   createPipeline,
   createStage,
   deleteStage,
+  ETIQUETA_TIPO_ETAPA,
   getPipelines,
+  LIMITES_DE_NOMBRE,
+  ordenCompletoTrasMover,
   reorderStages,
   updatePipeline,
   updateStage,
@@ -32,6 +35,39 @@ import {
 import { mensajeDeError } from '@/components/ui/ListState';
 import { RetirarEmbudoDialog } from '@/components/pipeline/RetirarEmbudoDialog';
 import type { Pipeline, PipelineStage } from '@/types';
+import type { TonoBadge } from '@/components/ui/Badge';
+
+const TONO_TIPO_ETAPA: Record<'OPEN' | 'WON' | 'LOST', TonoBadge> = {
+  OPEN: 'info',
+  WON: 'success',
+  LOST: 'error',
+};
+
+/**
+ * Cuántos caracteres quedan, junto al campo. El servidor recorta con un 400;
+ * el `maxLength` evita el viaje y el contador dice por qué no entra más.
+ */
+function ContadorDeNombre({
+  id,
+  largo,
+  maximo,
+}: {
+  id: string;
+  largo: number;
+  maximo: number;
+}) {
+  return (
+    <span
+      id={id}
+      aria-live="polite"
+      className={`text-[10px] tabular-nums ${
+        largo >= maximo ? 'text-status-error' : 'text-neutral-400'
+      }`}
+    >
+      {largo}/{maximo}
+    </span>
+  );
+}
 
 /**
  * Administrar los embudos.
@@ -50,6 +86,7 @@ export function AdminPipelines({ onCerrar }: { onCerrar: () => void }) {
   const [creando, setCreando] = useState(false);
   const [nombreNuevo, setNombreNuevo] = useState('');
   const [abierto, setAbierto] = useState<string | null>(null);
+  const idContadorNuevo = useId();
 
   const { data: pipelines } = useQuery({
     queryKey: ['pipelines'],
@@ -107,7 +144,14 @@ export function AdminPipelines({ onCerrar }: { onCerrar: () => void }) {
               onChange={(e) => setNombreNuevo(e.target.value)}
               placeholder="Nombre del embudo"
               aria-label="Nombre del embudo"
+              aria-describedby={idContadorNuevo}
+              maxLength={LIMITES_DE_NOMBRE.embudo}
               className="flex-1 rounded-md border border-neutral-300 px-2.5 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
+            />
+            <ContadorDeNombre
+              id={idContadorNuevo}
+              largo={nombreNuevo.length}
+              maximo={LIMITES_DE_NOMBRE.embudo}
             />
             <Button
               variant="accent"
@@ -161,6 +205,7 @@ function FilaPipeline({
   const [renombrando, setRenombrando] = useState(false);
   const [retirando, setRetirando] = useState(false);
   const [nombre, setNombre] = useState(pipeline.name);
+  const idContador = useId();
 
   /** Intercambia el orden con el vecino: mover uno solo dejaría empates. */
   async function mover(dir: -1 | 1) {
@@ -184,12 +229,20 @@ function FilaPipeline({
               value={nombre}
               onChange={(e) => setNombre(e.target.value)}
               aria-label={`Nombre de ${pipeline.name}`}
+              aria-describedby={idContador}
+              maxLength={LIMITES_DE_NOMBRE.embudo}
               className="flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
+            />
+            <ContadorDeNombre
+              id={idContador}
+              largo={nombre.length}
+              maximo={LIMITES_DE_NOMBRE.embudo}
             />
             <Button
               variant="quiet"
               size="sm"
               aria-label="Guardar el nombre"
+              disabled={!nombre.trim()}
               onClick={async () => {
                 const ok = await onAccion(
                   () => updatePipeline(pipeline.id, { name: nombre.trim() }),
@@ -312,26 +365,31 @@ function Etapas({
 }) {
   const [nueva, setNueva] = useState('');
   const [aEliminar, setAEliminar] = useState<PipelineStage | null>(null);
+  const idContadorNueva = useId();
+  const etapasOrdenadas = [...pipeline.stages].sort((a, b) => a.order - b.order);
 
+  /**
+   * Mover una etapa manda el orden COMPLETO del embudo (0..n-1). El servidor
+   * exige la lista entera y rechaza con 400 un orden parcial; antes se
+   * mandaban solo las dos intercambiadas.
+   */
   async function mover(etapa: PipelineStage, dir: -1 | 1) {
-    const ordenadas = [...pipeline.stages].sort((a, b) => a.order - b.order);
-    const i = ordenadas.findIndex((e) => e.id === etapa.id);
-    const otra = ordenadas[i + dir];
-    if (!otra) return;
+    const i = etapasOrdenadas.findIndex((e) => e.id === etapa.id);
+    if (i < 0 || !etapasOrdenadas[i + dir]) return;
 
     await onAccion(
       () =>
-        reorderStages(pipeline.id, [
-          { id: etapa.id, order: otra.order },
-          { id: otra.id, order: etapa.order },
-        ]),
+        reorderStages(
+          pipeline.id,
+          ordenCompletoTrasMover(pipeline.stages, etapa.id, dir),
+        ),
       'No se pudo cambiar el orden de las etapas.',
     );
   }
 
   return (
     <div className="space-y-1.5 border-t border-neutral-200 p-2.5">
-      {pipeline.stages.map((etapa, i) => (
+      {etapasOrdenadas.map((etapa, i) => (
         <div
           key={etapa.id}
           className="space-y-2 rounded-md bg-neutral-50 px-2 py-1.5"
@@ -352,6 +410,13 @@ function Etapas({
             </span>
           </span>
 
+          {/* El tipo con NOMBRE. Abierta/Ganada/Perdida decide qué cuenta
+              como venta cerrada, y un color solo no lo dice. */}
+          {etapa.type && (
+            <Badge tone={TONO_TIPO_ETAPA[etapa.type]}>
+              {ETIQUETA_TIPO_ETAPA[etapa.type]}
+            </Badge>
+          )}
           {etapa.isInitial && (
             <Badge tone="success">
               <LogIn size={10} />
@@ -414,7 +479,7 @@ function Etapas({
             variant="quiet"
             size="sm"
             aria-label={`Bajar ${etapa.name}`}
-            disabled={i === pipeline.stages.length - 1}
+            disabled={i === etapasOrdenadas.length - 1}
             onClick={() => void mover(etapa, 1)}
           >
             <ArrowDown size={12} />
@@ -475,7 +540,14 @@ function Etapas({
           onChange={(e) => setNueva(e.target.value)}
           placeholder="Nombre de la etapa"
           aria-label={`Nueva etapa en ${pipeline.name}`}
+          aria-describedby={idContadorNueva}
+          maxLength={LIMITES_DE_NOMBRE.etapa}
           className="flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
+        />
+        <ContadorDeNombre
+          id={idContadorNueva}
+          largo={nueva.length}
+          maximo={LIMITES_DE_NOMBRE.etapa}
         />
         <Button
           variant="secondary"

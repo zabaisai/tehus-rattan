@@ -27,6 +27,12 @@ import {
   useTenantConfiguration,
 } from "@/lib/tenant-configuration";
 import {
+  catalogVocabulary,
+  isLegacyItemType,
+  useTenantCapabilities,
+} from "@/lib/tenant-capabilities";
+import { RequireTenantCapability } from "@/components/capabilities/RequireTenantCapability";
+import {
   ProductModal,
   ProductFormData,
 } from "@/components/products/ProductModal";
@@ -42,6 +48,18 @@ const currencyFormatter = new Intl.NumberFormat("es-CO", {
   currency: "COP",
   maximumFractionDigits: 0,
 });
+
+/**
+ * Elementos de un tipo que la empresa YA NO CREA (Fase 4): se conservan y se
+ * editan, pero el formulario no ofrece crear otro igual. La frase es una, y
+ * la misma que lee quien mira la lista y quien abre la ficha.
+ */
+export const NOTA_HEREDADOS =
+  "Elementos heredados de otra forma de vender: se conservan y se pueden editar, pero no se crean nuevos.";
+
+function capitalizar(texto: string): string {
+  return texto.charAt(0).toLocaleUpperCase("es") + texto.slice(1);
+}
 
 function ProductsPageContent() {
   const queryClient = useQueryClient();
@@ -70,10 +88,20 @@ function ProductsPageContent() {
       ),
   });
 
-  // Tipo que se PROPONE al crear (Servicio solo si la empresa vende
-  // exclusivamente servicios). Es una sugerencia que el usuario confirma.
+  // Qué puede CREAR esta empresa (Fase 4): solo productos, solo servicios o
+  // ambos. Decide el vocabulario de toda la pantalla y qué ofrece el
+  // formulario. Mientras no se conoce, se habla en neutro («Catálogo») y se
+  // ofrecen ambos tipos, que es lo que el servidor admite por defecto.
+  const capacidades = useTenantCapabilities();
+  const vocabulario = catalogVocabulary(capacidades.catalog);
+  const reglasCatalogo = capacidades.catalog;
+
+  // Respaldo para una configuración sin reglas de catálogo: el tipo que se
+  // PROPONE al crear (Servicio solo si la empresa vende exclusivamente
+  // servicios). Es una sugerencia que el usuario confirma.
   const { data: configuration } = useTenantConfiguration();
-  const tipoSugerido = suggestedItemType(configuration);
+  const tipoPropuesto =
+    reglasCatalogo?.defaultItemType ?? suggestedItemType(configuration);
 
   // Heading/subtitle name the logged-in company (never a hardcoded tenant or
   // city). The city line is shown only when the company actually has one.
@@ -102,9 +130,13 @@ function ProductsPageContent() {
     }
     return out;
   }, [settings, products]);
+  const sujeto =
+    vocabulario.mode === "mixed"
+      ? "Productos y servicios"
+      : capitalizar(vocabulario.plural);
   const catalogSubtitle = company
-    ? `Productos y servicios activos de ${company.name}${company.city ? ` · ${company.city}` : ""}`
-    : "Productos y servicios activos del catálogo";
+    ? `${sujeto} activos de ${company.name}${company.city ? ` · ${company.city}` : ""}`
+    : `${sujeto} activos del catálogo`;
 
   // Enlace profundo desde la busqueda global: `?abrir=<id>` abre la ficha de
   // ese producto. Solo abre si el id existe de verdad: un producto borrado
@@ -137,6 +169,11 @@ function ProductsPageContent() {
     );
   }, [products, search]);
 
+  const esHeredado = (product: Product) =>
+    isLegacyItemType(reglasCatalogo, effectiveItemType(product.itemType));
+  const hayHeredados = filtered.some(esHeredado);
+  const hayFiltros = Boolean(search || category || itemType);
+
   function openCreateModal() {
     setEditingProduct(null);
     setModalOpen(true);
@@ -148,8 +185,11 @@ function ProductsPageContent() {
   }
 
   async function handleSubmit(data: ProductFormData) {
+    // `itemType` solo viaja cuando el formulario lo decidió: al editar un
+    // elemento heredado no se manda, para no cambiarlo sin querer ni chocar
+    // con la regla del servidor.
     const payload = {
-      itemType: data.itemType,
+      ...(data.itemType ? { itemType: data.itemType } : {}),
       name: data.name,
       description: data.description || undefined,
       price: Number(data.price),
@@ -170,7 +210,7 @@ function ProductsPageContent() {
   }
 
   async function handleDeactivate(id: string) {
-    if (!confirm("¿Retirar este elemento del catálogo?")) return;
+    if (!confirm(`¿Retirar este ${vocabulario.singular} del catálogo?`)) return;
     await deactivateProduct(id);
     await queryClient.invalidateQueries({ queryKey: ["products"] });
   }
@@ -183,7 +223,9 @@ function ProductsPageContent() {
     <div>
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-neutral-900">Catálogo</h2>
+          <h2 className="text-xl font-semibold text-neutral-900">
+            {vocabulario.title}
+          </h2>
           <p className="text-xs text-neutral-500">{catalogSubtitle}</p>
         </div>
         <div className="flex items-center gap-2">
@@ -199,7 +241,7 @@ function ProductsPageContent() {
             className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900 sm:flex-none"
           >
             <Plus size={16} />
-            Nuevo elemento
+            {vocabulario.newItem}
           </button>
         </div>
       </div>
@@ -208,7 +250,7 @@ function ProductsPageContent() {
         {/* Etiqueta oculta y no solo `placeholder`: el marcador desaparece al
             escribir y no es un nombre accesible. */}
         <Field
-          label="Buscar productos"
+          label="Buscar en el catálogo"
           labelOculta
           className="relative w-full flex-1 sm:max-w-xs"
         >
@@ -221,7 +263,7 @@ function ProductsPageContent() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar productos"
+            placeholder="Buscar en el catálogo"
             className="pl-8"
           />
         </Field>
@@ -240,18 +282,22 @@ function ProductsPageContent() {
           </Select>
         </Field>
 
-        <Field label="Filtrar por tipo" labelOculta className="w-full sm:w-auto">
-          <Select
-            value={itemType}
-            onChange={(e) =>
-              setItemType(e.target.value as "" | CatalogItemType)
-            }
-          >
-            <option value="">Productos y servicios</option>
-            <option value="PRODUCT">Solo productos</option>
-            <option value="SERVICE">Solo servicios</option>
-          </Select>
-        </Field>
+        {/* El filtro por tipo solo tiene sentido si la empresa crea de los
+            dos; con uno solo, los heredados se ven igual en la lista. */}
+        {vocabulario.showTypeChooser && (
+          <Field label="Filtrar por tipo" labelOculta className="w-full sm:w-auto">
+            <Select
+              value={itemType}
+              onChange={(e) =>
+                setItemType(e.target.value as "" | CatalogItemType)
+              }
+            >
+              <option value="">Productos y servicios</option>
+              <option value="PRODUCT">Solo productos</option>
+              <option value="SERVICE">Solo servicios</option>
+            </Select>
+          </Field>
+        )}
       </div>
 
       {isLoading && (
@@ -260,11 +306,29 @@ function ProductsPageContent() {
         </p>
       )}
 
-      {!isLoading && filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && hayFiltros && (
         <EmptyState
           icon={Package}
-          message="No hay productos ni servicios en el catálogo todavía."
+          message={`Ningún ${vocabulario.singular} coincide con la búsqueda.`}
         />
+      )}
+
+      {!isLoading && filtered.length === 0 && !hayFiltros && (
+        <EmptyState
+          icon={Package}
+          message={vocabulario.emptyTitle}
+          action={
+            <p className="max-w-sm text-center text-xs text-neutral-400">
+              {vocabulario.emptyHint}
+            </p>
+          }
+        />
+      )}
+
+      {!isLoading && hayHeredados && (
+        <p className="mb-3 text-xs text-neutral-500" data-testid="nota-heredados">
+          {NOTA_HEREDADOS}
+        </p>
       )}
 
       {!isLoading && filtered.length > 0 && (
@@ -315,6 +379,13 @@ function ProductsPageContent() {
                   >
                     {ITEM_TYPE_LABELS[effectiveItemType(product.itemType)]}
                   </Badge>
+                  {/* De un tipo que la empresa ya no crea: se dice con
+                      texto, no con un color que nadie sabe leer. */}
+                  {esHeredado(product) && (
+                    <Badge tone="neutral" title={NOTA_HEREDADOS}>
+                      Heredado
+                    </Badge>
+                  )}
                   {product.category && (
                     <span className="w-fit rounded-full bg-status-warning-surface px-2 py-0.5 text-[10px] font-medium text-status-warning-strong">
                       {product.category}
@@ -368,7 +439,8 @@ function ProductsPageContent() {
           key={editingProduct?.id ?? "new"}
           product={editingProduct}
           categories={categoryOptions}
-          suggestedItemType={tipoSugerido}
+          allowedItemTypes={reglasCatalogo?.allowedItemTypes}
+          defaultItemType={tipoPropuesto}
           onClose={() => setModalOpen(false)}
           onSubmit={handleSubmit}
         />
@@ -390,12 +462,14 @@ function ProductsPageContent() {
  */
 export default function ProductsPage() {
   return (
-    <Suspense
-      fallback={
-        <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>
-      }
-    >
-      <ProductsPageContent />
-    </Suspense>
+    <RequireTenantCapability capability="catalog">
+      <Suspense
+        fallback={
+          <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>
+        }
+      >
+        <ProductsPageContent />
+      </Suspense>
+    </RequireTenantCapability>
   );
 }

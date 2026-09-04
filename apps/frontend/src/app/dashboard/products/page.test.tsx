@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
 import ProductsPage from './page';
 import { Product } from '@/types';
 
@@ -14,6 +15,11 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => parametros,
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
   usePathname: () => '/dashboard/products',
+}));
+
+// El guard de capacidad se prueba aparte; aquí deja pasar.
+vi.mock('@/components/capabilities/RequireTenantCapability', () => ({
+  RequireTenantCapability: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 
 const productos: Product[] = [
@@ -122,7 +128,7 @@ describe('Catálogo de productos', () => {
       montar();
       await screen.findByText('Sala Toscana');
 
-      await user.type(screen.getByRole('searchbox', { name: 'Buscar productos' }), 'comedor');
+      await user.type(screen.getByRole('searchbox', { name: 'Buscar en el catálogo' }), 'comedor');
 
       await waitFor(() => {
         expect(screen.queryByText('Sala Toscana')).not.toBeInTheDocument();

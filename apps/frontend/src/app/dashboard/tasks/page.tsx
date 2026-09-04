@@ -14,6 +14,7 @@ import { Task } from '@/types';
 import { TaskModal, TaskFormData } from '@/components/tasks/TaskModal';
 import { ListState } from '@/components/ui/ListState';
 import { SugerenciasDeTarea } from '@/components/tasks/SugerenciasDeTarea';
+import { RequireTenantCapability } from '@/components/capabilities/RequireTenantCapability';
 import { intervaloDeRefresco, useRealtime } from '@/lib/use-realtime';
 
 // Las tablas de prioridad y estado viven en `lib/tareas`: la agenda del Inicio
@@ -279,6 +280,10 @@ function TasksPageContent() {
 /**
  * `useSearchParams` obliga a un límite de Suspense para que la página pueda
  * prerenderizarse. Mismo patrón que Productos, cotizaciones y conversaciones.
+ *
+ * La guarda de módulo (Fase 4) va DENTRO: con Tareas apagado el contenido no
+ * se monta y `GET /tasks` no se pide. Sin redirecciones: quien llega por un
+ * enlace guardado ve por qué no hay nada y, si administra, lo activa aquí.
  */
 export default function TasksPage() {
   return (
@@ -287,7 +292,9 @@ export default function TasksPage() {
         <p className="py-10 text-center text-sm text-neutral-400">Cargando...</p>
       }
     >
-      <TasksPageContent />
+      <RequireTenantCapability capability="tasks">
+        <TasksPageContent />
+      </RequireTenantCapability>
     </Suspense>
   );
 }

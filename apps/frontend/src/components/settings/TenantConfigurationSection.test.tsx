@@ -3,7 +3,11 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { TenantConfigurationSection } from './TenantConfigurationSection';
-import type { TenantConfiguration } from '@/lib/tenant-configuration';
+import {
+  TENANT_CONFIGURATION_QUERY_KEY,
+  type TenantConfiguration,
+} from '@/lib/tenant-configuration';
+import { DEFINICIONES_DE_PRUEBA } from '@/lib/__fixtures__/tenant-capabilities.fixture';
 
 const config: TenantConfiguration = {
   contractVersion: 1,
@@ -23,6 +27,13 @@ const config: TenantConfiguration = {
     catalog: true,
     quotes: false,
     tasks: true,
+  },
+  capabilities: {
+    // Tareas está activo porque la empresa nunca lo desactivó, no porque lo
+    // eligiera: la sección lo tiene que decir.
+    legacyDefaultsApplied: ['tasks'],
+    catalog: { allowedItemTypes: ['PRODUCT'], defaultItemType: 'PRODUCT' },
+    definitions: DEFINICIONES_DE_PRUEBA,
   },
   catalog: { categories: ['Salas'], allowFreeText: true },
   pipeline: {
@@ -67,11 +78,18 @@ vi.mock('@/lib/tenant-configuration', async () => {
 
 function montar(readOnly = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
+  render(
     <QueryClientProvider client={client}>
       <TenantConfigurationSection readOnly={readOnly} />
     </QueryClientProvider>,
   );
+  return { client };
+}
+
+/** Apaga un módulo pasando por el diálogo de confirmación. */
+async function apagar(user: ReturnType<typeof userEvent.setup>, etiqueta: RegExp) {
+  await user.click(screen.getByLabelText(etiqueta));
+  await user.click(await screen.findByRole('button', { name: 'Desactivar' }));
 }
 
 describe('TenantConfigurationSection', () => {
@@ -156,7 +174,11 @@ describe('TenantConfigurationSection', () => {
     expect(updateMyTenantConfiguration).not.toHaveBeenCalled();
   });
 
-  it('envía SOLO lo que cambió (región normalizada, modelo y módulos) y confirma el éxito', async () => {
+  // Teclea en tres campos con un `datalist` de cientos de zonas horarias
+  // detrás: en aislamiento tarda <1 s, pero con toda la suite en paralelo ha
+  // rozado los 5 s por defecto. El margen es contra la carga, no contra el
+  // código.
+  it('envía SOLO lo que cambió (región normalizada, modelo y módulos) y confirma el éxito', { timeout: 15_000 }, async () => {
     const user = userEvent.setup();
     montar();
     const zona = await screen.findByLabelText(/Zona horaria/);
@@ -212,8 +234,124 @@ describe('TenantConfigurationSection', () => {
     const user = userEvent.setup();
     updateMyTenantConfiguration.mockRejectedValue({ response: { status: 403, data: {} } });
     montar();
-    await user.click(await screen.findByLabelText(/Tareas/));
+    await screen.findByLabelText(/Tareas/);
+    await apagar(user, /Tareas/);
     await user.click(screen.getByRole('button', { name: 'Guardar configuración' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('no tienes permiso');
+  });
+
+  describe('módulos (Fase 4)', () => {
+    it('las etiquetas y descripciones salen de las definiciones que publica el servidor', async () => {
+      getMyTenantConfiguration.mockResolvedValue({
+        ...config,
+        capabilities: {
+          ...config.capabilities,
+          definitions: config.capabilities.definitions.map((d) =>
+            d.key === 'tasks' ? { ...d, label: 'Seguimientos', description: 'TEXTO DEL SERVIDOR' } : d,
+          ),
+        },
+      });
+      montar();
+
+      expect(await screen.findByLabelText(/Seguimientos/)).toBeChecked();
+      expect(screen.getByText('TEXTO DEL SERVIDOR')).toBeInTheDocument();
+      expect(screen.queryByLabelText(/^Tareas/)).not.toBeInTheDocument();
+    });
+
+    it('un módulo activo solo por compatibilidad lo dice; los elegidos, no', async () => {
+      montar();
+
+      const tareas = await screen.findByLabelText(/Tareas/);
+      expect(tareas.closest('label')).toHaveTextContent(
+        'Activo por compatibilidad: tu empresa nunca lo desactivó.',
+      );
+      expect(screen.getByLabelText(/Catálogo/).closest('label')).not.toHaveTextContent(
+        'Activo por compatibilidad',
+      );
+    });
+
+    it('apagar un módulo pide confirmación y la casilla no cambia hasta confirmar', async () => {
+      const user = userEvent.setup();
+      montar();
+      const tareas = await screen.findByLabelText(/Tareas/);
+
+      await user.click(tareas);
+
+      const dialogo = await screen.findByRole('dialog');
+      expect(dialogo).toHaveTextContent('Desactivar no borra nada: los datos vuelven al reactivarlo.');
+      expect(tareas).toBeChecked();
+
+      await user.click(screen.getByRole('button', { name: 'Cancelar' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(tareas).toBeChecked();
+      expect(screen.getByRole('button', { name: 'Guardar configuración' })).toBeDisabled();
+
+      await user.click(tareas);
+      await user.click(await screen.findByRole('button', { name: 'Desactivar' }));
+      await waitFor(() => expect(tareas).not.toBeChecked());
+      expect(screen.getByRole('button', { name: 'Guardar configuración' })).toBeEnabled();
+    });
+
+    it('encender un módulo es inmediato, sin diálogo', async () => {
+      const user = userEvent.setup();
+      montar();
+
+      await user.click(await screen.findByLabelText(/Cotizaciones/));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.getByLabelText(/Cotizaciones/)).toBeChecked();
+    });
+
+    it('avisa cuando Cotizaciones queda activo sin Catálogo', async () => {
+      const user = userEvent.setup();
+      montar();
+      await screen.findByLabelText(/Catálogo/);
+
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+
+      await user.click(screen.getByLabelText(/Cotizaciones/));
+      await apagar(user, /Catálogo/);
+
+      expect(await screen.findByRole('note')).toHaveTextContent(
+        'Crear cotizaciones nuevas necesita elementos del catálogo.',
+      );
+    });
+
+    it('tras guardar, la respuesta del servidor entra en caché ANTES de invalidar la empresa', async () => {
+      const user = userEvent.setup();
+      const respuesta: TenantConfiguration = {
+        ...config,
+        modules: { ...config.modules, quotes: true },
+      };
+      updateMyTenantConfiguration.mockResolvedValue(respuesta);
+      const { client } = montar();
+      const setQueryData = vi.spyOn(client, 'setQueryData');
+      const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+
+      await user.click(await screen.findByLabelText(/Cotizaciones/));
+      await user.click(screen.getByRole('button', { name: 'Guardar configuración' }));
+
+      await waitFor(() => expect(updateMyTenantConfiguration).toHaveBeenCalledTimes(1));
+      await waitFor(() =>
+        expect(setQueryData).toHaveBeenCalledWith(TENANT_CONFIGURATION_QUERY_KEY, respuesta),
+      );
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['company-me'] });
+      // Primero la caché canónica, después la invalidación (que vuelve a pedir).
+      expect(setQueryData.mock.invocationCallOrder[0]).toBeLessThan(
+        invalidateQueries.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('sin definiciones del servidor, la sección sigue funcionando con las suyas', async () => {
+      getMyTenantConfiguration.mockResolvedValue({
+        ...config,
+        capabilities: { ...config.capabilities, definitions: [] },
+      });
+      montar();
+
+      expect(await screen.findByLabelText(/Catálogo/)).toBeChecked();
+      expect(screen.getByLabelText(/Cotizaciones/)).not.toBeChecked();
+      expect(screen.getAllByText('Siempre activo')).toHaveLength(4);
+    });
   });
 });

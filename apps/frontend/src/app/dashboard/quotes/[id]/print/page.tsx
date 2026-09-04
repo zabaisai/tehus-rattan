@@ -6,8 +6,9 @@ import { ArrowLeft, Printer } from 'lucide-react';
 import { getQuote } from '@/lib/quotes';
 import { getLead } from '@/lib/leads';
 import { QuotePrintableDocument } from '@/components/documents/QuotePrintableDocument';
+import { RequireTenantCapability } from '@/components/capabilities/RequireTenantCapability';
 
-export default function QuotePrintPage() {
+function QuotePrintPageContent() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const quoteId = params.id;
@@ -71,5 +72,14 @@ export default function QuotePrintPage() {
 
       {quote && <QuotePrintableDocument quote={quote} lead={lead ?? null} />}
     </div>
+  );
+}
+
+/** La ruta de detalle/impresión está gobernada por la misma capacidad que la lista. */
+export default function QuotePrintPage() {
+  return (
+    <RequireTenantCapability capability="quotes">
+      <QuotePrintPageContent />
+    </RequireTenantCapability>
   );
 }

@@ -1,5 +1,10 @@
 import { Role } from '@/types';
 import { ResultadoDeBusqueda, TipoBuscable } from './busqueda';
+import {
+  catalogVocabulary,
+  type CatalogRules,
+  type TenantCapabilityKey,
+} from './tenant-capabilities';
 
 /**
  * Las acciones del panel «Crear rápidamente» del mockup 16.
@@ -35,23 +40,32 @@ export interface DefinicionDeAccion {
   ruta?: string;
   /** Se muestra cuando la acción navega en vez de abrir un formulario. */
   nota?: string;
+  /**
+   * Módulo de la empresa que tiene que estar activo (Fase 4). Sin él la
+   * acción no se ofrece: el servidor respondería `403 MODULE_DISABLED`.
+   */
+  capability?: TenantCapabilityKey;
 }
 
 export const ACCIONES_RAPIDAS: DefinicionDeAccion[] = [
   { accion: 'contacto', etiqueta: 'Nuevo contacto', roles: null },
   { accion: 'oportunidad', etiqueta: 'Nueva oportunidad', roles: null },
-  { accion: 'tarea', etiqueta: 'Nueva tarea', roles: null },
+  { accion: 'tarea', etiqueta: 'Nueva tarea', roles: null, capability: 'tasks' },
   {
     accion: 'cotizacion',
     etiqueta: 'Nueva cotización',
     roles: null,
     ruta: '/dashboard/pipeline',
     nota: 'Elige la oportunidad',
+    capability: 'quotes',
   },
   {
+    // La etiqueta es la genérica; `accionesPara` la sustituye por el
+    // vocabulario del catálogo de la empresa (producto / servicio / elemento).
     accion: 'producto',
     etiqueta: 'Nuevo producto',
     roles: ['ADMIN', 'SUPER_ADMIN'],
+    capability: 'catalog',
   },
   {
     accion: 'bot',
@@ -62,9 +76,36 @@ export const ACCIONES_RAPIDAS: DefinicionDeAccion[] = [
   },
 ];
 
-export function accionesPara(rol: Role | undefined): DefinicionDeAccion[] {
+export interface ContextoDeAcciones {
+  /**
+   * `can()` de `useTenantCapabilities`. Si no se pasa, no se filtra por
+   * módulo (uso fuera del shell, por ejemplo en pruebas del propio catálogo).
+   */
+  can?: (key: TenantCapabilityKey) => boolean;
+  /** Reglas del catálogo, para nombrar la acción como habla la empresa. */
+  catalogo?: CatalogRules | null;
+}
+
+/**
+ * Acciones que ve ESTE rol en ESTA empresa: primero el rol, después el
+ * módulo. La acción de catálogo toma el nombre del vocabulario de la empresa:
+ * «Nuevo servicio» para quien solo vende servicios, «Nuevo elemento» para
+ * quien vende ambos.
+ */
+export function accionesPara(
+  rol: Role | undefined,
+  contexto: ContextoDeAcciones = {},
+): DefinicionDeAccion[] {
   if (!rol) return [];
-  return ACCIONES_RAPIDAS.filter((a) => a.roles === null || a.roles.includes(rol));
+  const { can, catalogo } = contexto;
+  const vocabulario = catalogVocabulary(catalogo);
+  return ACCIONES_RAPIDAS.filter(
+    (a) => a.roles === null || a.roles.includes(rol),
+  )
+    .filter((a) => !a.capability || !can || can(a.capability))
+    .map((a) =>
+      a.accion === 'producto' ? { ...a, etiqueta: vocabulario.newItem } : a,
+    );
 }
 
 // ─────────────────────────────────────────────────────────────

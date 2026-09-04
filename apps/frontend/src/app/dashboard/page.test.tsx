@@ -3,7 +3,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import DashboardHomePage from './page';
 import { useAuthStore } from '@/store/auth.store';
+import { capacidadesDePrueba } from '@/lib/__fixtures__/tenant-capabilities.fixture';
 import type { Role } from '@/types';
+
+// Capacidades de la empresa (Fase 4): todo activo salvo que la prueba lo apague.
+let capacidades = capacidadesDePrueba();
+vi.mock('@/lib/tenant-capabilities', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-capabilities')>(
+    '@/lib/tenant-capabilities',
+  );
+  return { ...real, useTenantCapabilities: () => capacidades };
+});
 
 const getMyCompany = vi.fn();
 const getOverview = vi.fn();
@@ -63,6 +73,7 @@ function serie(valores: Array<Partial<{ openedCount: number; openedValue: number
 
 beforeEach(() => {
   vi.clearAllMocks();
+  capacidades = capacidadesDePrueba();
   getMyCompany.mockResolvedValue({ id: 'c1', name: 'Muebles del Valle' });
   getOverview.mockResolvedValue({
     leadsThisMonth: 12,
@@ -281,6 +292,64 @@ describe('Inicio — métricas accionables', () => {
 
     expect(await screen.findByText('acumulado histórico')).toBeInTheDocument();
     expect(screen.getByText('ahora mismo')).toBeInTheDocument();
+  });
+});
+
+describe('Inicio — módulos de la empresa (Fase 4)', () => {
+  it('sin Tareas, un ADMIN no ve «Tareas vencidas» ni la agenda, y NO se consultan', async () => {
+    sesion('ADMIN');
+    capacidades = capacidadesDePrueba({ modules: { tasks: false } });
+    renderPage();
+
+    await screen.findByRole('link', { name: /Oportunidades abiertas: 17/ });
+    expect(screen.queryByRole('link', { name: /Tareas vencidas/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Agenda de hoy' })).toBeNull();
+    // Las demás métricas y paneles siguen: nada queda a medias.
+    expect(screen.getByRole('region', { name: 'Embudo comercial' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Actividad reciente' })).toBeInTheDocument();
+    expect(getTasks).not.toHaveBeenCalled();
+    expect(getOverdueTasksCount).not.toHaveBeenCalled();
+  });
+
+  it('sin Tareas, un AGENT se queda con sus conversaciones y ningún hueco ni aviso', async () => {
+    sesion('AGENT');
+    capacidades = capacidadesDePrueba({ modules: { tasks: false } });
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: /Laura Martínez, 3 sin leer/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Agenda de hoy' })).toBeNull();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(getTasks).not.toHaveBeenCalled();
+  });
+
+  it('con Tareas activo, la agenda y la métrica vuelven', async () => {
+    sesion('ADMIN');
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: /Tareas vencidas: 5/ })).toBeInTheDocument();
+    expect(await screen.findByText('Llamar a Laura')).toBeInTheDocument();
+  });
+
+  it('mientras la configuración carga no se lanzan las consultas de Tareas', async () => {
+    sesion('AGENT');
+    capacidades = capacidadesDePrueba({ status: 'loading' });
+    renderPage();
+
+    await screen.findByRole('link', { name: /Laura Martínez, 3 sin leer/ });
+    expect(getTasks).not.toHaveBeenCalled();
+    expect(screen.queryByRole('region', { name: 'Agenda de hoy' })).toBeNull();
+  });
+
+  it('sin Cotizaciones, el hero no ofrece «Nueva cotización»', async () => {
+    sesion('ADMIN');
+    capacidades = capacidadesDePrueba({ modules: { quotes: false } });
+    renderPage();
+
+    await screen.findByRole('heading', { name: /Buen/ });
+    expect(screen.queryByRole('link', { name: 'Nueva cotización' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Abrir conversaciones/ })).toBeInTheDocument();
   });
 });
 

@@ -16,6 +16,8 @@ import {
   leerRecientes,
 } from '@/lib/creacion-rapida';
 import { rutaDelResultado, ETIQUETA_DE_TIPO, ResultadoDeBusqueda } from '@/lib/busqueda';
+import { useTenantCapabilities } from '@/lib/tenant-capabilities';
+import { suggestedItemType } from '@/lib/tenant-configuration';
 import { ContactModal } from '@/components/contacts/ContactModal';
 import { TaskModal } from '@/components/tasks/TaskModal';
 import { ProductModal } from '@/components/products/ProductModal';
@@ -43,7 +45,13 @@ export function CreacionRapida({ onCerrar }: { onCerrar: () => void }) {
   const user = useAuthStore((s) => s.user);
   const [abierto, setAbierto] = useState<AccionRapida | null>(null);
 
-  const acciones = accionesPara(user?.role);
+  // Rol Y módulo (Fase 4): una acción de un módulo apagado no se ofrece, y la
+  // del catálogo se llama como habla la empresa (producto / servicio / elemento).
+  const capacidades = useTenantCapabilities();
+  const acciones = accionesPara(user?.role, {
+    can: capacidades.can,
+    catalogo: capacidades.catalog,
+  });
   const recientes = leerRecientes({ companyId: user?.companyId, userId: user?.id });
 
   // El modal de oportunidad necesita el embudo y sus etapas. Solo se pide
@@ -54,7 +62,14 @@ export function CreacionRapida({ onCerrar }: { onCerrar: () => void }) {
     queryFn: getPipelines,
     enabled: abierto === 'oportunidad',
   });
-  const embudo = embudos?.[0];
+  // El embudo PREDETERMINADO de la empresa, no el primero que devuelva la
+  // API: el orden de la lista no es una decisión de negocio.
+  const embudo = embudos?.find((p) => p.isDefault) ?? embudos?.[0];
+
+  const configuracion = capacidades.configuration;
+  const categorias = configuracion?.catalog.categories ?? [];
+  const tipoPropuesto =
+    capacidades.catalog?.defaultItemType ?? suggestedItemType(configuracion);
 
   function activar(a: DefinicionDeAccion) {
     if (a.ruta) {
@@ -175,9 +190,13 @@ export function CreacionRapida({ onCerrar }: { onCerrar: () => void }) {
       {abierto === 'producto' && (
         <ProductModal
           product={null}
+          categories={categorias}
+          allowedItemTypes={capacidades.catalog?.allowedItemTypes}
+          defaultItemType={tipoPropuesto}
           onClose={() => setAbierto(null)}
           onSubmit={async (d) => {
             await createProduct({
+              itemType: d.itemType,
               name: d.name,
               description: d.description || undefined,
               price: Number(d.price),

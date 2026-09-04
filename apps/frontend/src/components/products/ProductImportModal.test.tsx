@@ -3,6 +3,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProductImportModal } from './ProductImportModal';
+import type { CatalogItemType } from '@/lib/tenant-configuration';
+import { capacidadesDeCatalogo } from '@/lib/__fixtures__/catalogo.fixture';
+
+let tipos: CatalogItemType[] = ['PRODUCT', 'SERVICE'];
+vi.mock('@/lib/tenant-capabilities', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-capabilities')>('@/lib/tenant-capabilities');
+  return { ...real, useTenantCapabilities: () => capacidadesDeCatalogo(tipos) };
+});
 
 const subirImportacion = vi.fn();
 const vistaPreviaDeImportacion = vi.fn();
@@ -80,6 +88,7 @@ async function subirArchivo(user: ReturnType<typeof userEvent.setup>) {
 
 describe('ProductImportModal — mapeo y tipo de elemento', () => {
   beforeEach(() => {
+    tipos = ['PRODUCT', 'SERVICE'];
     llamadas.length = 0;
     subirImportacion.mockReset().mockResolvedValue(importacion);
     vistaPreviaDeImportacion.mockReset().mockResolvedValue(previa);
@@ -144,6 +153,23 @@ describe('ProductImportModal — mapeo y tipo de elemento', () => {
     expect(screen.getByLabelText('Campo para la columna Tipo')).toHaveValue('itemType');
     expect(screen.getByLabelText('Campo para la columna Producto o servicio')).toHaveValue('');
     expect(screen.getByText(/Estas columnas no se importarán/)).toHaveTextContent('Producto o servicio');
+  });
+
+  it('en una empresa de solo servicios, avisa de que las filas de otro tipo fallarán', async () => {
+    // El servidor aplica la misma regla fila a fila; decirlo antes evita
+    // arrancar una importación que termina con la mitad en el reporte.
+    tipos = ['SERVICE'];
+    const user = userEvent.setup();
+    montar();
+    await subirArchivo(user);
+
+    const nota = screen.getByTestId('nota-tipo');
+    expect(nota).toHaveTextContent('Esta empresa solo crea servicios');
+    expect(nota).toHaveTextContent('se reportan como fallidas');
+
+    // Sin la columna, todo toma el tipo por defecto de la empresa: Servicio.
+    await user.selectOptions(screen.getByLabelText('Campo para la columna Producto o servicio'), '');
+    expect(screen.getByTestId('nota-tipo')).toHaveTextContent('todo se importa como Servicio');
   });
 
   it('si el servidor rechaza el mapeo, lo muestra y no arranca', async () => {

@@ -1,4 +1,5 @@
 import api from './axios';
+import type { TenantCapabilityKey } from './tenant-capabilities';
 
 /** Los tipos que la búsqueda global sabe recorrer. Espejo del DTO del backend. */
 export const TIPOS_BUSCABLES = [
@@ -10,6 +11,41 @@ export const TIPOS_BUSCABLES = [
 ] as const;
 
 export type TipoBuscable = (typeof TIPOS_BUSCABLES)[number];
+
+/**
+ * Módulo del que depende cada tipo (Fase 4). Los que no aparecen son
+ * centrales y se buscan siempre. El servidor ya omite los tipos de un módulo
+ * apagado; aquí se omiten ANTES de pedirlos y al pintar, para que la paleta
+ * no ofrezca un filtro que nunca devolvería nada.
+ */
+export const CAPACIDAD_DE_TIPO: Partial<Record<TipoBuscable, TenantCapabilityKey>> = {
+  productos: 'catalog',
+  cotizaciones: 'quotes',
+};
+
+/** Tipos que puede buscar esta empresa: los centrales más los módulos activos. */
+export function tiposBuscablesPara(
+  can: (key: TenantCapabilityKey) => boolean,
+): TipoBuscable[] {
+  return TIPOS_BUSCABLES.filter((t) => {
+    const capacidad = CAPACIDAD_DE_TIPO[t];
+    return !capacidad || can(capacidad);
+  });
+}
+
+/** Quita de la respuesta los grupos de tipos que la empresa no tiene activos. */
+export function filtrarRespuesta(
+  respuesta: RespuestaDeBusqueda,
+  permitidos: readonly TipoBuscable[],
+): RespuestaDeBusqueda {
+  const grupos = respuesta.grupos.filter((g) => permitidos.includes(g.tipo));
+  if (grupos.length === respuesta.grupos.length) return respuesta;
+  return {
+    ...respuesta,
+    grupos,
+    total: grupos.reduce((s, g) => s + g.total, 0),
+  };
+}
 
 /** Igual que en el backend: con una letra la búsqueda deja de discriminar. */
 export const LONGITUD_MINIMA_CONSULTA = 2;

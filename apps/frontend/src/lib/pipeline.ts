@@ -78,6 +78,44 @@ export async function deleteStage(pipelineId: string, stageId: string) {
   return data;
 }
 
+/** Límites de nombre que aplica el servidor (400 si se superan). */
+export const LIMITES_DE_NOMBRE = { embudo: 60, etapa: 40 } as const;
+
+export type TipoDeEtapa = "OPEN" | "WON" | "LOST";
+
+/** El tipo de etapa con nombre: un color solo no se lee. */
+export const ETIQUETA_TIPO_ETAPA: Record<TipoDeEtapa, string> = {
+  OPEN: "Abierta",
+  WON: "Ganada",
+  LOST: "Perdida",
+};
+
+/**
+ * Orden COMPLETO del embudo tras mover una etapa un puesto arriba o abajo.
+ *
+ * El servidor exige la lista entera con posiciones 0..n-1 sin huecos ni
+ * repetidos (400 en otro caso): mandar solo las dos etapas intercambiadas
+ * dejaba el resto fuera y la petición se rechazaba. Si la etapa no puede
+ * moverse (ya está en el extremo) devuelve el orden actual, normalizado.
+ */
+export function ordenCompletoTrasMover(
+  stages: Array<{ id: string; order: number }>,
+  stageId: string,
+  dir: -1 | 1,
+): Array<{ id: string; order: number }> {
+  const ordenadas = [...stages].sort((a, b) => a.order - b.order);
+  const i = ordenadas.findIndex((s) => s.id === stageId);
+  const j = i + dir;
+  if (i >= 0 && j >= 0 && j < ordenadas.length) {
+    [ordenadas[i], ordenadas[j]] = [ordenadas[j], ordenadas[i]];
+  }
+  return ordenadas.map((s, order) => ({ id: s.id, order }));
+}
+
+/**
+ * Reordena las etapas. `stages` debe ser la lista COMPLETA del embudo con
+ * posiciones 0..n-1; usa `ordenCompletoTrasMover` para construirla.
+ */
 export async function reorderStages(
   pipelineId: string,
   stages: Array<{ id: string; order: number }>,

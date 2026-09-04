@@ -114,6 +114,14 @@ export function mensajeDeError(e: unknown): string {
       : 'Modo demo: esta acción no se realiza desde la empresa de demostración.';
   }
 
+  // MÓDULO DESACTIVADO también antes del 403 genérico. El servidor lo manda
+  // cuando la empresa apagó Catálogo, Cotizaciones o Tareas y algo sigue
+  // llamando a su API: no es un problema de rol ni de conexión, y decir «no
+  // tienes permiso» mandaría al usuario a pedir un rol que no arregla nada.
+  if (respuesta?.data?.code === 'MODULE_DISABLED') {
+    return 'Este módulo no está activo para tu empresa.';
+  }
+
   if (respuesta?.status === 403) {
     return 'No tienes permiso para ver esto.';
   }

@@ -7,6 +7,16 @@ import { useAuthStore } from '@/store/auth.store';
 import { olvidarRecientes } from '@/lib/creacion-rapida';
 import { rutaDelResultado, resultadosEnOrden } from '@/lib/busqueda';
 import type { RespuestaDeBusqueda } from '@/lib/busqueda';
+import { capacidadesDePrueba } from '@/lib/__fixtures__/tenant-capabilities.fixture';
+
+// Capacidades de la empresa (Fase 4): todo activo salvo que la prueba lo apague.
+let capacidades = capacidadesDePrueba();
+vi.mock('@/lib/tenant-capabilities', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-capabilities')>(
+    '@/lib/tenant-capabilities',
+  );
+  return { ...real, useTenantCapabilities: () => capacidades };
+});
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -81,7 +91,80 @@ describe('PaletaDeBusqueda', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     olvidarRecientes();
+    capacidades = capacidadesDePrueba();
     buscarMock.mockResolvedValue(RESPUESTA);
+  });
+
+  describe('módulos de la empresa (Fase 4)', () => {
+    const CON_PRODUCTOS: RespuestaDeBusqueda = {
+      ...RESPUESTA,
+      total: 4,
+      grupos: [
+        ...RESPUESTA.grupos,
+        {
+          tipo: 'productos',
+          total: 1,
+          resultados: [
+            {
+              tipo: 'productos',
+              id: 'p1',
+              titulo: 'Sala Toscana (producto)',
+              subtitulo: null,
+              insignia: null,
+              contactoId: null,
+            },
+          ],
+        },
+      ],
+    };
+
+    it('sin catálogo no hay filtro «Productos», y un grupo de productos no se pinta aunque llegue', async () => {
+      capacidades = capacidadesDePrueba({ modules: { catalog: false } });
+      buscarMock.mockResolvedValue(CON_PRODUCTOS);
+      const user = userEvent.setup();
+      montar();
+
+      expect(screen.queryByRole('button', { name: 'Productos' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Cotizaciones' })).toBeInTheDocument();
+
+      await user.type(screen.getByRole('combobox'), 'laura');
+      const opciones = await screen.findAllByRole('option');
+
+      expect(opciones).toHaveLength(3);
+      expect(screen.queryByText('Sala Toscana (producto)')).not.toBeInTheDocument();
+    });
+
+    it('con un módulo apagado se piden SOLO los tipos permitidos', async () => {
+      capacidades = capacidadesDePrueba({ modules: { catalog: false } });
+      const user = userEvent.setup();
+      montar();
+
+      await user.type(screen.getByRole('combobox'), 'laura');
+
+      await waitFor(() => expect(buscarMock).toHaveBeenCalled());
+      expect(buscarMock.mock.calls[0][0]).toMatchObject({
+        tipos: ['contactos', 'conversaciones', 'oportunidades', 'cotizaciones'],
+      });
+    });
+
+    it('el texto de ayuda nombra solo lo que se puede buscar', () => {
+      capacidades = capacidadesDePrueba({ modules: { catalog: false, quotes: false } });
+      montar();
+
+      expect(screen.getByRole('combobox')).toHaveAttribute(
+        'placeholder',
+        'Buscar contactos, conversaciones u oportunidades',
+      );
+    });
+
+    it('con todo activo sigue nombrando los cinco tipos', () => {
+      montar();
+
+      expect(screen.getByRole('combobox')).toHaveAttribute(
+        'placeholder',
+        'Buscar contactos, conversaciones, oportunidades, productos o cotizaciones',
+      );
+    });
   });
 
   describe('antes de escribir', () => {

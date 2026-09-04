@@ -5,7 +5,17 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { CreacionRapida } from './CreacionRapida';
 import { useAuthStore } from '@/store/auth.store';
 import { olvidarRecientes, registrarReciente } from '@/lib/creacion-rapida';
+import { capacidadesDePrueba } from '@/lib/__fixtures__/tenant-capabilities.fixture';
 import type { Role } from '@/types';
+
+// Capacidades de la empresa (Fase 4): todo activo salvo que la prueba lo apague.
+let capacidades = capacidadesDePrueba();
+vi.mock('@/lib/tenant-capabilities', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-capabilities')>(
+    '@/lib/tenant-capabilities',
+  );
+  return { ...real, useTenantCapabilities: () => capacidades };
+});
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -26,14 +36,12 @@ vi.mock('@/lib/contacts', async () => {
   return { ...real, createContact: (p: PayloadContacto) => createContact(p) };
 });
 
+const getPipelines = vi.fn(async () => [
+  { id: 'p1', name: 'Embudo', isDefault: true, stages: [{ id: 's1', name: 'Nuevo', order: 0 }] },
+]);
 vi.mock('@/lib/pipeline', async () => {
   const real = await vi.importActual<typeof import('@/lib/pipeline')>('@/lib/pipeline');
-  return {
-    ...real,
-    getPipelines: vi.fn(async () => [
-      { id: 'p1', name: 'Embudo', stages: [{ id: 's1', name: 'Nuevo', order: 0 }] },
-    ]),
-  };
+  return { ...real, getPipelines: () => getPipelines() };
 });
 
 vi.mock('@/lib/users', async () => {
@@ -58,6 +66,78 @@ describe('CreacionRapida', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     olvidarRecientes();
+    capacidades = capacidadesDePrueba();
+    getPipelines.mockResolvedValue([
+      { id: 'p1', name: 'Embudo', isDefault: true, stages: [{ id: 's1', name: 'Nuevo', order: 0 }] },
+    ]);
+  });
+
+  describe('módulos de la empresa (Fase 4)', () => {
+    it('sin catálogo, un ADMIN no ve la acción del catálogo', () => {
+      capacidades = capacidadesDePrueba({ modules: { catalog: false } });
+      montar('ADMIN');
+
+      expect(screen.queryByRole('button', { name: /Nuevo producto/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Nueva tarea/ })).toBeInTheDocument();
+    });
+
+    it('sin tareas ni cotizaciones desaparecen sus acciones; el resto sigue', () => {
+      capacidades = capacidadesDePrueba({ modules: { tasks: false, quotes: false } });
+      montar('ADMIN');
+
+      expect(screen.queryByRole('button', { name: /Nueva tarea/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Nueva cotización/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Nuevo contacto/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Nueva oportunidad/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Nuevo producto/ })).toBeInTheDocument();
+    });
+
+    it('mientras la configuración carga, las acciones opcionales no aparecen', () => {
+      capacidades = capacidadesDePrueba({ status: 'loading' });
+      montar('ADMIN');
+
+      expect(screen.queryByRole('button', { name: /Nuevo producto/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Nueva tarea/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Nuevo contacto/ })).toBeInTheDocument();
+    });
+
+    it('la acción del catálogo habla como la empresa: «Nuevo servicio» para quien solo vende servicios', () => {
+      capacidades = capacidadesDePrueba({
+        catalogRules: { allowedItemTypes: ['SERVICE'], defaultItemType: 'SERVICE' },
+      });
+      montar('ADMIN');
+
+      expect(screen.getByRole('button', { name: /Nuevo servicio/ })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /Nuevo producto/ })).not.toBeInTheDocument();
+    });
+
+    it('el formulario del catálogo recibe las categorías de la empresa', async () => {
+      const user = userEvent.setup();
+      capacidades = capacidadesDePrueba({ categories: ['Salas', 'Comedores'] });
+      montar('ADMIN');
+
+      await user.click(screen.getByRole('button', { name: /Nuevo producto/ }));
+      await screen.findByRole('dialog');
+
+      const sugeridas = Array.from(document.querySelectorAll('datalist option')).map(
+        (o) => (o as HTMLOptionElement).value,
+      );
+      expect(sugeridas).toEqual(['Salas', 'Comedores']);
+    });
+
+    it('la oportunidad nueva usa el embudo PREDETERMINADO, no el primero de la lista', async () => {
+      const user = userEvent.setup();
+      getPipelines.mockResolvedValue([
+        { id: 'p1', name: 'Secundario', isDefault: false, stages: [{ id: 's1', name: 'Etapa secundaria', order: 0 }] },
+        { id: 'p2', name: 'Principal', isDefault: true, stages: [{ id: 's2', name: 'Etapa principal', order: 0 }] },
+      ]);
+      montar('ADMIN');
+
+      await user.click(screen.getByRole('button', { name: /Nueva oportunidad/ }));
+
+      expect(await screen.findByRole('option', { name: 'Etapa principal' })).toBeInTheDocument();
+      expect(screen.queryByRole('option', { name: 'Etapa secundaria' })).not.toBeInTheDocument();
+    });
   });
 
   describe('permisos', () => {
