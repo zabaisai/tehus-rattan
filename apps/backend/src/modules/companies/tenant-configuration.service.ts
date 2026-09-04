@@ -24,8 +24,21 @@ import {
   type TenantPipeline,
 } from './tenant-configuration';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
+import {
+  moduleDependencyViolation,
+  resolveEffectiveCapabilities,
+  resolveEffectiveCommercial,
+  type TenantCapabilities,
+} from './tenant-capabilities';
 
 export const TENANT_CONFIGURATION_AUDIT_ACTION = 'company.configuration.update';
+
+/**
+ * Vida de la caché de capacidades por empresa. Corta a propósito: el guard
+ * de módulo consulta en cada petición y con esto una ráfaga de peticiones
+ * cuesta una lectura; la escritura invalida en el acto dentro del proceso.
+ */
+export const CAPABILITIES_CACHE_TTL_MS = 5_000;
 
 /** Forma interna del parche, común a los dos endpoints. */
 export interface TenantConfigurationPatch {
@@ -68,10 +81,48 @@ const COMPANY_SELECT = {
  */
 @Injectable()
 export class TenantConfigurationService {
+  private readonly capabilitiesCache = new Map<
+    string,
+    { expiresAt: number; value: TenantCapabilities }
+  >();
+
   constructor(
     private prisma: PrismaService,
     private auditLog: PlatformAuditLogService,
   ) {}
+
+  /**
+   * Capacidades efectivas de UNA empresa, para guards y validaciones del
+   * dominio (tipo de catálogo permitido, búsqueda). Lee solo `settings` y
+   * cachea por `companyId` durante `CAPABILITIES_CACHE_TTL_MS`; la caché está
+   * aislada por clave y no puede servir la configuración de otra empresa.
+   * Una empresa inexistente responde 404 (sin cachear).
+   */
+  async resolveCapabilities(
+    companyId: string,
+    now = Date.now(),
+  ): Promise<TenantCapabilities> {
+    const hit = this.capabilitiesCache.get(companyId);
+    if (hit && hit.expiresAt > now) return hit.value;
+    const company = await this.prisma.company.findUnique({
+      where: { id: companyId },
+      select: { settings: true },
+    });
+    if (!company) throw new NotFoundException('Empresa no encontrada');
+    const value = resolveEffectiveCapabilities(
+      parseCompanySettings(company.settings),
+    );
+    this.capabilitiesCache.set(companyId, {
+      expiresAt: now + CAPABILITIES_CACHE_TTL_MS,
+      value,
+    });
+    return value;
+  }
+
+  /** Olvida la caché de una empresa (tras escribir su configuración). */
+  invalidateCapabilities(companyId: string): void {
+    this.capabilitiesCache.delete(companyId);
+  }
 
   async get(companyId: string): Promise<TenantConfigurationV1> {
     const company = await this.prisma.company.findUnique({
@@ -158,6 +209,22 @@ export class TenantConfigurationService {
     configuration: TenantConfigurationV1;
     settings: NormalizedCompanySettings;
   }> {
+    try {
+      return await this.applyInTransaction(companyId, patch, actor);
+    } finally {
+      // Haya ido bien o mal, la siguiente lectura vuelve a la base.
+      this.invalidateCapabilities(companyId);
+    }
+  }
+
+  private async applyInTransaction(
+    companyId: string,
+    patch: TenantConfigurationPatch,
+    actor: ConfigurationActor,
+  ): Promise<{
+    configuration: TenantConfigurationV1;
+    settings: NormalizedCompanySettings;
+  }> {
     // Todo lo que se pueda rechazar sin mirar la base se rechaza AQUÍ, antes
     // de abrir la transacción y tomar el bloqueo.
     const regional = normalizeRegionalPatch(patch.regional);
@@ -218,8 +285,12 @@ export class TenantConfigurationService {
         sections.includes('catalog');
 
       if (touchesSettings) {
+        // Se fusiona sobre las banderas EFECTIVAS, no sobre las normalizadas:
+        // en una empresa legacy (sin bandera guardada) el default normalizado
+        // es `false`, y desactivar un módulo habría apagado en silencio los
+        // otros dos al escribir el JSON v2 completo.
         const commercial: CommercialFlags = {
-          ...current.commercial,
+          ...resolveEffectiveCommercial(current),
           ...commercialPatch,
           ...(modulesPatch.catalog !== undefined && {
             usesCatalog: modulesPatch.catalog,
@@ -242,6 +313,13 @@ export class TenantConfigurationService {
             'La empresa debe vender productos, servicios o ambos: activa al menos uno',
           );
         }
+        // Dependencias duras entre módulos, sobre el conjunto ya fusionado.
+        const violation = moduleDependencyViolation({
+          catalog: commercial.usesCatalog,
+          quotes: commercial.usesQuotes,
+          tasks: commercial.usesTasks,
+        });
+        if (violation) throw new BadRequestException(violation);
         const built = buildCompanySettingsV2({
           commercial,
           categories: categories ?? current.catalog.categories,

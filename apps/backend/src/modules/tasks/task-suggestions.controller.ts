@@ -11,6 +11,8 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { TaskSuggestionStatus } from '@prisma/client';
 import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
+import { RequiresTenantCapability } from '../../common/decorators/requires-tenant-capability.decorator';
+import { TenantCapabilityGuard } from '../companies/tenant-capability.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
@@ -27,7 +29,13 @@ import {
  * de Pulso o de una automatizacion. Lo que se expone aqui es DECIDIRLAS, que
  * es lo que hace una persona.
  */
-@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, RolesGuard)
+@UseGuards(
+  AuthGuard('jwt'),
+  BusinessTenantGuard,
+  RolesGuard,
+  TenantCapabilityGuard,
+)
+@RequiresTenantCapability('tasks')
 @Controller('task-suggestions')
 export class TaskSuggestionsController {
   constructor(

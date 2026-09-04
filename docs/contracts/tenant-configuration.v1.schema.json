@@ -1,94 +1,222 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://takto.online/contracts/tenant-configuration.v1.schema.json",
-  "title": "TenantConfigurationV1 (IMPLEMENTADO en la Fase 2)",
+  "title": "TenantConfigurationV1 (IMPLEMENTADO en la Fase 2; capacidades efectivas en la Fase 4)",
   "description": "Respuesta de GET y PATCH /companies/me/configuration. Contrato agregado y versionado APARTE de la forma de almacenamiento de Company.settings (v0/v1/v2, ver company-settings.v2.schema.json). Se compone de tres fuentes sin duplicarlas: columnas de Company (región, tipo de negocio manual), Company.settings (banderas, módulos, categorías, plantilla de origen) y pipelines/pipeline_stages (pipeline real). Implementación: apps/backend/src/modules/companies/tenant-configuration.ts y tenant-configuration.service.ts. Una prueba (tenant-configuration.contract.spec.ts) valida una respuesta real del motor contra este esquema.",
   "type": "object",
   "properties": {
-    "contractVersion": { "type": "integer", "const": 1 },
+    "contractVersion": {
+      "type": "integer",
+      "const": 1
+    },
     "storageVersion": {
       "type": "integer",
-      "enum": [0, 1, 2],
+      "enum": [
+        0,
+        1,
+        2
+      ],
       "description": "Forma real guardada en Company.settings: 0 sin settings, 1 forma antigua, 2 forma actual. Leer nunca la cambia."
     },
     "identity": {
       "type": "object",
       "description": "Metadatos de origen (plantilla de onboarding) y modelo comercial DERIVADO de las banderas actuales. No editable por este contrato.",
       "properties": {
-        "industry": { "type": ["string", "null"] },
-        "businessType": { "type": ["string", "null"] },
-        "businessModel": { "type": ["string", "null"], "enum": ["products", "services", "mixed", null] },
-        "templateVersion": { "type": ["integer", "null"] }
+        "industry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "businessType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "businessModel": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "products",
+            "services",
+            "mixed",
+            null
+          ]
+        },
+        "templateVersion": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
       },
-      "required": ["industry", "businessType", "businessModel", "templateVersion"],
+      "required": [
+        "industry",
+        "businessType",
+        "businessModel",
+        "templateVersion"
+      ],
       "additionalProperties": false
     },
     "regional": {
       "type": "object",
       "description": "Fuente canónica: columnas de Company. Siempre válidas en la respuesta (una columna con texto inválido histórico se responde con el default del producto, sin reescribir).",
       "properties": {
-        "country": { "type": ["string", "null"], "maxLength": 80 },
-        "timezone": { "type": "string", "minLength": 1, "maxLength": 64, "description": "IANA canónica, p. ej. America/Bogota" },
-        "currency": { "type": "string", "pattern": "^[A-Z]{3}$", "description": "ISO 4217" },
-        "locale": { "type": "string", "minLength": 2, "maxLength": 35, "description": "BCP 47 canónica, p. ej. es-CO" }
+        "country": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 80
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "description": "IANA canónica, p. ej. America/Bogota"
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$",
+          "description": "ISO 4217"
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 35,
+          "description": "BCP 47 canónica, p. ej. es-CO"
+        }
       },
-      "required": ["country", "timezone", "currency", "locale"],
+      "required": [
+        "country",
+        "timezone",
+        "currency",
+        "locale"
+      ],
       "additionalProperties": false
     },
     "modules": {
       "type": "object",
       "properties": {
-        "conversations": { "const": true },
-        "contacts": { "const": true },
-        "opportunities": { "const": true },
-        "pipeline": { "const": true },
-        "catalog": { "type": "boolean" },
-        "quotes": { "type": "boolean" },
-        "tasks": { "type": "boolean" }
+        "conversations": {
+          "const": true
+        },
+        "contacts": {
+          "const": true
+        },
+        "opportunities": {
+          "const": true
+        },
+        "pipeline": {
+          "const": true
+        },
+        "catalog": {
+          "type": "boolean"
+        },
+        "quotes": {
+          "type": "boolean"
+        },
+        "tasks": {
+          "type": "boolean"
+        }
       },
-      "required": ["conversations", "contacts", "opportunities", "pipeline", "catalog", "quotes", "tasks"],
-      "additionalProperties": false
+      "required": [
+        "conversations",
+        "contacts",
+        "opportunities",
+        "pipeline",
+        "catalog",
+        "quotes",
+        "tasks"
+      ],
+      "additionalProperties": false,
+      "description": "Módulos EFECTIVOS (Fase 4): los centrales siempre true; los opcionales salen de las banderas declaradas y, si una empresa nunca declaró una bandera (v0 o v1 sin ella), se resuelve activa por compatibilidad. Desactivar un módulo nunca borra sus datos."
     },
     "catalog": {
       "type": "object",
       "properties": {
         "categories": {
           "type": "array",
-          "items": { "type": "string", "minLength": 1, "maxLength": 60 },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
           "maxItems": 30,
           "uniqueItems": true
         },
-        "allowFreeText": { "const": true }
+        "allowFreeText": {
+          "const": true
+        }
       },
-      "required": ["categories", "allowFreeText"],
+      "required": [
+        "categories",
+        "allowFreeText"
+      ],
       "additionalProperties": false
     },
     "pipeline": {
       "description": "Pipeline real de la empresa (isDefault no archivado; si no hay uno marcado, el primero no archivado por order, createdAt, id). null si la empresa no tiene ninguno.",
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
           "properties": {
-            "id": { "type": "string", "minLength": 1 },
-            "name": { "type": "string" },
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string"
+            },
             "stages": {
               "type": "array",
               "items": {
                 "type": "object",
                 "properties": {
-                  "id": { "type": "string", "minLength": 1 },
-                  "name": { "type": "string" },
-                  "type": { "type": "string", "enum": ["OPEN", "WON", "LOST"] },
-                  "isInitial": { "type": "boolean" },
-                  "order": { "type": "integer" }
+                  "id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "OPEN",
+                      "WON",
+                      "LOST"
+                    ]
+                  },
+                  "isInitial": {
+                    "type": "boolean"
+                  },
+                  "order": {
+                    "type": "integer"
+                  }
                 },
-                "required": ["id", "name", "type", "isInitial", "order"],
+                "required": [
+                  "id",
+                  "name",
+                  "type",
+                  "isInitial",
+                  "order"
+                ],
                 "additionalProperties": false
               }
             }
           },
-          "required": ["id", "name", "stages"],
+          "required": [
+            "id",
+            "name",
+            "stages"
+          ],
           "additionalProperties": false
         }
       ]
@@ -98,27 +226,231 @@
       "properties": {
         "categories": {
           "type": "object",
-          "properties": { "maxLength": { "const": 60 }, "maxCount": { "const": 30 } },
-          "required": ["maxLength", "maxCount"],
+          "properties": {
+            "maxLength": {
+              "const": 60
+            },
+            "maxCount": {
+              "const": 30
+            }
+          },
+          "required": [
+            "maxLength",
+            "maxCount"
+          ],
           "additionalProperties": false
         },
         "regional": {
           "type": "object",
           "properties": {
-            "country": { "type": "object", "properties": { "maxLength": { "const": 80 } }, "required": ["maxLength"], "additionalProperties": false },
-            "timezone": { "type": "object", "properties": { "maxLength": { "const": 64 } }, "required": ["maxLength"], "additionalProperties": false },
-            "currency": { "type": "object", "properties": { "length": { "const": 3 } }, "required": ["length"], "additionalProperties": false },
-            "locale": { "type": "object", "properties": { "maxLength": { "const": 35 } }, "required": ["maxLength"], "additionalProperties": false }
+            "country": {
+              "type": "object",
+              "properties": {
+                "maxLength": {
+                  "const": 80
+                }
+              },
+              "required": [
+                "maxLength"
+              ],
+              "additionalProperties": false
+            },
+            "timezone": {
+              "type": "object",
+              "properties": {
+                "maxLength": {
+                  "const": 64
+                }
+              },
+              "required": [
+                "maxLength"
+              ],
+              "additionalProperties": false
+            },
+            "currency": {
+              "type": "object",
+              "properties": {
+                "length": {
+                  "const": 3
+                }
+              },
+              "required": [
+                "length"
+              ],
+              "additionalProperties": false
+            },
+            "locale": {
+              "type": "object",
+              "properties": {
+                "maxLength": {
+                  "const": 35
+                }
+              },
+              "required": [
+                "maxLength"
+              ],
+              "additionalProperties": false
+            }
           },
-          "required": ["country", "timezone", "currency", "locale"],
+          "required": [
+            "country",
+            "timezone",
+            "currency",
+            "locale"
+          ],
           "additionalProperties": false
         }
       },
-      "required": ["categories", "regional"],
+      "required": [
+        "categories",
+        "regional"
+      ],
+      "additionalProperties": false
+    },
+    "capabilities": {
+      "type": "object",
+      "description": "Capacidades efectivas (Fase 4). Acompaña a modules con lo que explica el resultado: qué opcionales quedaron activos por compatibilidad, qué tipos de catálogo puede crear la empresa según su modelo comercial y el registro de definiciones (etiqueta, descripción, dependencias) que la interfaz muestra sin duplicar el contrato.",
+      "properties": {
+        "legacyDefaultsApplied": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "catalog",
+              "quotes",
+              "tasks"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "catalog": {
+          "type": "object",
+          "properties": {
+            "allowedItemTypes": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "PRODUCT",
+                  "SERVICE"
+                ]
+              },
+              "minItems": 1,
+              "maxItems": 2,
+              "uniqueItems": true
+            },
+            "defaultItemType": {
+              "type": "string",
+              "enum": [
+                "PRODUCT",
+                "SERVICE"
+              ]
+            }
+          },
+          "required": [
+            "allowedItemTypes",
+            "defaultItemType"
+          ],
+          "additionalProperties": false
+        },
+        "definitions": {
+          "type": "array",
+          "minItems": 7,
+          "maxItems": 7,
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string",
+                "enum": [
+                  "conversations",
+                  "contacts",
+                  "opportunities",
+                  "pipeline",
+                  "catalog",
+                  "quotes",
+                  "tasks"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              },
+              "group": {
+                "type": "string",
+                "enum": [
+                  "core",
+                  "commercial"
+                ]
+              },
+              "alwaysOn": {
+                "type": "boolean"
+              },
+              "configurable": {
+                "type": "boolean"
+              },
+              "dependsOn": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "catalog",
+                    "quotes",
+                    "tasks"
+                  ]
+                },
+                "uniqueItems": true
+              },
+              "relatedTo": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "catalog",
+                    "quotes",
+                    "tasks"
+                  ]
+                },
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "key",
+              "label",
+              "description",
+              "group",
+              "alwaysOn",
+              "configurable",
+              "dependsOn",
+              "relatedTo"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "legacyDefaultsApplied",
+        "catalog",
+        "definitions"
+      ],
       "additionalProperties": false
     }
   },
-  "required": ["contractVersion", "storageVersion", "identity", "regional", "modules", "catalog", "pipeline", "limits"],
+  "required": [
+    "contractVersion",
+    "storageVersion",
+    "identity",
+    "regional",
+    "modules",
+    "capabilities",
+    "catalog",
+    "pipeline",
+    "limits"
+  ],
   "additionalProperties": false,
   "x-phase2": {
     "status": "IMPLEMENTED",
@@ -131,12 +463,38 @@
     },
     "patch": {
       "editable": {
-        "regional": ["country (texto libre, max 80, null limpia)", "timezone (IANA)", "currency (ISO 4217, se normaliza a mayúsculas)", "locale (BCP 47, se canonicaliza)"],
-        "commercial": ["sellsProducts", "sellsServices"],
-        "modules": ["catalog", "quotes", "tasks"],
-        "catalog": ["categories"]
+        "regional": [
+          "country (texto libre, max 80, null limpia)",
+          "timezone (IANA)",
+          "currency (ISO 4217, se normaliza a mayúsculas)",
+          "locale (BCP 47, se canonicaliza)"
+        ],
+        "commercial": [
+          "sellsProducts",
+          "sellsServices"
+        ],
+        "modules": [
+          "catalog",
+          "quotes",
+          "tasks"
+        ],
+        "catalog": [
+          "categories"
+        ]
       },
-      "rejected400": ["settings", "storageVersion", "contractVersion", "identity", "pipeline", "pipelineDefaults", "companyId", "id", "limits", "cualquier clave desconocida (whitelist + forbidNonWhitelisted)", "ambas ventas en falso tras una edición explícita del modelo comercial"],
+      "rejected400": [
+        "settings",
+        "storageVersion",
+        "contractVersion",
+        "identity",
+        "pipeline",
+        "pipelineDefaults",
+        "companyId",
+        "id",
+        "limits",
+        "cualquier clave desconocida (whitelist + forbidNonWhitelisted)",
+        "ambas ventas en falso tras una edición explícita del modelo comercial"
+      ],
       "rules": [
         "GET nunca escribe; storageVersion refleja lo guardado",
         "un parche solo regional escribe columnas y no reescribe settings (v1 sigue v1)",
@@ -150,6 +508,15 @@
       "apps/frontend/src/lib/tenant-configuration.ts (cliente, tipos, hook)",
       "apps/frontend/src/components/settings/TenantConfigurationSection.tsx (Configuración → Empresa)",
       "apps/frontend/src/components/settings/CompanyCategoriesEditor.tsx (categorías)"
+    ]
+  },
+  "x-phase4": {
+    "status": "IMPLEMENTED",
+    "implementedAt": "2026-09-04",
+    "notes": [
+      "modules pasa a ser el resultado efectivo (regla legacy: no declarado = activo)",
+      "capabilities es nuevo y aditivo",
+      "la API responde 403 {code: MODULE_DISABLED, module} en los endpoints gobernados por un módulo desactivado (ver docs/phase-4/MODULE-MATRIX.md)"
     ]
   }
 }

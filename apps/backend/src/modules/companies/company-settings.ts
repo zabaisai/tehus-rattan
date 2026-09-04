@@ -36,6 +36,11 @@ export const BUSINESS_TYPE_LIMITS = {
   maxLength: 60,
 } as const;
 
+/** Límites de un pipeline administrado desde el CRM (Fase 4). */
+export const PIPELINE_LIMITS = {
+  maxNameLength: 60,
+} as const;
+
 export const STAGE_LIMITS = {
   maxNameLength: 40,
   maxCount: 20,
@@ -80,6 +85,13 @@ export interface NormalizedCompanySettings {
   pipelineDefaults: PipelineDefaultsInfo | null;
   /** Claves que no pertenecen al contrato; se conservan al escribir. */
   extra: Record<string, unknown>;
+  /**
+   * Banderas que el JSON guardado declara de forma explícita (booleanas).
+   * Lo que NO está aquí nunca fue decidido por nadie: la resolución de
+   * capacidades efectivas (`tenant-capabilities.ts`) aplica ahí el default de
+   * compatibilidad en vez del `false` de `DEFAULT_COMMERCIAL`.
+   */
+  declaredFlags: Partial<CommercialFlags>;
 }
 
 const DEFAULT_COMMERCIAL: CommercialFlags = {
@@ -113,6 +125,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function flagsFrom(source: Record<string, unknown>): CommercialFlags {
   const out = { ...DEFAULT_COMMERCIAL };
+  for (const key of COMMERCIAL_KEYS) {
+    if (typeof source[key] === 'boolean') out[key] = source[key];
+  }
+  return out;
+}
+
+/** Solo las banderas realmente presentes (booleanas) en el JSON guardado. */
+function declaredFlagsFrom(
+  source: Record<string, unknown>,
+): Partial<CommercialFlags> {
+  const out: Partial<CommercialFlags> = {};
   for (const key of COMMERCIAL_KEYS) {
     if (typeof source[key] === 'boolean') out[key] = source[key];
   }
@@ -214,6 +237,7 @@ export function parseCompanySettings(raw: unknown): NormalizedCompanySettings {
       vertical: null,
       pipelineDefaults: null,
       extra: {},
+      declaredFlags: {},
     };
   }
 
@@ -236,6 +260,9 @@ export function parseCompanySettings(raw: unknown): NormalizedCompanySettings {
       vertical: parseVertical(raw.vertical),
       pipelineDefaults: parsePipelineDefaults(raw.pipelineDefaults),
       extra,
+      declaredFlags: isRecord(raw.commercial)
+        ? declaredFlagsFrom(raw.commercial)
+        : {},
     };
   }
 
@@ -254,6 +281,7 @@ export function parseCompanySettings(raw: unknown): NormalizedCompanySettings {
     vertical: null,
     pipelineDefaults: null,
     extra,
+    declaredFlags: declaredFlagsFrom(raw),
   };
 }
 

@@ -130,15 +130,26 @@ describe('TenantConfigurationService', () => {
       expect(config.pipeline).toBeNull();
     });
 
-    it('empresa sin settings (v0) → defaults, storageVersion 0, sin escritura', async () => {
+    it('empresa sin settings (v0) → módulos opcionales activos por compatibilidad, storageVersion 0, sin escritura', async () => {
       prisma.company.findUnique.mockResolvedValue({ ...ROW, settings: null });
       const config = await service.get('company-a');
       expect(config.storageVersion).toBe(0);
       expect(config.identity.businessModel).toBeNull();
+      // Fase 4: lo que nunca se declaró sigue disponible. Una empresa anterior
+      // a la configuración conserva su catálogo, cotizaciones y tareas.
       expect(config.modules).toMatchObject({
-        catalog: false,
-        quotes: false,
-        tasks: false,
+        catalog: true,
+        quotes: true,
+        tasks: true,
+      });
+      expect(config.capabilities.legacyDefaultsApplied).toEqual([
+        'catalog',
+        'quotes',
+        'tasks',
+      ]);
+      expect(config.capabilities.catalog).toEqual({
+        allowedItemTypes: ['PRODUCT', 'SERVICE'],
+        defaultItemType: 'PRODUCT',
       });
       expect(prisma.company.update).not.toHaveBeenCalled();
     });

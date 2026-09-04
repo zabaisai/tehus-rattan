@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizePhone } from '../../common/phone/e164.util';
+import { TenantConfigurationService } from '../companies/tenant-configuration.service';
+import type { TenantCapabilities } from '../companies/tenant-capabilities';
 import {
   LIMITE_POR_TIPO_POR_DEFECTO,
   TIPOS_BUSCABLES,
@@ -55,9 +57,34 @@ export interface RespuestaDeBusqueda {
 /** `contains` insensible a mayúsculas, que es como busca una persona. */
 const like = (q: string) => ({ contains: q, mode: 'insensitive' as const });
 
+/**
+ * Qué capacidad de la empresa gobierna cada tipo buscable. Los tipos sin
+ * entrada son módulos centrales y se buscan siempre.
+ */
+const CAPACIDAD_POR_TIPO: Partial<
+  Record<TipoBuscable, keyof TenantCapabilities['modules']>
+> = {
+  productos: 'catalog',
+  cotizaciones: 'quotes',
+};
+
+/** Deja fuera los tipos cuyo módulo la empresa tiene desactivado. */
+export function tiposPermitidos(
+  tipos: readonly TipoBuscable[],
+  modules: TenantCapabilities['modules'],
+): TipoBuscable[] {
+  return tipos.filter((tipo) => {
+    const capacidad = CAPACIDAD_POR_TIPO[tipo];
+    return capacidad === undefined || modules[capacidad];
+  });
+}
+
 @Injectable()
 export class SearchService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configuration: TenantConfigurationService,
+  ) {}
 
   /**
    * Busca en varias entidades a la vez, SIEMPRE dentro de una empresa.
@@ -80,10 +107,15 @@ export class SearchService {
   ): Promise<RespuestaDeBusqueda> {
     const q = opciones.q.trim();
     const limite = opciones.limite ?? LIMITE_POR_TIPO_POR_DEFECTO;
-    const tipos =
+    // Un módulo desactivado no se busca: ni aparece en los resultados ni se
+    // consulta su tabla, aunque el cliente lo pida explícitamente.
+    const { modules } = await this.configuration.resolveCapabilities(companyId);
+    const tipos = tiposPermitidos(
       opciones.tipos && opciones.tipos.length > 0
         ? opciones.tipos
-        : [...TIPOS_BUSCABLES];
+        : [...TIPOS_BUSCABLES],
+      modules,
+    );
 
     // En paralelo: son consultas independientes y encadenarlas solo suma
     // latencia a una interfaz que responde mientras se teclea.

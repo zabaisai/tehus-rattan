@@ -9,6 +9,7 @@ import { ProductsService } from './products.service';
 describe('ProductsService — itemType', () => {
   let prisma: any;
   let service: ProductsService;
+  let configuracion: { resolveCapabilities: jest.Mock };
 
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'p1',
@@ -39,7 +40,26 @@ describe('ProductsService — itemType', () => {
         ),
       },
     };
-    service = new ProductsService(prisma);
+    configuracion = {
+      resolveCapabilities: jest.fn(async () => ({
+        modules: {
+          conversations: true,
+          contacts: true,
+          opportunities: true,
+          pipeline: true,
+          catalog: true,
+          quotes: true,
+          tasks: true,
+        },
+        legacyDefaultsApplied: [],
+        catalog: {
+          allowedItemTypes: ['PRODUCT', 'SERVICE'],
+          defaultItemType: 'PRODUCT',
+        },
+        definitions: [],
+      })),
+    };
+    service = new ProductsService(prisma, configuracion as any);
   });
 
   describe('findAll', () => {

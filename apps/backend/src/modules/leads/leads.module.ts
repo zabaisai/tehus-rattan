@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { CompaniesModule } from '../companies/companies.module';
 import { LeadsService } from './leads.service';
 import { LeadsController } from './leads.controller';
 import { LeadProductsService } from './lead-products.service';
@@ -9,7 +10,7 @@ import { AssignmentModule } from '../assignment/assignment.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-  imports: [AssignmentModule, NotificationsModule],
+  imports: [AssignmentModule, NotificationsModule, CompaniesModule],
   controllers: [LeadsController, LeadProductsController],
   providers: [
     LeadsService,

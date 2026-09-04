@@ -24,6 +24,11 @@ import {
   type NormalizedCompanySettings,
 } from './company-settings';
 import { ZONA_POR_DEFECTO } from '../../common/time/zona-horaria';
+import {
+  resolveEffectiveCapabilities,
+  type CapabilityDefinitionView,
+  type OptionalCapabilityKey,
+} from './tenant-capabilities';
 
 export const TENANT_CONFIGURATION_CONTRACT_VERSION = 1;
 
@@ -86,12 +91,28 @@ export interface TenantPipeline {
   stages: TenantPipelineStage[];
 }
 
+/**
+ * Capacidades efectivas (Fase 4): lo que la empresa PUEDE hacer hoy, ya
+ * aplicada la regla de compatibilidad. `modules` (arriba) es el resultado;
+ * aquí va lo que explica y acompaña ese resultado.
+ */
+export interface TenantCapabilitiesView {
+  /** Opcionales activos porque la empresa nunca los declaró (legacy). */
+  legacyDefaultsApplied: OptionalCapabilityKey[];
+  catalog: {
+    allowedItemTypes: CatalogItemTypeName[];
+    defaultItemType: CatalogItemTypeName;
+  };
+  definitions: CapabilityDefinitionView[];
+}
+
 export interface TenantConfigurationV1 {
   contractVersion: 1;
   storageVersion: 0 | 1 | 2;
   identity: TenantIdentity;
   regional: TenantRegional;
   modules: TenantModules;
+  capabilities: TenantCapabilitiesView;
   catalog: { categories: string[]; allowFreeText: true };
   pipeline: TenantPipeline | null;
   limits: {
@@ -125,7 +146,21 @@ export function deriveBusinessModel(flags: {
   return null;
 }
 
-export function deriveModules(flags: CommercialFlags): TenantModules {
+/**
+ * Módulos EFECTIVOS. Antes de la Fase 4 se derivaban de las banderas
+ * normalizadas, cuyo default es `false`: una empresa sin settings aparecía
+ * sin catálogo, cotizaciones ni tareas aunque las usara a diario. Ahora la
+ * fuente es la resolución de capacidades, que aplica el default de
+ * compatibilidad a lo que nunca se declaró.
+ */
+export function deriveModules(
+  settings: Pick<NormalizedCompanySettings, 'declaredFlags'>,
+): TenantModules {
+  return resolveEffectiveCapabilities(settings).modules;
+}
+
+/** Banderas tal cual: solo para quien necesite el dato bruto, no los módulos. */
+export function modulesFromFlags(flags: CommercialFlags): TenantModules {
   return {
     conversations: true,
     contacts: true,
@@ -326,6 +361,7 @@ export function buildTenantConfiguration(input: {
   const { company, settings, pipeline } = input;
   const businessType =
     settings.vertical?.businessType ?? company.businessType?.trim() ?? null;
+  const capabilities = resolveEffectiveCapabilities(settings);
   return {
     contractVersion: TENANT_CONFIGURATION_CONTRACT_VERSION,
     storageVersion: settings.storedVersion,
@@ -336,7 +372,12 @@ export function buildTenantConfiguration(input: {
       templateVersion: settings.vertical?.templateVersion ?? null,
     },
     regional: readRegional(company),
-    modules: deriveModules(settings.commercial),
+    modules: capabilities.modules,
+    capabilities: {
+      legacyDefaultsApplied: capabilities.legacyDefaultsApplied,
+      catalog: capabilities.catalog,
+      definitions: capabilities.definitions,
+    },
     catalog: {
       categories: [...settings.catalog.categories],
       allowFreeText: true,

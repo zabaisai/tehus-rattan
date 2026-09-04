@@ -15,6 +15,8 @@ import {
 import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
+import { RequiresTenantCapability } from '../../common/decorators/requires-tenant-capability.decorator';
+import { TenantCapabilityGuard } from '../companies/tenant-capability.guard';
 import { QuotesService } from './quotes.service';
 import { QuotePdfService } from './quote-pdf.service';
 import { QuoteCicloService } from './quote-ciclo.service';
@@ -26,7 +28,8 @@ import { CreateQuoteFromLeadDto } from './dto/create-quote-from-lead.dto';
 import { UpdateQuoteDto } from './dto/update-quote.dto';
 import { aNumeroParaMostrar } from '../../common/dinero/dinero';
 
-@UseGuards(AuthGuard('jwt'), BusinessTenantGuard)
+@UseGuards(AuthGuard('jwt'), BusinessTenantGuard, TenantCapabilityGuard)
+@RequiresTenantCapability('quotes')
 @Controller('quotes')
 export class QuotesController {
   constructor(
