@@ -4,6 +4,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import {
+  type CatalogItemType,
+  effectiveItemType,
+  parseItemTypeFilter,
+} from './catalog-item-type';
+
+/** Fila de Prisma con el tipo efectivo: nunca sale `itemType: null`. */
+function toResponse<T extends { itemType: CatalogItemType | null }>(row: T) {
+  return { ...row, itemType: effectiveItemType(row.itemType) };
+}
 
 @Injectable()
 export class ProductsService {
@@ -14,17 +24,20 @@ export class ProductsService {
     filters: {
       category?: string;
       search?: string;
+      itemType?: string;
       limit?: string;
       offset?: string;
     },
   ) {
     const pagination = this.parsePagination(filters.limit, filters.offset);
+    const itemTypeFilter = parseItemTypeFilter(filters.itemType);
 
-    return this.prisma.product.findMany({
+    const rows = await this.prisma.product.findMany({
       where: {
         companyId,
         isActive: true,
         ...(filters.category && { category: filters.category }),
+        ...(itemTypeFilter ?? {}),
         ...(filters.search && {
           OR: [
             { name: { contains: filters.search, mode: 'insensitive' } },
@@ -36,9 +49,15 @@ export class ProductsService {
       orderBy: { name: 'asc' },
       ...pagination,
     });
+    return rows.map(toResponse);
   }
 
   async findById(id: string, companyId: string) {
+    return toResponse(await this.findRow(id, companyId));
+  }
+
+  // Siempre por empresa: un id de otro tenant es un 404 genérico, nunca 403.
+  private async findRow(id: string, companyId: string) {
     const product = await this.prisma.product.findFirst({
       where: { id, companyId },
     });
@@ -57,11 +76,15 @@ export class ProductsService {
       sku?: string;
       stock?: number;
       imageUrl?: string;
+      itemType?: CatalogItemType;
     },
   ) {
-    return this.prisma.product.create({
-      data: { ...data, companyId },
+    // Un cliente antiguo que omite `itemType` crea un PRODUCT (explícito aquí
+    // además del default de la columna, para que la fila nueva nunca sea NULL).
+    const created = await this.prisma.product.create({
+      data: { ...data, itemType: data.itemType ?? 'PRODUCT', companyId },
     });
+    return toResponse(created);
   }
 
   async update(
@@ -77,19 +100,22 @@ export class ProductsService {
       stock?: number;
       imageUrl?: string;
       isActive?: boolean;
+      itemType?: CatalogItemType;
     },
   ) {
-    await this.findById(id, companyId);
-    return this.prisma.product.update({ where: { id }, data });
+    await this.findRow(id, companyId);
+    const updated = await this.prisma.product.update({ where: { id }, data });
+    return toResponse(updated);
   }
 
   async remove(id: string, companyId: string) {
-    await this.findById(id, companyId);
+    await this.findRow(id, companyId);
     // Soft delete preserves historical references.
-    return this.prisma.product.update({
+    const removed = await this.prisma.product.update({
       where: { id },
       data: { isActive: false },
     });
+    return toResponse(removed);
   }
 
   private parsePagination(limit?: string, offset?: string) {

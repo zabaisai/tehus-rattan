@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import CompanySettingsPage from './page';
 import { useAuthStore } from '@/store/auth.store';
 import type { Company } from '@/types';
@@ -16,6 +16,40 @@ vi.mock('@/lib/companies', () => ({
   resolveCompanyAssetUrl: (p: string) => p,
 }));
 vi.mock('@/lib/onboarding', () => ({ validateLogoFile: () => null }));
+vi.mock('@/lib/tenant-configuration', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-configuration')>('@/lib/tenant-configuration');
+  const fetchConfig = async () => ({
+      contractVersion: 1 as const,
+      storageVersion: 2,
+      identity: { industry: null, businessType: null, businessModel: 'products', templateVersion: null },
+      regional: { country: null, timezone: 'America/Bogota', currency: 'COP', locale: 'es-CO' },
+      modules: { conversations: true, contacts: true, opportunities: true, pipeline: true, catalog: true, quotes: false, tasks: false },
+      catalog: { categories: [], allowFreeText: true },
+      pipeline: null,
+      limits: { categories: { maxLength: 60, maxCount: 30 }, regional: real.DEFAULT_REGIONAL_LIMITS },
+    });
+  return {
+    ...real,
+    getMyTenantConfiguration: fetchConfig,
+    updateMyTenantConfiguration: vi.fn(),
+    useTenantConfiguration: () =>
+      useQuery({ queryKey: real.TENANT_CONFIGURATION_QUERY_KEY, queryFn: fetchConfig }),
+  };
+});
+vi.mock('@/lib/company-settings', async () => {
+  const real = await vi.importActual<typeof import('@/lib/company-settings')>('@/lib/company-settings');
+  const fetchSettings = async () => ({
+    version: 2 as const, commercial: { sellsProducts: true, sellsServices: false, usesCatalog: true, usesQuotes: false, usesTasks: false },
+    catalog: { categories: [], allowFreeText: true as const }, vertical: null, pipelineDefaults: null,
+    limits: { categories: { maxLength: 60, maxCount: 30 } },
+  });
+  return {
+    ...real,
+    getMyCompanySettings: fetchSettings,
+    useCompanySettings: () =>
+      useQuery({ queryKey: real.COMPANY_SETTINGS_QUERY_KEY, queryFn: fetchSettings }),
+  };
+});
 
 function company(overrides: Partial<Company> = {}): Company {
   return {
@@ -69,5 +103,26 @@ describe('CompanySettingsPage fiscal fields', () => {
       screen.getByText('No tienes permiso para administrar la configuración de la empresa.'),
     ).toBeInTheDocument();
     expect(screen.queryByText(/Identidad fiscal/)).not.toBeInTheDocument();
+  });
+
+  it('AGENT sees the tenant configuration read-only: disabled controls, no save button', async () => {
+    useAuthStore.setState({
+      user: { id: 'u2', name: 'Agente', email: 'ag@co.test', role: 'AGENT', companyId: 'c1' } as never,
+    });
+    renderPage();
+    const zona = await screen.findByLabelText(/Zona horaria/);
+    expect(zona).toBeDisabled();
+    expect(screen.getByLabelText('Vende productos')).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Guardar configuración' })).not.toBeInTheDocument();
+    expect(screen.getByText('Solo un administrador puede modificar la configuración.')).toBeInTheDocument();
+  });
+
+  it('ADMIN sees the tenant configuration with enabled controls and a save button', async () => {
+    getMyCompany.mockResolvedValue(company());
+    renderPage();
+    const zona = await screen.findByLabelText(/Zona horaria/);
+    expect(zona).toBeEnabled();
+    expect(zona).toHaveValue('America/Bogota');
+    expect(screen.getByRole('button', { name: 'Guardar configuración' })).toBeInTheDocument();
   });
 });

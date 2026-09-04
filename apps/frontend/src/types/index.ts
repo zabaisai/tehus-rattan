@@ -284,6 +284,9 @@ export interface ActividadReciente {
   actorName: string | null;
 }
 
+/** Tipo de elemento del catálogo (Fase 2). El servidor nunca devuelve null. */
+export type CatalogItemType = "PRODUCT" | "SERVICE";
+
 export interface Product {
   id: string;
   code: string | null;
@@ -295,6 +298,8 @@ export interface Product {
   sku: string | null;
   stock: number | null;
   isActive: boolean;
+  /** Efectivo: una fila anterior a la Fase 2 llega como PRODUCT. */
+  itemType: CatalogItemType;
   createdAt: string;
   updatedAt: string;
 }
@@ -305,6 +310,8 @@ export interface CreateProductPayload {
   price: number;
   category?: string;
   imageUrl?: string;
+  /** Opcional por compatibilidad: si se omite, el servidor guarda PRODUCT. */
+  itemType?: CatalogItemType;
 }
 
 export interface ProductImportIssue {
@@ -380,6 +387,7 @@ export interface UpdateProductPayload {
   category?: string;
   imageUrl?: string;
   isActive?: boolean;
+  itemType?: CatalogItemType;
 }
 
 export interface LeadProductRef {

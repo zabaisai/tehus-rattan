@@ -106,5 +106,10 @@
       "apps/frontend/src/components/leads/AddProductToLeadModal.tsx (filtro)",
       "apps/frontend/src/components/settings/CompanyCategoriesEditor.tsx (edición)"
     ]
+  },
+  "x-phase2": {
+    "status": "STORAGE_ONLY",
+    "implementedAt": "2026-09-03",
+    "note": "Desde la Fase 2 este esquema describe únicamente la FORMA DE ALMACENAMIENTO de Company.settings. La vista que consume el frontend es el contrato agregado TenantConfigurationV1 (docs/contracts/tenant-configuration.v1.schema.json), que compone columnas de Company (región), este JSON (banderas, módulos, categorías, plantilla de origen) y el pipeline relacional. GET/PATCH /companies/me/settings se conservan por compatibilidad y delegan en el mismo motor (TenantConfigurationService): transacción con bloqueo de fila y auditoría company.configuration.update. La región NO se duplica aquí: vive en companies.timezone/currency/locale/country."
   }
 }

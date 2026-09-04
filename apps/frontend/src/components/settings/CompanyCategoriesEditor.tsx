@@ -14,6 +14,7 @@ import {
   updateMyCompanySettings,
   useCompanySettings,
 } from "@/lib/company-settings";
+import { TENANT_CONFIGURATION_QUERY_KEY } from "@/lib/tenant-configuration";
 
 type ApiError = {
   response?: { status?: number; data?: { message?: string | string[] } };
@@ -107,6 +108,8 @@ export function CompanyCategoriesEditor() {
     try {
       await updateMyCompanySettings({ catalog: { categories } });
       await queryClient.invalidateQueries({ queryKey: COMPANY_SETTINGS_QUERY_KEY });
+      // El contrato agregado también lleva las categorías.
+      await queryClient.invalidateQueries({ queryKey: TENANT_CONFIGURATION_QUERY_KEY });
       setSuccess("Categorías guardadas.");
     } catch (err) {
       setError(mapError(err));

@@ -17,14 +17,21 @@ import {
   updateProduct,
   deactivateProduct,
 } from "@/lib/products";
-import { Product } from "@/types";
+import { CatalogItemType, Product } from "@/types";
 import { getMyCompany } from "@/lib/companies";
 import { useCompanySettings } from "@/lib/company-settings";
+import {
+  effectiveItemType,
+  ITEM_TYPE_LABELS,
+  suggestedItemType,
+  useTenantConfiguration,
+} from "@/lib/tenant-configuration";
 import {
   ProductModal,
   ProductFormData,
 } from "@/components/products/ProductModal";
 import { ProductImportModal } from "@/components/products/ProductImportModal";
+import { Badge } from "@/components/ui/Badge";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
@@ -40,6 +47,7 @@ function ProductsPageContent() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
+  const [itemType, setItemType] = useState<"" | CatalogItemType>("");
   const [modalOpen, setModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [importModalOpen, setImportModalOpen] = useState(false);
@@ -47,10 +55,25 @@ function ProductsPageContent() {
   const idPorUrl = parametros.get("abrir");
   const [urlAplicada, setUrlAplicada] = useState<string | null>(null);
 
+  // El filtro por tipo es del SERVIDOR (`?itemType=`): PRODUCT incluye los
+  // elementos anteriores a la Fase 2 que aún no tienen tipo guardado.
   const { data: products, isLoading } = useQuery({
-    queryKey: ["products", category],
-    queryFn: () => getProducts(category ? { category } : undefined),
+    queryKey: ["products", category, itemType],
+    queryFn: () =>
+      getProducts(
+        category || itemType
+          ? {
+              ...(category ? { category } : {}),
+              ...(itemType ? { itemType } : {}),
+            }
+          : undefined,
+      ),
   });
+
+  // Tipo que se PROPONE al crear (Servicio solo si la empresa vende
+  // exclusivamente servicios). Es una sugerencia que el usuario confirma.
+  const { data: configuration } = useTenantConfiguration();
+  const tipoSugerido = suggestedItemType(configuration);
 
   // Heading/subtitle name the logged-in company (never a hardcoded tenant or
   // city). The city line is shown only when the company actually has one.
@@ -80,8 +103,8 @@ function ProductsPageContent() {
     return out;
   }, [settings, products]);
   const catalogSubtitle = company
-    ? `Productos activos de ${company.name}${company.city ? ` · ${company.city}` : ""}`
-    : "Productos activos del catálogo";
+    ? `Productos y servicios activos de ${company.name}${company.city ? ` · ${company.city}` : ""}`
+    : "Productos y servicios activos del catálogo";
 
   // Enlace profundo desde la busqueda global: `?abrir=<id>` abre la ficha de
   // ese producto. Solo abre si el id existe de verdad: un producto borrado
@@ -126,6 +149,7 @@ function ProductsPageContent() {
 
   async function handleSubmit(data: ProductFormData) {
     const payload = {
+      itemType: data.itemType,
       name: data.name,
       description: data.description || undefined,
       price: Number(data.price),
@@ -146,7 +170,7 @@ function ProductsPageContent() {
   }
 
   async function handleDeactivate(id: string) {
-    if (!confirm("¿Desactivar este producto del catálogo?")) return;
+    if (!confirm("¿Retirar este elemento del catálogo?")) return;
     await deactivateProduct(id);
     await queryClient.invalidateQueries({ queryKey: ["products"] });
   }
@@ -175,7 +199,7 @@ function ProductsPageContent() {
             className="flex flex-1 items-center justify-center gap-1.5 rounded-md bg-brand-primary px-3 py-2 text-sm text-white hover:bg-primary-900 sm:flex-none"
           >
             <Plus size={16} />
-            Nuevo producto
+            Nuevo elemento
           </button>
         </div>
       </div>
@@ -215,6 +239,19 @@ function ProductsPageContent() {
             ))}
           </Select>
         </Field>
+
+        <Field label="Filtrar por tipo" labelOculta className="w-full sm:w-auto">
+          <Select
+            value={itemType}
+            onChange={(e) =>
+              setItemType(e.target.value as "" | CatalogItemType)
+            }
+          >
+            <option value="">Productos y servicios</option>
+            <option value="PRODUCT">Solo productos</option>
+            <option value="SERVICE">Solo servicios</option>
+          </Select>
+        </Field>
       </div>
 
       {isLoading && (
@@ -226,7 +263,7 @@ function ProductsPageContent() {
       {!isLoading && filtered.length === 0 && (
         <EmptyState
           icon={Package}
-          message="No hay productos en el catálogo todavía."
+          message="No hay productos ni servicios en el catálogo todavía."
         />
       )}
 
@@ -266,11 +303,24 @@ function ProductsPageContent() {
                   )}
                 </div>
 
-                {product.category && (
-                  <span className="w-fit rounded-full bg-status-warning-surface px-2 py-0.5 text-[10px] font-medium text-status-warning-strong">
-                    {product.category}
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {/* Producto o servicio; un elemento anterior a la Fase 2
+                      sin tipo guardado se muestra como Producto. */}
+                  <Badge
+                    tone={
+                      effectiveItemType(product.itemType) === "SERVICE"
+                        ? "accent"
+                        : "info"
+                    }
+                  >
+                    {ITEM_TYPE_LABELS[effectiveItemType(product.itemType)]}
+                  </Badge>
+                  {product.category && (
+                    <span className="w-fit rounded-full bg-status-warning-surface px-2 py-0.5 text-[10px] font-medium text-status-warning-strong">
+                      {product.category}
+                    </span>
+                  )}
+                </div>
 
                 {product.description && (
                   <p className="line-clamp-2 text-xs text-neutral-500">
@@ -318,6 +368,7 @@ function ProductsPageContent() {
           key={editingProduct?.id ?? "new"}
           product={editingProduct}
           categories={categoryOptions}
+          suggestedItemType={tipoSugerido}
           onClose={() => setModalOpen(false)}
           onSubmit={handleSubmit}
         />

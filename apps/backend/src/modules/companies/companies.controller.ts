@@ -16,8 +16,13 @@ import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CompaniesService } from './companies.service';
 import { CompanyBrandingService } from './company-branding.service';
+import {
+  ConfigurationActor,
+  TenantConfigurationService,
+} from './tenant-configuration.service';
 import { UpdateCompanyDto } from './dto/update-company.dto';
 import { UpdateCompanySettingsDto } from './dto/update-company-settings.dto';
+import { UpdateTenantConfigurationDto } from './dto/update-tenant-configuration.dto';
 import { UploadCompanyLogoDto } from './dto/upload-company-logo.dto';
 
 const MAX_LOGO_UPLOAD_SIZE = 2 * 1024 * 1024;
@@ -28,7 +33,13 @@ export class CompaniesController {
   constructor(
     private companiesService: CompaniesService,
     private companyBrandingService: CompanyBrandingService,
+    private tenantConfiguration: TenantConfigurationService,
   ) {}
+
+  /** Quién cambia la configuración, tomado del JWT: nunca del cuerpo. */
+  private actorOf(req: any): ConfigurationActor {
+    return { userId: req.user.sub, role: req.user.role };
+  }
 
   @Get('me')
   getMyCompany(@Request() req: any) {
@@ -41,12 +52,38 @@ export class CompaniesController {
     return this.companiesService.update(req.user.companyId, body);
   }
 
-  // Vista normalizada de Company.settings (v1 o v2). La leen todos los roles
-  // de la empresa: el catálogo necesita las categorías para el filtro y el
-  // selector, y un asesor también crea productos.
+  // ── Configuración por empresa (Fase 2) ─────────────────────────────────
+  // Contrato agregado `TenantConfigurationV1`: región (columnas), modelo
+  // comercial y módulos (settings), categorías y pipeline real. La lee
+  // cualquier rol de la empresa porque el frontend la necesita para operar
+  // (moneda, zona, categorías); solo la edita un administrador.
+
+  @Get('me/configuration')
+  getMyConfiguration(@Request() req: any) {
+    return this.tenantConfiguration.get(req.user.companyId);
+  }
+
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @Patch('me/configuration')
+  updateMyConfiguration(
+    @Request() req: any,
+    @Body() body: UpdateTenantConfigurationDto,
+  ) {
+    return this.tenantConfiguration.update(
+      req.user.companyId,
+      body,
+      this.actorOf(req),
+    );
+  }
+
+  // ── Compatibilidad: vista normalizada de Company.settings (Fase 1) ──────
+  // Se conservan para los clientes que ya las usan; delegan en el MISMO motor
+  // (transacción, bloqueo, reglas y auditoría), no en una segunda
+  // implementación.
+
   @Get('me/settings')
   getMySettings(@Request() req: any) {
-    return this.companiesService.getSettings(req.user.companyId);
+    return this.tenantConfiguration.getLegacySettings(req.user.companyId);
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
@@ -55,7 +92,11 @@ export class CompaniesController {
     @Request() req: any,
     @Body() body: UpdateCompanySettingsDto,
   ) {
-    return this.companiesService.updateSettings(req.user.companyId, body);
+    return this.tenantConfiguration.updateLegacySettings(
+      req.user.companyId,
+      body,
+      this.actorOf(req),
+    );
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')

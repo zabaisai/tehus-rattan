@@ -1,5 +1,6 @@
 import api from "./axios";
 import {
+  CatalogItemType,
   Product,
   CreateProductPayload,
   UpdateProductPayload,
@@ -61,6 +62,8 @@ export function validateProductImportFile(
 export async function getProducts(filters?: {
   category?: string;
   search?: string;
+  /** Fase 2: `PRODUCT` incluye los elementos anteriores sin tipo. */
+  itemType?: CatalogItemType;
 }): Promise<Product[]> {
   const { data } = await api.get<Product[]>("/products", { params: filters });
   return data;

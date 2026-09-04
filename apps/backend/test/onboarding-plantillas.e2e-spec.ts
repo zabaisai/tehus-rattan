@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { OnboardingService } from '../src/modules/onboarding/onboarding.service';
-import { CompaniesService } from '../src/modules/companies/companies.service';
+import { TenantConfigurationService } from '../src/modules/companies/tenant-configuration.service';
 import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import {
   buildCodePreview,
@@ -44,7 +44,10 @@ describe('Onboarding por industria (e2e, base real)', () => {
   const auditLog = new PlatformAuditLogService(
     prisma as unknown as PrismaService,
   );
-  const companies = new CompaniesService(prisma as unknown as PrismaService);
+  const configuracion = new TenantConfigurationService(
+    prisma as unknown as PrismaService,
+    auditLog,
+  );
   const service = new OnboardingService(
     prisma as unknown as PrismaService,
     { assertValidLogoFile: jest.fn(), uploadLogo: jest.fn() } as any,
@@ -252,7 +255,7 @@ describe('Onboarding por industria (e2e, base real)', () => {
       }),
       code,
     );
-    const settings = await companies.getSettings(result.company.id);
+    const settings = await configuracion.getLegacySettings(result.company.id);
     expect(settings.version).toBe(2);
     expect(settings.catalog.categories).toEqual([
       'Salas',
@@ -458,8 +461,8 @@ describe('Onboarding por industria (e2e, base real)', () => {
     });
     createdCompanies.push(b.id);
 
-    const settingsA = await companies.getSettings(a.company.id);
-    const settingsB = await companies.getSettings(b.id);
+    const settingsA = await configuracion.getLegacySettings(a.company.id);
+    const settingsB = await configuracion.getLegacySettings(b.id);
     expect(settingsA.catalog.categories).toEqual(['Vehículos', 'Accesorios']);
     expect(settingsB.version).toBe(1);
     expect(settingsB.catalog.categories).toEqual(['Salas', 'Comedores']);
@@ -473,9 +476,11 @@ describe('Onboarding por industria (e2e, base real)', () => {
     expect((rawB.settings as any).version).toBeUndefined();
 
     // Editar categorías desde la empresa B escribe v2, conserva banderas y claves desconocidas.
-    const updated = await companies.updateSettings(b.id, {
-      catalog: { categories: ['Salas', 'Dormitorios', 'salas'] },
-    });
+    const updated = await configuracion.updateLegacySettings(
+      b.id,
+      { catalog: { categories: ['Salas', 'Dormitorios', 'salas'] } },
+      { userId: superAdminId, role: 'SUPER_ADMIN' },
+    );
     expect(updated.version).toBe(2);
     expect(updated.catalog.categories).toEqual(['Salas', 'Dormitorios']);
     expect(updated.commercial.usesCatalog).toBe(true);
@@ -496,7 +501,7 @@ describe('Onboarding por industria (e2e, base real)', () => {
     });
 
     // A no cambió.
-    const settingsA2 = await companies.getSettings(a.company.id);
+    const settingsA2 = await configuracion.getLegacySettings(a.company.id);
     expect(settingsA2.catalog.categories).toEqual(['Vehículos', 'Accesorios']);
   });
 });

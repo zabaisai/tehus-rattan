@@ -25,6 +25,7 @@ Controllers use two patterns:
 | Auth | `POST /auth/login` | Public | None | User lookup by email |
 | Auth | `GET /auth/me` | JWT | Any authenticated role | JWT `sub` |
 | Companies | `/companies/*` | JWT | `ADMIN`, `SUPER_ADMIN` for updates | JWT `companyId` |
+| Companies (configuration, Fase 2) | `GET/PATCH /companies/me/configuration`, `GET/PATCH /companies/me/settings` | JWT + BusinessTenantGuard + RolesGuard | GET: any company role; PATCH: `ADMIN`, `SUPER_ADMIN` | JWT `companyId`; writes run in a transaction with a row lock and are audited (`company.configuration.update`) |
 | Quotes | `/quotes/*` | JWT + BusinessTenantGuard | Any authenticated role | JWT `companyId` |
 | Users | `/users/*` | JWT | `ADMIN`, `SUPER_ADMIN` for create/update/delete | JWT `companyId` |
 | Contacts | `/contacts/*` | JWT | Any authenticated role | JWT `companyId` |

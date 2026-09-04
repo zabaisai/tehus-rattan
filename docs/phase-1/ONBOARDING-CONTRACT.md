@@ -155,3 +155,5 @@ Contrato: `docs/contracts/company-settings.v2.schema.json`. Implementación:
 | GET | `/companies/me/settings` | sesión de empresa | Vista normalizada |
 | PATCH | `/companies/me/settings` | ADMIN / SUPER_ADMIN de la empresa | `catalog.categories`, `commercial.*` (única vía de escritura de settings) |
 | PATCH | `/companies/me` | ADMIN / SUPER_ADMIN de la empresa | Perfil, branding y datos fiscales; **rechaza `settings`** |
+| GET | `/companies/me/configuration` | sesión de empresa | **Fase 2**: contrato agregado `TenantConfigurationV1` (región, modelo, módulos, categorías, pipeline). Ver `docs/phase-2/CONFIGURATION-CONTRACT.md` |
+| PATCH | `/companies/me/configuration` | ADMIN / SUPER_ADMIN de la empresa | **Fase 2**: `regional.*`, `commercial.sellsProducts/sellsServices`, `modules.*`, `catalog.categories`. Desde la Fase 2, `/companies/me/settings` delega en el mismo motor (transacción, bloqueo de fila y auditoría) |

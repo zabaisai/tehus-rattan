@@ -11,6 +11,7 @@ import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Textarea } from "@/components/ui/Textarea";
 import { CompanyCategoriesEditor } from "@/components/settings/CompanyCategoriesEditor";
+import { TenantConfigurationSection } from "@/components/settings/TenantConfigurationSection";
 import { displayColor, PLATFORM_BRAND } from "@/lib/brand";
 
 type ApiError = {
@@ -408,6 +409,10 @@ function CompanySettingsForm({ company }: { company: Company }) {
         </div>
       </form>
 
+      {/* Configuración por empresa (Fase 2): región, modelo comercial y
+          módulos. Se guarda aparte del perfil, con su propio botón. */}
+      <TenantConfigurationSection />
+
       {/* Categorías del catálogo: lo que el onboarding guardó, editable aquí
           y leído por el filtro y el selector del catálogo. */}
       <CompanyCategoriesEditor />
@@ -428,15 +433,21 @@ export default function CompanySettingsPage() {
     <div>
       <h2 className="text-xl font-semibold text-neutral-900">Empresa</h2>
       <p className="mt-1 text-sm text-neutral-500">
-        Edita el perfil, branding y logo de tu empresa dentro del CRM.
+        Edita el perfil, la configuración regional, los módulos y el branding
+        de tu empresa dentro del CRM.
       </p>
 
       <div className="mt-6">
         {!canManage && (
-          <div className="rounded-lg border border-neutral-200 bg-white p-4">
-            <p className="text-sm text-neutral-600">
-              No tienes permiso para administrar la configuración de la empresa.
-            </p>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-neutral-200 bg-white p-4">
+              <p className="text-sm text-neutral-600">
+                No tienes permiso para administrar la configuración de la empresa.
+              </p>
+            </div>
+            {/* Un asesor consulta la configuración con la que opera (región,
+                módulos), sin controles habilitados ni botón de guardar. */}
+            <TenantConfigurationSection readOnly />
           </div>
         )}
 

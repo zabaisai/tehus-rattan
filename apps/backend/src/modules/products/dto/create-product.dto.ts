@@ -1,11 +1,14 @@
 import {
+  IsIn,
   IsString,
   IsNotEmpty,
   IsOptional,
   IsNumber,
   IsInt,
   Min,
+  ValidateIf,
 } from 'class-validator';
+import { CATALOG_ITEM_TYPES, type CatalogItemType } from '../catalog-item-type';
 
 export class CreateProductDto {
   @IsString()
@@ -40,4 +43,14 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   imageUrl?: string;
+
+  // Fase 2. Opcional para que un cliente antiguo que no lo envía siga
+  // creando PRODUCT (default de la columna). Solo se admiten los dos valores.
+  // `ValidateIf` y no `IsOptional`: este ultimo deja pasar `null`, y un
+  // `itemType: null` habria puesto la columna en NULL desde la API.
+  @ValidateIf((o: { itemType?: unknown }) => o.itemType !== undefined)
+  @IsIn(CATALOG_ITEM_TYPES, {
+    message: 'itemType debe ser PRODUCT o SERVICE',
+  })
+  itemType?: CatalogItemType;
 }

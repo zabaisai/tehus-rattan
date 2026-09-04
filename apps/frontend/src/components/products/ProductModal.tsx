@@ -1,7 +1,8 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Product } from "@/types";
+import { CatalogItemType, Product } from "@/types";
+import { effectiveItemType, ITEM_TYPE_LABELS } from "@/lib/tenant-configuration";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Field } from "@/components/ui/Field";
@@ -17,6 +18,8 @@ type ApiError = {
 };
 
 export interface ProductFormData {
+  /** Obligatorio: Producto o Servicio. */
+  itemType: CatalogItemType;
   name: string;
   description: string;
   price: string;
@@ -29,6 +32,12 @@ interface ProductModalProps {
   product: Product | null;
   /** Categorías de la empresa (sugerencias); el campo admite texto libre. */
   categories?: string[];
+  /**
+   * Tipo PROPUESTO al crear: Servicio solo si la empresa vende exclusivamente
+   * servicios; Producto en cualquier otro caso. Se muestra y se confirma; el
+   * backend sigue mandando.
+   */
+  suggestedItemType?: CatalogItemType;
   onClose: () => void;
   onSubmit: (data: ProductFormData) => Promise<void>;
 }
@@ -36,11 +45,16 @@ interface ProductModalProps {
 export function ProductModal({
   product,
   categories = [],
+  suggestedItemType = "PRODUCT",
   onClose,
   onSubmit,
 }: ProductModalProps) {
   const isEditing = !!product;
   const categoriesListId = useId();
+  const originalType = effectiveItemType(product?.itemType);
+  const [itemType, setItemType] = useState<CatalogItemType>(
+    product ? originalType : suggestedItemType,
+  );
 
   const [name, setName] = useState(product?.name ?? "");
   const [description, setDescription] = useState(product?.description ?? "");
@@ -57,6 +71,7 @@ export function ProductModal({
     setSaving(true);
     try {
       await onSubmit({
+        itemType,
         name,
         description,
         price,
@@ -75,11 +90,61 @@ export function ProductModal({
 
   return (
     <Modal
-      title={isEditing ? "Editar producto" : "Nuevo producto"}
+      title={
+        isEditing
+          ? `Editar ${ITEM_TYPE_LABELS[originalType].toLowerCase()}`
+          : "Nuevo elemento del catálogo"
+      }
       onClose={onClose}
       maxWidth="sm"
     >
       <form onSubmit={handleSubmit}>
+        {/* Producto o servicio (Fase 2). Obligatorio y visible: al crear se
+            propone según el modelo comercial de la empresa, pero quien crea
+            lo ve y lo confirma. */}
+        <fieldset className="mb-3">
+          <legend className="mb-1.5 block text-sm font-medium text-neutral-700">
+            Tipo de elemento{" "}
+            <span aria-hidden="true" className="text-status-error">
+              *
+            </span>
+          </legend>
+          <div className="flex gap-2">
+            {(["PRODUCT", "SERVICE"] as const).map((t) => (
+              <label
+                key={t}
+                className={`flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                  itemType === t
+                    ? "border-brand-primary bg-brand-secondary text-brand-primary"
+                    : "border-neutral-300 text-neutral-700 hover:bg-neutral-50"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="itemType"
+                  value={t}
+                  required
+                  checked={itemType === t}
+                  onChange={() => setItemType(t)}
+                  className="h-3.5 w-3.5 accent-brand-primary"
+                />
+                {ITEM_TYPE_LABELS[t]}
+              </label>
+            ))}
+          </div>
+          {!isEditing && suggestedItemType === "SERVICE" && (
+            <p className="mt-1 text-xs text-neutral-500">
+              Tu empresa vende solo servicios, así que se propone «Servicio».
+              Puedes cambiarlo.
+            </p>
+          )}
+          {isEditing && (
+            <p className="mt-1 text-xs text-neutral-400">
+              Cambiar el tipo no borra el precio, el stock ni el SKU.
+            </p>
+          )}
+        </fieldset>
+
         <Field label="Nombre" required className="mb-3">
           <Input
             type="text"
@@ -152,7 +217,7 @@ export function ProductModal({
               onChange={(e) => setIsActive(e.target.checked)}
               className="h-3.5 w-3.5 rounded border-neutral-300 accent-brand-primary"
             />
-            Producto activo
+            Activo en el catálogo
           </label>
         )}
 

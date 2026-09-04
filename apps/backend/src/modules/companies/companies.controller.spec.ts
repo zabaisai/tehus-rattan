@@ -14,6 +14,7 @@ import { BusinessTenantGuard } from '../../common/guards/business-tenant.guard';
 describe('CompaniesController', () => {
   let companiesService: any;
   let brandingService: any;
+  let tenantConfiguration: any;
   let controller: CompaniesController;
 
   const buildRequest = (companyId: string | null) => ({
@@ -23,7 +24,75 @@ describe('CompaniesController', () => {
   beforeEach(() => {
     companiesService = { findById: jest.fn(), update: jest.fn() };
     brandingService = { uploadLogo: jest.fn() };
-    controller = new CompaniesController(companiesService, brandingService);
+    tenantConfiguration = {
+      get: jest.fn(),
+      update: jest.fn(),
+      getLegacySettings: jest.fn(),
+      updateLegacySettings: jest.fn(),
+    };
+    controller = new CompaniesController(
+      companiesService,
+      brandingService,
+      tenantConfiguration,
+    );
+  });
+
+  describe('GET/PATCH /me/configuration (Fase 2)', () => {
+    it('GET has no @Roles metadata: any role of the company can read its configuration', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        CompaniesController.prototype.getMyConfiguration,
+      );
+      expect(roles).toBeUndefined();
+      void controller.getMyConfiguration(buildRequest('company-a'));
+      expect(tenantConfiguration.get).toHaveBeenCalledWith('company-a');
+    });
+
+    it('PATCH requires ADMIN or SUPER_ADMIN', () => {
+      const roles = Reflect.getMetadata(
+        'roles',
+        CompaniesController.prototype.updateMyConfiguration,
+      );
+      expect(roles).toEqual(['ADMIN', 'SUPER_ADMIN']);
+    });
+
+    it('PATCH scopes to req.user.companyId and takes the actor from the JWT, never from the body', () => {
+      const dto = {
+        regional: { timezone: 'America/Bogota' },
+        companyId: 'company-b',
+      } as any;
+      void controller.updateMyConfiguration(buildRequest('company-a'), dto);
+      expect(tenantConfiguration.update).toHaveBeenCalledWith(
+        'company-a',
+        dto,
+        { userId: 'user-1', role: 'ADMIN' },
+      );
+    });
+  });
+
+  describe('GET/PATCH /me/settings (compatibilidad) delegan en el mismo motor', () => {
+    it('GET → getLegacySettings(companyId)', () => {
+      void controller.getMySettings(buildRequest('company-a'));
+      expect(tenantConfiguration.getLegacySettings).toHaveBeenCalledWith(
+        'company-a',
+      );
+    });
+
+    it('PATCH → updateLegacySettings(companyId, dto, actor) y sigue exigiendo ADMIN/SUPER_ADMIN', () => {
+      const dto = { catalog: { categories: ['Salas'] } };
+      void controller.updateMySettings(buildRequest('company-a'), dto);
+      expect(tenantConfiguration.updateLegacySettings).toHaveBeenCalledWith(
+        'company-a',
+        dto,
+        { userId: 'user-1', role: 'ADMIN' },
+      );
+      expect(
+        Reflect.getMetadata(
+          'roles',
+          CompaniesController.prototype.updateMySettings,
+        ),
+      ).toEqual(['ADMIN', 'SUPER_ADMIN']);
+    });
   });
 
   describe('GET /me', () => {
