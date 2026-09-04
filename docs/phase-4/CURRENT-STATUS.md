@@ -1,22 +1,21 @@
 # Fase 4 — Estado actual (para reanudar)
 
-- Rama: `feat/phase-4-dynamic-crm` (worktree `../Tehus_Rattan-phase-4`),
-  base `origin/main` `b01a2ec`.
-- Línea base antes de tocar código (2026-09-04): backend 147/2415 unitarias,
-  70/1039 e2e; frontend 107/1081. Todo en verde.
-- Terminado: análisis de brechas; backend (registro de capacidades, regla
-  legacy, `capabilities` en el contrato, guard `MODULE_DISABLED`, caché por
-  empresa, tipo de catálogo por modelo comercial en API e importación,
-  búsqueda filtrada, invariantes y auditoría de pipelines, DTOs endurecidos);
-  frontend (proveedor de capacidades, navegación declarativa, route guards,
-  catálogo adaptativo, administración de módulos, pipelines); pruebas
-  (backend 153/2473 unitarias y 72/1065 e2e; frontend 113/1183; builds y lint);
-  QA local con el producto levantado: 4 empresas, ADMIN y AGENT, 172
-  comprobaciones sin fallos, datos borrados por ID (0 residuos); documentación
-  de la fase.
-- Falta: commits, push, PR, CI, merge, staging (precondiciones, backup,
-  deploy, QA de cuatro tenants, limpieza), cierre documental.
-- Próximo comando seguro: `git status` en el worktree y revisar el diff antes
-  de `git add`.
+- Estado: **FASE 4 CERRADA — PASS** (2026-09-04).
+- Implementación: PR #26 `feat/phase-4-dynamic-crm` → `main` `38c1575`
+  (merge commit, sin migraciones). Cierre documental: rama
+  `docs/phase-4-closure`.
+- Staging: release `38c1575` desplegado con `deploy.sh` (backup con checksums,
+  0 migraciones), health 12/12 y smoke 22/22, QA de cuatro empresas con ADMIN y
+  AGENT verificado y eliminado por ID (0 residuos; línea base igual salvo +1
+  `login_event` del propio smoke). Ver `STAGING-EVIDENCE.md`.
+- Producción: no existe ni se toca.
+- Siguiente fase (no iniciada, requiere autorización): Fase 5 — backfill de
+  `itemType`, migración de empresas existentes y conversión de valores legacy.
+- Deuda registrada: el paso 11 de `deploy.sh` no reintenta la comprobación
+  interna de salud y falló mientras el contenedor arrancaba (el mismo script
+  pasa completo al reejecutarse); `401 /api/auth/refresh` en el arranque
+  anónimo; formato de moneda fijo `es-CO`/`COP` en catálogo, cotizaciones y
+  panel de inicio; e2e del backend en paralelo comparten base (el CI usa
+  `--runInBand`).
 - Bloqueadores: ninguno.
 - Sin secretos en este documento.

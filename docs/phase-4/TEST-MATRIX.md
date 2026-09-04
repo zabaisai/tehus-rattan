@@ -83,3 +83,22 @@ final. **172 comprobaciones, 0 fallos, 0 errores de consola.**
 - Backfill de `itemType` y migración de empresas existentes (Fase 5).
 - Las e2e del backend en paralelo comparten base; el CI y estas ejecuciones
   usan `--runInBand`, como en fases anteriores.
+
+## QA multiempresa en staging (Chrome headless + CDP contra `crm-staging.takto.online`, 2026-09-04)
+
+Release `38c1575`. Mismo driver que en local, con la API real de staging y
+cuatro empresas temporales con ADMIN y AGENT, borradas por ID al final
+(0 residuos; línea base igual antes y después salvo un `login_event` del propio
+smoke test). Detalle y tablas en `STAGING-EVIDENCE.md`.
+
+| Comprobación | Resultado |
+| --- | --- |
+| Mueblería (1440) / Veterinaria sin cotizaciones (390) / Software solo servicios (1024) / Genérica sin catálogo (320) | **172 comprobaciones, 0 fallos** en navegación, panel de inicio, «Crear», rutas directas, catálogo y anchos |
+| Rutas de módulos inactivos | ADMIN ve la explicación, el enlace y «Activar módulo»; AGENT, un mensaje neutral sin datos ni enlaces |
+| Activar y desactivar sin volver a entrar | El catálogo aparece con los datos que ya existían; desactivar pide confirmación y la navegación se actualiza |
+| API por empresa y rol | 403 `MODULE_DISABLED`; `companyId` en el cuerpo → 400; recursos ajenos → 404; búsqueda sin los tipos inactivos |
+| Catálogo por modelo comercial | «solo servicios» crea SERVICE al omitir el tipo y rechaza PRODUCT con motivo |
+| Pipelines | segunda etapa ganada → 400; reordenamiento parcial → 400 y completo → 200; borrar la única ganada → 400; AGENT sin administración |
+| Empresas reales (solo lectura) | Tehus conserva sus siete módulos y su catálogo de productos; las dos empresas sin configuración mantienen catálogo, cotizaciones y tareas por compatibilidad |
+| Consola / red | 0 errores; solo `401 /api/auth/refresh` (previo a la fase) |
+| Limpieza | 4 empresas, 8 usuarios, 4 pipelines, 25 etapas, 8 productos, 3 tareas, 5 auditorías, 16 sesiones y 16 eventos de login borrados por ID; residuos 0; Tehus intacta |
