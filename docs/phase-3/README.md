@@ -9,7 +9,8 @@ TAKTO es la plataforma y propietaria del CRM; Tehus Rattan es una empresa
 cliente más. Nada de esta fase toma a Tehus o a los muebles como valor por
 defecto: los términos de muebles solo aparecen en la plantilla de muebles.
 
-Rama: `feat/phase-3-guided-onboarding` (desde `origin/main` `7630b61`).
+Rama: `feat/phase-3-guided-onboarding` (desde `origin/main` `7630b61`),
+fusionada en `main` `4d457df` (PR #24).
 Worktree aislado; el worktree principal y su archivo ajeno
 (`deploy/scripts/send-demo-template.mjs`) no se tocan.
 
@@ -57,14 +58,14 @@ persistencia de borrador en el navegador.
 | 1 | Inspección y análisis de brechas | HECHA — `GAP-ANALYSIS.md` |
 | 2 | Backend (plantillas v3, región, comprobación de invitación, auditoría) | HECHA |
 | 3 | Frontend (asistente guiado) | HECHA |
-| 4 | Pruebas (unitarias, e2e HTTP, frontend) | HECHA en local — conteos en `TEST-MATRIX.md` |
+| 4 | Pruebas (unitarias, e2e HTTP, frontend) | HECHA — local y CI (PR #24, verde al primer intento) |
 | 5 | QA local (4 flujos reales, 320–1440 px) | HECHA — ver `TEST-MATRIX.md` § QA local |
-| 6 | PR, CI y merge | PENDIENTE |
-| 7 | Backup y despliegue en staging | PENDIENTE |
-| 8 | QA funcional en staging (4 industrias) y limpieza | PENDIENTE |
-| 9 | Documentación y cierre | PENDIENTE |
+| 6 | PR, CI y merge | HECHA — PR #24 → `main` `4d457df` (merge commit) |
+| 7 | Backup y despliegue en staging | HECHA — release `4d457df`, backup con checksums, 0 migraciones, smoke 22/22 |
+| 8 | QA funcional en staging (4 industrias) y limpieza | HECHA — ver `STAGING-EVIDENCE.md`; 0 residuos, línea base igual |
+| 9 | Documentación y cierre | HECHA — rama `docs/phase-3-closure` |
 
-Estado de la fase: **FASE 3 ABIERTA — EN CURSO**.
+Estado de la fase: **FASE 3 CERRADA — PASS** (2026-09-04). Fase 4 no iniciada.
 
 ## Migraciones
 

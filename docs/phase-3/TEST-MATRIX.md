@@ -65,3 +65,23 @@ invitaciones temporales (cinco TAKTO, una TEHUS); todo borrado por ID al final
 | Anchos 320 / 390 / 768 / 1024 / 1280 / 1440 (paso «Recomendación») | 0 scroll horizontal, 0 controles sin nombre, `aria-current` en el paso actual, Tab llega al primer control con `outline solid 2px` |
 | Comprobación TEHUS | el código TEHUS temporal se comprobó seis veces (paso 1) y siguió ACTIVE: comprobar no consume |
 | Consola / red | 0 errores de consola; las únicas respuestas ≥400 son `401 /api/auth/refresh` del arranque anónimo de la app (comportamiento previo a la fase en cualquier página pública) |
+
+## QA en staging (Chrome headless + CDP contra `crm-staging.takto.online`, 2026-09-04)
+
+Release `4d457df`. Mismo driver que en local, con la API real de staging y un
+`SUPER_ADMIN` temporal más seis invitaciones temporales (cinco TAKTO, una
+TEHUS) sembradas en el contenedor y borradas por ID al final (0 residuos;
+hashes de la línea base iguales antes y después). Detalle y tablas en
+`STAGING-EVIDENCE.md`.
+
+| Comprobación | Resultado |
+| --- | --- |
+| Mueblería (1440) / Veterinaria y pet shop (390) / Software y tecnología (1024) / Otro (320) | las cuatro empresas creadas y verificadas en la base: plantilla v3 correcta, región persistida en `Company`, categorías y pipeline de la plantilla, usuarios, invitación USED, auditoría sin secretos |
+| Resumen y «Editar» | nombre, correo y región presentes; «Editar región» conserva los datos |
+| Anchos 320–1440 (paso «Recomendación») | 0 scroll horizontal, 0 controles sin nombre, `aria-current`, foco visible tras Tab |
+| Comprobación TEHUS | 201 `{"valid":true}` y el código siguió ACTIVE |
+| Códigos usado / inválido / ausente | 400 con motivo, sin efectos |
+| Mass assignment y `timezone` inválida | 400 antes de la transacción; el código de reserva siguió ACTIVE |
+| Dos envíos simultáneos con el mismo código | una sola empresa; el código pasó a USED |
+| Consola / red | 0 errores; solo `401 /api/auth/refresh` (previo a la fase) |
+| Limpieza | 5 empresas, 8 usuarios, 6 invitaciones, 5 pipelines, 29 etapas, 5 auditorías, 5 sesiones, 5 eventos de login borrados por ID; residuos 0; Tehus intacto |
