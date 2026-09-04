@@ -4,14 +4,18 @@ import { Test } from '@nestjs/testing';
 import request from 'supertest';
 import { AuthController } from '../src/modules/auth/auth.controller';
 import { AuthService } from '../src/modules/auth/auth.service';
+import { TrustedDeviceService } from '../src/modules/auth/device-verification/trusted-device.service';
 import { CookieOriginGuard } from '../src/common/guards/cookie-origin.guard';
 
 const ALLOWED_ORIGIN = 'https://crm-staging.takto.online';
 
 // AuthService is fully mocked — this only proves the CookieOriginGuard is wired
 // on the cookie-based auth POSTs and enforces the Origin policy.
+// Fase 4.5: login now goes through loginWithDeviceVerification, which returns a
+// discriminated union; the `authenticated` branch is the one this suite needs.
 const authServiceMock = {
-  login: jest.fn().mockResolvedValue({
+  loginWithDeviceVerification: jest.fn().mockResolvedValue({
+    outcome: 'authenticated',
     refreshToken: 'opaque-refresh',
     token: 'access-jwt',
     user: { id: 'u1', email: 'a@co.test', name: 'A' },
@@ -25,6 +29,12 @@ async function buildApp(nodeEnv: string): Promise<INestApplication> {
     providers: [
       CookieOriginGuard,
       { provide: AuthService, useValue: authServiceMock },
+      // Fase 4.5: AuthController also injects TrustedDeviceService, for
+      // POST /auth/trusted-devices/revoke-all — not exercised here.
+      {
+        provide: TrustedDeviceService,
+        useValue: { revokeAllForUser: jest.fn() },
+      },
       {
         provide: ConfigService,
         useValue: {
@@ -68,7 +78,7 @@ describe('CookieOriginGuard on auth endpoints (e2e)', () => {
         .set('Origin', ALLOWED_ORIGIN)
         .send(creds)
         .expect(201);
-      expect(authServiceMock.login).toHaveBeenCalled();
+      expect(authServiceMock.loginWithDeviceVerification).toHaveBeenCalled();
     });
 
     it('rejects a foreign Origin with 403 and never calls the service', async () => {
@@ -77,7 +87,9 @@ describe('CookieOriginGuard on auth endpoints (e2e)', () => {
         .set('Origin', 'https://evil.example.com')
         .send(creds)
         .expect(403);
-      expect(authServiceMock.login).not.toHaveBeenCalled();
+      expect(
+        authServiceMock.loginWithDeviceVerification,
+      ).not.toHaveBeenCalled();
     });
 
     it('rejects the literal Origin "null" with 403', async () => {
@@ -93,7 +105,7 @@ describe('CookieOriginGuard on auth endpoints (e2e)', () => {
         .post('/api/auth/login')
         .send(creds)
         .expect(201);
-      expect(authServiceMock.login).toHaveBeenCalled();
+      expect(authServiceMock.loginWithDeviceVerification).toHaveBeenCalled();
     });
 
     it('rejects POST /api/auth/logout from a foreign Origin', async () => {
@@ -116,7 +128,9 @@ describe('CookieOriginGuard on auth endpoints (e2e)', () => {
         .post('/api/auth/login')
         .send(creds)
         .expect(403);
-      expect(authServiceMock.login).not.toHaveBeenCalled();
+      expect(
+        authServiceMock.loginWithDeviceVerification,
+      ).not.toHaveBeenCalled();
     });
 
     it('still allows the configured Origin in production', async () => {
