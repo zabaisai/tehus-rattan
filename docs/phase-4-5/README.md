@@ -9,7 +9,8 @@ Hasta que ese código se consume no existe sesión.
 TAKTO es la plataforma y dueña del CRM. El login es su puerta: lleva marca
 TAKTO, nunca la de una empresa cliente.
 
-Rama: `feat/phase-4-5-auth-experience` (desde `origin/main` `32d3515`).
+Rama: `feat/phase-4-5-auth-experience` (desde `origin/main` `32d3515`),
+fusionada en `main` `52289a8` (PR #28).
 Worktree aislado; el worktree principal y su archivo ajeno
 (`deploy/scripts/send-demo-template.mjs`) no se tocan.
 
@@ -76,12 +77,12 @@ Configuración, activación en producción y Fase 5.
 | 4 | Frontend (acceso, verificación, apertura) | HECHA |
 | 5 | Pruebas unitarias y de extremo a extremo | HECHA |
 | 6 | QA local con el producto levantado y correo real de pruebas | HECHA — 64 comprobaciones, 0 fallos |
-| 7 | PR, CI y merge | PENDIENTE |
-| 8 | Backup y despliegue en staging | PENDIENTE |
-| 9 | Activación controlada y QA en staging | PENDIENTE |
-| 10 | Documentación y cierre | PENDIENTE |
+| 7 | PR, CI y merge | HECHA — PR #28 → `main` `52289a8` (merge commit) |
+| 8 | Backup y despliegue en staging | HECHA — release `52289a8`, backup con checksums, migración aplicada, health y smoke 22/22 |
+| 9 | Activación controlada y QA en staging | HECHA — 28 comprobaciones por API y 25 por navegador, con correo real |
+| 10 | Documentación y cierre | HECHA — rama `docs/phase-4-5-closure` |
 
-Estado de la fase: **FASE 4.5 EN CURSO**.
+Estado de la fase: **FASE 4.5 CERRADA — PASS** (2026-09-04). Fase 5 no iniciada.
 
 ## Migración
 
