@@ -50,12 +50,29 @@ backfill de `itemType` (Fase 5), renombrar `products` / `/products`,
 | 4 | Frontend administrativo, catálogo e importación | HECHA |
 | 5 | Pruebas (unitarias, e2e, frontend) | HECHA en local — conteos en `STAGING-EVIDENCE.md` |
 | 6 | QA visual local 320–1440 px | HECHA — 54 comprobaciones, 0 fallos (ver `STAGING-EVIDENCE.md`) |
-| 7 | PR, CI y merge | PENDIENTE |
-| 8 | Despliegue en staging | PENDIENTE |
-| 9 | QA funcional en staging y limpieza | PENDIENTE |
-| 10 | Documentación y cierre | PENDIENTE |
+| 7 | PR, CI y merge | HECHA — PR #22, CI verde al primer intento, merge `547f31f` (2026-09-04) |
+| 8 | Despliegue en staging | HECHA — `deploy.sh` sobre `547f31f`, backup verificado, migración aplicada, health 12/12, smoke 22/22 |
+| 9 | QA funcional en staging y limpieza | HECHA — 62/62 por API + frontend ADMIN/AGENT; datos `QA_PHASE2_` eliminados por ID, 0 residuos, huellas intactas |
+| 10 | Documentación y cierre | HECHA — este documento y `STAGING-EVIDENCE.md` (PR documental de cierre) |
 
-Estado de la fase: **FASE 2 ABIERTA — EN CURSO**.
+Estado de la fase: **FASE 2 CERRADA — PASS** (2026-09-04). Staging en
+`547f31f` con la migración aplicada; producción NO desplegada.
+
+## Deuda técnica registrada
+
+- `itemType` de los productos anteriores a la fase queda en `NULL` (se exponen
+  como Producto); el backfill auditable por empresa es de la Fase 5.
+- La navegación no se oculta según los módulos desactivados (Fase 4).
+- `CompanyLeadSettings` sigue sin API de escritura.
+- Drift previo a la fase en `contacts.altEmails/altPhones` (defaults) entre
+  migraciones y `schema.prisma`; no se toca aquí.
+- Pruebas e2e del backend en paralelo comparten una base y se pisan
+  (`flowbot-transporte`, `token-rotation`); en serie, como el CI, pasan.
+- `apps/frontend` arrastra 2 avisos de lint anteriores a la fase
+  (`EstadoTransporte.test.tsx`, `meta-sdk.ts`).
+- El selector por columna de la vista previa de importación es funcional pero
+  sencillo (un `select` nativo por cabecera); el editor completo de mapeo
+  puede mejorarse en una fase de UX.
 
 ## Fuera de alcance (no realizado)
 
