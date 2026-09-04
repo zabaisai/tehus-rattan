@@ -196,10 +196,12 @@ model User {
   invitationCodesUsed    InvitationCode[] @relation("InvitationCodeUsedBy")
   invitationCodesRevoked InvitationCode[] @relation("InvitationCodeRevokedBy")
 
-  sessions            UserSession[]        @relation("UserSessionUser")
-  sessionsRevoked     UserSession[]        @relation("UserSessionRevokedBy")
+  sessions            UserSession[]                 @relation("UserSessionUser")
+  sessionsRevoked     UserSession[]                 @relation("UserSessionRevokedBy")
   loginEvents         LoginEvent[]
   passwordResetTokens PasswordResetToken[]
+  deviceChallenges    DeviceVerificationChallenge[]
+  trustedDevices      TrustedDevice[]
 
   notifications           Notification[]           @relation("NotificationRecipient")
   notificationsAuthored   Notification[]           @relation("NotificationActor")
@@ -1725,6 +1727,74 @@ model PasswordResetToken {
   @@index([userId])
   @@index([expiresAt])
   @@map("password_reset_tokens")
+}
+
+// ─────────────────────────────────────────────
+// VERIFICACIÓN DE DISPOSITIVO (Fase 4.5)
+// ─────────────────────────────────────────────
+// Reto de un solo uso que exige un código enviado por correo cuando alguien
+// entra desde un dispositivo que la cuenta todavía no reconoce. La contraseña
+// se valida ANTES de crear el reto; el reto no autentica por sí solo y no
+// existe sesión, access token ni refresh token hasta consumirlo.
+//
+// El código tiene seis dígitos: un espacio de un millón de combinaciones es
+// demasiado pequeño para guardar un hash simple, así que se persiste un
+// HMAC-SHA256 con un secreto exclusivo de esta función. Ni el código ni el
+// secreto se guardan aquí, se registran ni viajan en ninguna respuesta.
+model DeviceVerificationChallenge {
+  id                String     @id @default(cuid())
+  userId            String
+  // HMAC-SHA256 del código, en hexadecimal. Nunca el código.
+  codeDigest        String
+  expiresAt         DateTime
+  attempts          Int        @default(0)
+  maxAttempts       Int
+  // Antes de este instante, reenviar no genera un código nuevo.
+  resendAvailableAt DateTime
+  consumedAt        DateTime?
+  revokedAt         DateTime?
+  // Mismos datos sanitizados que `user_sessions`: hash del dispositivo e IP
+  // truncada. Nunca la cookie en claro, la IP completa ni el agente crudo.
+  deviceIdHash      String?
+  ipPreview         String?
+  browser           String?
+  operatingSystem   String?
+  deviceType        DeviceType @default(UNKNOWN)
+  createdAt         DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("device_verification_challenges")
+}
+
+// Dispositivo en el que la persona pidió no repetir el código durante un
+// tiempo acotado. NO sustituye a la contraseña: solo evita el segundo factor
+// mientras siga vigente y sin revocar.
+//
+// El token es opaco (32 bytes aleatorios) y vive únicamente en una cookie
+// httpOnly; aquí solo se guarda su SHA-256. Se revoca al vencer, al cerrar
+// todas las sesiones, al restablecer la contraseña y al desactivar la cuenta.
+model TrustedDevice {
+  id              String     @id @default(cuid())
+  userId          String
+  tokenHash       String     @unique
+  deviceIdHash    String?
+  ipPreview       String?
+  browser         String?
+  operatingSystem String?
+  deviceType      DeviceType @default(UNKNOWN)
+  createdAt       DateTime   @default(now())
+  lastUsedAt      DateTime   @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("trusted_devices")
 }
 
 // ─────────────────────────────────────────────
