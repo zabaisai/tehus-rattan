@@ -22,16 +22,22 @@ function buildRes() {
 
 describe('AuthController', () => {
   let authService: any;
+  let trustedDevices: any;
   let controller: AuthController;
 
   beforeEach(() => {
     authService = {
       login: jest.fn(),
+      loginWithDeviceVerification: jest.fn(),
+      completeDeviceVerification: jest.fn(),
+      resendDeviceVerification: jest.fn(),
       me: jest.fn(),
       refresh: jest.fn(),
       logout: jest.fn(),
     };
-    controller = new AuthController(authService);
+    // Fase 4.5: el controlador también revoca dispositivos confiables.
+    trustedDevices = { revokeAllForUser: jest.fn().mockResolvedValue(0) };
+    controller = new AuthController(authService, trustedDevices);
   });
 
   it('does not gate /auth/login with the onboarding invite guard', () => {
@@ -41,7 +47,8 @@ describe('AuthController', () => {
 
   describe('login', () => {
     it('delegates to authService.login with a built request context, sets the refresh cookie, and never leaks the refresh token in the response body', async () => {
-      authService.login.mockResolvedValue({
+      authService.loginWithDeviceVerification.mockResolvedValue({
+        outcome: 'authenticated',
         token: 't',
         user: { id: 'u1', email: 'a@co.test', name: 'A' },
         refreshToken: 'plain-refresh-token',
@@ -54,17 +61,22 @@ describe('AuthController', () => {
         res,
       );
 
-      expect(authService.login).toHaveBeenCalledWith(
+      expect(authService.loginWithDeviceVerification).toHaveBeenCalledWith(
         'a@co.test',
         'password123',
         expect.objectContaining({ deviceIdHash: expect.any(String) }),
+        // Fase 4.5: el token del dispositivo confiable sale de la cookie.
+        null,
       );
       expect(res.cookie).toHaveBeenCalledWith(
         'takto_refresh_token',
         'plain-refresh-token',
         expect.objectContaining({ httpOnly: true, path: '/api/auth' }),
       );
+      // Fase 4.5: la respuesta gana `status` para que el cliente distinga
+      // «hay sesión» de «falta verificar el dispositivo».
       expect(result).toEqual({
+        status: 'authenticated',
         token: 't',
         user: { id: 'u1', email: 'a@co.test', name: 'A' },
       });
@@ -226,7 +238,8 @@ describe('AuthController', () => {
     });
 
     it('login never sets the legacy cookie name', async () => {
-      authService.login.mockResolvedValue({
+      authService.loginWithDeviceVerification.mockResolvedValue({
+        outcome: 'authenticated',
         token: 't',
         user: { id: 'u1', email: 'a@co.test', name: 'A' },
         refreshToken: 'plain',

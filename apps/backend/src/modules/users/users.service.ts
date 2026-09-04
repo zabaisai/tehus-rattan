@@ -77,13 +77,32 @@ export class UsersService {
     });
   }
 
+  /**
+   * Desactiva la cuenta y, en la misma transacción, cierra sus sesiones y
+   * retira la confianza de sus dispositivos (Fase 4.5).
+   *
+   * Antes bastaba con `isActive: false` porque cada petición revalida la
+   * sesión; ahora además hay que impedir que un dispositivo recordado siga
+   * evitando el segundo factor si la cuenta se reactiva.
+   */
   async deactivate(id: string, companyId: string) {
     const user = await this.prisma.user.findFirst({ where: { id, companyId } });
     if (!user) throw new NotFoundException('Usuario no encontrado');
-    return this.prisma.user.update({
-      where: { id },
-      data: { isActive: false },
-      select: { id: true, email: true, isActive: true },
+    return this.prisma.$transaction(async (tx) => {
+      const actualizado = await tx.user.update({
+        where: { id },
+        data: { isActive: false },
+        select: { id: true, email: true, isActive: true },
+      });
+      await tx.userSession.updateMany({
+        where: { userId: id, status: 'ACTIVE' },
+        data: { status: 'REVOKED', revokedAt: new Date() },
+      });
+      await tx.trustedDevice.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return actualizado;
     });
   }
 }

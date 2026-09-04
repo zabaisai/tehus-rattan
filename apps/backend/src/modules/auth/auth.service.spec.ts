@@ -16,6 +16,9 @@ describe('AuthService', () => {
   let usersService: any;
   let jwtService: any;
   let sessionsService: any;
+  let deviceVerificationConfig: any;
+  let deviceVerification: any;
+  let trustedDevices: any;
   let service: AuthService;
   let passwordHash: string;
 
@@ -44,11 +47,28 @@ describe('AuthService', () => {
       closeSessionByRefreshToken: jest.fn().mockResolvedValue(undefined),
     };
 
+    // Fase 4.5: con el interruptor apagado (`appliesTo` falso) el login es
+    // exactamente el de antes, que es lo que cubre este archivo.
+    deviceVerificationConfig = { appliesTo: jest.fn().mockReturnValue(false) };
+    deviceVerification = {
+      createChallenge: jest.fn(),
+      verifyChallenge: jest.fn(),
+      resendChallenge: jest.fn(),
+    };
+    trustedDevices = {
+      isTrusted: jest.fn().mockResolvedValue(false),
+      trustDevice: jest.fn(),
+      revokeAllForUser: jest.fn(),
+    };
+
     service = new AuthService(
       usersService,
       jwtService,
       prisma,
       sessionsService,
+      deviceVerificationConfig,
+      deviceVerification,
+      trustedDevices,
     );
   });
 

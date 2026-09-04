@@ -9,11 +9,17 @@ import { CookieOriginGuard } from '../../common/guards/cookie-origin.guard';
 import { UsersModule } from '../users/users.module';
 import { SessionsModule } from '../sessions/sessions.module';
 import { ACCESS_TOKEN_EXPIRES_IN } from '../sessions/sessions.constants';
+import { MailModule } from '../mail/mail.module';
+import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
+import { DeviceVerificationConfig } from './device-verification/device-verification.config';
+import { DeviceVerificationService } from './device-verification/device-verification.service';
+import { TrustedDeviceService } from './device-verification/trusted-device.service';
 
 @Module({
   imports: [
     UsersModule,
     SessionsModule,
+    MailModule,
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -29,7 +35,18 @@ import { ACCESS_TOKEN_EXPIRES_IN } from '../sessions/sessions.constants';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, CookieOriginGuard],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    CookieOriginGuard,
+    DeviceVerificationConfig,
+    DeviceVerificationService,
+    TrustedDeviceService,
+    PlatformAuditLogService,
+  ],
+  // `TrustedDeviceService` se exporta para que la revocación de sesiones y el
+  // restablecimiento de contraseña retiren también la confianza del
+  // dispositivo en el mismo camino.
+  exports: [AuthService, TrustedDeviceService, DeviceVerificationService],
 })
 export class AuthModule {}
