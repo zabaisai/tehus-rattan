@@ -296,7 +296,7 @@ export function ProductImportModal({
                           aria-label={`Campo para la columna ${c}`}
                           value={campo ?? ""}
                           onChange={(e) => asignar(i, e.target.value)}
-                          className={`mt-1 w-full max-w-40 rounded border px-1 py-0.5 text-[11px] font-normal outline-none focus:border-neutral-500 ${
+                          className={`mt-1 w-full min-w-28 max-w-40 rounded border px-1 py-0.5 text-[11px] font-normal outline-none focus:border-neutral-500 ${
                             campo
                               ? "border-status-success/40 text-status-success-strong"
                               : "border-neutral-200 text-neutral-500"

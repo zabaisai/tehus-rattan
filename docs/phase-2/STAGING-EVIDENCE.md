@@ -40,11 +40,44 @@ una sola base real y se pisan entre sí — `flowbot-transporte` y
 serie, que es como corre el CI, pasan las 69. No es algo que introduzca la
 Fase 2: ninguno de esos dos ficheros se toca aquí.
 
-QA visual 320–1440 px: pendiente.
+## QA visual local (2026-09-04)
 
-## Seguridad del diff
+Producto real levantado en local (backend `node dist/src/main` con la base de
+desarrollo, frontend `next start` con el build de producción), sin mocks. Dos
+recorridos con Chrome headless dirigido por CDP: uno como ADMIN y otro como
+AGENT de una empresa temporal `QA_PHASE2_LOCAL_` (creada y eliminada por ID al
+terminar; cero residuos). Anchos: 320, 360, 390, 768, 1024 y 1440 px.
 
-Pendiente.
+| Pantalla | Comprobación | Resultado |
+| --- | --- | --- |
+| Configuración → Empresa (sección nueva) | scroll horizontal, controles con nombre accesible, valores cargados | 6/6 anchos sin scroll horizontal; 0 controles sin nombre |
+| Configuración → Empresa como AGENT | controles deshabilitados, sin botón de guardar, aviso «Solo un administrador…» | 6/6 |
+| Guardado real (ADMIN, navegador interactivo) | zona `Bogota` → error junto al campo sin llamar al servidor; `America/Costa_Rica` + `crc` + «Vende servicios» → «Configuración guardada.» | columnas `timezone=America/Costa_Rica`, `currency=CRC`, `settings` v2 con `futuro` conservado, 1 fila `audit_logs` (`sections: regional, commercial`) |
+| Catálogo | badge Producto/Servicio por tarjeta (el elemento con `itemType NULL` sale como Producto), filtro «Solo servicios» deja una sola tarjeta | 6/6 anchos |
+| Modal «Nuevo elemento del catálogo» | dentro del viewport, radios Producto (marcado)/Servicio, foco visible (`outline solid 2px`), Escape cierra | 6/6 |
+| Importación → vista previa | CSV con columnas `Tipo` y `Tipo de elemento`: `Tipo`→Categoría, `Tipo de elemento`→Tipo de elemento; selector por columna con etiquetas legibles; nota del tipo; tabla ancha desplazable dentro de su contenedor, sin scroll de página | 6/6 |
+
+Total: 54 comprobaciones automáticas, 0 fallos. Capturas fuera del repositorio.
+
+## Seguridad del diff (2026-09-04)
+
+- 60 archivos frente a `origin/main` `6c1de8d`; ninguno ajeno a la fase (el
+  archivo modificado del worktree principal, `deploy/scripts/send-demo-template.mjs`,
+  no forma parte del diff).
+- Migración: solo `CREATE TYPE`, `ADD COLUMN` nullable sin default,
+  `SET DEFAULT` para inserciones futuras y `CREATE INDEX`. Sin `DROP`,
+  `TRUNCATE`, `UPDATE`, `RENAME` ni `DELETE`.
+- Escaneo de secretos sobre las líneas añadidas (contraseñas, claves, tokens,
+  hosts): sin hallazgos. Las únicas credenciales son las ficticias de las
+  pruebas (`e2e-…`, `example.test`).
+- Ninguna referencia a Tehus en el código añadido; ningún destino de
+  producción (`crm.takto.online`, `api.crm.takto.online`) aparece.
+- Guardas: los cuatro endpoints de configuración llevan `AuthGuard('jwt')`,
+  `BusinessTenantGuard` y `RolesGuard` (clase), `@Roles` en los PATCH;
+  `security-policy.spec.ts` y `dto-tenant-whitelist.spec.ts` los cubren.
+  `companyId` nunca sale del cuerpo. Los DTOs nuevos rechazan claves
+  desconocidas (`forbidNonWhitelisted`) y `itemType: null` (`ValidateIf`).
+- CORS/CSRF/rate limiting: sin cambios.
 
 ## CI y PR
 

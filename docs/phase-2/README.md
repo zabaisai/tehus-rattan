@@ -49,7 +49,7 @@ backfill de `itemType` (Fase 5), renombrar `products` / `/products`,
 | 3 | Tipo PRODUCT/SERVICE, migración e importación | HECHA — backend |
 | 4 | Frontend administrativo, catálogo e importación | HECHA |
 | 5 | Pruebas (unitarias, e2e, frontend) | HECHA en local — conteos en `STAGING-EVIDENCE.md` |
-| 6 | QA visual local 320–1440 px | PENDIENTE |
+| 6 | QA visual local 320–1440 px | HECHA — 54 comprobaciones, 0 fallos (ver `STAGING-EVIDENCE.md`) |
 | 7 | PR, CI y merge | PENDIENTE |
 | 8 | Despliegue en staging | PENDIENTE |
 | 9 | QA funcional en staging y limpieza | PENDIENTE |
