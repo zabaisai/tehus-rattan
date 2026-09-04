@@ -283,7 +283,9 @@ describe('Asistente de onboarding (Fase 1)', () => {
       const [payload] = createCompanyOnboarding.mock.calls[0];
       expect(payload.company.businessType).toBe('Insumos agrícolas');
       expect(payload.commercial.businessType).toBe('other');
-    });
+      // Recorre el asistente entero escribiendo varios campos: bajo la suite
+      // completa supera los 5 s por defecto sin que nada falle.
+    }, 20000);
 
     it('al pasar de manual a una plantilla normal el texto manual no viaja y el diálogo de protección sigue funcionando', async () => {
       const user = userEvent.setup();
