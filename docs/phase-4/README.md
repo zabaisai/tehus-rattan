@@ -10,8 +10,9 @@ cliente más. Nada de esta fase toma a Tehus ni a los muebles como valor por
 defecto: los términos de muebles solo aparecen en la plantilla de muebles y en
 las empresas que la eligieron.
 
-Rama: `feat/phase-4-dynamic-crm` (desde `origin/main` `b01a2ec`). Worktree
-aislado; el worktree principal y su archivo ajeno
+Rama: `feat/phase-4-dynamic-crm` (desde `origin/main` `b01a2ec`), fusionada en
+`main` `38c1575` (PR #26). Worktree aislado; el worktree principal y su
+archivo ajeno
 (`deploy/scripts/send-demo-template.mjs`) no se tocan.
 
 ## Documentos
@@ -75,12 +76,12 @@ Super Admin, historias clínicas veterinarias, formato de moneda por región.
 | 5 | Frontend dinámico (navegación, rutas, catálogo, módulos, pipelines) | HECHA |
 | 6 | Pruebas (unitarias, e2e HTTP, frontend) | HECHA en local — conteos en `TEST-MATRIX.md` |
 | 7 | QA local de las cuatro empresas (ADMIN y AGENT) | HECHA — 172 comprobaciones, 0 fallos |
-| 8 | PR, CI y merge | PENDIENTE |
-| 9 | Backup y despliegue en staging | PENDIENTE |
-| 10 | QA multiempresa en staging y limpieza | PENDIENTE |
-| 11 | Documentación y cierre | PENDIENTE |
+| 8 | PR, CI y merge | HECHA — PR #26 → `main` `38c1575` (merge commit) |
+| 9 | Backup y despliegue en staging | HECHA — release `38c1575`, backup con checksums, 0 migraciones, health 12/12, smoke 22/22 |
+| 10 | QA multiempresa en staging y limpieza | HECHA — 172 comprobaciones sin fallos; 0 residuos, línea base igual |
+| 11 | Documentación y cierre | HECHA — rama `docs/phase-4-closure` |
 
-Estado de la fase: **FASE 4 ABIERTA — EN CURSO**.
+Estado de la fase: **FASE 4 CERRADA — PASS** (2026-09-04). Fase 5 no iniciada.
 
 ## Migraciones
 
