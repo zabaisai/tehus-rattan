@@ -15,6 +15,9 @@ import { UpdateTaskDto } from './tasks/dto/update-task.dto';
 import { CreateNoteDto } from './notes/dto/create-note.dto';
 import { UpdateConversationDto } from './conversations/dto/update-conversation.dto';
 import { ConnectWhatsAppIntegrationDto } from './whatsapp-integration/dto/connect-whatsapp-integration.dto';
+import { CreateProductDto } from './products/dto/create-product.dto';
+import { UpdateProductDto } from './products/dto/update-product.dto';
+import { UpdateTenantConfigurationDto } from './companies/dto/update-tenant-configuration.dto';
 
 // Same configuration as the global ValidationPipe registered in src/main.ts
 const buildPipe = () =>
@@ -73,6 +76,26 @@ describe('DTO tenant field whitelist (real ValidationPipe)', () => {
   it('rejects companyId in CreateLeadProductDto', async () => {
     await expectCompanyIdRejected(CreateLeadProductDto, {
       productId: 'product-a',
+    });
+  });
+
+  it('rejects companyId in CreateProductDto', async () => {
+    await expectCompanyIdRejected(CreateProductDto, {
+      name: 'Silla',
+      price: 100,
+      itemType: 'PRODUCT',
+    });
+  });
+
+  it('rejects companyId in UpdateProductDto', async () => {
+    await expectCompanyIdRejected(UpdateProductDto, {
+      itemType: 'SERVICE',
+    });
+  });
+
+  it('rejects companyId in UpdateTenantConfigurationDto (Fase 2)', async () => {
+    await expectCompanyIdRejected(UpdateTenantConfigurationDto, {
+      regional: { timezone: 'America/Bogota' },
     });
   });
 

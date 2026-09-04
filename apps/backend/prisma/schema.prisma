@@ -1070,13 +1070,30 @@ model Product {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  /// Producto o servicio (Fase 2). NULLABLE A PROPÓSITO: las filas anteriores
+  /// a la Fase 2 quedan en NULL y la aplicación las trata como PRODUCT; el
+  /// backfill auditable por empresa pertenece a la Fase 5. El default aplica
+  /// solo a inserciones nuevas (ver la migración: se añade la columna sin
+  /// default y luego se fija, para que Postgres no rellene lo existente).
+  itemType CatalogItemType? @default(PRODUCT)
+
   companyId String
   company   Company @relation(fields: [companyId], references: [id])
 
   leadProducts LeadProduct[]
   quoteItems   QuoteItem[]
 
+  // El listado filtra siempre por empresa y activos, y desde la Fase 2 por
+  // tipo; la tabla no tenía ningún índice propio (ni siquiera por companyId).
+  @@index([companyId, isActive, itemType])
   @@map("products")
+}
+
+/// Tipo de elemento del catálogo. La tabla sigue llamándose `products` y el
+/// modelo `Product`: renombrar es una fase posterior.
+enum CatalogItemType {
+  PRODUCT
+  SERVICE
 }
 
 // ─────────────────────────────────────────────

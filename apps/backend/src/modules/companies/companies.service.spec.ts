@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { CompaniesService } from './companies.service';
 
@@ -121,75 +121,10 @@ describe('CompaniesService', () => {
     );
   });
 
-  describe('settings (Fase 1)', () => {
-    const v1 = {
-      sellsProducts: true,
-      sellsServices: false,
-      usesCatalog: true,
-      usesQuotes: false,
-      usesTasks: true,
-      categories: ['Salas', 'Comedores'],
-      futuro: { conservar: true },
-    };
-
-    it('getSettings lee una empresa v1 sin escribir nada (sin migración automática)', async () => {
-      prisma.company.findUnique.mockResolvedValue({ settings: v1 });
-
-      const view = await service.getSettings('company-a');
-
-      expect(view.version).toBe(1);
-      expect(view.catalog.categories).toEqual(['Salas', 'Comedores']);
-      expect(view.commercial.usesCatalog).toBe(true);
-      expect(prisma.company.update).not.toHaveBeenCalled();
-      expect(JSON.stringify(view)).not.toContain('futuro');
-    });
-
-    it('updateSettings migra v1 → v2 solo por edición explícita, conservando banderas y claves desconocidas', async () => {
-      prisma.company.findUnique.mockResolvedValue({ settings: v1 });
-      prisma.company.update.mockImplementation((args: any) =>
-        Promise.resolve({ settings: args.data.settings }),
-      );
-
-      const view = await service.updateSettings('company-a', {
-        catalog: { categories: ['Salas', ' salas ', 'Dormitorios'] },
-      });
-
-      expect(prisma.company.update).toHaveBeenCalledWith({
-        where: { id: 'company-a' },
-        data: {
-          settings: {
-            futuro: { conservar: true },
-            version: 2,
-            commercial: {
-              sellsProducts: true,
-              sellsServices: false,
-              usesCatalog: true,
-              usesQuotes: false,
-              usesTasks: true,
-            },
-            catalog: {
-              categories: ['Salas', 'Dormitorios'],
-              allowFreeText: true,
-            },
-          },
-        },
-        select: { settings: true },
-      });
-      expect(view.version).toBe(2);
-      expect(view.catalog.categories).toEqual(['Salas', 'Dormitorios']);
-    });
-
-    it('updateSettings rechaza categorías inválidas sin llamar a Prisma', async () => {
-      prisma.company.findUnique.mockResolvedValue({ settings: v1 });
-
-      await expect(
-        service.updateSettings('company-a', {
-          catalog: { categories: ['x'.repeat(61)] },
-        }),
-      ).rejects.toThrow(BadRequestException);
-      expect(prisma.company.update).not.toHaveBeenCalled();
-    });
-
+  describe('settings (Fase 1 → motor de configuración en Fase 2)', () => {
+    // getSettings/updateSettings viven ahora en TenantConfigurationService
+    // (ver tenant-configuration.service.spec.ts). Aquí solo queda comprobar
+    // que el perfil genérico sigue sin aceptar `settings`.
     it('update() ya no acepta settings: el tipo no lo admite y nada lo pasa a Prisma', async () => {
       await service.update('company-a', { city: 'Bogotá' });
       const data = prisma.company.update.mock.calls[0][0].data;

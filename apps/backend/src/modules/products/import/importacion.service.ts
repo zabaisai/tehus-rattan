@@ -22,6 +22,7 @@ import {
 // `import type` obligatorio: el tipo aparece en una firma decorada y con
 // `emitDecoratorMetadata` TypeScript intentaria emitirlo como valor.
 import type { AlmacenamientoDeImportaciones } from './almacenamiento-importaciones';
+import { type CatalogItemType, parseItemTypeLabel } from '../catalog-item-type';
 
 export interface IncidenciaDeFila {
   fila: number;
@@ -268,9 +269,9 @@ export class ImportacionDeProductosService {
         imp.fileName,
         async (fila, numero) => {
           const activo = mapeo ?? mapearCabeceras(cabecerasDe(fila.length));
-          const datos = this.interpretarFila(fila, activo, imp.companyId);
+          const resultado = this.interpretarFila(fila, activo, imp.companyId);
 
-          if (!datos) {
+          if (!resultado) {
             contadores.skipped++;
             contadores.processed++;
             if (incidencias.length < MAX_ERRORES_DETALLADOS) {
@@ -282,7 +283,22 @@ export class ImportacionDeProductosService {
             return;
           }
 
-          lote.push({ fila: numero, datos });
+          if ('fallida' in resultado) {
+            // La fila tiene nombre pero un valor que no se puede interpretar
+            // sin adivinar: se cuenta como fallida CON motivo. Convertirla en
+            // silencio a un valor por defecto escondería el error del archivo.
+            contadores.failed++;
+            contadores.processed++;
+            this.anotar(
+              incidencias,
+              numero,
+              resultado.fallida,
+              resultado.nombre,
+            );
+            return;
+          }
+
+          lote.push({ fila: numero, datos: resultado.datos });
           if (lote.length >= FILAS_POR_LOTE) {
             const r = await this.escribirLote(lote, incidencias);
             contadores = sumar(contadores, r, lote.length);
@@ -452,6 +468,9 @@ export class ImportacionDeProductosService {
         ...(datos.description ? { description: datos.description } : {}),
         ...(datos.code ? { code: datos.code } : {}),
         ...(datos.stock !== undefined ? { stock: datos.stock } : {}),
+        // Solo si el archivo lo trae: un archivo antiguo sin la columna no
+        // cambia el tipo de un elemento existente.
+        ...(datos.itemType ? { itemType: datos.itemType } : {}),
       },
     });
   }
@@ -467,11 +486,16 @@ export class ImportacionDeProductosService {
     }
   }
 
+  /**
+   * `null` = fila sin nombre ni código (se omite). `{ fallida }` = la fila
+   * existe pero trae un valor que no se puede interpretar (se cuenta como
+   * fallida con motivo). Si no, los datos listos para escribir.
+   */
   private interpretarFila(
     fila: FilaCruda,
     mapeo: MapeoDeColumnas,
     companyId: string,
-  ): DatosDeProducto | null {
+  ): ResultadoDeFila | null {
     const leer = (campo: string): string => {
       const i = mapeo.campos[campo];
       return i === undefined ? '' : (fila[i] ?? '').trim();
@@ -480,15 +504,34 @@ export class ImportacionDeProductosService {
     const name = leer('name') || leer('code') || leer('sku');
     if (!name) return null;
 
+    // Tipo de elemento (Fase 2): solo si la columna está mapeada y la celda
+    // trae algo. Vacío = no informado (PRODUCT al crear; sin cambio al
+    // actualizar). Un valor no reconocido NO se convierte en silencio.
+    const tipoCrudo = leer('itemType');
+    let itemType: CatalogItemType | undefined;
+    if (tipoCrudo) {
+      const tipo = parseItemTypeLabel(tipoCrudo);
+      if (!tipo) {
+        return {
+          fallida: `Tipo de elemento no reconocido: "${tipoCrudo.slice(0, 40)}" (usa Producto o Servicio)`,
+          nombre: name.slice(0, 300),
+        };
+      }
+      itemType = tipo;
+    }
+
     return {
-      companyId,
-      name: name.slice(0, 300),
-      price: interpretarPrecio(leer('price')),
-      category: leer('category') || 'Sin categoría',
-      description: leer('description') || undefined,
-      code: leer('code') || undefined,
-      sku: leer('sku') || undefined,
-      stock: leer('stock') ? interpretarEntero(leer('stock')) : undefined,
+      datos: {
+        companyId,
+        name: name.slice(0, 300),
+        price: interpretarPrecio(leer('price')),
+        category: leer('category') || 'Sin categoría',
+        description: leer('description') || undefined,
+        code: leer('code') || undefined,
+        sku: leer('sku') || undefined,
+        stock: leer('stock') ? interpretarEntero(leer('stock')) : undefined,
+        itemType,
+      },
     };
   }
 
@@ -576,7 +619,13 @@ interface DatosDeProducto {
   code?: string;
   sku?: string;
   stock?: number;
+  /** Solo cuando el archivo lo informa; al crear sin él, la columna aplica PRODUCT. */
+  itemType?: CatalogItemType;
 }
+
+type ResultadoDeFila =
+  | { datos: DatosDeProducto }
+  | { fallida: string; nombre?: string };
 
 function sumar(
   c: {

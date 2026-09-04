@@ -1,12 +1,14 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Package } from 'lucide-react';
 import { getProducts } from '@/lib/products';
 import { useCompanySettings } from '@/lib/company-settings';
-import { AddLeadProductPayload } from '@/types';
+import { effectiveItemType, ITEM_TYPE_LABELS } from '@/lib/tenant-configuration';
+import { AddLeadProductPayload, CatalogItemType } from '@/types';
 import { Modal } from '@/components/ui/Modal';
+import { Badge } from '@/components/ui/Badge';
 
 type ApiError = {
   response?: {
@@ -30,16 +32,27 @@ interface AddProductToLeadModalProps {
 export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalProps) {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [itemType, setItemType] = useState<'' | CatalogItemType>('');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unitPrice, setUnitPrice] = useState('');
   const [notes, setNotes] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  // Etiquetas asociadas a su control: sin `htmlFor` un lector de pantalla
+  // anuncia un cuadro de texto sin nombre.
+  const ids = useId();
 
+  // Ambos tipos son seleccionables; el filtro por tipo lo resuelve el
+  // servidor (PRODUCT incluye los elementos anteriores sin tipo).
   const { data: products, isLoading } = useQuery({
-    queryKey: ['products', category],
-    queryFn: () => getProducts(category ? { category } : undefined),
+    queryKey: ['products', category, itemType],
+    queryFn: () =>
+      getProducts(
+        category || itemType
+          ? { ...(category ? { category } : {}), ...(itemType ? { itemType } : {}) }
+          : undefined,
+      ),
   });
 
   const filtered = useMemo(() => {
@@ -80,7 +93,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedProductId) {
-      setError('Selecciona un producto del catálogo');
+      setError('Selecciona un elemento del catálogo');
       return;
     }
     setError('');
@@ -104,13 +117,13 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
   const noProductsAtAll = !isLoading && (products?.length ?? 0) === 0;
 
   return (
-    <Modal title="Agregar producto" onClose={onClose} maxWidth="md" stackedZIndex>
+    <Modal title="Agregar producto o servicio" onClose={onClose} maxWidth="md" stackedZIndex>
         {isLoading && <p className="text-sm text-neutral-400">Cargando catálogo...</p>}
 
         {noProductsAtAll && (
           <div className="flex flex-col items-center gap-2 rounded-md border border-dashed border-neutral-300 py-8 text-center text-neutral-400">
             <Package size={24} strokeWidth={1.5} />
-            <p className="text-sm">Primero crea o importa productos en el catálogo.</p>
+            <p className="text-sm">Primero crea o importa productos o servicios en el catálogo.</p>
           </div>
         )}
 
@@ -123,13 +136,25 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Buscar producto"
+                  placeholder="Buscar en el catálogo"
+                  aria-label="Buscar en el catálogo"
                   className="w-full rounded-md border border-neutral-300 py-2 pl-7 pr-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
                 />
               </div>
               <select
+                value={itemType}
+                onChange={(e) => setItemType(e.target.value as '' | CatalogItemType)}
+                aria-label="Filtrar por tipo"
+                className="rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+              >
+                <option value="">Todos</option>
+                <option value="PRODUCT">Productos</option>
+                <option value="SERVICE">Servicios</option>
+              </select>
+              <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
+                aria-label="Filtrar por categoría"
                 className="rounded-md border border-neutral-300 px-2 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
               >
                 <option value="">Todas</option>
@@ -161,6 +186,11 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                       className="h-3.5 w-3.5"
                     />
                     <span className="text-neutral-800">{product.name}</span>
+                    <Badge
+                      tone={effectiveItemType(product.itemType) === 'SERVICE' ? 'accent' : 'info'}
+                    >
+                      {ITEM_TYPE_LABELS[effectiveItemType(product.itemType)]}
+                    </Badge>
                   </span>
                   <span className="text-xs text-neutral-500">
                     {currencyFormatter.format(product.price)}
@@ -173,10 +203,11 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
               <>
                 <div className="mb-3 grid grid-cols-2 gap-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-neutral-600">
+                    <label htmlFor={`${ids}-cantidad`} className="mb-1 block text-xs font-medium text-neutral-600">
                       Cantidad
                     </label>
                     <input
+                      id={`${ids}-cantidad`}
                       type="number"
                       min={1}
                       step={1}
@@ -186,10 +217,11 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                     />
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-neutral-600">
+                    <label htmlFor={`${ids}-precio`} className="mb-1 block text-xs font-medium text-neutral-600">
                       Precio unitario
                     </label>
                     <input
+                      id={`${ids}-precio`}
                       type="number"
                       min={0}
                       step="0.01"
@@ -201,10 +233,11 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                 </div>
 
                 <div className="mb-4">
-                  <label className="mb-1 block text-xs font-medium text-neutral-600">
+                  <label htmlFor={`${ids}-notas`} className="mb-1 block text-xs font-medium text-neutral-600">
                     Notas (opcional)
                   </label>
                   <textarea
+                    id={`${ids}-notas`}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     rows={2}

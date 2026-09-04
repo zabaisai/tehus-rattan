@@ -6,6 +6,7 @@ import {
   arrancarImportacion,
   cancelarImportacion,
   estadoDeImportacion,
+  fijarMapeoDeImportacion,
   getLimitesDeImportacion,
   subirImportacion,
   urlDelReporte,
@@ -13,7 +14,11 @@ import {
   vistaPreviaDeImportacion,
 } from "@/lib/products";
 import { useQuery } from "@tanstack/react-query";
-import type { Importacion, VistaPreviaDeImportacion } from "@/types";
+import type {
+  Importacion,
+  MapeoDeColumnas,
+  VistaPreviaDeImportacion,
+} from "@/types";
 import { Modal } from "@/components/ui/Modal";
 
 type ApiError = {
@@ -40,6 +45,23 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 const TERMINADAS = ["COMPLETED", "FAILED", "CANCELLED"];
 
 /**
+ * Etiquetas legibles de los campos del producto que admite la importación.
+ * Antes la vista previa enseñaba la clave interna (`price`, `itemType`); esto
+ * es lo que lee una persona. Un campo que el servidor conozca y aquí no, se
+ * muestra por su clave para no ocultarlo.
+ */
+export const ETIQUETAS_CAMPO: Record<string, string> = {
+  name: "Nombre",
+  sku: "SKU",
+  code: "Código",
+  price: "Precio",
+  category: "Categoría",
+  stock: "Stock",
+  description: "Descripción",
+  itemType: "Tipo de elemento",
+};
+
+/**
  * Importar un catálogo, en CUATRO pasos: subir, revisar el mapeo, procesar y
  * ver el resultado.
  *
@@ -59,6 +81,9 @@ export function ProductImportModal({
   const [archivo, setArchivo] = useState<File | null>(null);
   const [importacion, setImportacion] = useState<Importacion | null>(null);
   const [previa, setPrevia] = useState<VistaPreviaDeImportacion | null>(null);
+  // Mapeo campo → columna que la persona CONFIRMA (o corrige) antes de
+  // empezar. Arranca con la propuesta del servidor.
+  const [campos, setCampos] = useState<Record<string, number>>({});
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState("");
 
@@ -121,7 +146,9 @@ export function ProductImportModal({
     try {
       const imp = await subirImportacion(archivo);
       setImportacion(imp);
-      setPrevia(await vistaPreviaDeImportacion(imp.id));
+      const vista = await vistaPreviaDeImportacion(imp.id);
+      setPrevia(vista);
+      setCampos(vista.mapeoPropuesto.campos);
       setPaso("revisar");
     } catch (e) {
       setError(mensaje(e, "No se pudo subir el archivo."));
@@ -130,11 +157,40 @@ export function ProductImportModal({
     }
   }
 
+  /** Una columna alimenta UN campo y un campo sale de UNA columna. */
+  function asignar(indice: number, campo: string) {
+    setCampos((prev) => {
+      const next: Record<string, number> = {};
+      for (const [k, v] of Object.entries(prev)) {
+        if (v !== indice && k !== campo) next[k] = v;
+      }
+      if (campo) next[campo] = indice;
+      return next;
+    });
+  }
+
+  function campoDe(indice: number): string | undefined {
+    return Object.entries(campos).find(([, i]) => i === indice)?.[0];
+  }
+
+  function mapeoActual(): MapeoDeColumnas {
+    const usadas = new Set(Object.values(campos));
+    return {
+      campos,
+      sinAsignar: (previa?.cabeceras ?? [])
+        .map((cabecera, indice) => ({ indice, cabecera }))
+        .filter((c) => !usadas.has(c.indice) && c.cabecera.trim()),
+    };
+  }
+
   async function arrancar() {
     if (!importacion) return;
     setOcupado(true);
     setError("");
     try {
+      // El mapeo confirmado se fija ANTES de arrancar: es lo que el worker
+      // usará para leer cada fila.
+      await fijarMapeoDeImportacion(importacion.id, mapeoActual());
       await arrancarImportacion(importacion.id);
       setPaso("procesando");
     } catch (e) {
@@ -228,21 +284,31 @@ export function ProductImportModal({
               <thead>
                 <tr className="border-b border-neutral-200 bg-neutral-50 text-left">
                   {previa.cabeceras.map((c, i) => {
-                    const campo = Object.entries(
-                      previa.mapeoPropuesto.campos,
-                    ).find(([, indice]) => indice === i)?.[0];
+                    const campo = campoDe(i);
+                    const disponibles =
+                      previa.camposDisponibles?.length
+                        ? previa.camposDisponibles
+                        : Object.keys(ETIQUETAS_CAMPO);
                     return (
-                      <th key={i} className="px-2 py-2 font-medium">
+                      <th key={i} className="px-2 py-2 font-medium align-top">
                         <span className="block text-neutral-800">{c}</span>
-                        <span
-                          className={
+                        <select
+                          aria-label={`Campo para la columna ${c}`}
+                          value={campo ?? ""}
+                          onChange={(e) => asignar(i, e.target.value)}
+                          className={`mt-1 w-full max-w-40 rounded border px-1 py-0.5 text-[11px] font-normal outline-none focus:border-neutral-500 ${
                             campo
-                              ? "text-[10px] text-status-success"
-                              : "text-[10px] text-neutral-400"
-                          }
+                              ? "border-status-success/40 text-status-success-strong"
+                              : "border-neutral-200 text-neutral-500"
+                          }`}
                         >
-                          {campo ?? "sin asignar"}
-                        </span>
+                          <option value="">No importar</option>
+                          {disponibles.map((k) => (
+                            <option key={k} value={k}>
+                              {ETIQUETAS_CAMPO[k] ?? k}
+                            </option>
+                          ))}
+                        </select>
                       </th>
                     );
                   })}
@@ -268,15 +334,33 @@ export function ProductImportModal({
             </table>
           </div>
 
-          {previa.mapeoPropuesto.sinAsignar.length > 0 && (
+          {mapeoActual().sinAsignar.length > 0 && (
             <p className="text-xs text-neutral-500">
-              Estas columnas no se reconocieron y se ignorarán:{" "}
-              {previa.mapeoPropuesto.sinAsignar
-                .map((c) => c.cabecera)
+              Estas columnas no se importarán:{" "}
+              {mapeoActual()
+                .sinAsignar.map((c) => c.cabecera)
                 .join(", ")}
               .
             </p>
           )}
+
+          {/* Tipo de elemento (Fase 2): sin columna, todo es Producto. */}
+          <p className="text-xs text-neutral-500" data-testid="nota-tipo">
+            {campos.itemType !== undefined ? (
+              <>
+                La columna{" "}
+                <strong>{previa.cabeceras[campos.itemType]}</strong> indica el
+                tipo de elemento: admite «Producto» o «Servicio»; otro valor
+                deja la fila como fallida en el reporte.
+              </>
+            ) : (
+              <>
+                Sin una columna de <strong>Tipo de elemento</strong>, todo se
+                importa como <strong>Producto</strong>. Si tu archivo la trae,
+                asígnala arriba (admite «Producto» o «Servicio»).
+              </>
+            )}
+          </p>
 
           <div className="flex justify-end gap-2">
             <button

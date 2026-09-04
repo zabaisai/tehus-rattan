@@ -67,6 +67,25 @@ export const CAMPOS: CampoDeProducto[] = [
     etiqueta: 'Descripción',
     alias: ['descripcion', 'detalle', 'observaciones', 'notas', 'description'],
   },
+  // Fase 2. Va DESPUÉS de `category` a propósito y sin el alias genérico
+  // `tipo`: esa palabra ya significa categoría en los archivos que la gente
+  // trae, y reutilizarla haría que un catálogo antiguo cambiara de tipo sin
+  // querer. Solo cabeceras inequívocas. Sin columna, el elemento es PRODUCT.
+  {
+    campo: 'itemType',
+    etiqueta: 'Tipo de elemento',
+    alias: [
+      'tipo de elemento',
+      'tipo elemento',
+      'tipo de catalogo',
+      'tipo catalogo',
+      'tipo de item',
+      'item type',
+      'itemtype',
+      'producto o servicio',
+      'producto/servicio',
+    ],
+  },
 ];
 
 export interface MapeoDeColumnas {

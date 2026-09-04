@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import ProductsPage from './page';
 import { Product } from '@/types';
 
@@ -45,6 +45,35 @@ vi.mock('@/lib/products', async () => {
     createProduct: vi.fn(),
     updateProduct: vi.fn(),
     deleteProduct: vi.fn(),
+  };
+});
+
+vi.mock('@/lib/company-settings', async () => {
+  const real = await vi.importActual<typeof import('@/lib/company-settings')>('@/lib/company-settings');
+  const fetchSettings = async () => ({
+    version: 2 as const,
+    commercial: { sellsProducts: true, sellsServices: false, usesCatalog: true, usesQuotes: false, usesTasks: false },
+    catalog: { categories: ['Salas', 'Comedores'], allowFreeText: true as const },
+    vertical: null,
+    pipelineDefaults: null,
+    limits: { categories: { maxLength: 60, maxCount: 30 } },
+  });
+  return {
+    ...real,
+    getMyCompanySettings: fetchSettings,
+    useCompanySettings: () =>
+      useQuery({ queryKey: real.COMPANY_SETTINGS_QUERY_KEY, queryFn: fetchSettings }),
+  };
+});
+
+vi.mock('@/lib/tenant-configuration', async () => {
+  const real = await vi.importActual<typeof import('@/lib/tenant-configuration')>('@/lib/tenant-configuration');
+  const fetchConfig = async () => null;
+  return {
+    ...real,
+    getMyTenantConfiguration: fetchConfig,
+    useTenantConfiguration: () =>
+      useQuery({ queryKey: real.TENANT_CONFIGURATION_QUERY_KEY, queryFn: fetchConfig }),
   };
 });
 

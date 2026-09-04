@@ -6,6 +6,10 @@ import {
   redondea,
   aNumeroParaMostrar,
 } from '../../common/dinero/dinero';
+import {
+  type CatalogItemType,
+  effectiveItemType,
+} from '../products/catalog-item-type';
 
 const PRODUCT_SELECT = {
   id: true,
@@ -15,6 +19,7 @@ const PRODUCT_SELECT = {
   price: true,
   sku: true,
   code: true,
+  itemType: true,
 };
 
 type LeadProductWithProduct = {
@@ -34,6 +39,7 @@ type LeadProductWithProduct = {
     price: Dinero;
     sku: string | null;
     code: string | null;
+    itemType: CatalogItemType | null;
   };
 };
 
@@ -176,6 +182,8 @@ export class LeadProductsService {
       product: {
         ...item.product,
         price: aNumeroParaMostrar(item.product.price),
+        // Fila legacy sin tipo → PRODUCT, igual que en /products.
+        itemType: effectiveItemType(item.product.itemType),
       },
     };
   }
