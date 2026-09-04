@@ -90,18 +90,30 @@ export class PipelineController {
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Post()
-  create(@Request() req: any, @Body() body: CreatePipelineDto) {
-    return this.pipelineService.create(req.user.companyId, body);
+  async create(@Request() req: any, @Body() body: CreatePipelineDto) {
+    const r = await this.pipelineService.create(req.user.companyId, body);
+    await this.auditar(req, 'pipeline.create', r.id, {
+      fields: Object.keys(body),
+    });
+    return r;
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Patch(':id')
-  update(
+  async update(
     @Param('id') id: string,
     @Request() req: any,
     @Body() body: UpdatePipelineDto,
   ) {
-    return this.pipelineService.update(id, req.user.companyId, body);
+    const r = await this.pipelineService.update(id, req.user.companyId, body);
+    // Qué campos se tocaron, no con qué valores: el nombre y el orden están
+    // en el propio embudo; marcar predeterminado sí se anota porque cambia a
+    // dónde entran las oportunidades nuevas.
+    await this.auditar(req, 'pipeline.update', id, {
+      fields: Object.keys(body),
+      ...(body.isDefault ? { isDefault: true } : {}),
+    });
+    return r;
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
@@ -163,57 +175,86 @@ export class PipelineController {
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Patch('reordenar/embudos')
-  reordenar(@Request() req: any, @Body() body: ReordenarPipelinesDto) {
-    return this.retiro.reordenar(req.user.companyId, body.pipelines);
+  async reordenar(@Request() req: any, @Body() body: ReordenarPipelinesDto) {
+    const r = await this.retiro.reordenar(req.user.companyId, body.pipelines);
+    await this.auditar(req, 'pipeline.reorder', 'embudos', {
+      reordenados: r.reordenados,
+    });
+    return r;
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Post(':id/stages')
-  createStage(
+  async createStage(
     @Param('id') id: string,
     @Request() req: any,
     @Body() body: CreateStageDto,
   ) {
-    return this.pipelineService.createStage(id, req.user.companyId, body);
+    const r = await this.pipelineService.createStage(
+      id,
+      req.user.companyId,
+      body,
+    );
+    await this.auditar(req, 'pipeline.stage.create', id, {
+      stageId: r.id,
+      type: r.type,
+      isInitial: r.isInitial,
+    });
+    return r;
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Patch(':id/stages/reorder')
-  reorderStages(
+  async reorderStages(
     @Param('id') id: string,
     @Request() req: any,
     @Body() body: ReorderStagesDto,
   ) {
-    return this.pipelineService.reorderStages(
+    const r = await this.pipelineService.reorderStages(
       id,
       req.user.companyId,
       body.stages,
     );
+    await this.auditar(req, 'pipeline.stages.reorder', id, {
+      etapas: body.stages.length,
+    });
+    return r;
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Patch(':id/stages/:stageId')
-  updateStage(
+  async updateStage(
     @Param('id') id: string,
     @Param('stageId') stageId: string,
     @Request() req: any,
     @Body() body: UpdateStageDto,
   ) {
-    return this.pipelineService.updateStage(
+    const r = await this.pipelineService.updateStage(
       id,
       stageId,
       req.user.companyId,
       body,
     );
+    await this.auditar(req, 'pipeline.stage.update', id, {
+      stageId,
+      fields: Object.keys(body),
+    });
+    return r;
   }
 
   @Roles('ADMIN', 'SUPER_ADMIN')
   @Delete(':id/stages/:stageId')
-  removeStage(
+  async removeStage(
     @Param('id') id: string,
     @Param('stageId') stageId: string,
     @Request() req: any,
   ) {
-    return this.pipelineService.removeStage(id, stageId, req.user.companyId);
+    const r = await this.pipelineService.removeStage(
+      id,
+      stageId,
+      req.user.companyId,
+    );
+    await this.auditar(req, 'pipeline.stage.delete', id, { stageId });
+    return r;
   }
 }

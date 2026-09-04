@@ -3,6 +3,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { TenantConfigurationService } from '../src/modules/companies/tenant-configuration.service';
+import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { ImportacionDeProductosService } from '../src/modules/products/import/importacion.service';
 import { mapearCabeceras } from '../src/modules/products/import/mapeo-columnas';
 import { AlmacenamientoEnDirectorioCompartido } from '../src/modules/products/import/almacenamiento-importaciones';
@@ -80,12 +82,18 @@ describe('Importación de catálogo (e2e, base real)', () => {
     // que viaja entre ellos es la clave.
     almacenBackend = new AlmacenamientoEnDirectorioCompartido(carpeta);
     almacenWorker = new AlmacenamientoEnDirectorioCompartido(carpeta);
+    const configuracion = new TenantConfigurationService(
+      prisma as unknown as PrismaService,
+      new PlatformAuditLogService(prisma as unknown as PrismaService),
+    );
     servicio = new ImportacionDeProductosService(
       prisma as unknown as PrismaService,
+      configuracion,
       almacenBackend,
     );
     servicioWorker = new ImportacionDeProductosService(
       prisma as unknown as PrismaService,
+      configuracion,
       almacenWorker,
     );
 

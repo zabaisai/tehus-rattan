@@ -4,12 +4,16 @@ import { PipelineService } from './pipeline.service';
 /**
  * CARACTERIZACIÓN — no es una prueba de diseño nuevo.
  *
- * Fija el comportamiento que el módulo tiene HOY, antes de la reforma de
- * pipelines (orden, archivado, probabilidad, tipo de etapa, predeterminado
- * garantizado). Cualquiera de esos cambios debe seguir cumpliendo lo que se
- * afirma aquí, en especial el aislamiento multiempresa: TODO método resuelve
- * primero la pertenencia del pipeline a la empresa del JWT y falla con 404
- * antes de tocar etapas o leads.
+ * Fija el comportamiento que el módulo tiene HOY. Cualquier cambio debe seguir
+ * cumpliendo lo que se afirma aquí, en especial el aislamiento multiempresa:
+ * TODO método resuelve primero la pertenencia del pipeline a la empresa del
+ * JWT y falla con 404 antes de tocar etapas o leads. Desde la Fase 4 las
+ * operaciones sobre etapas bloquean la fila del embudo (`SELECT … FOR
+ * UPDATE` con companyId) dentro de la transacción; el doble de `$queryRaw`
+ * refleja la misma pertenencia que `pipeline.findFirst`.
+ *
+ * Las invariantes nuevas (cierre único, nombres, orden completo) viven en
+ * `pipeline.invariantes.spec.ts`.
  *
  * Ids ficticios; ninguna empresa ni dato real.
  */
@@ -64,6 +68,11 @@ describe('PipelineService (caracterización pre-reforma)', () => {
       // update, que necesitan leer y escribir dentro de la misma transacción).
       $transaction: jest.fn((arg: any) =>
         typeof arg === 'function' ? arg(prisma) : Promise.all(arg),
+      ),
+      // Bloqueo de fila del embudo: pertenece a la empresa exactamente cuando
+      // `pipeline.findFirst` lo devuelve.
+      $queryRaw: jest.fn(async () =>
+        (await prisma.pipeline.findFirst()) ? [{ id: PIPELINE_A }] : [],
       ),
     };
     service = new PipelineService(prisma);
@@ -133,10 +142,18 @@ describe('PipelineService (caracterización pre-reforma)', () => {
 
   describe('pipelines', () => {
     it('create fuerza el companyId del contexto, nunca uno del cliente', async () => {
+      // El último embudo de la empresa va en la posición 2: el nuevo entra al final.
+      prisma.pipeline.findFirst.mockResolvedValue({ ...pipelineRow, order: 2 });
+
       await service.create(COMPANY_A, { name: 'Nuevo', isDefault: false });
 
       expect(prisma.pipeline.create).toHaveBeenCalledWith({
-        data: { name: 'Nuevo', isDefault: false, companyId: COMPANY_A },
+        data: {
+          name: 'Nuevo',
+          isDefault: false,
+          order: 3,
+          companyId: COMPANY_A,
+        },
       });
     });
 
@@ -295,17 +312,24 @@ describe('PipelineService (caracterización pre-reforma)', () => {
 
   describe('etapas', () => {
     it('createStage calcula el orden como último + 1 cuando no se indica', async () => {
-      prisma.pipelineStage.findFirst.mockResolvedValue({ id: 's', order: 4 });
+      prisma.pipelineStage.findMany.mockResolvedValue([
+        { id: 's', name: 'Anterior', order: 4, type: 'OPEN' },
+      ]);
 
       await service.createStage(PIPELINE_A, COMPANY_A, { name: 'Cierre' });
 
       expect(prisma.pipelineStage.create).toHaveBeenCalledWith({
-        data: { name: 'Cierre', order: 5, pipelineId: PIPELINE_A },
+        data: {
+          name: 'Cierre',
+          type: 'OPEN',
+          order: 5,
+          pipelineId: PIPELINE_A,
+        },
       });
     });
 
     it('createStage usa orden 0 en un pipeline sin etapas', async () => {
-      prisma.pipelineStage.findFirst.mockResolvedValue(null);
+      prisma.pipelineStage.findMany.mockResolvedValue([]);
 
       await service.createStage(PIPELINE_A, COMPANY_A, { name: 'Primera' });
 
@@ -320,7 +344,7 @@ describe('PipelineService (caracterización pre-reforma)', () => {
     });
 
     it('updateStage exige que la etapa pertenezca al pipeline', async () => {
-      prisma.pipelineStage.findFirst.mockResolvedValue(null);
+      prisma.pipelineStage.findMany.mockResolvedValue([]);
 
       await expect(
         service.updateStage(PIPELINE_A, 'ajena', COMPANY_A, { name: 'X' }),
@@ -330,7 +354,9 @@ describe('PipelineService (caracterización pre-reforma)', () => {
     });
 
     it('removeStage rechaza borrar una etapa con leads y no borra nada', async () => {
-      prisma.pipelineStage.findFirst.mockResolvedValue({ id: 'stage-1' });
+      prisma.pipelineStage.findMany.mockResolvedValue([
+        { id: 'stage-1', name: 'Nuevo', type: 'OPEN', isInitial: false },
+      ]);
       prisma.lead.count.mockResolvedValue(2);
 
       await expect(
@@ -341,7 +367,9 @@ describe('PipelineService (caracterización pre-reforma)', () => {
     });
 
     it('removeStage borra cuando la etapa está vacía', async () => {
-      prisma.pipelineStage.findFirst.mockResolvedValue({ id: 'stage-1' });
+      prisma.pipelineStage.findMany.mockResolvedValue([
+        { id: 'stage-1', name: 'Nuevo', type: 'OPEN', isInitial: false },
+      ]);
       prisma.lead.count.mockResolvedValue(0);
 
       await service.removeStage(PIPELINE_A, 'stage-1', COMPANY_A);
@@ -363,7 +391,9 @@ describe('PipelineService (caracterización pre-reforma)', () => {
         ]),
       ).rejects.toBeInstanceOf(BadRequestException);
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
+      // La validación ocurre dentro de la transacción (con el embudo
+      // bloqueado), pero no se escribe nada.
+      expect(prisma.pipelineStage.update).not.toHaveBeenCalled();
     });
 
     it('aplica todos los cambios de orden en UNA transacción', async () => {

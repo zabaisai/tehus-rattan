@@ -1,4 +1,6 @@
 import { PrismaService } from '../src/prisma/prisma.service';
+import { TenantConfigurationService } from '../src/modules/companies/tenant-configuration.service';
+import { PlatformAuditLogService } from '../src/modules/platform/platform-audit-log.service';
 import { SearchService } from '../src/modules/search/search.service';
 
 // Habla con un Postgres REAL, como `leads-delete.e2e-spec.ts`, porque lo que
@@ -23,7 +25,13 @@ describe('SearchService — aislamiento multiempresa (e2e, base real)', () => {
   beforeAll(async () => {
     prisma = new PrismaService();
     await prisma.$connect();
-    service = new SearchService(prisma);
+    service = new SearchService(
+      prisma,
+      new TenantConfigurationService(
+        prisma,
+        new PlatformAuditLogService(prisma),
+      ),
+    );
 
     const a = await prisma.company.create({
       data: { name: 'E2E Search Co A' },

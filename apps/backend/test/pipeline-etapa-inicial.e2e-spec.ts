@@ -140,7 +140,7 @@ describe('Etapa inicial de un embudo (e2e, base real)', () => {
 
     await expect(
       servicio.removeStage(pipeline.id, segunda.id, empresa),
-    ).rejects.toThrow(/leads activos/i);
+    ).rejects.toThrow(/oportunidad/i);
   });
 
   it('cada embudo tiene su propia etapa de entrada', async () => {

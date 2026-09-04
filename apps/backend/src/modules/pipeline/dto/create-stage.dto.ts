@@ -2,21 +2,26 @@ import {
   IsString,
   IsNotEmpty,
   IsOptional,
-  IsNumber,
   IsInt,
   IsIn,
   Min,
   Max,
   IsBoolean,
+  MaxLength,
 } from 'class-validator';
+import { STAGE_LIMITS } from '../../companies/company-settings';
 
 export class CreateStageDto {
   @IsString()
   @IsNotEmpty({ message: 'El nombre de la etapa es requerido' })
+  @MaxLength(STAGE_LIMITS.maxNameLength, {
+    message: `El nombre de la etapa debe tener como máximo ${STAGE_LIMITS.maxNameLength} caracteres`,
+  })
   name!: string;
 
   @IsOptional()
-  @IsNumber()
+  @IsInt()
+  @Min(0)
   order?: number;
 
   @IsOptional()
