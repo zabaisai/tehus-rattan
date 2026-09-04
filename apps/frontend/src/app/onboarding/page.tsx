@@ -1,52 +1,70 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { getMe } from "@/lib/auth";
 import { useAuthStore } from "@/store/auth.store";
 import { OnboardingProgress } from "@/components/onboarding/OnboardingProgress";
 import { InviteCodeStep } from "@/components/onboarding/steps/InviteCodeStep";
-import { CompanyInfoStep, CompanyInfoState } from "@/components/onboarding/steps/CompanyInfoStep";
-import { IndustryStep, IndustrySelection } from "@/components/onboarding/steps/IndustryStep";
+import { CompanyInfoStep } from "@/components/onboarding/steps/CompanyInfoStep";
+import { RegionStep } from "@/components/onboarding/steps/RegionStep";
+import { SellingModeStep } from "@/components/onboarding/steps/SellingModeStep";
+import { RecommendationStep } from "@/components/onboarding/steps/RecommendationStep";
 import { ModulesStep } from "@/components/onboarding/steps/ModulesStep";
 import { CategoriesStep } from "@/components/onboarding/steps/CategoriesStep";
+import { PipelineStep, validatePipeline } from "@/components/onboarding/steps/PipelineStep";
+import { BrandingStep, EMPTY_BRANDING_COLORS } from "@/components/onboarding/steps/BrandingStep";
+import { AdminStep } from "@/components/onboarding/steps/AdminStep";
+import { AgentsStep } from "@/components/onboarding/steps/AgentsStep";
 import {
-  PipelineStep,
-  PipelineState,
-  validatePipeline,
-} from "@/components/onboarding/steps/PipelineStep";
-import {
-  BrandingStep,
-  BrandingColorState,
-  EMPTY_BRANDING_COLORS,
-} from "@/components/onboarding/steps/BrandingStep";
-import { AdminStep, AdminState } from "@/components/onboarding/steps/AdminStep";
-import { AgentsStep, AgentDraft } from "@/components/onboarding/steps/AgentsStep";
-import { ConfirmationStep } from "@/components/onboarding/steps/ConfirmationStep";
+  ConfirmationStep,
+  type EditableSection,
+} from "@/components/onboarding/steps/ConfirmationStep";
 import { SuccessScreen } from "@/components/onboarding/SuccessScreen";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { Modal } from "@/components/ui/Modal";
 import {
+  checkInvitationCode,
   createCompanyOnboarding,
   validateLogoFile,
-  OnboardingResult,
+  type OnboardingResult,
 } from "@/lib/onboarding";
 import {
-  categorySuggestionsFor,
   DEFAULT_BUSINESS_TYPE_MAX_LENGTH,
   findBusinessType,
   findIndustry,
-  flagsForModel,
   getOnboardingTemplates,
   type BusinessModel,
-  type BusinessTypeTemplate,
   type ModulesTemplate,
   type OnboardingTemplates,
 } from "@/lib/onboarding-templates";
+import { EMPTY_REGION, presetForCountry, type CountryPreset } from "@/lib/onboarding-regions";
+import {
+  buildOnboardingPayload,
+  categorySuggestions,
+  MANUAL_MODULES,
+  NOTHING_EDITED,
+  recommendedBusinessType,
+  recommendedModelFor,
+  suggestionsFrom,
+  type AdminState,
+  type AgentDraft,
+  type BrandingColorState,
+  type CompanyInfoState,
+  type EditedFlags,
+  type PipelineState,
+  type WizardState,
+} from "@/lib/onboarding-wizard";
 import { normalizeCategoryList } from "@/lib/company-settings";
 import { PASSWORD_RULES } from "@/lib/password-policy";
+import {
+  DEFAULT_REGIONAL_LIMITS,
+  validateRegionalDraft,
+  type RegionalDraft,
+  type RegionalDraftErrors,
+} from "@/lib/tenant-configuration";
 
 // Misma política que `IsStrongPassword` en el backend; el mensaje nombra lo
 // que falta para que la persona sepa qué corregir sin adivinar.
@@ -59,7 +77,9 @@ function passwordProblem(password: string): string | null {
 type StepKey =
   | "invite"
   | "company"
-  | "industry"
+  | "region"
+  | "selling"
+  | "recommendation"
   | "modules"
   | "categories"
   | "pipeline"
@@ -71,7 +91,9 @@ type StepKey =
 const STEP_LABELS: Record<StepKey, string> = {
   invite: "Código de invitación",
   company: "Datos de empresa",
-  industry: "Industria y tipo de negocio",
+  region: "Región",
+  selling: "Forma de vender",
+  recommendation: "Recomendación",
   modules: "Módulos",
   categories: "Categorías",
   pipeline: "Pipeline inicial",
@@ -83,8 +105,6 @@ const STEP_LABELS: Record<StepKey, string> = {
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// Sin plantilla todavía (o «Configurar manualmente»): lo mínimo, todo editable.
-const MANUAL_MODULES: ModulesTemplate = { catalog: false, quotes: false, tasks: true };
 const FALLBACK_LIMITS = {
   categories: { maxLength: 60, maxCount: 30 },
   stages: { maxNameLength: 40, maxCount: 20 },
@@ -98,46 +118,45 @@ type ApiError = {
   };
 };
 
-function mapOnboardingError(err: unknown): string {
-  const response = (err as ApiError).response;
-  const status = response?.status;
-  const message = response?.data?.message;
-  const readable = Array.isArray(message) ? message[0] : message;
+function readableMessage(err: unknown): string | undefined {
+  const message = (err as ApiError).response?.data?.message;
+  return Array.isArray(message) ? message[0] : message;
+}
 
+function mapOnboardingError(err: unknown): string {
+  const status = (err as ApiError).response?.status;
+  const readable = readableMessage(err);
   if (status === 403) {
     return "El código de invitación no es válido o el registro no está disponible.";
   }
-  if (status === 409) {
-    return readable || "Ya existe un usuario con ese correo.";
-  }
+  if (status === 409) return readable || "Ya existe un usuario con ese correo.";
   if (status === 400) {
     return readable || "Hay un problema con la información enviada. Revísala e intenta de nuevo.";
   }
   return "No pudimos crear la empresa. Revisa la información e inténtalo nuevamente.";
 }
 
-/** Lo que una plantilla sugiere para las tres secciones editables. */
-function suggestionsFrom(type: BusinessTypeTemplate | undefined): {
-  modules: ModulesTemplate;
-  categories: string[];
-  pipeline: PipelineState;
-} {
-  if (!type) {
-    return {
-      modules: { ...MANUAL_MODULES },
-      categories: [],
-      pipeline: { name: "Ventas", stages: [] },
-    };
+function mapInviteError(err: unknown): string {
+  const status = (err as ApiError).response?.status;
+  if (status === 400 || status === 403) {
+    return readableMessage(err) || "El código de invitación no es válido.";
   }
-  return {
-    modules: { ...type.modules },
-    categories: [...type.categories],
-    pipeline: {
-      name: type.pipeline.name,
-      stages: type.pipeline.stages.map((s) => ({ ...s })),
-    },
-  };
+  if (status === 429) return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
+  return "No pudimos comprobar el código. Revisa tu conexión e inténtalo de nuevo.";
 }
+
+const SECTION_STEP: Record<EditableSection, StepKey> = {
+  company: "company",
+  region: "region",
+  selling: "selling",
+  recommendation: "recommendation",
+  modules: "modules",
+  categories: "categories",
+  pipeline: "pipeline",
+  branding: "branding",
+  admin: "admin",
+  agents: "agents",
+};
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -156,42 +175,46 @@ export default function OnboardingPage() {
   const templatesError = templatesQuery.isError
     ? "No pudimos cargar las opciones de configuración. Revisa tu conexión e inténtalo de nuevo."
     : "";
-  const loadTemplates = () => templatesQuery.refetch();
   const limits = templates?.limits ?? FALLBACK_LIMITS;
-  const businessTypeMaxLength =
-    limits.businessType?.maxLength ?? DEFAULT_BUSINESS_TYPE_MAX_LENGTH;
+  const businessTypeMaxLength = limits.businessType?.maxLength ?? DEFAULT_BUSINESS_TYPE_MAX_LENGTH;
   const coreModules = templates?.coreModules ?? ["conversations", "contacts", "leads", "pipeline"];
 
-  // ── Estado del asistente.
+  // ── Estado del asistente (en memoria: atrás/adelante no pierde nada, un
+  // error del servidor no reinicia, y recargar la página empieza de cero a
+  // propósito: aquí no se guarda ni el código ni ninguna contraseña).
   const [step, setStep] = useState<StepKey>("invite");
   const [stepError, setStepError] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [result, setResult] = useState<OnboardingResult | null>(null);
+  const submittingRef = useRef(false);
+  const alertRef = useRef<HTMLParagraphElement>(null);
+  const headingRef = useRef<HTMLDivElement>(null);
 
   const [inviteCode, setInviteCode] = useState("");
   const [company, setCompany] = useState<CompanyInfoState>({
     name: "",
     city: "",
-    country: "",
     phone: "",
     email: "",
     website: "",
     description: "",
   });
-  const [selection, setSelection] = useState<IndustrySelection>({
-    industry: "generic",
-    businessType: "",
-    businessModel: "mixed",
-    customBusinessType: "",
-  });
+  const [industry, setIndustry] = useState("generic");
+  const [regional, setRegional] = useState<RegionalDraft>({ ...EMPTY_REGION });
+  const [regionErrors, setRegionErrors] = useState<RegionalDraftErrors>({});
+  const [pendingPreset, setPendingPreset] = useState<CountryPreset | null>(null);
+  const [businessModel, setBusinessModel] = useState<BusinessModel>("mixed");
+  const [businessType, setBusinessType] = useState("");
+  const [typeChosen, setTypeChosen] = useState(false);
+  const [customBusinessType, setCustomBusinessType] = useState("");
   const [modules, setModules] = useState<ModulesTemplate>({ ...MANUAL_MODULES });
   const [categories, setCategories] = useState<string[]>([]);
   const [pipeline, setPipeline] = useState<PipelineState>({ name: "Ventas", stages: [] });
-  // «Sugerido» frente a «editado», por sección: lo que decide si un cambio de
-  // plantilla puede reemplazar el contenido en silencio o debe preguntar.
-  const [edited, setEdited] = useState({ modules: false, categories: false, pipeline: false });
-  const [pendingSelection, setPendingSelection] = useState<IndustrySelection | null>(null);
+  // Procedencia por sección: lo que decide si un cambio anterior puede
+  // reemplazar el contenido en silencio o debe preguntar.
+  const [edited, setEdited] = useState<EditedFlags>({ ...NOTHING_EDITED });
+  const [pendingSelection, setPendingSelection] = useState<string | null>(null);
 
   const [colors, setColors] = useState<BrandingColorState>({ ...EMPTY_BRANDING_COLORS });
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -204,17 +227,39 @@ export default function OnboardingPage() {
   });
   const [agents, setAgents] = useState<AgentDraft[]>([]);
 
-  const industry = findIndustry(templates, selection.industry);
-  const businessType = findBusinessType(templates, selection.industry, selection.businessType);
-  const canRestore = Boolean(businessType && !businessType.manual);
-  const categorySuggestions = categorySuggestionsFor(industry, businessType);
+  const industryTemplate = findIndustry(templates, industry);
+  const selectedType = findBusinessType(templates, industry, businessType);
+  const recommendedType = recommendedBusinessType(industryTemplate, businessModel);
+  const canRestore = Boolean(selectedType && !selectedType.manual);
+  // Lo que una plantilla nueva REEMPLAZARÍA: módulos, categorías y etapas. La
+  // forma de vender elegida se conserva siempre, así que no motiva la pregunta.
+  const sectionsEdited = edited.modules || edited.categories || edited.pipeline;
+  const anySectionEdited = sectionsEdited || edited.businessModel;
+
+  const state: WizardState = {
+    company,
+    industry,
+    regional,
+    businessModel,
+    businessType,
+    customBusinessType,
+    modules,
+    categories,
+    pipeline,
+    colors,
+    admin,
+    agents,
+  };
+  const suggestions = categorySuggestions(templates, state);
 
   // Pasos visibles: «Categorías» solo existe cuando hay catálogo.
   const steps = useMemo<StepKey[]>(
     () => [
       "invite",
       "company",
-      "industry",
+      "region",
+      "selling",
+      "recommendation",
       "modules",
       ...(modules.catalog ? (["categories"] as StepKey[]) : []),
       "pipeline",
@@ -228,55 +273,111 @@ export default function OnboardingPage() {
   const stepIndex = Math.max(0, steps.indexOf(step));
   const isLastStep = stepIndex === steps.length - 1;
 
-  // ── Aplicar una plantilla a las secciones (todas o solo las no editadas).
-  function applySelection(next: IndustrySelection, replaceEdited: boolean) {
-    const type = findBusinessType(templates, next.industry, next.businessType);
+  // El error se anuncia y recibe el foco: sin esto, quien navega con teclado
+  // o lector de pantalla pulsa «Siguiente» y no pasa nada visible.
+  useEffect(() => {
+    if (stepError || submitError) alertRef.current?.focus();
+  }, [stepError, submitError]);
+
+  // Al cambiar de paso, el foco va al encabezado del paso nuevo.
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, [step]);
+
+  // ── Recomendaciones y protección de ediciones ────────────────────────────
+
+  function applySelection(typeKey: string, replaceEdited: boolean) {
+    const type = findBusinessType(templates, industry, typeKey);
     const s = suggestionsFrom(type);
-    const model: BusinessModel = type ? type.businessModel : next.businessModel;
-    // La descripción manual solo tiene sentido con «Otro»: al pasar a una
-    // plantilla normal se descarta, así nunca viaja un texto contradictorio.
-    setSelection({
-      ...next,
-      businessModel: model,
-      customBusinessType: type?.manual ? next.customBusinessType : "",
-    });
+    setBusinessType(typeKey);
+    if (!type?.manual) setCustomBusinessType("");
+    if (type && (replaceEdited || !edited.businessModel)) setBusinessModel(type.businessModel);
     if (replaceEdited || !edited.modules) setModules(s.modules);
     if (replaceEdited || !edited.categories) setCategories(s.categories);
     if (replaceEdited || !edited.pipeline) setPipeline(s.pipeline);
-    if (replaceEdited) setEdited({ modules: false, categories: false, pipeline: false });
+    if (replaceEdited) setEdited((e) => ({ ...NOTHING_EDITED, regional: e.regional }));
   }
 
-  function requestSelection(next: IndustrySelection) {
+  function requestSelection(typeKey: string) {
     setStepError("");
-    const anyEdited = edited.modules || edited.categories || edited.pipeline;
-    if (anyEdited) {
+    if (sectionsEdited) {
       // No se reemplaza en silencio lo que la persona ya cambió.
-      setPendingSelection(next);
+      setPendingSelection(typeKey);
       return;
     }
-    applySelection(next, true);
+    applySelection(typeKey, true);
   }
 
-  function handleIndustryChange(industryKey: string) {
-    const first = findIndustry(templates, industryKey)?.businessTypes[0];
-    requestSelection({
-      industry: industryKey,
-      businessType: first?.key ?? "",
-      businessModel: first?.businessModel ?? selection.businessModel,
-      customBusinessType: selection.customBusinessType,
-    });
+  function handleIndustryChange(nextIndustry: string) {
+    const nextTemplate = findIndustry(templates, nextIndustry);
+    setIndustry(nextIndustry);
+    setTypeChosen(false);
+    const model = edited.businessModel ? businessModel : recommendedModelFor(nextTemplate);
+    if (!edited.businessModel) setBusinessModel(model);
+    const rec = recommendedBusinessType(nextTemplate, model);
+    if (rec) requestSelectionFor(nextIndustry, rec.key);
+    else setBusinessType("");
   }
 
-  function handleBusinessTypeChange(typeKey: string) {
-    requestSelection({ ...selection, businessType: typeKey });
+  // Igual que requestSelection pero para una industria recién elegida (el
+  // estado `industry` aún no está actualizado en este render).
+  function requestSelectionFor(industryKey: string, typeKey: string) {
+    const type = findBusinessType(templates, industryKey, typeKey);
+    if (sectionsEdited) {
+      setPendingSelection(typeKey);
+      return;
+    }
+    const s = suggestionsFrom(type);
+    setBusinessType(typeKey);
+    setCustomBusinessType("");
+    if (type && !edited.businessModel) setBusinessModel(type.businessModel);
+    setModules(s.modules);
+    setCategories(s.categories);
+    setPipeline(s.pipeline);
+    setEdited((e) => ({ ...NOTHING_EDITED, regional: e.regional }));
   }
 
-  function handleCustomBusinessTypeChange(text: string) {
-    setSelection((prev) => ({ ...prev, customBusinessType: text }));
+  function handleModelChange(model: BusinessModel) {
+    setBusinessModel(model);
+    setEdited((e) => ({ ...e, businessModel: true }));
+    setStepError("");
+    // Si la persona aún no eligió plantilla, la recomendación sigue a su
+    // forma de vender.
+    if (!typeChosen) {
+      const rec = recommendedBusinessType(industryTemplate, model);
+      if (rec && rec.key !== businessType) {
+        if (edited.modules || edited.categories || edited.pipeline) setPendingSelection(rec.key);
+        else applySelectionKeepingModel(rec.key, model);
+      }
+    }
+  }
+
+  function applySelectionKeepingModel(typeKey: string, model: BusinessModel) {
+    const type = findBusinessType(templates, industry, typeKey);
+    const s = suggestionsFrom(type);
+    setBusinessType(typeKey);
+    if (!type?.manual) setCustomBusinessType("");
+    setBusinessModel(model);
+    setModules(s.modules);
+    setCategories(s.categories);
+    setPipeline(s.pipeline);
+    setEdited((e) => ({ ...NOTHING_EDITED, regional: e.regional, businessModel: true }));
+  }
+
+  function handleSelectType(typeKey: string) {
+    setTypeChosen(true);
+    requestSelection(typeKey);
+  }
+
+  function resetAll() {
+    const key = businessType || recommendedType?.key;
+    if (!key) return;
+    setTypeChosen(false);
+    applySelection(key, true);
   }
 
   function restore(section: "modules" | "categories" | "pipeline") {
-    const s = suggestionsFrom(businessType);
+    const s = suggestionsFrom(selectedType);
     if (section === "modules") setModules(s.modules);
     if (section === "categories") setCategories(s.categories);
     if (section === "pipeline") setPipeline(s.pipeline);
@@ -305,6 +406,36 @@ export default function OnboardingPage() {
     setAdmin((prev) => ({ ...prev, ...patch }));
   }
 
+  // ── Región: el país propone; lo editado a mano no se pisa en silencio.
+  function handleCountryChange(country: string, preset: CountryPreset | undefined) {
+    setStepError("");
+    setRegionErrors((e) => ({ ...e, country: undefined }));
+    if (!preset) {
+      setRegional((r) => ({ ...r, country }));
+      return;
+    }
+    if (edited.regional) {
+      setRegional((r) => ({ ...r, country: preset.name }));
+      setPendingPreset(preset);
+      return;
+    }
+    setPendingPreset(null);
+    setRegional({ country: preset.name, timezone: preset.timezone, currency: preset.currency, locale: preset.locale });
+  }
+  function handleRegionalField(field: Exclude<keyof RegionalDraft, "country">, value: string) {
+    setRegional((r) => ({ ...r, [field]: value }));
+    setEdited((e) => ({ ...e, regional: true }));
+    setRegionErrors((e) => ({ ...e, [field]: undefined }));
+  }
+  function applyPreset(preset: CountryPreset) {
+    setRegional({ country: preset.name, timezone: preset.timezone, currency: preset.currency, locale: preset.locale });
+    setEdited((e) => ({ ...e, regional: false }));
+    setRegionErrors({});
+    setPendingPreset(null);
+  }
+
+  // ── Validación por paso ─────────────────────────────────────────────────
+
   function validateCurrentStep(): string | null {
     switch (step) {
       case "invite":
@@ -312,19 +443,34 @@ export default function OnboardingPage() {
         return null;
       case "company":
         if (!company.name.trim()) return "El nombre de la empresa es requerido.";
-        return null;
-      case "industry":
         if (!templates) return "Espera a que carguen las opciones o reintenta.";
-        if (!industry) return "Elige una industria.";
-        if (!businessType) return "Elige un tipo de negocio (o «Otro / Configurar manualmente»).";
-        if (businessType.manual) {
-          const text = selection.customBusinessType.replace(/\s+/g, " ").trim();
+        if (!industryTemplate) return "Elige una industria.";
+        return null;
+      case "region": {
+        if (!regional.country.trim()) {
+          setRegionErrors({ country: "Elige o escribe el país." });
+          return "Elige el país donde opera tu empresa.";
+        }
+        const errors = validateRegionalDraft(regional, DEFAULT_REGIONAL_LIMITS);
+        setRegionErrors(errors);
+        if (Object.keys(errors).length > 0) return "Revisa los campos de región marcados.";
+        return null;
+      }
+      case "selling":
+        return null;
+      case "recommendation": {
+        if (!templates) return "Espera a que carguen las opciones o reintenta.";
+        const current = selectedType ?? recommendedType;
+        if (!current) return "Elige una plantilla (o «Configurar manualmente»).";
+        if (current.manual) {
+          const text = customBusinessType.replace(/\s+/g, " ").trim();
           if (!text) return "Describe tu tipo de negocio para continuar con la configuración manual.";
           if (text.length > businessTypeMaxLength) {
             return `La descripción del tipo de negocio debe tener como máximo ${businessTypeMaxLength} caracteres.`;
           }
         }
         return null;
+      }
       case "modules":
         return null;
       case "categories": {
@@ -360,18 +506,12 @@ export default function OnboardingPage() {
             return "Completa nombre, email y contraseña de cada asesor, o elimínalo.";
           }
           const email = agent.email.trim().toLowerCase();
-          if (!EMAIL_REGEX.test(email)) {
-            return `El email de "${agent.name || "un asesor"}" no es válido.`;
-          }
-          if (seen.has(email)) {
-            return `El email "${agent.email.trim()}" está repetido.`;
-          }
+          if (!EMAIL_REGEX.test(email)) return `El email de "${agent.name || "un asesor"}" no es válido.`;
+          if (seen.has(email)) return `El email "${agent.email.trim()}" está repetido.`;
           seen.add(email);
-          {
-            const problem = passwordProblem(agent.password);
-            if (problem) {
-              return `Asesor ${agents.indexOf(agent) + 1} (${agent.name.trim() || "sin nombre"}): ${problem}`;
-            }
+          const problem = passwordProblem(agent.password);
+          if (problem) {
+            return `Asesor ${agents.indexOf(agent) + 1} (${agent.name.trim() || "sin nombre"}): ${problem}`;
           }
         }
         return null;
@@ -381,13 +521,40 @@ export default function OnboardingPage() {
     }
   }
 
-  function goNext() {
+  async function goNext() {
     const error = validateCurrentStep();
     if (error) {
       setStepError(error);
       return;
     }
     setStepError("");
+
+    if (step === "invite") {
+      // Se comprueba SIN consumir: un código malo se descubre aquí y no tras
+      // rellenar todo el asistente. Nunca viaja en la URL ni se guarda.
+      setBusy(true);
+      try {
+        await checkInvitationCode(inviteCode.trim());
+      } catch (err) {
+        setStepError(mapInviteError(err));
+        return;
+      } finally {
+        setBusy(false);
+      }
+    }
+
+    if (step === "region" && !edited.businessModel) {
+      // La forma de vender arranca con lo que la industria suele hacer; si la
+      // persona no la tocó, no hay nada que proteger.
+      setBusinessModel(recommendedModelFor(industryTemplate));
+    }
+
+    if (step === "selling" && !typeChosen && recommendedType && recommendedType.key !== businessType) {
+      // Entrar a la recomendación: la plantilla recomendada se aplica a las
+      // secciones que la persona aún no ha tocado.
+      applySelection(recommendedType.key, false);
+    }
+
     setStep(steps[Math.min(stepIndex + 1, steps.length - 1)]);
   }
 
@@ -396,94 +563,60 @@ export default function OnboardingPage() {
     setStep(steps[Math.max(stepIndex - 1, 0)]);
   }
 
+  function goToSection(section: EditableSection) {
+    setStepError("");
+    setSubmitError("");
+    setStep(SECTION_STEP[section]);
+  }
+
+  const payload = useMemo(
+    () => buildOnboardingPayload(state, templates, limits),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [company, industry, regional, businessModel, businessType, customBusinessType, modules, categories, pipeline, colors, admin, agents, templates, limits],
+  );
+
   async function handleSubmit() {
+    // Guarda de reentrada además del botón deshabilitado: dos clics seguidos
+    // o Enter repetido no pueden mandar dos peticiones.
+    if (submittingRef.current) return;
     const error = validateCurrentStep();
     if (error) {
       setStepError(error);
       return;
     }
-
-    setSubmitting(true);
+    submittingRef.current = true;
+    setBusy(true);
     setSubmitError("");
     try {
-      const { categories: cleanCategories } = normalizeCategoryList(
-        categories,
-        limits.categories,
-      );
-      const payload = {
-        company: {
-          name: company.name.trim(),
-          // Solo con «Otro / Configurar manualmente» viaja un texto; con una
-          // plantilla normal el backend guarda el nombre canónico de la plantilla.
-          businessType: businessType?.manual
-            ? selection.customBusinessType.replace(/\s+/g, " ").trim() || undefined
-            : undefined,
-          city: company.city.trim() || undefined,
-          country: company.country.trim() || undefined,
-          phone: company.phone.trim() || undefined,
-          email: company.email.trim() || undefined,
-          website: company.website.trim() || undefined,
-          description: company.description.trim() || undefined,
-        },
-        // Solo se envía lo que la empresa eligió; vacío = apariencia TAKTO.
-        branding: {
-          primaryColor: colors.primaryColor.trim() || undefined,
-          accentColor: colors.accentColor.trim() || undefined,
-          backgroundColor: colors.backgroundColor.trim() || undefined,
-        },
-        commercial: {
-          ...flagsForModel(selection.businessModel),
-          usesCatalog: modules.catalog,
-          usesQuotes: modules.quotes,
-          usesTasks: modules.tasks,
-          categories: modules.catalog ? cleanCategories : [],
-          industry: selection.industry,
-          businessType: selection.businessType,
-          businessModel: selection.businessModel,
-        },
-        pipeline: {
-          name: pipeline.name.trim(),
-          typedStages: pipeline.stages.map((s) => ({
-            name: s.name.replace(/\s+/g, " ").trim(),
-            type: s.type,
-          })),
-          templateKey: selection.businessType,
-        },
-        admin: {
-          name: admin.name.trim(),
-          email: admin.email.trim(),
-          password: admin.password,
-        },
-        agents: agents.map((agent) => ({
-          name: agent.name.trim(),
-          email: agent.email.trim(),
-          password: agent.password,
-          role: "AGENT" as const,
-        })),
-      };
-
       const response = await createCompanyOnboarding(
         payload,
         { logo: logoFile ?? undefined, secondaryLogo: secondaryLogoFile ?? undefined },
-        inviteCode,
+        inviteCode.trim(),
       );
 
       if (response.token && response.user) {
-        // Same two-step pattern as the normal login: the onboarding response
-        // only carries id/email/name, so backfill role/companyId via
-        // /auth/me before sending the new admin into the dashboard.
         setSession(response.user, response.token);
-        const fullUser = await getMe();
-        setUser(fullUser);
-        router.push("/dashboard");
-        return;
+        try {
+          // Igual que el login: el resultado solo trae id/email/name; el rol
+          // y la empresa se completan con /auth/me antes de entrar.
+          const fullUser = await getMe();
+          setUser(fullUser);
+          router.push("/dashboard");
+          return;
+        } catch {
+          // La empresa YA existe: no se muestra un error de creación falso;
+          // se ofrece iniciar sesión.
+          setResult(response);
+          return;
+        }
       }
-
       setResult(response);
     } catch (err) {
+      // El estado del asistente se conserva tal cual para corregir y reintentar.
       setSubmitError(mapOnboardingError(err));
     } finally {
-      setSubmitting(false);
+      submittingRef.current = false;
+      setBusy(false);
     }
   }
 
@@ -498,9 +631,7 @@ export default function OnboardingPage() {
     );
   }
 
-  const pendingType = pendingSelection
-    ? findBusinessType(templates, pendingSelection.industry, pendingSelection.businessType)
-    : undefined;
+  const pendingType = pendingSelection ? findBusinessType(templates, industry, pendingSelection) : undefined;
 
   return (
     // El alta de una empresa ocurre ANTES de que exista esa empresa: aquí no
@@ -508,24 +639,63 @@ export default function OnboardingPage() {
     <div className="flex min-h-screen flex-1 flex-col bg-neutral-50 lg:flex-row">
       <OnboardingProgress current={stepIndex} labels={steps.map((k) => STEP_LABELS[k])} />
 
-      <div className="flex flex-1 items-start justify-center px-4 py-8 sm:px-8">
+      <div className="flex flex-1 items-start justify-center px-4 py-6 sm:px-8 sm:py-8">
         <Card padding="lg" className="w-full max-w-xl">
+          <div ref={headingRef} tabIndex={-1} className="outline-none" aria-live="polite">
+            <p className="text-xs font-medium uppercase tracking-wide text-content-secondary">
+              Paso {stepIndex + 1} de {steps.length}
+            </p>
+          </div>
+
           {step === "invite" && <InviteCodeStep value={inviteCode} onChange={setInviteCode} />}
-          {step === "company" && <CompanyInfoStep value={company} onChange={patchCompany} />}
-          {step === "industry" && (
-            <IndustryStep
+          {step === "company" && (
+            <CompanyInfoStep
+              value={company}
+              onChange={patchCompany}
               templates={templates}
-              loading={templatesLoading}
-              loadError={templatesError}
-              onRetry={() => void loadTemplates()}
-              value={selection}
-              businessTypeMaxLength={businessTypeMaxLength}
+              templatesLoading={templatesLoading}
+              templatesError={templatesError}
+              onRetryTemplates={() => void templatesQuery.refetch()}
+              industry={industry}
               onIndustryChange={handleIndustryChange}
-              onBusinessTypeChange={handleBusinessTypeChange}
-              onCustomBusinessTypeChange={handleCustomBusinessTypeChange}
-              onBusinessModelChange={(businessModel) =>
-                setSelection((prev) => ({ ...prev, businessModel }))
-              }
+            />
+          )}
+          {step === "region" && (
+            <RegionStep
+              value={regional}
+              errors={regionErrors}
+              limits={DEFAULT_REGIONAL_LIMITS}
+              edited={edited.regional}
+              onCountryChange={handleCountryChange}
+              onFieldChange={handleRegionalField}
+              onApplyPreset={() => {
+                const preset = presetForCountry(regional.country);
+                if (preset) applyPreset(preset);
+              }}
+              pendingPreset={pendingPreset}
+              onKeepMine={() => setPendingPreset(null)}
+              onApplyPending={() => pendingPreset && applyPreset(pendingPreset)}
+            />
+          )}
+          {step === "selling" && (
+            <SellingModeStep
+              value={businessModel}
+              recommended={recommendedModelFor(industryTemplate)}
+              onChange={handleModelChange}
+            />
+          )}
+          {step === "recommendation" && (
+            <RecommendationStep
+              industry={industryTemplate}
+              selected={selectedType}
+              recommended={recommendedType}
+              model={businessModel}
+              customBusinessType={customBusinessType}
+              businessTypeMaxLength={businessTypeMaxLength}
+              anyEdited={anySectionEdited}
+              onSelectType={handleSelectType}
+              onCustomBusinessTypeChange={setCustomBusinessType}
+              onResetAll={resetAll}
             />
           )}
           {step === "modules" && (
@@ -542,7 +712,7 @@ export default function OnboardingPage() {
             <CategoriesStep
               value={categories}
               onChange={changeCategories}
-              suggestions={categorySuggestions}
+              suggestions={suggestions}
               limits={limits.categories}
               edited={edited.categories}
               canRestore={canRestore}
@@ -573,59 +743,40 @@ export default function OnboardingPage() {
           {step === "agents" && <AgentsStep value={agents} onChange={setAgents} />}
           {step === "confirm" && (
             <ConfirmationStep
-              companyName={company.name}
-              businessTypeLabel={
-                businessType?.manual ? selection.customBusinessType.trim() : ""
-              }
-              city={company.city}
-              country={company.country}
-              industryName={industry?.name ?? ""}
-              businessTypeName={businessType?.name ?? ""}
-              selection={selection}
+              payload={payload}
+              templates={templates}
               coreModules={coreModules}
-              modules={modules}
-              categories={categories}
-              pipeline={pipeline}
               hasLogo={!!logoFile}
               hasSecondaryLogo={!!secondaryLogoFile}
-              primaryColor={colors.primaryColor}
-              accentColor={colors.accentColor}
-              adminName={admin.name}
-              adminEmail={admin.email}
-              agentsCount={agents.length}
+              onEdit={goToSection}
             />
           )}
 
-          {/* `role="alert"`: el error aparece al intentar avanzar, y sin esto
-              un lector de pantalla no lo menciona nunca. */}
-          {stepError && (
-            <p role="alert" className="mt-4 text-sm text-status-error">
-              {stepError}
-            </p>
-          )}
-          {submitError && (
-            <p role="alert" className="mt-4 text-sm text-status-error">
-              {submitError}
+          {/* `role="alert"` y foco: el error aparece al intentar avanzar y se
+              anuncia; el foco va al mensaje para que no pase inadvertido. */}
+          {(stepError || submitError) && (
+            <p
+              ref={alertRef}
+              tabIndex={-1}
+              role="alert"
+              className="mt-4 rounded-md border border-status-error/30 bg-status-error-surface px-3 py-2 text-sm text-status-error outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
+            >
+              {stepError || submitError}
             </p>
           )}
 
-          <div className="mt-8 flex items-center justify-between border-t border-line-default pt-5">
-            <Button
-              variant="quiet"
-              onClick={goBack}
-              disabled={stepIndex === 0 || submitting}
-              className="px-4 py-2"
-            >
+          <div className="mt-8 flex items-center justify-between gap-3 border-t border-line-default pt-5">
+            <Button variant="quiet" onClick={goBack} disabled={stepIndex === 0 || busy} className="px-4 py-2">
               Atrás
             </Button>
 
             {isLastStep ? (
-              <Button onClick={handleSubmit} disabled={submitting} className="px-6 py-2.5">
-                {submitting ? "Creando empresa..." : "Crear empresa"}
+              <Button onClick={() => void handleSubmit()} disabled={busy} className="px-6 py-2.5">
+                {busy ? "Creando empresa..." : "Crear empresa"}
               </Button>
             ) : (
-              <Button onClick={goNext} className="px-6 py-2.5">
-                Siguiente
+              <Button onClick={() => void goNext()} disabled={busy} className="px-6 py-2.5">
+                {busy && step === "invite" ? "Comprobando..." : "Siguiente"}
               </Button>
             )}
           </div>
@@ -633,28 +784,40 @@ export default function OnboardingPage() {
       </div>
 
       {pendingSelection && (
-        <ConfirmDialog
-          title="¿Reemplazar tus cambios?"
-          message={
-            <p>
-              Ya personalizaste módulos, categorías o etapas. Si aplicas las sugerencias de
-              {" "}
-              <strong>{pendingType?.name ?? "la nueva plantilla"}</strong>, esos cambios se
-              reemplazarán. Si prefieres conservarlos, solo se actualizará lo que no hayas
-              editado.
-            </p>
-          }
-          confirmLabel="Aplicar sugerencias"
-          confirmVariant="primary"
+        <Modal
+          title="¿Aplicar las nuevas recomendaciones?"
           onClose={() => {
             applySelection(pendingSelection, false);
             setPendingSelection(null);
           }}
-          onConfirm={async () => {
-            applySelection(pendingSelection, true);
-            setPendingSelection(null);
-          }}
-        />
+          maxWidth="sm"
+          stackedZIndex
+        >
+          <p className="text-sm text-content-secondary">
+            Ya personalizaste tu forma de vender, módulos, categorías o etapas. Con la plantilla{" "}
+            <strong>{pendingType?.name ?? "elegida"}</strong> puedes conservar esos cambios (solo se
+            actualizará lo que no hayas editado) o reemplazarlos por las nuevas recomendaciones.
+          </p>
+          <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="secondary"
+              onClick={() => {
+                applySelection(pendingSelection, false);
+                setPendingSelection(null);
+              }}
+            >
+              Conservar mis cambios
+            </Button>
+            <Button
+              onClick={() => {
+                applySelection(pendingSelection, true);
+                setPendingSelection(null);
+              }}
+            >
+              Aplicar las nuevas recomendaciones
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );

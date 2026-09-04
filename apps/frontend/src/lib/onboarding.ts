@@ -7,6 +7,10 @@ export interface OnboardingCompanyInfo {
   businessType?: string;
   city?: string;
   country?: string;
+  /** Fase 3: región (mismas reglas que Configuración → Empresa). */
+  timezone?: string;
+  currency?: string;
+  locale?: string;
   phone?: string;
   email?: string;
   website?: string;
@@ -117,6 +121,20 @@ export interface OnboardingResult {
   // in which case the wizard falls back to the "go to /login" screen.
   token?: string;
   user?: AuthResponse['user'];
+}
+
+/**
+ * Comprueba el código ANTES de rellenar el asistente, sin consumirlo. Viaja
+ * solo en el header; el servidor responde 400 con el motivo (inválido,
+ * vencido, revocado, usado).
+ */
+export async function checkInvitationCode(inviteCode: string): Promise<{ valid: true }> {
+  const { data } = await api.post<{ valid: true }>(
+    '/onboarding/invitation/check',
+    {},
+    { headers: { 'X-Onboarding-Invite-Code': inviteCode } },
+  );
+  return data;
 }
 
 // The invite code travels only in the X-Onboarding-Invite-Code header, never

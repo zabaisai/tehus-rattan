@@ -257,13 +257,12 @@ export function validateRegionalDraft(
     !TIMEZONE_PATTERN.test(timezone)
   ) {
     errors.timezone = 'Usa un identificador IANA, por ejemplo America/Bogota.';
-  } else {
-    const known = supportedValues('timeZone');
-    if (
-      known &&
-      timezone !== 'UTC' &&
-      ![...known].some((z) => z.toLowerCase() === timezone.toLowerCase())
-    ) {
+  } else if (timezone !== 'UTC') {
+    // Igual que el servidor: lo que `Intl` resuelve vale, incluidos los alias
+    // (America/Argentina/Buenos_Aires) que no salen en `supportedValuesOf`.
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: timezone });
+    } catch {
       errors.timezone = 'Esa zona horaria no se reconoce.';
     }
   }

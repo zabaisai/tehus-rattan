@@ -51,6 +51,11 @@ export default function LoginPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setResetNotice('Contraseña actualizada correctamente. Ya puedes iniciar sesión.');
       window.history.replaceState(null, '', '/login');
+    } else if (params.get('created') === '1') {
+      // El onboarding llega aquí cuando la empresa se creó pero no pudo abrir
+      // sesión sola: la persona debe saber que sí se creó.
+      setResetNotice('Tu empresa se creó correctamente. Inicia sesión con el correo del administrador.');
+      window.history.replaceState(null, '', '/login');
     }
   }, []);
 

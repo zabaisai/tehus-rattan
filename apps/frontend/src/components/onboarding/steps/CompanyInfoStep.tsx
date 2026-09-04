@@ -1,34 +1,48 @@
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { Textarea } from "@/components/ui/Textarea";
+import type { OnboardingTemplates } from "@/lib/onboarding-templates";
+import type { CompanyInfoState } from "@/lib/onboarding-wizard";
 
-// El tipo de negocio NO va aquí: se elige una sola vez en `IndustryStep`
-// (plantilla o descripción manual). Dos campos para el mismo dato acababan
-// guardando valores contradictorios.
-export interface CompanyInfoState {
-  name: string;
-  city: string;
-  country: string;
-  phone: string;
-  email: string;
-  website: string;
-  description: string;
-}
+export type { CompanyInfoState };
 
 interface CompanyInfoStepProps {
   value: CompanyInfoState;
   onChange: (patch: Partial<CompanyInfoState>) => void;
+  /** Industria: primera respuesta que orienta todas las recomendaciones. */
+  templates: OnboardingTemplates | null;
+  templatesLoading: boolean;
+  templatesError: string;
+  onRetryTemplates: () => void;
+  industry: string;
+  onIndustryChange: (industry: string) => void;
 }
 
-export function CompanyInfoStep({ value, onChange }: CompanyInfoStepProps) {
+/**
+ * Nombre, industria y datos informativos. El país, la zona horaria, la
+ * moneda y el idioma van en el paso «Región»; el tipo de negocio se elige en
+ * «Recomendación» (plantilla o descripción manual). Aquí no se guarda nada:
+ * todo viaja junto al final.
+ */
+export function CompanyInfoStep({
+  value,
+  onChange,
+  templates,
+  templatesLoading,
+  templatesError,
+  onRetryTemplates,
+  industry,
+  onIndustryChange,
+}: CompanyInfoStepProps) {
+  const industryTemplate = templates?.industries.find((i) => i.key === industry);
+
   return (
     <div>
-      <h3 className="text-lg font-semibold text-content-primary">
-        Datos de tu empresa
-      </h3>
+      <h3 className="text-lg font-semibold text-content-primary">Datos de tu empresa</h3>
       <p className="mt-1.5 text-sm text-content-secondary">
-        Estos datos son informativos. No son datos legales, fiscales ni de
-        facturación.
+        Con el nombre y la industria preparamos una configuración inicial que podrás cambiar.
+        Los demás datos son informativos: no son datos legales, fiscales ni de facturación.
       </p>
 
       <div className="mt-6 space-y-4">
@@ -41,6 +55,42 @@ export function CompanyInfoStep({ value, onChange }: CompanyInfoStepProps) {
             placeholder="Nombre de tu empresa"
           />
         </Field>
+
+        {templatesLoading && (
+          <p role="status" className="text-sm text-content-secondary">
+            Cargando industrias…
+          </p>
+        )}
+        {!templatesLoading && templatesError && (
+          <div
+            role="alert"
+            className="rounded-md border border-status-error/30 bg-status-error-surface px-3 py-2 text-sm text-status-error"
+          >
+            <p>{templatesError}</p>
+            <button
+              type="button"
+              onClick={onRetryTemplates}
+              className="mt-2 rounded text-sm font-medium underline outline-none focus-visible:ring-2 focus-visible:ring-line-focus"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+        {!templatesLoading && templates && (
+          <Field
+            label="Industria"
+            required
+            hint={industryTemplate?.description ?? "Elige la que más se parezca a tu negocio."}
+          >
+            <Select required value={industry} onChange={(e) => onIndustryChange(e.target.value)}>
+              {templates.industries.map((i) => (
+                <option key={i.key} value={i.key}>
+                  {i.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Teléfono comercial">
@@ -57,16 +107,7 @@ export function CompanyInfoStep({ value, onChange }: CompanyInfoStepProps) {
               type="text"
               value={value.city}
               onChange={(e) => onChange({ city: e.target.value })}
-              placeholder="Medellín"
-            />
-          </Field>
-
-          <Field label="País">
-            <Input
-              type="text"
-              value={value.country}
-              onChange={(e) => onChange({ country: e.target.value })}
-              placeholder="Colombia"
+              placeholder="Ciudad"
             />
           </Field>
 
