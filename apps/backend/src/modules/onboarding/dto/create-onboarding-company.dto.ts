@@ -20,6 +20,7 @@ import {
   CATEGORY_LIMITS,
   STAGE_LIMITS,
 } from '../../companies/company-settings';
+import { REGIONAL_LIMITS } from '../../companies/tenant-configuration';
 import {
   BUSINESS_MODELS,
   INDUSTRY_KEYS,
@@ -48,7 +49,29 @@ export class OnboardingCompanyInfoDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(REGIONAL_LIMITS.country.maxLength, {
+    message: `El país debe tener como máximo ${REGIONAL_LIMITS.country.maxLength} caracteres`,
+  })
   country?: string;
+
+  // ── Región (Fase 3). Opcionales para no romper a clientes anteriores (sin
+  // ellos la empresa nace con los defaults de columna). Cuando llegan, el
+  // servicio los valida con los MISMOS normalizadores de la Fase 2
+  // (IANA, ISO 4217, BCP 47) y los persiste en las columnas de Company.
+  @IsOptional()
+  @IsString()
+  @MaxLength(REGIONAL_LIMITS.timezone.maxLength)
+  timezone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(REGIONAL_LIMITS.currency.length)
+  currency?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(REGIONAL_LIMITS.locale.maxLength)
+  locale?: string;
 
   @IsOptional()
   @IsString()

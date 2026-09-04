@@ -41,6 +41,25 @@ export class OnboardingController {
   // executes before FileFieldsInterceptor/multer has parsed the multipart
   // body — body.inviteCode (and any "data" field content) isn't available
   // yet at that point for a multipart request.
+  // Paso 1 del asistente (Fase 3): comprueba el código ANTES de rellenar
+  // nueve pantallas, sin consumirlo. Mismo header, misma guardia y mismo
+  // límite por IP que la creación; solo lectura. La respuesta no lleva más
+  // que la validez: ni preview, ni empresa prevista, ni fechas.
+  @Throttle({
+    default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding },
+  })
+  @UseGuards(OnboardingInviteGuard)
+  @Post('invitation/check')
+  checkInvitation(@Req() req: ExpressRequest, @Body() body: unknown) {
+    const fromBody =
+      body && typeof body === 'object'
+        ? (body as Record<string, unknown>).inviteCode
+        : undefined;
+    return this.onboardingService.checkInvitation(
+      req.headers?.['x-onboarding-invite-code'] ?? fromBody,
+    );
+  }
+
   @Throttle({
     default: { ttl: THROTTLE_TTL_MS, limit: THROTTLE_LIMITS.onboarding },
   })

@@ -100,6 +100,8 @@ describe('OnboardingService', () => {
         ),
         deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
+      loginEvent: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      userSession: { deleteMany: jest.fn().mockResolvedValue({ count: 0 }) },
       invitationCode: {
         findUnique: jest.fn().mockResolvedValue({
           id: 'invitation-1',
@@ -326,8 +328,9 @@ describe('OnboardingService', () => {
               vertical: {
                 industry: 'furniture_decor',
                 businessType: 'showroom',
-                businessModel: 'products',
-                templateVersion: 2,
+                // v3: la tienda/showroom vende muebles E instalación.
+                businessModel: 'mixed',
+                templateVersion: 3,
               },
               pipelineDefaults: { templateKey: 'showroom', stagesTyped: true },
             }),
@@ -953,6 +956,8 @@ describe('OnboardingService', () => {
 
       expect(prisma.pipelineStage.deleteMany).toHaveBeenCalled();
       expect(prisma.pipeline.delete).toHaveBeenCalled();
+      expect(prisma.loginEvent.deleteMany).toHaveBeenCalled();
+      expect(prisma.userSession.deleteMany).toHaveBeenCalled();
       expect(prisma.user.deleteMany).toHaveBeenCalled();
       expect(prisma.company.delete).toHaveBeenCalled();
       // A logo failure means the company is rolled back — no session should
@@ -965,6 +970,183 @@ describe('OnboardingService', () => {
           data: expect.objectContaining({ status: 'ACTIVE' }),
         }),
       );
+    });
+  });
+
+  describe('región y comprobación de invitación (Fase 3)', () => {
+    it('persiste país, zona, moneda e idioma normalizados en las columnas de Company (mismas reglas que la Fase 2)', async () => {
+      const dto = buildDto({
+        company: {
+          name: 'Clínica QA',
+          country: '  Costa  Rica ',
+          timezone: 'america/costa_rica',
+          currency: 'crc',
+          locale: 'es-cr',
+        },
+      });
+      await service.createCompany(
+        dto,
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+      expect(prisma.company.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            country: 'Costa Rica',
+            timezone: 'America/Costa_Rica',
+            currency: 'CRC',
+            locale: 'es-CR',
+          }),
+        }),
+      );
+      // Nada de región va al JSON de settings.
+      const data = prisma.company.create.mock.calls[0][0].data;
+      expect(JSON.stringify(data.settings)).not.toMatch(/Costa_Rica|CRC|es-CR/);
+    });
+
+    it('sin región (cliente anterior) no escribe zona, moneda ni idioma: mandan los defaults de columna', async () => {
+      await service.createCompany(
+        buildDto(),
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+      const data = prisma.company.create.mock.calls[0][0].data;
+      expect('timezone' in data).toBe(false);
+      expect('currency' in data).toBe(false);
+      expect('locale' in data).toBe(false);
+    });
+
+    it.each([
+      ['zona inválida', { timezone: 'Costa_Rica' }],
+      ['moneda inválida', { currency: 'COLONES' }],
+      ['idioma inválido', { locale: 'castellano' }],
+      ['país demasiado largo', { country: 'x'.repeat(81) }],
+    ])(
+      'rechaza %s con 400 ANTES de abrir la transacción o consumir el código',
+      async (_n, patch) => {
+        const dto = buildDto({ company: { name: 'X', ...patch } });
+        await expect(
+          service.createCompany(
+            dto,
+            undefined,
+            VALID_INVITE_CODE,
+            FAKE_CONTEXT,
+          ),
+        ).rejects.toBeInstanceOf(BadRequestException);
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+        expect(prisma.invitationCode.updateMany).not.toHaveBeenCalled();
+        expect(prisma.company.create).not.toHaveBeenCalled();
+      },
+    );
+
+    it('la auditoría registra plantilla, versión, módulos, región y conteos; nunca contraseñas ni el código completo', async () => {
+      const dto = buildDto({
+        company: {
+          name: 'Vet QA',
+          timezone: 'America/Costa_Rica',
+          currency: 'CRC',
+          locale: 'es-CR',
+        },
+        commercial: {
+          sellsProducts: true,
+          sellsServices: true,
+          usesCatalog: true,
+          usesQuotes: false,
+          usesTasks: true,
+          categories: ['Consultas', 'Vacunas'],
+          industry: 'veterinary_pet',
+          businessType: 'vet_petshop',
+          businessModel: 'mixed',
+        },
+        agents: [
+          { name: 'A', email: 'a@example.test', password: 'SuperSecret!123' },
+        ],
+      } as any);
+      await service.createCompany(
+        dto,
+        undefined,
+        VALID_INVITE_CODE,
+        FAKE_CONTEXT,
+      );
+      const [, input] = auditLogService.record.mock.calls[0];
+      expect(input.action).toBe('USE_INVITATION_CODE');
+      expect(input.metadata.onboarding).toEqual({
+        templateVersion: 3,
+        industry: 'veterinary_pet',
+        businessType: 'vet_petshop',
+        businessModel: 'mixed',
+        modules: { catalog: true, quotes: false, tasks: true },
+        categoriesCount: 2,
+        stagesCount: expect.any(Number),
+        agentsCount: 1,
+        regional: {
+          country: null,
+          timezone: 'America/Costa_Rica',
+          currency: 'CRC',
+          locale: 'es-CR',
+        },
+        branding: false,
+      });
+      const serialized = JSON.stringify(input);
+      expect(serialized).not.toContain('SuperSecret');
+      expect(serialized).not.toContain(dto.admin.password);
+      expect(serialized).not.toContain('AAAA-BBBB');
+    });
+
+    describe('checkInvitation (solo lectura, sin consumir)', () => {
+      it('un código ACTIVE es válido y no se escribe nada', async () => {
+        await expect(
+          service.checkInvitation(VALID_INVITE_CODE),
+        ).resolves.toEqual({ valid: true });
+        expect(prisma.invitationCode.updateMany).not.toHaveBeenCalled();
+        expect(prisma.invitationCode.update).not.toHaveBeenCalled();
+        expect(prisma.$transaction).not.toHaveBeenCalled();
+      });
+
+      it('se compara por hash normalizado: mayúsculas, espacios y guiones no importan; el prefijo TAKTO o TEHUS tampoco', async () => {
+        await service.checkInvitation('  tehus-aaaa bbbb-cccc-dddd ');
+        const hashUsed =
+          prisma.invitationCode.findUnique.mock.calls[0][0].where.codeHash;
+        prisma.invitationCode.findUnique.mockClear();
+        await service.checkInvitation(VALID_INVITE_CODE);
+        expect(
+          prisma.invitationCode.findUnique.mock.calls[0][0].where.codeHash,
+        ).toBe(hashUsed);
+      });
+
+      it.each([
+        ['inexistente', null, /inválido/],
+        [
+          'revocado',
+          { id: 'i', status: 'REVOKED', expiresAt: null },
+          /revocado/,
+        ],
+        ['usado', { id: 'i', status: 'USED', expiresAt: null }, /ya utilizado/],
+        [
+          'vencido por estado',
+          { id: 'i', status: 'EXPIRED', expiresAt: null },
+          /vencido/,
+        ],
+        [
+          'vencido por fecha',
+          { id: 'i', status: 'ACTIVE', expiresAt: new Date(Date.now() - 1000) },
+          /vencido/,
+        ],
+      ])('código %s → 400 con motivo', async (_n, row, re) => {
+        prisma.invitationCode.findUnique.mockResolvedValue(row);
+        await expect(
+          service.checkInvitation(VALID_INVITE_CODE),
+        ).rejects.toThrow(re);
+      });
+
+      it('sin código → 400 requerido', async () => {
+        await expect(service.checkInvitation('')).rejects.toThrow(/requerido/);
+        await expect(service.checkInvitation(undefined)).rejects.toThrow(
+          /requerido/,
+        );
+      });
     });
   });
 });

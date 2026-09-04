@@ -38,6 +38,7 @@ import {
   findIndustry,
   ONBOARDING_TEMPLATES_VERSION,
 } from './templates/onboarding-templates';
+import { normalizeRegionalPatch } from '../companies/tenant-configuration';
 import { SessionsService } from '../sessions/sessions.service';
 import { SessionRequestContext } from '../sessions/utils/request-context.util';
 
@@ -176,6 +177,17 @@ export class OnboardingService {
     }
 
     const companyName = dto.company.name.trim();
+
+    // ── Región (Fase 3): mismas reglas que PATCH /companies/me/configuration,
+    // aplicadas ANTES de abrir la transacción. Un valor inválido es un 400 sin
+    // haber tocado la base ni consumido la invitación.
+    const regional = normalizeRegionalPatch({
+      country: dto.company.country,
+      timezone: dto.company.timezone,
+      currency: dto.company.currency,
+      locale: dto.company.locale,
+    });
+
     const slug = await this.generateUniqueSlug(companyName);
 
     const adminPasswordHash = await bcrypt.hash(dto.admin.password, 10);
@@ -217,38 +229,9 @@ export class OnboardingService {
     );
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const invitation = await tx.invitationCode.findUnique({
-        where: { codeHash },
-      });
-
-      if (!invitation) {
-        this.logger.warn(
-          'Intento de onboarding con código de invitación inválido',
-        );
-        throw new BadRequestException('Código de invitación inválido');
-      }
-      if (invitation.status === 'REVOKED') {
-        this.logger.warn(
-          `Intento de onboarding con código revocado (invitationId=${invitation.id})`,
-        );
-        throw new BadRequestException('Código de invitación revocado');
-      }
-      if (invitation.status === 'USED') {
-        this.logger.warn(
-          `Intento de onboarding con código ya utilizado (invitationId=${invitation.id})`,
-        );
-        throw new BadRequestException('Código de invitación ya utilizado');
-      }
-      const isExpired =
-        invitation.status === 'EXPIRED' ||
-        (invitation.expiresAt !== null &&
-          invitation.expiresAt.getTime() <= Date.now());
-      if (isExpired) {
-        this.logger.warn(
-          `Intento de onboarding con código vencido (invitationId=${invitation.id})`,
-        );
-        throw new BadRequestException('Código de invitación vencido');
-      }
+      const invitation = this.assertInvitationUsable(
+        await tx.invitationCode.findUnique({ where: { codeHash } }),
+      );
 
       // Atomic conditional claim: if a concurrent request already consumed,
       // revoked, or the code expired in the instant between the read above
@@ -276,7 +259,15 @@ export class OnboardingService {
           slug,
           businessType: businessTypeLabel || undefined,
           city: dto.company.city?.trim() || undefined,
-          country: dto.company.country?.trim() || undefined,
+          country: regional.country ?? undefined,
+          // Sin valor → default de columna (America/Bogota, COP, es-CO).
+          ...(regional.timezone !== undefined && {
+            timezone: regional.timezone,
+          }),
+          ...(regional.currency !== undefined && {
+            currency: regional.currency,
+          }),
+          ...(regional.locale !== undefined && { locale: regional.locale }),
           phone: dto.company.phone?.trim() || undefined,
           email: dto.company.email?.trim().toLowerCase() || undefined,
           website: dto.company.website?.trim() || undefined,
@@ -385,11 +376,35 @@ export class OnboardingService {
         action: 'USE_INVITATION_CODE',
         entityType: 'InvitationCode',
         entityId: invitation.id,
+        // Qué plantilla y qué región eligió la empresa, para poder responder
+        // «¿cómo se creó?» sin mirar sus datos. Nunca contraseñas, código
+        // completo, tokens ni logos.
         metadata: {
           invitationId: invitation.id,
           codePreview: invitation.codePreview,
           companyId: company.id,
           companyName: company.name,
+          onboarding: {
+            templateVersion: ONBOARDING_TEMPLATES_VERSION,
+            industry: vertical?.industry ?? null,
+            businessType: vertical?.businessType ?? null,
+            businessModel: vertical?.businessModel ?? null,
+            modules: {
+              catalog: commercial.usesCatalog,
+              quotes: commercial.usesQuotes,
+              tasks: commercial.usesTasks,
+            },
+            categoriesCount: settings.catalog.categories.length,
+            stagesCount: stages.length,
+            agentsCount: agents.length,
+            regional: {
+              country: regional.country ?? null,
+              timezone: regional.timezone ?? null,
+              currency: regional.currency ?? null,
+              locale: regional.locale ?? null,
+            },
+            branding: Boolean(files?.logo || files?.secondaryLogo),
+          },
         },
       });
 
@@ -480,6 +495,61 @@ export class OnboardingService {
     };
   }
 
+  /**
+   * Comprueba un código SIN consumirlo (paso 1 del asistente). Mismas reglas
+   * y mismos mensajes que la creación; solo lectura, sin transacción ni
+   * escritura. No revela nada más que el estado del propio código.
+   */
+  async checkInvitation(inviteCode: unknown): Promise<{ valid: true }> {
+    if (typeof inviteCode !== 'string' || !inviteCode.trim()) {
+      throw new BadRequestException('El código de invitación es requerido');
+    }
+    const codeHash = hashInvitationCode(normalizeInvitationCode(inviteCode));
+    const invitation = await this.prisma.invitationCode.findUnique({
+      where: { codeHash },
+    });
+    this.assertInvitationUsable(invitation);
+    return { valid: true };
+  }
+
+  /**
+   * Estado del código → 400 con el motivo (inválido, revocado, usado,
+   * vencido). El prefijo (TAKTO o TEHUS) no participa: se compara por hash.
+   */
+  private assertInvitationUsable<
+    T extends { id: string; status: string; expiresAt: Date | null },
+  >(invitation: T | null): T {
+    if (!invitation) {
+      this.logger.warn(
+        'Intento de onboarding con código de invitación inválido',
+      );
+      throw new BadRequestException('Código de invitación inválido');
+    }
+    if (invitation.status === 'REVOKED') {
+      this.logger.warn(
+        `Intento de onboarding con código revocado (invitationId=${invitation.id})`,
+      );
+      throw new BadRequestException('Código de invitación revocado');
+    }
+    if (invitation.status === 'USED') {
+      this.logger.warn(
+        `Intento de onboarding con código ya utilizado (invitationId=${invitation.id})`,
+      );
+      throw new BadRequestException('Código de invitación ya utilizado');
+    }
+    const isExpired =
+      invitation.status === 'EXPIRED' ||
+      (invitation.expiresAt !== null &&
+        invitation.expiresAt.getTime() <= Date.now());
+    if (isExpired) {
+      this.logger.warn(
+        `Intento de onboarding con código vencido (invitationId=${invitation.id})`,
+      );
+      throw new BadRequestException('Código de invitación vencido');
+    }
+    return invitation;
+  }
+
   private async cleanupFailedCompany(
     companyId: string,
     pipelineId: string,
@@ -489,6 +559,11 @@ export class OnboardingService {
       await this.prisma.$transaction([
         this.prisma.pipelineStage.deleteMany({ where: { pipelineId } }),
         this.prisma.pipeline.delete({ where: { id: pipelineId } }),
+        // La sesión y el evento de login del administrador se crearon dentro
+        // de la transacción: sin esto quedarían filas de «inicio de sesión
+        // correcto» apuntando a una empresa que no existe.
+        this.prisma.loginEvent.deleteMany({ where: { companyId } }),
+        this.prisma.userSession.deleteMany({ where: { companyId } }),
         this.prisma.user.deleteMany({ where: { companyId } }),
         this.prisma.company.delete({ where: { id: companyId } }),
         // The onboarding attempt failed overall (logo upload, in this case)

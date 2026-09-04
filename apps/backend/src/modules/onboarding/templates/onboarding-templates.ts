@@ -19,7 +19,7 @@
  * valor por defecto. La industria por defecto es `generic`.
  */
 
-export const ONBOARDING_TEMPLATES_VERSION = 2;
+export const ONBOARDING_TEMPLATES_VERSION = 3;
 
 export type BusinessModel = 'products' | 'services' | 'mixed';
 export type StageType = 'OPEN' | 'WON' | 'LOST';
@@ -110,6 +110,14 @@ const ALL_MODULES: ModulesTemplate = {
   tasks: true,
 };
 
+/** Pipeline neutral y corto para «Otro»: nada específico de ninguna industria. */
+export const MANUAL_PIPELINE: PipelineTemplate = pipeline('Ventas', [
+  'Nuevo lead',
+  'Contactado',
+  'Propuesta',
+  'Seguimiento',
+]);
+
 function manual(): BusinessTypeTemplate {
   return {
     key: 'other',
@@ -119,7 +127,7 @@ function manual(): BusinessTypeTemplate {
     businessModel: 'mixed',
     modules: { catalog: false, quotes: false, tasks: true },
     categories: [],
-    pipeline: GENERIC_PIPELINE,
+    pipeline: MANUAL_PIPELINE,
     manual: true,
   };
 }
@@ -236,24 +244,28 @@ export const ONBOARDING_TEMPLATES: OnboardingTemplates = {
       categorySuggestions: [
         'Salas',
         'Comedores',
+        'Sillas',
         'Dormitorios',
         'Exterior',
         'Decoración',
+        'Instalación',
         'Personalizados',
       ],
       businessTypes: [
         {
           key: 'showroom',
           name: 'Tienda / showroom',
-          description: 'Exhibes y vendes muebles con asesoría y cotización.',
-          businessModel: 'products',
+          description:
+            'Exhibes y vendes muebles con asesoría, cotización e instalación.',
+          // Mixto: además de los muebles se cobra la instalación o el armado.
+          businessModel: 'mixed',
           modules: ALL_MODULES,
           categories: [
             'Salas',
             'Comedores',
-            'Dormitorios',
-            'Exterior',
+            'Sillas',
             'Decoración',
+            'Instalación',
           ],
           pipeline: pipeline('Ventas', [
             'Nuevo lead',
@@ -308,6 +320,11 @@ export const ONBOARDING_TEMPLATES: OnboardingTemplates = {
       description:
         'Clínicas, pet shops, grooming y guarderías. Flujo comercial: citas, reservas y seguimiento.',
       categorySuggestions: [
+        'Consultas',
+        'Vacunas',
+        'Peluquería',
+        'Alimentos',
+        'Medicamentos',
         'Consulta veterinaria',
         'Vacunación',
         'Grooming',
@@ -316,6 +333,29 @@ export const ONBOARDING_TEMPLATES: OnboardingTemplates = {
         'Otros servicios',
       ],
       businessTypes: [
+        {
+          key: 'vet_petshop',
+          name: 'Veterinaria y pet shop',
+          description:
+            'Atiendes consultas y vacunas y además vendes alimentos, medicamentos y accesorios.',
+          // Servicios (consulta, vacuna, peluquería) y productos (alimentos,
+          // medicamentos): el catálogo mezcla ambos tipos.
+          businessModel: 'mixed',
+          modules: { catalog: true, quotes: false, tasks: true },
+          categories: [
+            'Consultas',
+            'Vacunas',
+            'Peluquería',
+            'Alimentos',
+            'Medicamentos',
+          ],
+          pipeline: pipeline('Citas y pedidos', [
+            'Nueva solicitud',
+            'Contactado',
+            'Cita o pedido confirmado',
+            'Seguimiento',
+          ]),
+        },
         {
           key: 'clinic',
           name: 'Clínica veterinaria',
@@ -380,13 +420,29 @@ export const ONBOARDING_TEMPLATES: OnboardingTemplates = {
       name: 'Servicios profesionales',
       description: 'Consultoría, agencias, servicios técnicos y proyectos.',
       categorySuggestions: [
-        'Consultoría',
-        'Proyectos',
         'Implementación',
+        'Consultoría',
         'Soporte',
+        'Licencias',
+        'Proyectos',
         'Otros servicios',
       ],
       businessTypes: [
+        {
+          key: 'software',
+          name: 'Software y tecnología',
+          description:
+            'Vendes licencias, implementación y soporte con propuesta y negociación.',
+          businessModel: 'services',
+          modules: ALL_MODULES,
+          categories: ['Implementación', 'Consultoría', 'Soporte', 'Licencias'],
+          pipeline: pipeline('Ventas', [
+            'Nuevo lead',
+            'Descubrimiento',
+            'Propuesta',
+            'Negociación',
+          ]),
+        },
         {
           key: 'consulting',
           name: 'Consultoría',

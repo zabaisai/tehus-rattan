@@ -210,7 +210,8 @@ describe('Onboarding por industria (e2e, base real)', () => {
         industry: 'generic',
         businessType: 'services',
         businessModel: 'services',
-        templateVersion: 2,
+        // Fase 3: plantillas v3 (el resto del contrato v2 no cambia).
+        templateVersion: 3,
       },
       pipelineDefaults: { templateKey: 'products', stagesTyped: true },
     });
