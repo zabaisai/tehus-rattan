@@ -20,14 +20,18 @@ worktree principal no se ha tocado en ningún momento.
   pantalla en tres monedas distintas.
 - Lint y comprobación de tipos limpios en backend y frontend.
 
-## Qué falta
+- Pull request, integración continua verde y fusión en la rama principal.
+- Respaldo verificado, copia cifrada externa y despliegue en staging.
+- Migración aplicada, verificada y repetida sin cambios.
+- QA por navegador con administrador y asesor, y reversión probada de verdad.
 
-1. Pull request, integración continua y fusión.
-2. Respaldo oficial en staging y verificación de la copia.
-3. Ensayo en seco en staging, revisión del plan y aplicación.
-4. Verificación y segunda ejecución sin cambios.
-5. QA por navegador con perfil administrador y con perfil asesor.
-6. Rama de cierre documental y actualización de la memoria del proyecto.
+## Estado
+
+**FASE 5 CERRADA — PASS.** No queda trabajo pendiente de esta fase.
+
+Producción sigue sin migrar, que es lo previsto: la herramienta está lista y
+probada, pero migrar producción es una decisión aparte que necesita su propia
+autorización, su respaldo y su ventana.
 
 ## Cómo se ejecuta la herramienta
 
@@ -47,13 +51,14 @@ la herramienta se niega y explica la diferencia.
 Se puede acotar a empresas concretas repitiendo `--empresa <id>`, que sirve para
 migrar de forma gradual empezando por una sola.
 
-## Lo que hay que mirar primero en staging
+## Cómo quedó staging
 
-Según el inventario tomado al empezar: cuatro empresas, dos sin configuración y
-dos en forma plana, ninguna canónica; tres elementos de catálogo sin tipo, todos
-de una misma empresa; ninguna clave desconocida. Las cuatro empresas comparten
-región, así que la moneda distinta habrá que probarla con datos sintéticos y
-retirarlos después.
+Las cuatro empresas en la forma canónica y los tres elementos de catálogo con su
+tipo escrito. La configuración efectiva de cada empresa es idéntica a la de
+antes salvo las dos diferencias esperadas. Ningún dato comercial cambió.
+
+La moneda por empresa se probó con una empresa sintética en pesos mexicanos,
+porque las cuatro reales comparten región. Esa empresa se borró al terminar.
 
 ## Riesgos vivos
 
