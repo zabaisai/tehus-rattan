@@ -9,6 +9,7 @@ import { SelectorDeColor } from "@/components/ui/SelectorDeColor";
 import { TarjetaDeOportunidad } from "./TarjetaDeOportunidad";
 import { moneda } from "@/lib/pipeline-url";
 import type { KanbanStage, Lead, PipelineStage } from "@/types";
+import type { RegionDeMoneda } from "@/lib/dinero";
 
 const GRIS_DE_ETAPA_SIN_COLOR = "#9AA1B2";
 
@@ -43,7 +44,10 @@ export function EtapaVertical({
   onAbrirConversacion,
   onMoverDeEtapa,
   onGuardarEtapa,
+  region,
 }: {
+  /** Moneda e idioma de la empresa. Opcional: sin ella usa el del producto. */
+  region?: RegionDeMoneda;
   etapa: KanbanStage;
   /** La etapa tal y como la define el embudo: probabilidad y etapa de entrada. */
   configuracion: PipelineStage | undefined;
@@ -136,7 +140,7 @@ export function EtapaVertical({
           <div className="flex items-center gap-1">
             <dt className="sr-only">Valor de la etapa</dt>
             <dd className="font-mono font-semibold tabular-nums text-content-primary">
-              {moneda(etapa.totalValue)}
+              {moneda(etapa.totalValue, region)}
             </dd>
           </div>
           {typeof probabilidad === "number" && (
@@ -207,6 +211,7 @@ export function EtapaVertical({
             >
               {etapa.leads.map((lead, i) => (
                 <TarjetaDeOportunidad
+                  region={region}
                   key={lead.id}
                   lead={lead}
                   indice={i}

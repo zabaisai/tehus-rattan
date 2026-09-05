@@ -17,6 +17,7 @@ import { AddProductToLeadModal } from './AddProductToLeadModal';
 import { CreateQuoteModal } from '@/components/quotes/CreateQuoteModal';
 import { PipelineStage, AddLeadProductPayload, Quote } from '@/types';
 import { Modal } from '@/components/ui/Modal';
+import { useFormatoDeDinero } from '@/lib/use-formato-de-dinero';
 import { Button } from '@/components/ui/Button';
 
 type ApiError = {
@@ -26,21 +27,6 @@ type ApiError = {
     };
   };
 };
-
-function formatCurrency(value: number | null) {
-  if (!value) return null;
-  return new Intl.NumberFormat('es-CO', {
-    style: 'currency',
-    currency: 'COP',
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-const moneyFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
 
 function formatDate(value: string | null) {
   if (!value) return null;
@@ -75,10 +61,14 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
   const queryClient = useQueryClient();
   const queryKey = ['lead', leadId];
 
+  const { formatear: dinero } = useFormatoDeDinero();
   const { data: lead, isLoading, isError } = useQuery({
     queryKey,
     queryFn: () => getLead(leadId),
   });
+
+  /** Valor de la oportunidad en la moneda de la empresa; nulo si no hay. */
+  const valorDeLaOportunidad = lead?.value ? dinero(lead.value) : null;
 
   const { data: users } = useQuery({
     queryKey: ['company-users'],
@@ -325,10 +315,10 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                 </dd>
               </div>
 
-              {formatCurrency(lead.value) && (
+              {valorDeLaOportunidad && (
                 <div>
                   <dt className="text-xs font-medium text-neutral-500">Valor</dt>
-                  <dd className="text-neutral-800">{formatCurrency(lead.value)}</dd>
+                  <dd className="text-neutral-800">{valorDeLaOportunidad}</dd>
                 </div>
               )}
 
@@ -434,11 +424,11 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                                   className="w-24 rounded border border-neutral-300 px-1.5 py-1 text-xs outline-none focus:border-neutral-500"
                                 />
                               ) : (
-                                moneyFormatter.format(item.unitPrice)
+                                dinero(item.unitPrice)
                               )}
                             </td>
                             <td className="px-2 py-1.5 font-medium text-neutral-800">
-                              {moneyFormatter.format(item.subtotal)}
+                              {dinero(item.subtotal)}
                             </td>
                             <td className="px-2 py-1.5">
                               <div className="flex justify-end gap-1">
@@ -490,7 +480,7 @@ export function LeadDetailModal({ leadId, stages, onClose, onChanged }: LeadDeta
                           Total estimado
                         </td>
                         <td colSpan={2} className="px-2 py-1.5 text-sm font-semibold text-neutral-900">
-                          {moneyFormatter.format(leadProductsTotal)}
+                          {dinero(leadProductsTotal)}
                         </td>
                       </tr>
                     </tfoot>

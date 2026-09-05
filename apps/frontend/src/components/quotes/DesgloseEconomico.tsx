@@ -1,6 +1,7 @@
 'use client';
 
 import type { Quote } from '@/types';
+import { formatearDinero } from '@/lib/dinero';
 
 /**
  * EL DESGLOSE DE UNA COTIZACIÓN, EN UN SOLO SITIO.
@@ -85,10 +86,17 @@ export function filasDelDesglose(
 
 interface Props {
   quote: Quote;
-  formatter: Intl.NumberFormat;
+  /**
+   * Formato de dinero de la empresa. Se recibe por propiedad para que este
+   * componente siga siendo presentacional y no consulte nada por su cuenta.
+   */
+  formato?: (valor: number) => string;
 }
 
-export default function DesgloseEconomico({ quote, formatter }: Props) {
+export default function DesgloseEconomico({
+  quote,
+  formato = formatearDinero,
+}: Props) {
   return (
     <dl className="mt-3 space-y-1 text-sm">
       {filasDelDesglose(quote).map((fila) => (
@@ -104,7 +112,7 @@ export default function DesgloseEconomico({ quote, formatter }: Props) {
             {fila.label}
           </dt>
           <dd className={fila.emphasize ? 'text-neutral-900' : 'text-neutral-800'}>
-            {formatter.format(fila.value)}
+            {formato(fila.value)}
           </dd>
         </div>
       ))}

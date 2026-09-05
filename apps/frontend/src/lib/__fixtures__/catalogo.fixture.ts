@@ -17,9 +17,13 @@ export function capacidadesDeCatalogo(
   over: {
     modules?: Partial<TenantModules>;
     identity?: Partial<TenantConfiguration['identity']>;
+    regional?: Partial<TenantConfiguration['regional']>;
   } = {},
 ): TenantCapabilities {
-  const base = capacidadesDePrueba({ modules: over.modules });
+  const base = capacidadesDePrueba({
+    modules: over.modules,
+    regional: over.regional,
+  });
   const catalog = {
     allowedItemTypes,
     defaultItemType: (allowedItemTypes.includes('PRODUCT')

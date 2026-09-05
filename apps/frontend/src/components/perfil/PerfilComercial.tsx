@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { getPerfilComercial, clavePerfil } from "@/lib/perfil";
+import { useFormatoDeDinero } from "@/lib/use-formato-de-dinero";
 import { archiveContact, restoreContact } from "@/lib/contacts";
 import { Badge } from "@/components/ui/Badge";
 import { TextoLargo } from "@/components/ui/TextoLargo";
@@ -39,14 +40,6 @@ const ESTADO_COTIZACION: Record<string, string> = {
   REJECTED: "Rechazada",
   EXPIRED: "Vencida",
 };
-
-function moneda(v: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(v);
-}
 
 function fechaCorta(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CO", {
@@ -115,6 +108,7 @@ export function PerfilComercial({
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pestana, setPestana] = useState<Pestana>("resumen");
+  const { formatear: moneda } = useFormatoDeDinero();
 
   const {
     data: perfil,

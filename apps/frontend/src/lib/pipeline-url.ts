@@ -12,6 +12,11 @@
  * Funciones puras y fuera de la pantalla: así se comprueba qué sobrevive a
  * una recarga sin montar el tablero entero.
  */
+import {
+  formatearDinero,
+  REGION_POR_DEFECTO,
+  type RegionDeMoneda,
+} from "./dinero";
 
 import type { KanbanStage, Lead } from "@/types";
 
@@ -205,12 +210,11 @@ export function filtrarEtapas(
  * está escrito deja de dar el total que también está escrito. En un tablero de
  * ventas eso es exactamente lo que hace que nadie se fíe de la cifra.
  */
-export function moneda(valor: number | null | undefined): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(valor ?? 0);
+export function moneda(
+  valor: number | null | undefined,
+  region: RegionDeMoneda = REGION_POR_DEFECTO,
+): string {
+  return formatearDinero(valor, region);
 }
 
 /** «10:23», «ayer», «12 ago». Fecha del dato, nunca una inventada. */

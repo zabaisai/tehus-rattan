@@ -2,12 +2,7 @@
 
 import { Plus, Trash2 } from 'lucide-react';
 import { DocumentItem } from '@/types/documents';
-
-const moneyFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
+import { formatearDinero, type RegionDeMoneda } from '@/lib/dinero';
 
 function emptyItem(): DocumentItem {
   return {
@@ -21,6 +16,8 @@ function emptyItem(): DocumentItem {
 }
 
 interface DocumentItemsEditorProps {
+  /** Moneda e idioma de la empresa; llega por propiedad, no se consulta aquí. */
+  region?: RegionDeMoneda;
   items: DocumentItem[];
   onChange: (items: DocumentItem[]) => void;
   // Used by QuotePrintableDocument: a real quote's items are a snapshot,
@@ -29,7 +26,12 @@ interface DocumentItemsEditorProps {
   readOnly?: boolean;
 }
 
-export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItemsEditorProps) {
+export function DocumentItemsEditor({
+  items,
+  onChange,
+  readOnly,
+  region,
+}: DocumentItemsEditorProps) {
   function updateItem(id: string, patch: Partial<DocumentItem>) {
     onChange(
       items.map((item) => {
@@ -110,7 +112,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
               <td className="border border-neutral-800 p-0">
                 {readOnly ? (
                   <span className="block px-1.5 py-1 text-right">
-                    {moneyFormatter.format(item.unitPrice)}
+                    {formatearDinero(item.unitPrice, region)}
                   </span>
                 ) : (
                   <input
@@ -125,7 +127,7 @@ export function DocumentItemsEditor({ items, onChange, readOnly }: DocumentItems
                 )}
               </td>
               <td className="border border-neutral-800 bg-[#F4EFE6] px-1.5 py-1 text-right font-medium">
-                {moneyFormatter.format(item.total)}
+                {formatearDinero(item.total, region)}
               </td>
               {!readOnly && (
                 <td className="print-hidden border border-neutral-800 text-center">

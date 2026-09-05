@@ -104,6 +104,8 @@ export function configuracionDePrueba(
     identity?: Partial<TenantConfiguration['identity']>;
     catalogRules?: ReglasDeCatalogo;
     definitions?: CapabilityDefinition[];
+    /** Moneda e idioma de la empresa; por defecto los del producto. */
+    regional?: Partial<TenantConfiguration['regional']>;
   } = {},
 ): TenantConfiguration {
   const modules: TenantModules = { ...MODULOS_TODOS_ACTIVOS, ...over.modules };
@@ -122,6 +124,7 @@ export function configuracionDePrueba(
       timezone: 'America/Bogota',
       currency: 'COP',
       locale: 'es-CO',
+      ...over.regional,
     },
     modules,
     capabilities: {
@@ -158,6 +161,7 @@ export function capacidadesDePrueba(
     legacyDefaultsApplied?: OptionalModuleKey[];
     categories?: string[];
     catalogRules?: ReglasDeCatalogo;
+    regional?: Partial<TenantConfiguration['regional']>;
     error?: unknown;
     retry?: () => void;
     apply?: (c: TenantConfiguration) => void;
@@ -171,6 +175,7 @@ export function capacidadesDePrueba(
           legacyDefaultsApplied: over.legacyDefaultsApplied,
           categories: over.categories,
           catalogRules: over.catalogRules,
+          regional: over.regional,
         })
       : null;
   const modules = configuration?.modules ?? null;

@@ -16,6 +16,7 @@ import { getInbox } from '@/lib/conversations';
 import { getTasks } from '@/lib/tasks';
 import { estaPendiente } from '@/lib/tareas';
 import { useTenantCapabilities } from '@/lib/tenant-capabilities';
+import { useFormatoDeDinero } from '@/lib/use-formato-de-dinero';
 import { ForbiddenState } from '@/components/ui/ForbiddenState';
 import { ComparacionMetrica, MetricCard } from '@/components/ui/MetricCard';
 import { Panel, esSinPermiso } from '@/components/ui/Panel';
@@ -26,20 +27,6 @@ import { AgendaDeHoy, ordenarAgenda } from '@/components/inicio/AgendaDeHoy';
 import { RendimientoPorAsesor } from '@/components/inicio/RendimientoPorAsesor';
 import { ActividadReciente } from '@/components/inicio/ActividadReciente';
 import { TendenciaDeVentas } from '@/components/inicio/TendenciaDeVentas';
-
-const dinero = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
-
-/** Cifras grandes en las tarjetas: «$ 48,2 M» se lee de un vistazo. */
-function dineroCorto(v: number): string {
-  if (Math.abs(v) >= 1_000_000) {
-    return `$ ${(v / 1_000_000).toLocaleString('es-CO', { maximumFractionDigits: 1 })} M`;
-  }
-  return dinero.format(v);
-}
 
 const DIAS_TENDENCIA = 30;
 
@@ -66,10 +53,15 @@ function compararCantidad(
   };
 }
 
+/**
+ * La comparación recibe el formato de la empresa: las cifras grandes se
+ * abrevian en la moneda y el idioma del inquilino, no en unos fijos.
+ */
 function compararDinero(
   actual: number,
   previo: number,
   contra: string,
+  dineroCorto: (v: number) => string,
 ): ComparacionMetrica | undefined {
   if (previo === 0 && actual === 0) return undefined;
   const delta = actual - previo;
@@ -105,6 +97,7 @@ export default function DashboardHomePage() {
   // empresa decidió no usar. `can()` es falso hasta conocer la configuración,
   // así que un módulo apagado tampoco parpadea mientras carga.
   const { can } = useTenantCapabilities();
+  const { abreviar: dineroCorto } = useFormatoDeDinero();
   const conTareas = can('tasks');
   const conCotizaciones = can('quotes');
 
@@ -233,6 +226,7 @@ export default function DashboardHomePage() {
                 tendencia.data.totals.openedValue,
                 tendencia.data.previous.openedValue,
                 CONTRA,
+                dineroCorto,
               )
             }
             nota={tendencia.data ? 'abierto por día' : undefined}

@@ -5,6 +5,7 @@ import { GripVertical, MessageSquare, Target } from "lucide-react";
 import { Avatar } from "@/components/ui/Avatar";
 import { moneda, cuando } from "@/lib/pipeline-url";
 import type { Lead } from "@/types";
+import type { RegionDeMoneda } from "@/lib/dinero";
 
 /**
  * Una oportunidad del tablero (mockup 04).
@@ -33,6 +34,7 @@ export function TarjetaDeOportunidad({
   onAbrirOportunidad,
   onAbrirConversacion,
   onMoverDeEtapa,
+  region,
 }: {
   lead: Lead;
   indice: number;
@@ -42,6 +44,8 @@ export function TarjetaDeOportunidad({
   onAbrirOportunidad: (lead: Lead) => void;
   onAbrirConversacion: (lead: Lead) => void;
   onMoverDeEtapa: (leadId: string, etapaId: string) => void;
+  /** Moneda e idioma de la empresa. Opcional: sin ella usa el del producto. */
+  region?: RegionDeMoneda;
 }) {
   const contacto = lead.contact.name || lead.contact.phone;
 
@@ -81,7 +85,7 @@ export function TarjetaDeOportunidad({
                 {contacto}
               </p>
               <p className="mt-1 font-mono text-sm font-semibold tabular-nums text-content-primary">
-                {moneda(lead.value)}
+                {moneda(lead.value, region)}
               </p>
             </div>
 

@@ -4,6 +4,7 @@ import { useId, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Package } from 'lucide-react';
 import { getProducts } from '@/lib/products';
+import { useFormatoDeDinero } from '@/lib/use-formato-de-dinero';
 import { useCompanySettings } from '@/lib/company-settings';
 import { effectiveItemType, ITEM_TYPE_LABELS } from '@/lib/tenant-configuration';
 import {
@@ -22,12 +23,6 @@ type ApiError = {
     };
   };
 };
-
-const currencyFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
 
 interface AddProductToLeadModalProps {
   onClose: () => void;
@@ -52,6 +47,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
   // «servicio» o, si crea de los dos, el neutro. El filtro por tipo solo se
   // dibuja cuando hay dos tipos entre los que elegir.
   const capacidades = useTenantCapabilities();
+  const { formatear: dinero } = useFormatoDeDinero();
   const vocabulario = catalogVocabulary(capacidades.catalog);
   const titulo =
     vocabulario.mode === 'mixed'
@@ -217,7 +213,7 @@ export function AddProductToLeadModal({ onClose, onAdd }: AddProductToLeadModalP
                     ) && <Badge tone="neutral">Heredado</Badge>}
                   </span>
                   <span className="text-xs text-neutral-500">
-                    {currencyFormatter.format(product.price)}
+                    {dinero(product.price)}
                   </span>
                 </label>
               ))}
