@@ -27,6 +27,12 @@ node dist/src/scripts/migrar-inquilinos revertir \
   --manifiesto <ruta del manifiesto> --confirmar
 ```
 
+**Cuidado con los permisos del manifiesto.** El fichero se escribe con permisos
+restrictivos y pertenece al usuario que ejecutó la herramienta. Si se saca del
+contenedor y luego se vuelve a meter, el proceso puede no poder leerlo y la
+reversión falla con un error de permisos. Lo comprobado en staging: usar la ruta
+donde la herramienta lo escribió, o ajustar el propietario antes de revertir.
+
 La reversión exige las mismas guardas que la aplicación: confirmación explícita
 y que el nombre de la base de destino coincida con la variable de entorno. Todo
 ocurre dentro de una transacción con cerrojo, y una guarda de conteo aborta si

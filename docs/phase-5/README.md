@@ -74,12 +74,12 @@ pantalla y el documento impreso no pueden discrepar.
 | 4 | Moneda por empresa en la interfaz | HECHA |
 | 5 | Pruebas unitarias, de extremo a extremo y de pantalla | HECHA |
 | 6 | Revisión del diff, lint y tipos | HECHA |
-| 7 | PR, integración continua y fusión | PENDIENTE |
-| 8 | Respaldo y ejecución en staging | PENDIENTE |
-| 9 | QA en staging con administrador y asesor | PENDIENTE |
-| 10 | Documentación y cierre | PENDIENTE |
+| 7 | PR, integración continua y fusión | HECHA |
+| 8 | Respaldo y ejecución en staging | HECHA |
+| 9 | QA en staging con administrador y asesor | HECHA — 18/18 en las tres pasadas |
+| 10 | Documentación y cierre | HECHA |
 
-Estado de la fase: **EN CURSO**.
+Estado de la fase: **FASE 5 CERRADA — PASS**.
 
 ## Fuera de alcance
 

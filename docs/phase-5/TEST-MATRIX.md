@@ -81,11 +81,21 @@ Solo resultados reales. Lo que no se ha ejecutado dice PENDIENTE.
 
 | # | Comprobación | Resultado |
 |---|---|---|
-| S1 | Respaldo oficial y verificación de la copia | PENDIENTE |
-| S2 | Ensayo en seco y revisión del plan | PENDIENTE |
-| S3 | Aplicación con confirmación | PENDIENTE |
-| S4 | Verificación | PENDIENTE |
-| S5 | Segunda ejecución sin cambios | PENDIENTE |
-| S6 | Configuración efectiva idéntica empresa por empresa | PENDIENTE |
-| S7 | QA por navegador con perfil administrador | PENDIENTE |
-| S8 | QA por navegador con perfil asesor | PENDIENTE |
+| S1 | Respaldo oficial, verificación y copia cifrada externa | PASA |
+| S2 | Despliegue y pruebas de humo | PASA · 12/12 y 21/21 |
+| S3 | El código nuevo por sí solo no cambia nada | PASA |
+| S4 | Ensayo en seco: 4 a canonicalizar, 3 filas, 0 ambiguas | PASA |
+| S5 | El ensayo no escribe nada | PASA |
+| S6 | Las guardas rechazan aplicar sin confirmación y con otro destino | PASA |
+| S7 | Aplicación: 3 filas y 4 empresas, 0 ambiguas | PASA |
+| S8 | Verificación: sin problemas, cero elementos sin tipo | PASA |
+| S9 | Segunda ejecución completa sin cambios | PASA |
+| S10 | Configuración efectiva idéntica empresa por empresa | PASA · 0 diferencias inesperadas |
+| S11 | Huellas de catálogo y embudos idénticas a las previas | PASA |
+| S12 | Sin migraciones de esquema nuevas | PASA |
+| S13 | QA por navegador, administrador, antes de migrar | PASA · 18/18 |
+| S14 | QA por navegador, administrador, después de migrar | PASA · 18/18 |
+| S15 | QA por navegador, asesor | PASA · 18/18 |
+| S16 | Moneda de la empresa en pantalla, con datos sintéticos | PASA |
+| S17 | Reversión desde el manifiesto | PASA |
+| S18 | Retirada de los datos sintéticos por identificador exacto | PASA |
