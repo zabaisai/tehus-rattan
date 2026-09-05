@@ -5,6 +5,7 @@ import { CompaniesController } from './companies.controller';
 import { TenantConfigurationService } from './tenant-configuration.service';
 import { TenantCapabilityGuard } from './tenant-capability.guard';
 import { PlatformAuditLogService } from '../platform/platform-audit-log.service';
+import { MigracionDeInquilinosService } from './migracion/migracion-de-inquilinos.service';
 
 @Module({
   controllers: [CompaniesController],
@@ -14,12 +15,14 @@ import { PlatformAuditLogService } from '../platform/platform-audit-log.service'
     TenantConfigurationService,
     TenantCapabilityGuard,
     PlatformAuditLogService,
+    MigracionDeInquilinosService,
   ],
   exports: [
     CompaniesService,
     CompanyBrandingService,
     TenantConfigurationService,
     TenantCapabilityGuard,
+    MigracionDeInquilinosService,
   ],
 })
 export class CompaniesModule {}

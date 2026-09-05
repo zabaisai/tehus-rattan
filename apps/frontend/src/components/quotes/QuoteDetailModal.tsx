@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Printer } from 'lucide-react';
 import { getQuote, updateQuote, deleteQuote, QUOTE_STATUS_LABELS, QUOTE_STATUS_COLORS } from '@/lib/quotes';
 import DesgloseEconomico from './DesgloseEconomico';
+import { useFormatoDeDinero } from '@/lib/use-formato-de-dinero';
 import { QuoteStatus } from '@/types';
 import { Modal } from '@/components/ui/Modal';
 
@@ -15,12 +16,6 @@ type ApiError = {
     };
   };
 };
-
-const moneyFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
 
 function formatDate(value: string | null) {
   if (!value) return null;
@@ -47,6 +42,7 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
   const queryClient = useQueryClient();
   const queryKey = ['quote', quoteId];
 
+  const { formatear: dinero } = useFormatoDeDinero();
   const { data: quote, isLoading, isError } = useQuery({
     queryKey,
     queryFn: () => getQuote(quoteId),
@@ -208,12 +204,12 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
                         )}
                       </td>
                       <td className="px-2 py-1.5">{item.quantity}</td>
-                      <td className="px-2 py-1.5">{moneyFormatter.format(item.unitPrice)}</td>
+                      <td className="px-2 py-1.5">{dinero(item.unitPrice)}</td>
                       <td className="px-2 py-1.5 text-neutral-500">
-                        {item.lineDiscount > 0 ? `−${moneyFormatter.format(item.lineDiscount)}` : '—'}
+                        {item.lineDiscount > 0 ? `−${dinero(item.lineDiscount)}` : '—'}
                       </td>
                       <td className="px-2 py-1.5 font-medium text-neutral-800">
-                        {moneyFormatter.format(item.subtotal)}
+                        {dinero(item.subtotal)}
                       </td>
                     </tr>
                   ))}
@@ -221,7 +217,7 @@ export function QuoteDetailModal({ quoteId, onClose, onChanged }: QuoteDetailMod
               </table>
             </div>
 
-            <DesgloseEconomico quote={quote} formatter={moneyFormatter} />
+            <DesgloseEconomico quote={quote} formato={dinero} />
 
             {(quote.notes || quote.validUntil) && (
               <div className="mt-3 space-y-1.5 border-t border-neutral-100 pt-3 text-sm">

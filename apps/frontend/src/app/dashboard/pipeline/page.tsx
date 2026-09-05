@@ -40,6 +40,7 @@ import {
   type CambiosDePipeline,
 } from "@/lib/pipeline-url";
 import type { KanbanData, Lead } from "@/types";
+import { useFormatoDeDinero } from "@/lib/use-formato-de-dinero";
 
 const RETARDO_DE_BUSQUEDA = 300;
 
@@ -56,6 +57,7 @@ const RETARDO_DE_BUSQUEDA = 300;
  */
 function PipelineContenido() {
   const queryClient = useQueryClient();
+  const { region } = useFormatoDeDinero();
   const pathname = usePathname();
   const parametros = useSearchParams();
   const estado = leerEstadoDePipeline(
@@ -289,7 +291,7 @@ function PipelineContenido() {
           <Cifra
             icono={Coins}
             etiqueta="en curso"
-            valor={moneda(resumen.valor)}
+            valor={moneda(resumen.valor, region)}
             cargando={cargandoCifras}
           />
           <Cifra
@@ -396,6 +398,7 @@ function PipelineContenido() {
         </div>
 
         <TableroVertical
+          region={region}
           embudo={activo}
           filtro={filtro}
           seleccion={estado.seleccion}

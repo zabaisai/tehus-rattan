@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { EtapaVertical } from "./EtapaVertical";
 import { filtrarEtapas } from "@/lib/pipeline-url";
 import type { KanbanData, Lead, Pipeline } from "@/types";
+import type { RegionDeMoneda } from "@/lib/dinero";
 
 /**
  * El tablero del embudo, VERTICAL (mockup 04).
@@ -42,7 +43,10 @@ export function TableroVertical({
   onSeleccionar,
   onAbrirOportunidad,
   onAgregar,
+  region,
 }: {
+  /** Moneda e idioma de la empresa. Opcional: sin ella usa el del producto. */
+  region?: RegionDeMoneda;
   embudo: Pipeline;
   filtro: { q: string; asesor: string | null };
   seleccion: string | null;
@@ -283,6 +287,7 @@ export function TableroVertical({
         <div className="space-y-3">
           {etapas.map((etapa, i) => (
             <EtapaVertical
+              region={region}
               key={etapa.id}
               etapa={etapa}
               configuracion={porId.get(etapa.id)}

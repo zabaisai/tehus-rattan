@@ -12,6 +12,7 @@ import { DocumentFooter } from './DocumentFooter';
 import { Quote, LeadDetail } from '@/types';
 import { DocumentCompanyIdentity, DocumentItem } from '@/types/documents';
 import { toDocumentCompanyIdentity } from '@/lib/document-company';
+import { type RegionDeMoneda } from '@/lib/dinero';
 
 function formatDate(value: string | null | undefined): string {
   if (!value) return '';
@@ -28,6 +29,11 @@ function noop() {
 }
 
 interface QuotePrintableDocumentProps {
+  /**
+   * Moneda e idioma de la empresa. Es la MISMA fuente que usa el PDF del
+   * backend, así que el documento en pantalla y el impreso no discrepan.
+   */
+  region?: RegionDeMoneda;
   quote: Quote;
   lead: LeadDetail | null;
 }
@@ -37,7 +43,11 @@ interface QuotePrintableDocumentProps {
 // QuoteItem snapshot rather than local calculator state. Reparación and
 // Remisión aren't wired to any real data source yet (only quotes exist on
 // the backend), so this only ever renders the sale-invoice layout.
-export function QuotePrintableDocument({ quote, lead }: QuotePrintableDocumentProps) {
+export function QuotePrintableDocument({
+  quote,
+  lead,
+  region,
+}: QuotePrintableDocumentProps) {
   // The document renders the identity of the company that OWNS the quote
   // (resolved server-side and returned on GET /quotes/:id), never the viewer's
   // own company or a hardcoded footer. The only name fallback is the owning
@@ -96,9 +106,10 @@ export function QuotePrintableDocument({ quote, lead }: QuotePrintableDocumentPr
         ]}
       />
 
-      <DocumentItemsEditor readOnly items={items} onChange={noop} />
+      <DocumentItemsEditor readOnly region={region} items={items} onChange={noop} />
 
       <DocumentTotalsBlock
+        region={region}
         // Las MISMAS filas que la pantalla de detalle: dos listas escritas a
         // mano acaban enseñando cifras distintas del mismo documento. El
         // «Abono» que había aquí no existe en el modelo y siempre valía cero.

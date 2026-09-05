@@ -6,6 +6,7 @@ import { DocumentItemsEditor } from '../DocumentItemsEditor';
 import { DocumentTotalsBlock } from '../DocumentTotalsBlock';
 import { DocumentSignatureBlock } from '../DocumentSignatureBlock';
 import { DocumentFooter } from '../DocumentFooter';
+import { type RegionDeMoneda } from '@/lib/dinero';
 import {
   DocumentClient,
   DocumentCompanyIdentity,
@@ -14,6 +15,9 @@ import {
 } from '@/types/documents';
 
 interface RepairTemplateProps {
+  /** Moneda e idioma de la empresa; se reenvía a los bloques de importes. */
+  region?: RegionDeMoneda;
+
   company: DocumentCompanyIdentity;
   meta: RepairMeta;
   onMetaChange: (meta: RepairMeta) => void;
@@ -31,6 +35,7 @@ interface RepairTemplateProps {
 // the reference Excel has no T&C block at all (confirmed by direct
 // inspection), unlike "Factura venta" and "Remision".
 export function RepairTemplate({
+  region,
   company,
   meta,
   onMetaChange,
@@ -82,9 +87,10 @@ export function RepairTemplate({
         ]}
       />
 
-      <DocumentItemsEditor items={items} onChange={onItemsChange} />
+      <DocumentItemsEditor region={region} items={items} onChange={onItemsChange} />
 
       <DocumentTotalsBlock
+        region={region}
         rows={[
           { label: 'Subtotal', value: subtotal },
           { label: 'Transporte', value: transport, editable: true, onChange: onTransportChange },

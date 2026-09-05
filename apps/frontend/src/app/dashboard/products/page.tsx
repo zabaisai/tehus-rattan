@@ -42,12 +42,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Field } from "@/components/ui/Field";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
-
-const currencyFormatter = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  maximumFractionDigits: 0,
-});
+import { useFormatoDeDinero } from "@/lib/use-formato-de-dinero";
 
 /**
  * Elementos de un tipo que la empresa YA NO CREA (Fase 4): se conservan y se
@@ -93,6 +88,7 @@ function ProductsPageContent() {
   // formulario. Mientras no se conoce, se habla en neutro («Catálogo») y se
   // ofrecen ambos tipos, que es lo que el servidor admite por defecto.
   const capacidades = useTenantCapabilities();
+  const { formatear: dinero } = useFormatoDeDinero();
   const vocabulario = catalogVocabulary(capacidades.catalog);
   const reglasCatalogo = capacidades.catalog;
 
@@ -400,7 +396,7 @@ function ProductsPageContent() {
                 )}
 
                 <p className="mt-1 text-base font-semibold text-neutral-900">
-                  {currencyFormatter.format(product.price)}
+                  {dinero(product.price)}
                 </p>
 
                 {/*

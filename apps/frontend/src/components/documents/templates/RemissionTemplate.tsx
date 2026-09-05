@@ -8,6 +8,7 @@ import { DocumentTermsAndConditions } from '../DocumentTermsAndConditions';
 import { DocumentSignatureBlock } from '../DocumentSignatureBlock';
 import { DocumentFooter } from '../DocumentFooter';
 import { REMISSION_PAYMENT_METHOD_SUGGESTIONS } from '@/lib/document-templates';
+import { type RegionDeMoneda } from '@/lib/dinero';
 import {
   DocumentTransport,
   DocumentReceiver,
@@ -17,6 +18,9 @@ import {
 } from '@/types/documents';
 
 interface RemissionTemplateProps {
+  /** Moneda e idioma de la empresa; se reenvía a los bloques de importes. */
+  region?: RegionDeMoneda;
+
   company: DocumentCompanyIdentity;
   meta: RemissionMeta;
   onMetaChange: (meta: RemissionMeta) => void;
@@ -31,6 +35,7 @@ interface RemissionTemplateProps {
 }
 
 export function RemissionTemplate({
+  region,
   company,
   meta,
   onMetaChange,
@@ -94,9 +99,10 @@ export function RemissionTemplate({
         ]}
       />
 
-      <DocumentItemsEditor items={items} onChange={onItemsChange} />
+      <DocumentItemsEditor region={region} items={items} onChange={onItemsChange} />
 
       <DocumentTotalsBlock
+        region={region}
         rows={[
           { label: 'Valor parcial', value: partial },
           { label: 'IVA liquidado', value: iva, editable: true, onChange: onIvaChange },

@@ -7,8 +7,10 @@ import { getQuote } from '@/lib/quotes';
 import { getLead } from '@/lib/leads';
 import { QuotePrintableDocument } from '@/components/documents/QuotePrintableDocument';
 import { RequireTenantCapability } from '@/components/capabilities/RequireTenantCapability';
+import { useFormatoDeDinero } from '@/lib/use-formato-de-dinero';
 
 function QuotePrintPageContent() {
+  const { region } = useFormatoDeDinero();
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const quoteId = params.id;
@@ -70,7 +72,13 @@ function QuotePrintPageContent() {
         </p>
       )}
 
-      {quote && <QuotePrintableDocument quote={quote} lead={lead ?? null} />}
+      {quote && (
+        <QuotePrintableDocument
+          quote={quote}
+          lead={lead ?? null}
+          region={region}
+        />
+      )}
     </div>
   );
 }

@@ -1,10 +1,6 @@
 'use client';
 
-const moneyFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
+import { formatearDinero, type RegionDeMoneda } from '@/lib/dinero';
 
 export interface DocumentTotalsRow {
   label: string;
@@ -19,13 +15,22 @@ export interface DocumentTotalsRow {
 }
 
 interface DocumentTotalsBlockProps {
+  /**
+   * Moneda e idioma de la empresa. Llega por propiedad porque este bloque es
+   * puramente visual y se reutiliza en la cotización imprimible y en la
+   * calculadora de documentos.
+   */
+  region?: RegionDeMoneda;
   rows: DocumentTotalsRow[];
 }
 
 // All three templates' totals sections share the same visual: a beige-
 // filled label/value table (matches the SUBTOTAL/ABONO/DESCUENTO/TOTAL
 // RESTANTE rows in the Excel), just with a different set of rows per type.
-export function DocumentTotalsBlock({ rows }: DocumentTotalsBlockProps) {
+export function DocumentTotalsBlock({
+  rows,
+  region,
+}: DocumentTotalsBlockProps) {
   return (
     <table className="mb-3 ml-auto w-64 border-collapse text-xs">
       <tbody>
@@ -58,7 +63,7 @@ export function DocumentTotalsBlock({ rows }: DocumentTotalsBlockProps) {
                     className="w-full bg-transparent text-right outline-none"
                   />
                 ) : (
-                  moneyFormatter.format(row.value)
+                  formatearDinero(row.value, region)
                 )}
               </td>
             )}

@@ -10,6 +10,7 @@ import { RemissionTemplate } from './templates/RemissionTemplate';
 import { DOCUMENT_TEMPLATE_LABELS } from '@/lib/document-templates';
 import { getMyCompany } from '@/lib/companies';
 import { toDocumentCompanyIdentity } from '@/lib/document-company';
+import { useFormatoDeDinero } from '@/lib/use-formato-de-dinero';
 import {
   DocumentTemplateType,
   DocumentClient,
@@ -38,6 +39,7 @@ function emptyReceiver(): DocumentReceiver {
 // Purely local calculator state — nothing here reads or writes the real
 // Quote/QuoteItem API yet (see the follow-up commit that connects them).
 export function DocumentCalculator() {
+  const { region } = useFormatoDeDinero();
   const [templateType, setTemplateType] = useState<DocumentTemplateType>('SALE_INVOICE');
 
   // The document is issued by the logged-in user's own company. Its fiscal
@@ -112,6 +114,7 @@ export function DocumentCalculator() {
       <PrintableDocumentShell>
         {templateType === 'SALE_INVOICE' && (
           <SaleInvoiceTemplate
+            region={region}
             company={companyIdentity}
             meta={invoiceMeta}
             onMetaChange={setInvoiceMeta}
@@ -128,6 +131,7 @@ export function DocumentCalculator() {
 
         {templateType === 'REPAIR' && (
           <RepairTemplate
+            region={region}
             company={companyIdentity}
             meta={repairMeta}
             onMetaChange={setRepairMeta}
@@ -144,6 +148,7 @@ export function DocumentCalculator() {
 
         {templateType === 'REMISSION' && (
           <RemissionTemplate
+            region={region}
             company={companyIdentity}
             meta={remissionMeta}
             onMetaChange={setRemissionMeta}

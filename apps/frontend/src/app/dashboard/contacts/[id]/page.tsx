@@ -16,6 +16,7 @@ import {
   Target,
 } from "lucide-react";
 import { getPerfilComercial, clavePerfil, type PerfilComercial } from "@/lib/perfil";
+import { useFormatoDeDinero } from "@/lib/use-formato-de-dinero";
 import { getCanonico, clavesDeFusion } from "@/lib/fusion";
 import { canalLegible } from "@/lib/conversations";
 import { Avatar } from "@/components/ui/Avatar";
@@ -43,14 +44,6 @@ type Pestana =
   | "tareas"
   | "cotizaciones"
   | "documentos";
-
-function moneda(v: number): string {
-  return new Intl.NumberFormat("es-CO", {
-    style: "currency",
-    currency: "COP",
-    maximumFractionDigits: 0,
-  }).format(v);
-}
 
 function fechaLarga(iso: string): string {
   return new Date(iso).toLocaleDateString("es-CO", {
@@ -99,6 +92,7 @@ const ESTADO_CONVERSACION: Record<string, string> = {
 };
 
 function Perfil360({ contactId }: { contactId: string }) {
+  const { formatear: moneda } = useFormatoDeDinero();
   const router = useRouter();
   const params = useSearchParams();
   const volverA = params.get("volverA");

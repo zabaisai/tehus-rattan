@@ -7,6 +7,7 @@ import { DocumentTotalsBlock } from '../DocumentTotalsBlock';
 import { DocumentTermsAndConditions } from '../DocumentTermsAndConditions';
 import { DocumentSignatureBlock } from '../DocumentSignatureBlock';
 import { DocumentFooter } from '../DocumentFooter';
+import { type RegionDeMoneda } from '@/lib/dinero';
 import {
   DocumentClient,
   DocumentCompanyIdentity,
@@ -15,6 +16,9 @@ import {
 } from '@/types/documents';
 
 interface SaleInvoiceTemplateProps {
+  /** Moneda e idioma de la empresa; se reenvía a los bloques de importes. */
+  region?: RegionDeMoneda;
+
   company: DocumentCompanyIdentity;
   meta: SaleInvoiceMeta;
   onMetaChange: (meta: SaleInvoiceMeta) => void;
@@ -29,6 +33,7 @@ interface SaleInvoiceTemplateProps {
 }
 
 export function SaleInvoiceTemplate({
+  region,
   company,
   meta,
   onMetaChange,
@@ -86,9 +91,10 @@ export function SaleInvoiceTemplate({
         ]}
       />
 
-      <DocumentItemsEditor items={items} onChange={onItemsChange} />
+      <DocumentItemsEditor region={region} items={items} onChange={onItemsChange} />
 
       <DocumentTotalsBlock
+        region={region}
         rows={[
           { label: 'Subtotal', value: subtotal },
           { label: 'Abono', value: advance, editable: true, onChange: onAdvanceChange },

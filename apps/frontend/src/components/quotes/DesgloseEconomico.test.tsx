@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import DesgloseEconomico, { filasDelDesglose } from './DesgloseEconomico';
 import type { Quote } from '@/types';
+import { formatearDinero } from '@/lib/dinero';
 
 /**
  * EL DESGLOSE QUE VE QUIEN COTIZA.
@@ -16,11 +17,8 @@ import type { Quote } from '@/types';
  * vez, cuando los importes salian por la API como la representacion interna de
  * un Decimal.
  */
-const formatter = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
+// El desglose recibe el formato de la empresa; aquí se usa el del producto.
+const formato = (valor: number) => formatearDinero(valor);
 
 const base: Quote = {
   id: 'q1',
@@ -182,7 +180,7 @@ describe('Desglose económico de una cotización', () => {
           taxTotal: 100700,
           total: 630700,
         }}
-        formatter={formatter}
+        formato={formato}
       />,
     );
 

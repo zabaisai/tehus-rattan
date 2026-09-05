@@ -13,6 +13,7 @@ import { QuoteDetailModal } from '@/components/quotes/QuoteDetailModal';
 import { ListState } from '@/components/ui/ListState';
 import { RequireTenantCapability } from '@/components/capabilities/RequireTenantCapability';
 import { useTenantCapabilities } from '@/lib/tenant-capabilities';
+import { useFormatoDeDinero } from '@/lib/use-formato-de-dinero';
 import { useAuthStore } from '@/store/auth.store';
 
 type ApiError = {
@@ -22,12 +23,6 @@ type ApiError = {
     };
   };
 };
-
-const moneyFormatter = new Intl.NumberFormat('es-CO', {
-  style: 'currency',
-  currency: 'COP',
-  maximumFractionDigits: 0,
-});
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString('es-CO', {
@@ -52,6 +47,7 @@ function QuotesPageContent() {
   // oportunidad. Con cotizaciones activas y catálogo apagado se puede ver lo
   // que ya existe, pero no crear: se dice aquí, antes de que alguien lo busque.
   const capacidades = useTenantCapabilities();
+  const { formatear: dinero } = useFormatoDeDinero();
   const rol = useAuthStore((s) => s.user?.role);
   const sinCatalogo =
     capacidades.isReady && capacidades.can('quotes') && !capacidades.can('catalog');
@@ -201,7 +197,7 @@ function QuotesPageContent() {
                 </div>
                 <div className="mt-2 flex items-center justify-between">
                   <p className="text-sm font-semibold text-neutral-900">
-                    {moneyFormatter.format(quote.total)}
+                    {dinero(quote.total)}
                   </p>
                   <p className="text-xs text-neutral-400">{formatDate(quote.createdAt)}</p>
                 </div>
@@ -263,13 +259,13 @@ function QuotesPageContent() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-neutral-600">
-                    {moneyFormatter.format(quote.subtotal)}
+                    {dinero(quote.subtotal)}
                   </td>
                   <td className="px-3 py-2 text-neutral-600">
-                    {moneyFormatter.format(quote.discount)}
+                    {dinero(quote.discount)}
                   </td>
                   <td className="px-3 py-2 font-medium text-neutral-900">
-                    {moneyFormatter.format(quote.total)}
+                    {dinero(quote.total)}
                   </td>
                   <td className="px-3 py-2 text-neutral-500">{formatDate(quote.createdAt)}</td>
                   <td className="px-3 py-2 text-right">
